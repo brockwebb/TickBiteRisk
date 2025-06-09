@@ -9,6 +9,8 @@
 
 Estimate and communicate **per‑bite Lyme‑disease risk** for any U.S. county using open federal data and a transparent Bayesian model.  Built for hikers, scouts, clinicians, and data‑science learners—100 % open source.
 
+This project ships as self-hosted code; we do not currently provide a public API.
+
 ## quick start (docker)
 
 ```bash
