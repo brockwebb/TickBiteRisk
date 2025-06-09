@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+authors:
+
+* family-names: Webb
+  given-names: Brock
+  orcid: "0000-0000-0000-0000"  # replace if you have one
+  affiliation: Independent Researcher
+* family-names: TickBiteRisk
+  given-names: Contributors
+  affiliation: Open-source community
+  title: TickBiteRisk: Bayesian per‑bite Lyme‑disease risk engine
+  version: 0.1.0
+  date-released: 2025-06-08
+  license: MIT
+  repository-code: "[https://github.com/yourhandle/tickbiterisk](https://github.com/yourhandle/tickbiterisk)"
+  abstract: |
+  TickBiteRisk is an open, reproducible toolkit that combines county-level
+  Borrelia prevalence, weekly human–tick exposure signals, and attachment‑time
+  dose–response data in a Bayesian state‑space model to estimate per‑bite Lyme
+  disease risk anywhere in the United States. The project targets clinicians,
+  outdoor educators, and data‑science learners, offering both a JSON API and
+  educational notebooks under permissive licenses.
+  keywords:
+* Lyme disease
+* Bayesian statistics
+* epidemiology
+* open data
+* tick-borne disease
+  doi: 10.5281/zenodo.xxxxx  # replace after Zenodo deposition
