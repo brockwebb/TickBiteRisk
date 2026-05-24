@@ -13,6 +13,10 @@ from tickbiterisk.etl.noaa import (
     get_noaa_token,
     select_long_coverage_stations,
 )
+from tickbiterisk.etl.noaa_backfill import (
+    NoaaBackfillError,
+    run_noaa_county_backfill,
+)
 from tickbiterisk.etl.open_meteo import (
     build_open_meteo_archive_url,
     fetch_open_meteo_archive,
@@ -161,6 +165,62 @@ def noaa_daily(
     )
     output = write_noaa_daily_observations_output(rows, output_dir, append=True)
     typer.echo(f"Wrote {output}")
+
+
+@etl_app.command("noaa-backfill-county")
+def noaa_backfill_county(
+    county_fips: str = typer.Option(..., help="Maryland county FIPS code."),
+    start_date: str = typer.Option(..., help="Daily observation start date."),
+    end_date: str = typer.Option(..., help="Daily observation end date."),
+    output_dir: Path = typer.Option(
+        Path("build/etl"), help="Output directory for ETL artifacts."
+    ),
+    station_limit: int = typer.Option(
+        1, help="Maximum number of selected NOAA stations to backfill."
+    ),
+    min_data_coverage: float = typer.Option(
+        0.5, help="Minimum NOAA station data coverage."
+    ),
+    max_end_lag_days: int = typer.Option(
+        14, help="Allowed station-reporting lag at the requested end date."
+    ),
+    dry_run: bool = typer.Option(False, help="Print planned query without fetching data."),
+) -> None:
+    parsed_start_date = _parse_iso_date(start_date, "start-date")
+    parsed_end_date = _parse_iso_date(end_date, "end-date")
+    station_url = build_noaa_station_url(
+        county_fips,
+        parsed_start_date,
+        parsed_end_date,
+    )
+    if dry_run:
+        typer.echo(station_url)
+        typer.echo("daily URLs require station selection")
+        return
+
+    try:
+        result = run_noaa_county_backfill(
+            county_fips=county_fips,
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            output_dir=output_dir,
+            token=get_noaa_token(),
+            station_limit=station_limit,
+            min_data_coverage=min_data_coverage,
+            max_end_lag_days=max_end_lag_days,
+        )
+    except NoaaBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    typer.echo(
+        f"Selected {result.station_count} station(s): "
+        f"{', '.join(result.selected_station_ids)}"
+    )
+    typer.echo(f"Wrote {result.stations_output_path}")
+    typer.echo(
+        f"Wrote {result.daily_observation_count} daily observation row(s) "
+        f"to {result.daily_output_path}"
+    )
 
 
 def _parse_iso_date(value: str, option_name: str) -> date:

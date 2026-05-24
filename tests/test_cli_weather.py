@@ -1,6 +1,8 @@
+import pytest
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
+from tickbiterisk.etl.noaa_backfill import NoaaCountyBackfillResult
 
 
 runner = CliRunner()
@@ -89,3 +91,72 @@ def test_noaa_daily_dry_run_prints_noaa_url(tmp_path) -> None:
     assert "ncei.noaa.gov" in result.stdout
     assert "GHCND%3AUSW00093721" in result.stdout
     assert not (tmp_path / "noaa_ghcnd_daily_observations.csv").exists()
+
+
+def test_noaa_backfill_county_dry_run_prints_station_discovery_url(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-county",
+            "--county-fips",
+            "24003",
+            "--start-date",
+            "1992-01-01",
+            "--end-date",
+            "2026-05-24",
+            "--output-dir",
+            str(tmp_path),
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "ncei.noaa.gov" in result.stdout
+    assert "FIPS%3A24003" in result.stdout
+    assert "daily URLs require station selection" in result.stdout
+    assert not (tmp_path / "noaa_ghcnd_stations.csv").exists()
+
+
+def test_noaa_backfill_county_command_reports_result(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_token() -> str:
+        return "token-value"
+
+    def fake_backfill(**kwargs) -> NoaaCountyBackfillResult:
+        assert kwargs["county_fips"] == "24003"
+        assert kwargs["token"] == "token-value"
+        assert kwargs["station_limit"] == 1
+        assert kwargs["output_dir"] == tmp_path
+        return NoaaCountyBackfillResult(
+            county_fips="24003",
+            selected_station_ids=["GHCND:BWI"],
+            station_count=1,
+            daily_observation_count=2,
+            stations_output_path=tmp_path / "noaa_ghcnd_stations.csv",
+            daily_output_path=tmp_path / "noaa_ghcnd_daily_observations.csv",
+        )
+
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", fake_token)
+    monkeypatch.setattr("tickbiterisk.cli.run_noaa_county_backfill", fake_backfill)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-county",
+            "--county-fips",
+            "24003",
+            "--start-date",
+            "1992-05-01",
+            "--end-date",
+            "1992-05-02",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Selected 1 station(s): GHCND:BWI" in result.stdout
+    assert "Wrote 2 daily observation row(s)" in result.stdout

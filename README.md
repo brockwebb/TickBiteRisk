@@ -67,9 +67,10 @@ tickbiterisk etl weather-locations --output-dir build/etl
 tickbiterisk etl weather-backfill-open-meteo --county-fips 24003 --start-date 2020-01-01 --end-date 2020-01-03 --output-dir build/etl/weather-smoke
 tickbiterisk etl noaa-stations --county-fips 24003 --start-date 1992-01-01 --end-date 2026-05-24 --output-dir build/etl/noaa
 tickbiterisk etl noaa-daily --county-fips 24003 --station-id GHCND:USW00093721 --start-date 1992-05-01 --end-date 1992-05-07 --output-dir build/etl/noaa
+tickbiterisk etl noaa-backfill-county --county-fips 24003 --start-date 1992-01-01 --end-date 2026-05-24 --output-dir build/etl/noaa
 ```
 
-NOAA CDO/GHCND is the primary observed historical weather source and reads `NOAA_TOKEN` from the environment. NOAA daily pulls are split into calendar-year windows and paginated, but daily station observations are still raw input; modeling uses weekly, monthly, and seasonal aggregates. Open-Meteo does not require an API key and remains a secondary reanalysis/gap-fill path.
+NOAA CDO/GHCND is the primary observed historical weather source and reads `NOAA_TOKEN` from the environment. `noaa-backfill-county` discovers county stations, selects long-coverage stations, and writes raw station plus daily observation CSVs with append/dedupe semantics. NOAA daily pulls are split into calendar-year windows and paginated, but daily station observations are still raw input; modeling uses weekly, monthly, and seasonal aggregates. Open-Meteo does not require an API key and remains a secondary reanalysis/gap-fill path.
 
 ## api summary
 
