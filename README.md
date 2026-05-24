@@ -11,6 +11,10 @@ Estimate and communicate **per‑bite Lyme‑disease risk** for any U.S. county 
 
 This project ships as self-hosted code; we do not currently provide a public API.
 
+## current build status
+
+The active implementation is a Maryland-first ETL and modeling prototype. The current code focuses on source manifest parsing, Maryland Lyme county-year reconciliation, tick/vector status normalization, and a Postgres-ready warehouse schema. The API endpoint described below is roadmap behavior until the model-ready warehouse tables are built.
+
 ## quick start (docker)
 
 ```bash

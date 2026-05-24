@@ -4,6 +4,8 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
+Implementation status: the first ETL slice is implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, and Postgres-ready schema. Weather acquisition and model backtesting are the next planned slices.
+
 ## 1. Purpose
 
 TickBiteRisk will produce a Maryland-focused tickborne disease risk score that translates messy surveillance, ecology, weather, and vector data into a transparent 1-10 relative risk signal.
