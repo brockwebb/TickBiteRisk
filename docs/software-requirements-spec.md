@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, Census population denominators, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, and Postgres-ready schema. Model feature assembly and backtesting are the next planned slices.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, Census county reference/area, Census population denominators, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, and Postgres-ready schema. Model feature assembly and backtesting are the next planned slices.
 
 ## 1. Purpose
 
@@ -101,6 +101,7 @@ Initial normalized tables:
 - `lone_star_status`
 - `all_tbd_2022_county`
 - `nssp_coverage`
+- `county_reference`
 - `county_population_year`
 - `weather_locations`
 - `weather_daily`
@@ -165,9 +166,16 @@ The system must support Maryland daily weather acquisition and feature generatio
 
 NOAA CDO must read credentials from environment variables such as `NOAA_TOKEN` only.
 
-### FR7: Host Ecology Features
+### FR7: County Reference And Area
 
-### FR7: Population Denominators
+The system must acquire Maryland county reference geography for density denominators and stable joins:
+
+- Use the Census 2024 Gazetteer county file as the primary lightweight reference.
+- Store `county_reference` keyed by `county_fips`.
+- Preserve county/state FIPS, county name, land area, water area, internal-point latitude/longitude, source label, and source URL hash.
+- Use land square miles for later deer harvest density and other county-normalized ecology features.
+
+### FR8: Population Denominators
 
 The system must acquire Maryland county-year population denominators for incidence-rate modeling:
 
@@ -177,7 +185,7 @@ The system must acquire Maryland county-year population denominators for inciden
 - Preserve Census dataset, source ID, vintage, and source URL hash for provenance.
 - Read `CENSUS_API_KEY` from the environment when required; never print or commit the key.
 
-### FR8: Host Ecology Features
+### FR9: Host Ecology Features
 
 The system must include host/ecology feature slots for:
 
@@ -187,7 +195,7 @@ The system must include host/ecology feature slots for:
 
 These sources may be missing in the first ETL slice, but the schema and manifest must track them.
 
-### FR9: Risk Score
+### FR10: Risk Score
 
 The product risk score is 1-10.
 
@@ -208,7 +216,7 @@ Display categories:
 - `7-8`: high
 - `9-10`: very high
 
-### FR10: Model Backtesting
+### FR11: Model Backtesting
 
 Every candidate model must be evaluated through time-aware backtests.
 
@@ -225,7 +233,7 @@ Backtests must report:
 - Source version/checksums.
 - Whether weather is reconstruction mode or forecast mode.
 
-### FR11: Model Bake-Off
+### FR12: Model Bake-Off
 
 The system must support multiple modeling lanes before choosing a product model:
 
@@ -239,7 +247,7 @@ The system must support multiple modeling lanes before choosing a product model:
 
 No model family is accepted because it is fashionable or intuitive. Product use requires backtest evidence.
 
-### FR12: User Explanation
+### FR13: User Explanation
 
 For any generated score, the system must provide a compact explanation:
 
@@ -250,7 +258,7 @@ For any generated score, the system must provide a compact explanation:
 - Habitat/host contribution when available.
 - Source-quality warnings.
 
-### FR13: Export
+### FR14: Export
 
 The system must export model-ready tables as Parquet or CSV for analysis and reproducibility.
 

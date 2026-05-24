@@ -2,6 +2,7 @@ from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
 from tickbiterisk.etl.census_population import CensusCountyPopulation
+from tickbiterisk.etl.county_reference import CENSUS_GAZETTEER_COUNTIES_2024_URL
 
 
 runner = CliRunner()
@@ -66,3 +67,32 @@ def test_census_population_command_writes_population_output(tmp_path, monkeypatc
     assert result.exit_code == 0
     assert "Wrote 1 county-year population row(s)" in result.stdout
     assert (tmp_path / "county_population_year.csv").exists()
+
+
+def test_county_reference_command_writes_maryland_gazetteer_output(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    sample = (
+        "USPS\tGEOID\tANSICODE\tNAME\tALAND\tAWATER\tALAND_SQMI\tAWATER_SQMI\tINTPTLAT\tINTPTLONG\n"
+        "MD\t24003\t01710958\tAnne Arundel County\t1074169609\t448789171\t414.739\t173.278\t38.991617\t-76.560894\n"
+    )
+
+    monkeypatch.setattr(
+        "tickbiterisk.cli.fetch_census_gazetteer_counties_text",
+        lambda url=CENSUS_GAZETTEER_COUNTIES_2024_URL: sample,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "county-reference",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 1 county reference row(s)" in result.stdout
+    assert (tmp_path / "county_reference.csv").exists()

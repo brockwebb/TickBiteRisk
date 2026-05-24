@@ -15,6 +15,12 @@ from tickbiterisk.etl.census_population import (
     get_census_api_key,
     sanitize_census_url,
 )
+from tickbiterisk.etl.county_reference import (
+    CENSUS_GAZETTEER_COUNTIES_2024_URL,
+    fetch_census_gazetteer_counties_text,
+    parse_census_gazetteer_counties,
+)
+from tickbiterisk.etl.county_reference_build import write_county_reference_output
 from tickbiterisk.etl.noaa import (
     build_noaa_daily_data_url,
     build_noaa_station_url,
@@ -80,6 +86,21 @@ def weather_locations(
         load_maryland_weather_locations(), output_dir
     )
     typer.echo(f"Wrote {output}")
+
+
+@etl_app.command("county-reference")
+def county_reference(
+    output_dir: Path = typer.Option(
+        Path("build/etl"), help="Output directory for ETL artifacts."
+    ),
+) -> None:
+    text = fetch_census_gazetteer_counties_text()
+    rows = parse_census_gazetteer_counties(
+        text,
+        source_url=CENSUS_GAZETTEER_COUNTIES_2024_URL,
+    )
+    output = write_county_reference_output(rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} county reference row(s) to {output}")
 
 
 @etl_app.command("census-population")

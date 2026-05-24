@@ -11,6 +11,7 @@ def test_schema_defines_core_tables() -> None:
         "tick_vector_status",
         "tick_pathogen_status",
         "lone_star_status",
+        "county_reference",
         "county_population_year",
         "weather_locations",
         "noaa_ghcnd_stations",
@@ -50,6 +51,16 @@ def test_county_population_year_defines_incidence_denominator_key() -> None:
     assert "population integer NOT NULL CHECK (population > 0)" in schema
     assert "source_url_hash text NOT NULL" in schema
     assert "PRIMARY KEY (county_fips, year)" in schema
+
+
+def test_county_reference_defines_area_and_internal_point_fields() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+
+    assert "CREATE TABLE IF NOT EXISTS county_reference" in schema
+    assert "aland_sqmi double precision NOT NULL CHECK (aland_sqmi > 0)" in schema
+    assert "awater_sqmi double precision NOT NULL CHECK (awater_sqmi >= 0)" in schema
+    assert "intptlat double precision NOT NULL" in schema
+    assert "intptlon double precision NOT NULL" in schema
 
 
 def test_noaa_ghcnd_daily_observations_defines_raw_station_primary_key() -> None:

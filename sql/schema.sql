@@ -78,6 +78,20 @@ CREATE TABLE IF NOT EXISTS lone_star_status (
     PRIMARY KEY (source_id, county_fips)
 );
 
+CREATE TABLE IF NOT EXISTS county_reference (
+    county_fips char(5) PRIMARY KEY REFERENCES md_jurisdictions(county_fips),
+    state_fips char(2) NOT NULL DEFAULT '24',
+    state char(2) NOT NULL DEFAULT 'MD',
+    county_name text NOT NULL,
+    aland_sqmi double precision NOT NULL CHECK (aland_sqmi > 0),
+    awater_sqmi double precision NOT NULL CHECK (awater_sqmi >= 0),
+    intptlat double precision NOT NULL,
+    intptlon double precision NOT NULL,
+    geography_source text NOT NULL,
+    source_url_hash text NOT NULL,
+    ingested_at timestamptz DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS county_population_year (
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
     county_name text NOT NULL,
