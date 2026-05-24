@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from tickbiterisk.etl.noaa import NoaaDailyObservation, NoaaStation
 from tickbiterisk.etl.open_meteo import WeatherDailyObservation
 from tickbiterisk.etl.weather_features import WeatherMonthlyFeature
 from tickbiterisk.etl.weather_locations import WeatherLocation
@@ -40,6 +41,32 @@ WEATHER_DAILY_COLUMNS = [
     "evapotranspiration_mm",
     "wind_mean_mph",
     "wind_max_mph",
+    "source_url_hash",
+]
+
+NOAA_STATION_COLUMNS = [
+    "county_fips",
+    "station_id",
+    "name",
+    "latitude",
+    "longitude",
+    "mindate",
+    "maxdate",
+    "data_coverage",
+    "elevation",
+    "elevation_unit",
+]
+
+NOAA_DAILY_COLUMNS = [
+    "county_fips",
+    "station_id",
+    "date",
+    "source",
+    "tmax_f",
+    "tmin_f",
+    "prcp_inches",
+    "snow_inches",
+    "snwd_inches",
     "source_url_hash",
 ]
 
@@ -103,6 +130,47 @@ def write_weather_daily_output(
         output_path,
         append=append,
         key_columns=["county_fips", "date", "source", "weather_model"],
+    )
+    return output_path
+
+
+def write_noaa_stations_output(
+    rows: list[NoaaStation], output_dir: Path, *, append: bool = False
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "noaa_ghcnd_stations.csv"
+    records = []
+    for row in rows:
+        record = asdict(row)
+        record["mindate"] = row.mindate.isoformat()
+        record["maxdate"] = row.maxdate.isoformat()
+        records.append(record)
+    _write_output(
+        records,
+        NOAA_STATION_COLUMNS,
+        output_path,
+        append=append,
+        key_columns=["county_fips", "station_id"],
+    )
+    return output_path
+
+
+def write_noaa_daily_observations_output(
+    rows: list[NoaaDailyObservation], output_dir: Path, *, append: bool = False
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "noaa_ghcnd_daily_observations.csv"
+    records = []
+    for row in rows:
+        record = asdict(row)
+        record["date"] = row.date.isoformat()
+        records.append(record)
+    _write_output(
+        records,
+        NOAA_DAILY_COLUMNS,
+        output_path,
+        append=append,
+        key_columns=["county_fips", "station_id", "date"],
     )
     return output_path
 

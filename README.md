@@ -60,14 +60,16 @@ Full details: [`/docs/data-sources.md`](docs/data-sources.md)
 
 ## maryland weather ETL
 
-The Maryland weather ETL derives county daily weather from the Open-Meteo historical archive using Census Gazetteer county internal points as stable query locations. The planned full backfill range is 2000-01-01 through 2024-12-31.
+The Maryland weather ETL has two acquisition paths: NOAA CDO/GHCND for observed station history, and Open-Meteo as a secondary reanalysis/gap-fill source using Census Gazetteer county internal points. The planned NOAA backfill range is 1992-01-01 through the current year.
 
 ```bash
 tickbiterisk etl weather-locations --output-dir build/etl
 tickbiterisk etl weather-backfill-open-meteo --county-fips 24003 --start-date 2020-01-01 --end-date 2020-01-03 --output-dir build/etl/weather-smoke
+tickbiterisk etl noaa-stations --county-fips 24003 --start-date 1992-01-01 --end-date 2026-05-24 --output-dir build/etl/noaa
+tickbiterisk etl noaa-daily --county-fips 24003 --station-id GHCND:USW00093721 --start-date 1992-05-01 --end-date 1992-05-07 --output-dir build/etl/noaa
 ```
 
-Open-Meteo does not require an API key for the historical archive path. NOAA CDO is validation-only; the ETL validates `NOAA_TOKEN` from the environment and never reads tokens from files or CLI arguments.
+NOAA CDO/GHCND is the primary observed historical weather source and reads `NOAA_TOKEN` from the environment. NOAA daily pulls are split into calendar-year windows and paginated, but daily station observations are still raw input; modeling uses weekly, monthly, and seasonal aggregates. Open-Meteo does not require an API key and remains a secondary reanalysis/gap-fill path.
 
 ## api summary
 

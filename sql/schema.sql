@@ -89,6 +89,36 @@ CREATE TABLE IF NOT EXISTS weather_locations (
     created_at timestamptz DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS noaa_ghcnd_stations (
+    county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
+    station_id text NOT NULL,
+    name text NOT NULL,
+    latitude double precision NOT NULL,
+    longitude double precision NOT NULL,
+    mindate date NOT NULL,
+    maxdate date NOT NULL,
+    data_coverage double precision NOT NULL,
+    elevation double precision,
+    elevation_unit text,
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, station_id)
+);
+
+CREATE TABLE IF NOT EXISTS noaa_ghcnd_daily_observations (
+    county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
+    station_id text NOT NULL,
+    date date NOT NULL,
+    source text NOT NULL,
+    tmax_f double precision,
+    tmin_f double precision,
+    prcp_inches double precision,
+    snow_inches double precision,
+    snwd_inches double precision,
+    source_url_hash text NOT NULL,
+    ingested_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, station_id, date)
+);
+
 CREATE TABLE IF NOT EXISTS weather_daily (
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
     date date NOT NULL,

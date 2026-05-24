@@ -6,8 +6,11 @@ import pandas as pd
 
 from tickbiterisk.etl.build import write_reconciled_lyme_outputs
 from tickbiterisk.etl.lyme import LymeCountyYearValue
+from tickbiterisk.etl.noaa import NoaaDailyObservation, NoaaStation
 from tickbiterisk.etl.open_meteo import WeatherDailyObservation
 from tickbiterisk.etl.weather_build import (
+    write_noaa_daily_observations_output,
+    write_noaa_stations_output,
     write_weather_daily_output,
     write_weather_features_monthly_output,
     write_weather_locations_output,
@@ -80,6 +83,36 @@ def sample_weather_daily() -> WeatherDailyObservation:
     )
 
 
+def sample_noaa_station() -> NoaaStation:
+    return NoaaStation(
+        county_fips="24003",
+        station_id="GHCND:USW00093721",
+        name="BALTIMORE WASHINGTON INTERNATIONAL AIRPORT, MD US",
+        latitude=39.1733,
+        longitude=-76.684,
+        elevation=47.5,
+        elevation_unit="METERS",
+        mindate=date(1939, 7, 1),
+        maxdate=date(2026, 5, 20),
+        data_coverage=0.9999,
+    )
+
+
+def sample_noaa_daily() -> NoaaDailyObservation:
+    return NoaaDailyObservation(
+        county_fips="24003",
+        station_id="GHCND:USW00093721",
+        date=date(1992, 5, 1),
+        source="noaa_cdo_ghcnd_daily",
+        tmax_f=72.0,
+        tmin_f=44.0,
+        prcp_inches=0.01,
+        snow_inches=0.0,
+        snwd_inches=None,
+        source_url_hash="b" * 64,
+    )
+
+
 def test_write_weather_locations_output_creates_csv(tmp_path: Path) -> None:
     output = write_weather_locations_output(
         load_maryland_weather_locations()[:1], tmp_path
@@ -98,6 +131,33 @@ def test_write_weather_locations_output_creates_csv(tmp_path: Path) -> None:
         "geography_source",
     ]
     assert df.loc[0, "county_fips"] == "24001"
+
+
+def test_write_noaa_stations_output_creates_csv(tmp_path: Path) -> None:
+    output = write_noaa_stations_output([sample_noaa_station()], tmp_path)
+
+    df = pd.read_csv(output, dtype={"county_fips": str})
+
+    assert output.name == "noaa_ghcnd_stations.csv"
+    assert df.loc[0, "county_fips"] == "24003"
+    assert df.loc[0, "station_id"] == "GHCND:USW00093721"
+    assert df.loc[0, "mindate"] == "1939-07-01"
+
+
+def test_write_noaa_daily_observations_output_appends_by_station_date(
+    tmp_path: Path,
+) -> None:
+    first = sample_noaa_daily()
+    second = replace(first, date=date(1992, 5, 2), tmax_f=80.0)
+
+    write_noaa_daily_observations_output([first], tmp_path)
+    output = write_noaa_daily_observations_output([second], tmp_path, append=True)
+
+    df = pd.read_csv(output, dtype={"county_fips": str})
+
+    assert output.name == "noaa_ghcnd_daily_observations.csv"
+    assert list(df["date"]) == ["1992-05-01", "1992-05-02"]
+    assert list(df["tmax_f"]) == [72.0, 80.0]
 
 
 def test_write_weather_daily_output_creates_csv(tmp_path: Path) -> None:

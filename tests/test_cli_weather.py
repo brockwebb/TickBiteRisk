@@ -39,3 +39,53 @@ def test_weather_backfill_dry_run_prints_open_meteo_url(tmp_path) -> None:
     assert "archive-api.open-meteo.com" in result.stdout
     assert "24003" in result.stdout
     assert not (tmp_path / "weather_daily.csv").exists()
+
+
+def test_noaa_stations_dry_run_prints_noaa_url(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-stations",
+            "--county-fips",
+            "24003",
+            "--start-date",
+            "1992-01-01",
+            "--end-date",
+            "2026-05-24",
+            "--output-dir",
+            str(tmp_path),
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "ncei.noaa.gov" in result.stdout
+    assert "FIPS%3A24003" in result.stdout
+    assert not (tmp_path / "noaa_ghcnd_stations.csv").exists()
+
+
+def test_noaa_daily_dry_run_prints_noaa_url(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-daily",
+            "--county-fips",
+            "24003",
+            "--station-id",
+            "GHCND:USW00093721",
+            "--start-date",
+            "1992-05-01",
+            "--end-date",
+            "1992-05-07",
+            "--output-dir",
+            str(tmp_path),
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "ncei.noaa.gov" in result.stdout
+    assert "GHCND%3AUSW00093721" in result.stdout
+    assert not (tmp_path / "noaa_ghcnd_daily_observations.csv").exists()
