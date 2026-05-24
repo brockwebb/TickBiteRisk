@@ -45,8 +45,8 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 | `selected_tbd_monthly` | Selected tickborne disease cases by month | `/Users/brock/Downloads/Selected_Tickborne_Disease_Cases_by_Month.csv` | CSV | United States | 2016-2023 | National seasonality, multi-disease context | acquired, optional | Public CDC/dashboard export | `9d686c6d95671e071603d73c0c1e57772c7af7560f8c4b4ea9aafc0ff438a617` |
 | `selected_tbd_us_year` | Selected tickborne diseases United States | `/Users/brock/Downloads/Selected_Tickborne_Diseases_United-States.csv` | CSV | United States | 2016-2023 | National validation, multi-disease context | acquired, optional | Public CDC/dashboard export | `a1991bf322ae3d94a81744dc92fa9b15c8017e5f8741f6c55658f7dd76a8de40` |
 | `cdc_tick_disease_database_xlsx` | User-compiled CDC tick disease database | `/Users/brock/Downloads/CDC_Tick_Disease_Database.xlsx` | XLSX | United States, mostly state/year | 1992-2023 | Reference, source checklist | acquired, optional | Derived local workbook; not canonical | `29c5fa03dc8555844f0e82e8988f5b37ba5274689b871bb77e502e4c5a1d2f8b` |
-| `open_meteo_archive` | Open-Meteo historical weather archive | `https://archive-api.open-meteo.com/v1/archive` | API JSON/CSV | Coordinate/county centroid | 2000-2024 initial backfill | Weather predictor | candidate, missing | API terms apply; no key | See weather acquisition design |
-| `noaa_cdo` | NOAA Climate Data Online | `https://www.ncdc.noaa.gov/cdo-web/webservices/v2` | API JSON | Station/grid depending dataset | Validation branch | Weather validation | candidate, missing | Requires local token; never commit token | Use `NOAA_TOKEN` from environment |
+| `open_meteo_archive_md_county_daily` | Open-Meteo historical weather archive | `https://archive-api.open-meteo.com/v1/archive` | API JSON/CSV | Maryland county internal points from Census Gazetteer | 2000-01-01 through 2024-12-31 planned | Primary weather backfill for `weather_daily` and `weather_features_monthly` | candidate, etl_supported, backfill_pending | API terms apply; no key | Bounded county/date CLI path supported; monthly features are derived from daily rows |
+| `noaa_cdo` | NOAA Climate Data Online | `https://www.ncdc.noaa.gov/cdo-web/webservices/v2` | API JSON | Station/grid depending dataset | Validation branch | Weather validation only, not primary backfill | candidate, missing | Requires local token; never commit token | Requires `NOAA_TOKEN` from environment only |
 | `census_county_reference` | Census county FIPS/reference | `https://www2.census.gov/geo/docs/reference/codes2020/national_county2020.txt` | TXT/CSV | County | 2020 reference | Geography, FIPS validation | candidate, missing | Public federal data | Needed for robust county names/FIPS |
 | `census_population` | Census ACS or PEP county population | Census API | API CSV/JSON | County | Annual/latest | Incidence denominator | candidate, missing | Public federal data | Prefer annual PEP if available for 2000-2024 |
 | `nlcd_habitat` | USGS/MRLC NLCD land cover | MRLC data portal | GeoTIFF/raster or summary CSV | Raster/county summary | 2021 or annual NLCD | Habitat predictor | candidate, missing | Public federal data | For MVP, precomputed county summaries are preferred over 15GB raw raster |
@@ -68,6 +68,7 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 - CDC lone star tick status workbook.
 - NSSP coverage table.
 - `AllTBD2022_Public` comparator workbook.
+- Maryland weather county internal points from Census Gazetteer 2024.
 
 ### Needs Reconciliation Before Modeling
 
@@ -81,7 +82,7 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 ### Still Needed
 
 - Maryland county population denominators by year.
-- Maryland county centroids/geometries from Census/TIGER or equivalent.
+- Maryland county boundary geometries from Census/TIGER or equivalent for maps and habitat joins.
 - Open-Meteo daily backfill for Maryland jurisdictions.
 - Deer harvest county-year data from Maryland DNR.
 - Mast/acorn survey data where usable.

@@ -58,6 +58,17 @@ tickbiterisk runserver           # http://127.0.0.1:8000
 
 Full details: [`/docs/data-sources.md`](docs/data-sources.md)
 
+## maryland weather ETL
+
+The Maryland weather ETL derives county daily weather from the Open-Meteo historical archive using Census Gazetteer county internal points as stable query locations. The planned full backfill range is 2000-01-01 through 2024-12-31.
+
+```bash
+tickbiterisk etl weather-locations --output-dir build/etl
+tickbiterisk etl weather-backfill-open-meteo --county-fips 24003 --start-date 2020-01-01 --end-date 2020-01-03 --output-dir build/etl/weather-smoke
+```
+
+Open-Meteo does not require an API key for the historical archive path. NOAA CDO is validation-only; the ETL validates `NOAA_TOKEN` from the environment and never reads tokens from files or CLI arguments.
+
 ## api summary
 
 * `GET /risk?fips=24003&tau=24` – one attachment duration

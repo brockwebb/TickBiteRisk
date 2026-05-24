@@ -138,11 +138,17 @@ These are static/cumulative stratification layers. They are not prevalence estim
 
 ### FR6: Weather Acquisition
 
-The system must support Maryland daily weather acquisition and feature generation as specified in:
+The system must support Maryland daily weather acquisition and feature generation:
 
-`docs/superpowers/specs/2026-05-24-maryland-weather-acquisition-design.md`
+- Build Maryland county weather locations from Census Gazetteer county internal points.
+- Use Open-Meteo historical archive as the default daily backfill source.
+- Support bounded county/date backfills before full Maryland range runs.
+- Plan full Open-Meteo backfill coverage for 2000-01-01 through 2024-12-31.
+- Write normalized daily rows to `weather_daily`.
+- Derive monthly tick-activity features in `weather_features_monthly`.
+- Compute trailing 10-year weather normals and anomalies without future leakage; a feature for month `M` may only use weather observations available before `M`.
 
-Open-Meteo is the default historical backfill source. NOAA CDO is a validation branch and must read credentials from environment variables only.
+NOAA CDO is a validation branch only, not the primary backfill source. It must read credentials from environment variables such as `NOAA_TOKEN` only.
 
 ### FR7: Host Ecology Features
 
