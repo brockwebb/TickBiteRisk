@@ -200,6 +200,63 @@ def test_run_noaa_county_backfill_fetches_multiple_selected_stations(
     assert any("stationid=GHCND%3ASECOND" in call for call in calls)
 
 
+def test_run_noaa_county_backfill_uses_nearest_fallback_station(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    def fake_json_get(url: str, token: str) -> dict:
+        calls.append(url)
+        if "stations?" in url:
+            return {
+                "results": [
+                    {
+                        "id": "GHCND:SHORT",
+                        "name": "SHORT",
+                        "latitude": 39.0,
+                        "longitude": -76.0,
+                        "mindate": "2010-01-01",
+                        "maxdate": "2026-01-01",
+                        "datacoverage": 1.0,
+                    }
+                ]
+            }
+        return {
+            "results": [
+                {
+                    "date": "1992-05-01T00:00:00",
+                    "datatype": "TMAX",
+                    "station": "GHCND:NEAR",
+                    "value": 70.0,
+                }
+            ]
+        }
+
+    fallback_stations = [
+        _station("GHCND:FAR", latitude=38.0, longitude=-75.0),
+        _station("GHCND:NEAR", latitude=39.17, longitude=-76.68),
+    ]
+
+    result = run_noaa_county_backfill(
+        county_fips="24003",
+        start_date=date(1992, 5, 1),
+        end_date=date(1992, 5, 1),
+        output_dir=tmp_path,
+        token="token-value",
+        fallback_stations=fallback_stations,
+        json_get=fake_json_get,
+    )
+
+    assert result.selection_method == "nearest_maryland"
+    assert result.selected_station_ids == ["GHCND:NEAR"]
+    assert any("stationid=GHCND%3ANEAR" in call for call in calls)
+    assert not any("stationid=GHCND%3AFAR" in call for call in calls)
+
+    stations = pd.read_csv(tmp_path / "noaa_ghcnd_stations.csv", dtype={"county_fips": str})
+    assert list(stations["county_fips"]) == ["24003"]
+    assert list(stations["station_id"]) == ["GHCND:NEAR"]
+
+
 def test_run_noaa_maryland_backfill_runs_requested_county_subset(
     tmp_path: Path,
 ) -> None:
@@ -454,3 +511,67 @@ def test_audit_noaa_station_coverage_records_no_selected_station(
     assert df.loc[0, "status"] == "needs_fallback"
     assert int(df.loc[0, "candidate_station_count"]) == 1
     assert "No selected station covers requested range" in df.loc[0, "error"]
+
+
+def test_audit_noaa_station_coverage_can_use_nearest_fallback(tmp_path: Path) -> None:
+    def fake_json_get(url: str, token: str) -> dict:
+        if "FIPS%3A24003" in url:
+            return {
+                "results": [
+                    {
+                        "id": "GHCND:SHORT",
+                        "name": "SHORT",
+                        "latitude": 39.0,
+                        "longitude": -76.0,
+                        "mindate": "2010-01-01",
+                        "maxdate": "2026-01-01",
+                        "datacoverage": 1.0,
+                    }
+                ]
+            }
+        return {
+            "results": [
+                {
+                    "id": "GHCND:FALLBACK",
+                    "name": "FALLBACK",
+                    "latitude": 39.17,
+                    "longitude": -76.68,
+                    "mindate": "1939-01-01",
+                    "maxdate": "2026-05-20",
+                    "datacoverage": 0.99,
+                }
+            ]
+        }
+
+    result = audit_noaa_station_coverage(
+        start_date=date(1992, 1, 1),
+        end_date=date(2026, 5, 24),
+        output_dir=tmp_path,
+        token="token-value",
+        county_fips_values=["24003", "24005"],
+        nearest_station_fallback=True,
+        json_get=fake_json_get,
+    )
+
+    df = pd.read_csv(result.output_path, dtype={"county_fips": str})
+    anne_arundel = df[df["county_fips"] == "24003"].iloc[0]
+    assert result.ok_count == 2
+    assert result.needs_fallback_count == 0
+    assert anne_arundel["status"] == "ok"
+    assert anne_arundel["selection_method"] == "nearest_maryland"
+    assert anne_arundel["selected_station_ids"] == "GHCND:FALLBACK"
+
+
+def _station(station_id: str, *, latitude: float, longitude: float):
+    from tickbiterisk.etl.noaa import NoaaStation
+
+    return NoaaStation(
+        county_fips="24005",
+        station_id=station_id,
+        name=station_id,
+        latitude=latitude,
+        longitude=longitude,
+        mindate=date(1939, 1, 1),
+        maxdate=date(2026, 5, 20),
+        data_coverage=0.99,
+    )

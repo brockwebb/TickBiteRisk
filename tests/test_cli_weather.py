@@ -204,6 +204,7 @@ def test_noaa_backfill_maryland_command_reports_summary(
         assert kwargs["token"] == "token-value"
         assert kwargs["county_fips_values"] == ["24003"]
         assert kwargs["output_dir"] == tmp_path
+        assert kwargs["nearest_station_fallback"] is False
         return NoaaMarylandBackfillResult(
             county_results=[
                 NoaaCountyBackfillResult(
@@ -240,6 +241,36 @@ def test_noaa_backfill_maryland_command_reports_summary(
     assert result.exit_code == 0
     assert "Completed 1/1 Maryland county backfill(s)" in result.stdout
     assert "Wrote 2 daily observation row(s)" in result.stdout
+
+
+def test_noaa_backfill_maryland_command_passes_nearest_station_fallback(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_backfill(**kwargs) -> NoaaMarylandBackfillResult:
+        assert kwargs["nearest_station_fallback"] is True
+        return NoaaMarylandBackfillResult(county_results=[], failures=[])
+
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", lambda: "token-value")
+    monkeypatch.setattr("tickbiterisk.cli.run_noaa_maryland_backfill", fake_backfill)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-maryland",
+            "--start-date",
+            "1992-05-01",
+            "--end-date",
+            "1992-05-02",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+            "--nearest-station-fallback",
+        ],
+    )
+
+    assert result.exit_code == 0
 
 
 def test_noaa_backfill_maryland_exits_nonzero_on_partial_failures(
@@ -396,6 +427,7 @@ def test_noaa_audit_stations_command_reports_summary(
         assert kwargs["county_fips_values"] == ["24003"]
         assert kwargs["output_dir"] == tmp_path
         assert kwargs["token"] == "token-value"
+        assert kwargs["nearest_station_fallback"] is False
         return NoaaStationCoverageAuditResult(
             output_path=tmp_path / "noaa_station_coverage_audit.csv",
             county_count=1,
@@ -427,3 +459,39 @@ def test_noaa_audit_stations_command_reports_summary(
     assert "Audited 1 county station set(s)" in result.stdout
     assert "ok=1, needs_fallback=0, errors=0" in result.stdout
     assert "noaa_station_coverage_audit.csv" in result.stdout
+
+
+def test_noaa_audit_stations_command_passes_nearest_station_fallback(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_audit(**kwargs) -> NoaaStationCoverageAuditResult:
+        assert kwargs["nearest_station_fallback"] is True
+        return NoaaStationCoverageAuditResult(
+            output_path=tmp_path / "noaa_station_coverage_audit.csv",
+            county_count=1,
+            ok_count=1,
+            needs_fallback_count=0,
+            error_count=0,
+        )
+
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", lambda: "token-value")
+    monkeypatch.setattr("tickbiterisk.cli.audit_noaa_station_coverage", fake_audit)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-audit-stations",
+            "--start-date",
+            "1992-01-01",
+            "--end-date",
+            "2026-05-24",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+            "--nearest-station-fallback",
+        ],
+    )
+
+    assert result.exit_code == 0

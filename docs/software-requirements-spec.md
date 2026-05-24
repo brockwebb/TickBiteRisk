@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slice is implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, weather ETL scaffolding, and Postgres-ready schema. NOAA historical weather acquisition and model backtesting are the next planned slices.
+Implementation status: the first ETL slice is implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, weather ETL scaffolding, NOAA station audit/backfill tooling, and Postgres-ready schema. Full NOAA historical weather acquisition and model backtesting are the next planned slices.
 
 ## 1. Purpose
 
@@ -150,6 +150,8 @@ The system must support Maryland daily weather acquisition and feature generatio
 - Provide a NOAA station coverage audit command that checks Maryland county station candidates against the requested historical range and records `ok`, `needs_fallback`, or `error` before a large daily pull.
 - Provide a bounded NOAA county backfill command that discovers county stations, selects long-coverage stations, fetches daily observations for selected stations, and writes both `noaa_ghcnd_stations` and `noaa_ghcnd_daily_observations` CSV outputs.
 - Provide a Maryland NOAA orchestration command that runs the county backfill for all Maryland jurisdictions or an explicit county subset, reports county failures, and supports small smoke runs before the full historical acquisition.
+- Support an explicit nearest eligible Maryland station fallback for station audit and Maryland backfill when a county lacks an internal station with enough coverage for the requested range.
+- Preserve the target county FIPS in fallback outputs while retaining the source NOAA station ID and station metadata for provenance.
 - Split NOAA CDO daily requests into calendar-year windows and paginate station/daily responses before pivoting daily datatypes, so long historical backfills respect API date limits and do not silently stop at the first API page.
 - Write raw NOAA GHCND station observations to `noaa_ghcnd_daily_observations`; daily is not the modeling granularity.
 - Aggregate daily weather to weekly, monthly, and seasonal features for modeling, including monthly tick-activity features in `weather_features_monthly`.

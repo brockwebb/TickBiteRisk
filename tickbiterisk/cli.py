@@ -252,6 +252,10 @@ def noaa_backfill_maryland(
     allow_partial: bool = typer.Option(
         False, help="Exit successfully even when one or more counties fail."
     ),
+    nearest_station_fallback: bool = typer.Option(
+        False,
+        help="Use nearest qualifying Maryland station when a county has no internal station.",
+    ),
     dry_run: bool = typer.Option(False, help="Print planned queries without fetching data."),
 ) -> None:
     parsed_start_date = _parse_iso_date(start_date, "start-date")
@@ -295,6 +299,7 @@ def noaa_backfill_maryland(
             min_data_coverage=min_data_coverage,
             max_end_lag_days=max_end_lag_days,
             continue_on_error=not fail_fast,
+            nearest_station_fallback=nearest_station_fallback,
         )
     except NoaaBackfillError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -333,6 +338,10 @@ def noaa_audit_stations(
     max_end_lag_days: int = typer.Option(
         14, help="Allowed station-reporting lag at the requested end date."
     ),
+    nearest_station_fallback: bool = typer.Option(
+        False,
+        help="Use nearest qualifying Maryland station when a county has no internal station.",
+    ),
     dry_run: bool = typer.Option(False, help="Print planned station queries."),
 ) -> None:
     parsed_start_date = _parse_iso_date(start_date, "start-date")
@@ -368,6 +377,7 @@ def noaa_audit_stations(
         station_limit=station_limit,
         min_data_coverage=min_data_coverage,
         max_end_lag_days=max_end_lag_days,
+        nearest_station_fallback=nearest_station_fallback,
     )
     typer.echo(f"Audited {result.county_count} county station set(s)")
     typer.echo(
