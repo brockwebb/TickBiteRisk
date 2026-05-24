@@ -66,3 +66,71 @@ def parse_cdc_lyme_public_use(path: Path, source_id: str) -> list[LymeCountyYear
             )
         )
     return sorted(rows, key=lambda row: (row.county_fips, row.year, row.source_id))
+
+
+def parse_cdc_county_dashboard(path: Path, source_id: str) -> list[LymeCountyYearValue]:
+    df = pd.read_csv(path, dtype=str, encoding="latin1")
+    required = {"Ctyname", "stname", "stcode", "ctycode"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing CDC county dashboard columns: {sorted(missing)}")
+
+    md = df[df["stname"].eq("Maryland")].copy()
+    year_columns = [
+        column
+        for column in md.columns
+        if column.lower().startswith("cases")
+        and column.lower().replace("cases", "").isdigit()
+    ]
+    rows: list[LymeCountyYearValue] = []
+    for record in md.to_dict(orient="records"):
+        county_fips = f"{int(record['stcode']):02d}{int(record['ctycode']):03d}"
+        if county_fips not in maryland_fips_set():
+            continue
+        for column in year_columns:
+            year = int(column.lower().replace("cases", ""))
+            total = _frequency_to_int(record[column])
+            rows.append(
+                LymeCountyYearValue(
+                    source_id=source_id,
+                    county_fips=county_fips,
+                    year=year,
+                    confirmed_cases=None,
+                    probable_cases=None,
+                    total_cases=total,
+                )
+            )
+    return sorted(rows, key=lambda row: (row.county_fips, row.year, row.source_id))
+
+
+def parse_cdc_lyme_geodata(path: Path, source_id: str) -> list[LymeCountyYearValue]:
+    df = pd.read_csv(path, dtype=str)
+    required = {
+        "STUSPS",
+        "fips",
+        "year",
+        "Lyme_Confirmed_Cases",
+        "Lyme_Probable_Cases",
+        "Lyme_Confirmed_Probable_Cases",
+    }
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing CDC Lyme geodata columns: {sorted(missing)}")
+
+    md = df[df["STUSPS"].eq("MD")].copy()
+    md["fips"] = md["fips"].astype(str).str.split(".").str[0].str.zfill(5)
+    md = md[md["fips"].isin(maryland_fips_set())]
+
+    rows: list[LymeCountyYearValue] = []
+    for record in md.to_dict(orient="records"):
+        rows.append(
+            LymeCountyYearValue(
+                source_id=source_id,
+                county_fips=record["fips"],
+                year=int(float(record["year"])),
+                confirmed_cases=_frequency_to_int(record["Lyme_Confirmed_Cases"]),
+                probable_cases=_frequency_to_int(record["Lyme_Probable_Cases"]),
+                total_cases=_frequency_to_int(record["Lyme_Confirmed_Probable_Cases"]),
+            )
+        )
+    return sorted(rows, key=lambda row: (row.county_fips, row.year, row.source_id))
