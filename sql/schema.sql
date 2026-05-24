@@ -77,3 +77,71 @@ CREATE TABLE IF NOT EXISTS lone_star_status (
     created_at timestamptz DEFAULT now(),
     PRIMARY KEY (source_id, county_fips)
 );
+
+CREATE TABLE IF NOT EXISTS weather_locations (
+    county_fips char(5) PRIMARY KEY REFERENCES md_jurisdictions(county_fips),
+    state_fips char(2) NOT NULL DEFAULT '24',
+    state char(2) NOT NULL DEFAULT 'MD',
+    county_name text NOT NULL,
+    centroid_lat double precision NOT NULL,
+    centroid_lon double precision NOT NULL,
+    geography_source text NOT NULL,
+    created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS weather_daily (
+    county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
+    date date NOT NULL,
+    source text NOT NULL,
+    weather_model text NOT NULL,
+    temp_mean_f double precision NOT NULL,
+    temp_max_f double precision NOT NULL,
+    temp_min_f double precision NOT NULL,
+    humidity_mean_pct double precision NOT NULL,
+    humidity_max_pct double precision NOT NULL,
+    humidity_min_pct double precision NOT NULL,
+    dew_point_mean_f double precision NOT NULL,
+    precipitation_mm double precision NOT NULL,
+    rain_mm double precision NOT NULL,
+    snowfall_mm double precision NOT NULL,
+    precipitation_hours double precision NOT NULL,
+    soil_temp_0_7cm_f double precision NOT NULL,
+    soil_moisture_0_7cm double precision,
+    evapotranspiration_mm double precision NOT NULL,
+    wind_mean_mph double precision NOT NULL,
+    wind_max_mph double precision NOT NULL,
+    source_url_hash text NOT NULL,
+    ingested_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, date, source, weather_model)
+);
+
+CREATE TABLE IF NOT EXISTS weather_features_monthly (
+    county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
+    year integer NOT NULL,
+    month integer NOT NULL CHECK (month BETWEEN 1 AND 12),
+    source text NOT NULL,
+    weather_model text NOT NULL,
+    days_above_40f integer NOT NULL,
+    days_50_65f integer NOT NULL,
+    days_70_85f integer NOT NULL,
+    degree_days_above_40f double precision NOT NULL,
+    freeze_thaw_days integer NOT NULL,
+    precip_total_mm double precision NOT NULL,
+    rain_total_mm double precision NOT NULL,
+    snowfall_total_mm double precision NOT NULL,
+    precip_days integer NOT NULL,
+    dry_spell_max_days integer NOT NULL,
+    humidity_days_above_85pct integer NOT NULL,
+    soil_moisture_mean double precision,
+    soil_temp_above_40f_days integer NOT NULL,
+    hot_dry_stress_days integer NOT NULL,
+    evapotranspiration_total_mm double precision NOT NULL,
+    temp_mean_f double precision NOT NULL,
+    precip_mean_mm double precision NOT NULL,
+    humidity_mean_pct double precision NOT NULL,
+    temp_anomaly_vs_10yr double precision,
+    precip_anomaly_vs_10yr double precision,
+    humidity_anomaly_vs_10yr double precision,
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, year, month, source, weather_model)
+);
