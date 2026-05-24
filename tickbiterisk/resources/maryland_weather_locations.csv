@@ -1,0 +1,25 @@
+county_fips,state_fips,state,county_name,centroid_lat,centroid_lon,geography_source
+24001,24,MD,Allegany County,39.612313,-78.703104,Census Gazetteer 2024 county internal point
+24003,24,MD,Anne Arundel County,38.991617,-76.560894,Census Gazetteer 2024 county internal point
+24005,24,MD,Baltimore County,39.443167,-76.616569,Census Gazetteer 2024 county internal point
+24009,24,MD,Calvert County,38.522719,-76.529762,Census Gazetteer 2024 county internal point
+24011,24,MD,Caroline County,38.871531,-75.831662,Census Gazetteer 2024 county internal point
+24013,24,MD,Carroll County,39.563328,-77.015330,Census Gazetteer 2024 county internal point
+24015,24,MD,Cecil County,39.562354,-75.941585,Census Gazetteer 2024 county internal point
+24017,24,MD,Charles County,38.472853,-77.015427,Census Gazetteer 2024 county internal point
+24019,24,MD,Dorchester County,38.429196,-76.047433,Census Gazetteer 2024 county internal point
+24021,24,MD,Frederick County,39.470177,-77.397636,Census Gazetteer 2024 county internal point
+24023,24,MD,Garrett County,39.547299,-79.274619,Census Gazetteer 2024 county internal point
+24025,24,MD,Harford County,39.537429,-76.299789,Census Gazetteer 2024 county internal point
+24027,24,MD,Howard County,39.252264,-76.924406,Census Gazetteer 2024 county internal point
+24029,24,MD,Kent County,39.241279,-76.125987,Census Gazetteer 2024 county internal point
+24031,24,MD,Montgomery County,39.137381,-77.203063,Census Gazetteer 2024 county internal point
+24033,24,MD,Prince George's County,38.829278,-76.848188,Census Gazetteer 2024 county internal point
+24035,24,MD,Queen Anne's County,39.040693,-76.082405,Census Gazetteer 2024 county internal point
+24037,24,MD,St. Mary's County,38.223077,-76.534487,Census Gazetteer 2024 county internal point
+24039,24,MD,Somerset County,38.074450,-75.853323,Census Gazetteer 2024 county internal point
+24041,24,MD,Talbot County,38.748349,-76.178476,Census Gazetteer 2024 county internal point
+24043,24,MD,Washington County,39.603621,-77.814671,Census Gazetteer 2024 county internal point
+24045,24,MD,Wicomico County,38.367368,-75.632084,Census Gazetteer 2024 county internal point
+24047,24,MD,Worcester County,38.222133,-75.309931,Census Gazetteer 2024 county internal point
+24510,24,MD,Baltimore City,39.300032,-76.610476,Census Gazetteer 2024 county internal point
