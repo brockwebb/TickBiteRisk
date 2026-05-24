@@ -1,5 +1,6 @@
 from datetime import date
 
+import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
@@ -133,6 +134,44 @@ def test_noaa_daily_dry_run_prints_noaa_url(tmp_path) -> None:
     assert "ncei.noaa.gov" in result.stdout
     assert "GHCND%3AUSW00093721" in result.stdout
     assert not (tmp_path / "noaa_ghcnd_daily_observations.csv").exists()
+
+
+def test_noaa_weather_features_command_reads_raw_noaa_csv(tmp_path) -> None:
+    input_path = tmp_path / "noaa_ghcnd_daily_observations.csv"
+    input_path.write_text(
+        "\n".join(
+            [
+                "county_fips,station_id,date,source,tmax_f,tmin_f,prcp_inches,snow_inches,snwd_inches,source_url_hash",
+                "24003,GHCND:USW00093721,2020-05-04,noaa_cdo_ghcnd_daily,70,50,0.10,0,,bbbb",
+                "24003,GHCND:USW00093721,2020-05-05,noaa_cdo_ghcnd_daily,92,72,0,0,,bbbb",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-weather-features",
+            "--input-path",
+            str(input_path),
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    weekly = tmp_path / "weather_features_weekly.csv"
+    monthly = tmp_path / "weather_features_monthly.csv"
+    assert weekly.exists()
+    assert monthly.exists()
+    assert "Wrote 1 NOAA weekly feature row(s)" in result.stdout
+    assert "Wrote 1 NOAA monthly feature row(s)" in result.stdout
+    df = pd.read_csv(weekly, dtype={"county_fips": str})
+    assert df.loc[0, "source"] == "noaa_cdo_ghcnd_daily"
+    assert df.loc[0, "weather_model"] == "ghcnd_station_daily"
+    assert pd.isna(df.loc[0, "humidity_mean_pct"])
 
 
 def test_noaa_backfill_county_dry_run_prints_station_discovery_url(tmp_path) -> None:

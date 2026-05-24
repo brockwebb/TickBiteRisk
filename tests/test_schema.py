@@ -85,7 +85,22 @@ def test_weather_weekly_features_use_iso_week_and_completeness_fields() -> None:
     assert "week_start_date date NOT NULL" in schema
     assert "week_end_date date NOT NULL" in schema
     assert "week_complete boolean NOT NULL" in schema
+    assert "feature_quality_flags text DEFAULT ''" in schema
     assert "PRIMARY KEY (county_fips, iso_year, iso_week, source, weather_model)" in schema
+
+
+def test_weather_feature_tables_allow_noaa_unavailable_fields() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+    feature_schema = schema.split("CREATE TABLE IF NOT EXISTS weather_features_weekly", maxsplit=1)[
+        1
+    ]
+
+    assert "rain_total_mm double precision NOT NULL" not in feature_schema
+    assert "humidity_days_above_85pct integer NOT NULL" not in feature_schema
+    assert "soil_temp_above_40f_days integer NOT NULL" not in feature_schema
+    assert "hot_dry_stress_days integer NOT NULL" not in feature_schema
+    assert "evapotranspiration_total_mm double precision NOT NULL" not in feature_schema
+    assert "humidity_mean_pct double precision NOT NULL" not in feature_schema
 
 
 def test_weather_monthly_features_include_completeness_fields() -> None:

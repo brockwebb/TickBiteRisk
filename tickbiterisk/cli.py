@@ -37,6 +37,7 @@ from tickbiterisk.etl.open_meteo import (
 )
 from tickbiterisk.etl.population_build import write_county_population_output
 from tickbiterisk.etl.weather_build import (
+    read_noaa_daily_observations_input,
     write_noaa_daily_observations_output,
     write_noaa_stations_output,
     write_weather_daily_output,
@@ -47,6 +48,8 @@ from tickbiterisk.etl.weather_build import (
 from tickbiterisk.etl.weather_features import (
     add_trailing_monthly_anomalies,
     add_trailing_weekly_anomalies,
+    compute_noaa_monthly_weather_features,
+    compute_noaa_weekly_weather_features,
     compute_monthly_weather_features,
     compute_weekly_weather_features,
 )
@@ -214,6 +217,35 @@ def noaa_daily(
     )
     output = write_noaa_daily_observations_output(rows, output_dir, append=True)
     typer.echo(f"Wrote {output}")
+
+
+@etl_app.command("noaa-weather-features")
+def noaa_weather_features(
+    input_path: Path = typer.Option(
+        Path("build/etl/noaa_ghcnd_daily_observations.csv"),
+        help="Input noaa_ghcnd_daily_observations.csv path.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl"), help="Output directory for ETL artifacts."
+    ),
+) -> None:
+    rows = read_noaa_daily_observations_input(input_path)
+    weekly_features = add_trailing_weekly_anomalies(
+        compute_noaa_weekly_weather_features(rows)
+    )
+    weekly_output = write_weather_features_weekly_output(
+        weekly_features, output_dir, append=True
+    )
+    monthly_features = add_trailing_monthly_anomalies(
+        compute_noaa_monthly_weather_features(rows)
+    )
+    monthly_output = write_weather_features_monthly_output(
+        monthly_features, output_dir, append=True
+    )
+    typer.echo(f"Wrote {len(weekly_features)} NOAA weekly feature row(s) to {weekly_output}")
+    typer.echo(
+        f"Wrote {len(monthly_features)} NOAA monthly feature row(s) to {monthly_output}"
+    )
 
 
 @etl_app.command("noaa-backfill-county")

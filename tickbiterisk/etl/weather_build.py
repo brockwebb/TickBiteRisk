@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -102,6 +103,7 @@ WEATHER_WEEKLY_COLUMNS = [
     "temp_anomaly_vs_10yr",
     "precip_anomaly_vs_10yr",
     "humidity_anomaly_vs_10yr",
+    "feature_quality_flags",
 ]
 
 WEATHER_MONTHLY_COLUMNS = [
@@ -134,7 +136,29 @@ WEATHER_MONTHLY_COLUMNS = [
     "temp_anomaly_vs_10yr",
     "precip_anomaly_vs_10yr",
     "humidity_anomaly_vs_10yr",
+    "feature_quality_flags",
 ]
+
+
+def read_noaa_daily_observations_input(input_path: Path) -> list[NoaaDailyObservation]:
+    df = pd.read_csv(input_path, dtype={"county_fips": str, "station_id": str})
+    rows: list[NoaaDailyObservation] = []
+    for record in df.to_dict(orient="records"):
+        rows.append(
+            NoaaDailyObservation(
+                county_fips=str(record["county_fips"]).zfill(5),
+                station_id=str(record["station_id"]),
+                date=date.fromisoformat(str(record["date"])),
+                source=str(record["source"]),
+                tmax_f=_nullable_float(record.get("tmax_f")),
+                tmin_f=_nullable_float(record.get("tmin_f")),
+                prcp_inches=_nullable_float(record.get("prcp_inches")),
+                snow_inches=_nullable_float(record.get("snow_inches")),
+                snwd_inches=_nullable_float(record.get("snwd_inches")),
+                source_url_hash=str(record["source_url_hash"]),
+            )
+        )
+    return rows
 
 
 def write_weather_locations_output(
@@ -261,3 +285,9 @@ def _write_output(
         df = df.drop_duplicates(subset=key_columns, keep="last")
         df = df.sort_values(key_columns).reset_index(drop=True)
     df.to_csv(output_path, index=False)
+
+
+def _nullable_float(value: object) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    return float(value)

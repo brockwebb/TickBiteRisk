@@ -19,6 +19,7 @@ from tickbiterisk.etl.weather_build import (
     write_weather_locations_output,
 )
 from tickbiterisk.etl.weather_features import (
+    compute_noaa_weekly_weather_features,
     compute_monthly_weather_features,
     compute_weekly_weather_features,
 )
@@ -253,6 +254,7 @@ def test_write_weather_features_weekly_output_creates_csv(tmp_path: Path) -> Non
     assert df.loc[0, "week_end_date"] == "2020-05-03"
     assert int(df.loc[0, "days_observed"]) == 1
     assert bool(df.loc[0, "week_complete"]) is False
+    assert "feature_quality_flags" in df.columns
 
 
 def test_write_weather_features_weekly_output_appends_without_losing_prior_counties(
@@ -269,6 +271,20 @@ def test_write_weather_features_weekly_output_appends_without_losing_prior_count
     )
     assert list(df["county_fips"]) == ["24003", "24005"]
     assert list(df["temp_mean_f"]) == [55.0, 50.0]
+
+
+def test_write_noaa_weather_features_weekly_output_preserves_nullable_fields(
+    tmp_path: Path,
+) -> None:
+    features = compute_noaa_weekly_weather_features([sample_noaa_daily()])
+
+    output = write_weather_features_weekly_output(features, tmp_path)
+
+    df = pd.read_csv(output, dtype={"county_fips": str})
+    assert df.loc[0, "source"] == "noaa_cdo_ghcnd_daily"
+    assert pd.isna(df.loc[0, "humidity_mean_pct"])
+    assert pd.isna(df.loc[0, "rain_total_mm"])
+    assert "no_humidity" in df.loc[0, "feature_quality_flags"]
 
 
 def test_write_weather_features_monthly_output_creates_csv(tmp_path: Path) -> None:

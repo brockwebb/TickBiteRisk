@@ -1,9 +1,12 @@
 from datetime import date
 
 from tickbiterisk.etl.open_meteo import WeatherDailyObservation
+from tickbiterisk.etl.noaa import NoaaDailyObservation
 from tickbiterisk.etl.weather_features import (
     add_trailing_monthly_anomalies,
     add_trailing_weekly_anomalies,
+    compute_noaa_monthly_weather_features,
+    compute_noaa_weekly_weather_features,
     compute_monthly_weather_features,
     compute_weekly_weather_features,
 )
@@ -37,6 +40,127 @@ def obs(day: date, **overrides: float) -> WeatherDailyObservation:
         source_url_hash="a" * 64,
         **values,
     )
+
+
+def noaa_obs(day: date, **overrides: float | None) -> NoaaDailyObservation:
+    values = {
+        "tmax_f": 62.0,
+        "tmin_f": 42.0,
+        "prcp_inches": 0.0,
+        "snow_inches": 0.0,
+        "snwd_inches": None,
+    }
+    values.update(overrides)
+    return NoaaDailyObservation(
+        county_fips="24003",
+        station_id="GHCND:USW00093721",
+        date=day,
+        source="noaa_cdo_ghcnd_daily",
+        source_url_hash="b" * 64,
+        **values,
+    )
+
+
+def test_compute_noaa_weekly_weather_features_preserves_missing_derived_fields() -> None:
+    rows = [
+        noaa_obs(
+            date(2020, 5, 4),
+            tmax_f=70.0,
+            tmin_f=50.0,
+            prcp_inches=0.10,
+            snow_inches=0.0,
+        ),
+        noaa_obs(
+            date(2020, 5, 5),
+            tmax_f=92.0,
+            tmin_f=72.0,
+            prcp_inches=0.0,
+            snow_inches=0.0,
+        ),
+        noaa_obs(
+            date(2020, 5, 6),
+            tmax_f=None,
+            tmin_f=45.0,
+            prcp_inches=None,
+            snow_inches=None,
+        ),
+    ]
+
+    features = compute_noaa_weekly_weather_features(rows)
+
+    assert len(features) == 1
+    week = features[0]
+    assert week.iso_year == 2020
+    assert week.iso_week == 19
+    assert week.days_observed == 3
+    assert week.expected_days == 7
+    assert week.week_complete is False
+    assert week.days_above_40f == 2
+    assert week.days_50_65f == 1
+    assert week.days_70_85f == 1
+    assert week.degree_days_above_40f == 62.0
+    assert week.freeze_thaw_days == 0
+    assert week.precip_total_mm == 2.54
+    assert week.rain_total_mm is None
+    assert week.snowfall_total_mm == 0.0
+    assert week.precip_days == 1
+    assert week.dry_spell_max_days == 1
+    assert week.humidity_days_above_85pct is None
+    assert week.humidity_mean_pct is None
+    assert week.soil_moisture_mean is None
+    assert week.soil_temp_above_40f_days is None
+    assert week.hot_dry_stress_days is None
+    assert week.evapotranspiration_total_mm is None
+    assert week.temp_mean_f == 71.0
+    assert week.precip_mean_mm == 1.27
+    assert week.feature_quality_flags == (
+        "no_humidity,no_soil_data,no_evapotranspiration,no_rain_split,"
+        "partial_temp,partial_precip,partial_snow"
+    )
+
+
+def test_compute_noaa_monthly_weather_features_converts_inches_to_mm() -> None:
+    rows = [
+        noaa_obs(date(2020, 5, 1), prcp_inches=1.0, snow_inches=0.5),
+        noaa_obs(date(2020, 5, 2), prcp_inches=0.0, snow_inches=0.0),
+    ]
+
+    features = compute_noaa_monthly_weather_features(rows)
+
+    assert len(features) == 1
+    may = features[0]
+    assert may.year == 2020
+    assert may.month == 5
+    assert may.precip_total_mm == 25.4
+    assert may.snowfall_total_mm == 12.7
+    assert may.precip_mean_mm == 12.7
+    assert may.feature_quality_flags == (
+        "no_humidity,no_soil_data,no_evapotranspiration,no_rain_split"
+    )
+
+
+def test_noaa_trailing_anomalies_skip_unavailable_humidity() -> None:
+    features = []
+    for year, tmax, prcp in [(2010, 60.0, 0.1), (2011, 62.0, 0.2), (2020, 80.0, 1.0)]:
+        features.extend(
+            compute_noaa_weekly_weather_features(
+                [
+                    noaa_obs(
+                        date.fromisocalendar(year, 20, 1),
+                        tmax_f=tmax,
+                        tmin_f=40.0,
+                        prcp_inches=prcp,
+                    )
+                ]
+            )
+        )
+
+    with_anomalies = add_trailing_weekly_anomalies(features, baseline_years=10)
+    year_2020 = next(feature for feature in with_anomalies if feature.iso_year == 2020)
+
+    assert year_2020.temp_anomaly_vs_10yr == 9.5
+    assert year_2020.precip_anomaly_vs_10yr == 21.59
+    assert year_2020.humidity_anomaly_vs_10yr is None
 
 
 def test_compute_monthly_weather_features_matches_hand_calculation() -> None:

@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slice is implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, weather ETL scaffolding, NOAA station audit/backfill tooling, and Postgres-ready schema. Full NOAA historical weather acquisition and model backtesting are the next planned slices.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, Census population denominators, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, and Postgres-ready schema. Model feature assembly and backtesting are the next planned slices.
 
 ## 1. Purpose
 
@@ -158,6 +158,8 @@ The system must support Maryland daily weather acquisition and feature generatio
 - Write raw NOAA GHCND station observations to `noaa_ghcnd_daily_observations`; daily is not the modeling granularity.
 - Aggregate daily weather to weekly, monthly, and seasonal features. `weather_features_weekly` is the primary weather modeling grain because warm, humid, or wet spells can matter inside a month.
 - Retain `weather_features_monthly` and seasonal features as slower climate/context features, not the primary tick-activity driver.
+- Preserve NOAA unavailable fields as null rather than imputing unsupported humidity, soil, evapotranspiration, or rain-split values.
+- Label source-specific limitations with `feature_quality_flags`, including `no_humidity`, `no_soil_data`, `no_evapotranspiration`, and `no_rain_split` for NOAA-derived feature rows.
 - Include `days_observed`, `expected_days`, and completeness flags on weekly/monthly features so partial smoke/backfill ranges cannot be mistaken for complete periods.
 - Compute trailing 10-year weather normals and anomalies without future leakage; a feature for ISO week or month `T` may only use weather observations available before `T`.
 
