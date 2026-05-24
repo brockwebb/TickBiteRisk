@@ -73,11 +73,13 @@ def weather_backfill_open_meteo(
         return
 
     rows = fetch_open_meteo_archive(location, parsed_start_date, parsed_end_date)
-    daily_output = write_weather_daily_output(rows, output_dir)
+    daily_output = write_weather_daily_output(rows, output_dir, append=True)
     monthly_features = add_trailing_monthly_anomalies(
         compute_monthly_weather_features(rows)
     )
-    monthly_output = write_weather_features_monthly_output(monthly_features, output_dir)
+    monthly_output = write_weather_features_monthly_output(
+        monthly_features, output_dir, append=True
+    )
     typer.echo(f"Wrote {daily_output}")
     typer.echo(f"Wrote {monthly_output}")
 

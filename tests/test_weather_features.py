@@ -81,6 +81,9 @@ def test_compute_monthly_weather_features_matches_hand_calculation() -> None:
     assert may.county_fips == "24003"
     assert may.year == 2020
     assert may.month == 5
+    assert may.days_observed == 3
+    assert may.expected_days == 31
+    assert may.month_complete is False
     assert may.days_above_40f == 3
     assert may.days_50_65f == 1
     assert may.days_70_85f == 1
@@ -96,6 +99,16 @@ def test_compute_monthly_weather_features_matches_hand_calculation() -> None:
     assert may.soil_temp_above_40f_days == 3
     assert may.hot_dry_stress_days == 1
     assert may.evapotranspiration_total_mm == 4.0
+
+
+def test_complete_month_is_marked_complete() -> None:
+    rows = [obs(date(2020, 2, day)) for day in range(1, 30)]
+
+    features = compute_monthly_weather_features(rows)
+
+    assert features[0].days_observed == 29
+    assert features[0].expected_days == 29
+    assert features[0].month_complete is True
 
 
 def test_dry_spell_is_computed_within_each_month() -> None:

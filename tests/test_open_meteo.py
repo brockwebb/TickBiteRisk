@@ -91,6 +91,21 @@ def test_parse_open_meteo_archive_response_maps_daily_rows() -> None:
     assert len(rows[0].source_url_hash) == 64
 
 
+def test_parse_open_meteo_archive_response_preserves_nullable_soil_moisture() -> None:
+    payload = open_meteo_payload()
+    payload["daily"]["soil_moisture_0_to_7cm_mean"] = [None, 0.28]
+
+    rows = parse_open_meteo_archive_response(
+        payload,
+        location=LOCATION,
+        source_url="https://example.test/weather",
+        weather_model="open_meteo_archive",
+    )
+
+    assert rows[0].soil_moisture_0_7cm is None
+    assert rows[1].soil_moisture_0_7cm == 0.28
+
+
 def test_parse_open_meteo_archive_response_rejects_missing_required_variable() -> None:
     payload = {"daily": {"time": ["2020-01-01"]}}
 

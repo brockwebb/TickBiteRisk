@@ -1,5 +1,6 @@
-from pathlib import Path
 from datetime import date
+from dataclasses import replace
+from pathlib import Path
 
 import pandas as pd
 
@@ -111,6 +112,20 @@ def test_write_weather_daily_output_creates_csv(tmp_path: Path) -> None:
     assert float(df.loc[0, "temp_mean_f"]) == 55.0
 
 
+def test_write_weather_daily_output_appends_without_losing_prior_counties(
+    tmp_path: Path,
+) -> None:
+    first = sample_weather_daily()
+    second = replace(first, county_fips="24005", temp_mean_f=50.0)
+
+    write_weather_daily_output([first], tmp_path)
+    write_weather_daily_output([second], tmp_path, append=True)
+
+    df = pd.read_csv(tmp_path / "weather_daily.csv", dtype={"county_fips": str})
+    assert list(df["county_fips"]) == ["24003", "24005"]
+    assert list(df["temp_mean_f"]) == [55.0, 50.0]
+
+
 def test_write_weather_features_monthly_output_creates_csv(tmp_path: Path) -> None:
     features = compute_monthly_weather_features([sample_weather_daily()])
     output = write_weather_features_monthly_output(features, tmp_path)
@@ -121,3 +136,21 @@ def test_write_weather_features_monthly_output_creates_csv(tmp_path: Path) -> No
     assert df.loc[0, "county_fips"] == "24003"
     assert int(df.loc[0, "year"]) == 2020
     assert int(df.loc[0, "month"]) == 5
+    assert int(df.loc[0, "days_observed"]) == 1
+    assert bool(df.loc[0, "month_complete"]) is False
+
+
+def test_write_weather_features_monthly_output_appends_without_losing_prior_counties(
+    tmp_path: Path,
+) -> None:
+    first = compute_monthly_weather_features([sample_weather_daily()])[0]
+    second = replace(first, county_fips="24005", temp_mean_f=50.0)
+
+    write_weather_features_monthly_output([first], tmp_path)
+    write_weather_features_monthly_output([second], tmp_path, append=True)
+
+    df = pd.read_csv(
+        tmp_path / "weather_features_monthly.csv", dtype={"county_fips": str}
+    )
+    assert list(df["county_fips"]) == ["24003", "24005"]
+    assert list(df["temp_mean_f"]) == [55.0, 50.0]

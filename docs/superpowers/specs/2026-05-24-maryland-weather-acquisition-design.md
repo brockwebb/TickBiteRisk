@@ -167,6 +167,9 @@ year
 month
 source
 weather_model
+days_observed
+expected_days
+month_complete
 days_above_40f
 days_50_65f
 days_70_85f

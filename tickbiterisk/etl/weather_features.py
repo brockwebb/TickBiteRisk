@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from calendar import monthrange
 from dataclasses import dataclass, replace
 from itertools import groupby
 from statistics import mean
@@ -14,6 +15,9 @@ class WeatherMonthlyFeature:
     month: int
     source: str
     weather_model: str
+    days_observed: int
+    expected_days: int
+    month_complete: bool
     days_above_40f: int
     days_50_65f: int
     days_70_85f: int
@@ -25,7 +29,7 @@ class WeatherMonthlyFeature:
     precip_days: int
     dry_spell_max_days: int
     humidity_days_above_85pct: int
-    soil_moisture_mean: float
+    soil_moisture_mean: float | None
     soil_temp_above_40f_days: int
     hot_dry_stress_days: int
     evapotranspiration_total_mm: float
@@ -59,6 +63,8 @@ def compute_monthly_weather_features(
         sorted_rows, key=key
     ):
         rows = list(group)
+        days_observed = len({row.date for row in rows})
+        expected_days = monthrange(year, month)[1]
         features.append(
             WeatherMonthlyFeature(
                 county_fips=county_fips,
@@ -66,6 +72,9 @@ def compute_monthly_weather_features(
                 month=month,
                 source=source,
                 weather_model=weather_model,
+                days_observed=days_observed,
+                expected_days=expected_days,
+                month_complete=days_observed == expected_days,
                 days_above_40f=sum(row.temp_max_f >= 40 for row in rows),
                 days_50_65f=sum(50 <= row.temp_mean_f <= 65 for row in rows),
                 days_70_85f=sum(70 <= row.temp_mean_f <= 85 for row in rows),
@@ -83,8 +92,8 @@ def compute_monthly_weather_features(
                 humidity_days_above_85pct=sum(
                     row.humidity_mean_pct >= 85 for row in rows
                 ),
-                soil_moisture_mean=round(
-                    mean(row.soil_moisture_0_7cm for row in rows), 6
+                soil_moisture_mean=_nullable_mean(
+                    [row.soil_moisture_0_7cm for row in rows]
                 ),
                 soil_temp_above_40f_days=sum(
                     row.soil_temp_0_7cm_f >= 40 for row in rows
@@ -165,3 +174,10 @@ def _longest_dry_spell(rows: list[WeatherDailyObservation]) -> int:
         else:
             current = 0
     return longest
+
+
+def _nullable_mean(values: list[float | None]) -> float | None:
+    present_values = [value for value in values if value is not None]
+    if not present_values:
+        return None
+    return round(mean(present_values), 6)

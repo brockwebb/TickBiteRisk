@@ -54,7 +54,7 @@ class WeatherDailyObservation:
     snowfall_mm: float
     precipitation_hours: float
     soil_temp_0_7cm_f: float
-    soil_moisture_0_7cm: float
+    soil_moisture_0_7cm: float | None
     evapotranspiration_mm: float
     wind_mean_mph: float
     wind_max_mph: float
@@ -138,7 +138,7 @@ def parse_open_meteo_archive_response(
                 soil_temp_0_7cm_f=float(
                     daily["soil_temperature_0_to_7cm_mean"][index]
                 ),
-                soil_moisture_0_7cm=float(
+                soil_moisture_0_7cm=_nullable_float(
                     daily["soil_moisture_0_to_7cm_mean"][index]
                 ),
                 evapotranspiration_mm=float(
@@ -190,3 +190,9 @@ def fetch_open_meteo_archive(
                 break
             time.sleep(sleep_seconds * attempt)
     raise OpenMeteoArchiveError(f"Open-Meteo archive fetch failed: {last_error}")
+
+
+def _nullable_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    return float(value)

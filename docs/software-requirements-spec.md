@@ -146,6 +146,7 @@ The system must support Maryland daily weather acquisition and feature generatio
 - Plan full Open-Meteo backfill coverage for 2000-01-01 through 2024-12-31.
 - Write normalized daily rows to `weather_daily`.
 - Derive monthly tick-activity features in `weather_features_monthly`.
+- Include `days_observed`, `expected_days`, and `month_complete` on monthly features so partial smoke/backfill ranges cannot be mistaken for complete months.
 - Compute trailing 10-year weather normals and anomalies without future leakage; a feature for month `M` may only use weather observations available before `M`.
 
 NOAA CDO is a validation branch only, not the primary backfill source. It must read credentials from environment variables such as `NOAA_TOKEN` only.

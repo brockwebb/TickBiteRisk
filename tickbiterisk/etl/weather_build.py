@@ -49,6 +49,9 @@ WEATHER_MONTHLY_COLUMNS = [
     "month",
     "source",
     "weather_model",
+    "days_observed",
+    "expected_days",
+    "month_complete",
     "days_above_40f",
     "days_50_65f",
     "days_70_85f",
@@ -85,7 +88,7 @@ def write_weather_locations_output(
 
 
 def write_weather_daily_output(
-    rows: list[WeatherDailyObservation], output_dir: Path
+    rows: list[WeatherDailyObservation], output_dir: Path, *, append: bool = False
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "weather_daily.csv"
@@ -94,16 +97,44 @@ def write_weather_daily_output(
         record = asdict(row)
         record["date"] = row.date.isoformat()
         records.append(record)
-    pd.DataFrame(records, columns=WEATHER_DAILY_COLUMNS).to_csv(output_path, index=False)
+    _write_output(
+        records,
+        WEATHER_DAILY_COLUMNS,
+        output_path,
+        append=append,
+        key_columns=["county_fips", "date", "source", "weather_model"],
+    )
     return output_path
 
 
 def write_weather_features_monthly_output(
-    rows: list[WeatherMonthlyFeature], output_dir: Path
+    rows: list[WeatherMonthlyFeature], output_dir: Path, *, append: bool = False
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "weather_features_monthly.csv"
-    pd.DataFrame([asdict(row) for row in rows], columns=WEATHER_MONTHLY_COLUMNS).to_csv(
-        output_path, index=False
+    _write_output(
+        [asdict(row) for row in rows],
+        WEATHER_MONTHLY_COLUMNS,
+        output_path,
+        append=append,
+        key_columns=["county_fips", "year", "month", "source", "weather_model"],
     )
     return output_path
+
+
+def _write_output(
+    records: list[dict],
+    columns: list[str],
+    output_path: Path,
+    *,
+    append: bool,
+    key_columns: list[str],
+) -> None:
+    df = pd.DataFrame(records, columns=columns)
+    if append and output_path.exists():
+        existing = pd.read_csv(output_path, dtype={"county_fips": str})
+        df = pd.concat([existing, df], ignore_index=True)
+    if not df.empty:
+        df = df.drop_duplicates(subset=key_columns, keep="last")
+        df = df.sort_values(key_columns).reset_index(drop=True)
+    df.to_csv(output_path, index=False)

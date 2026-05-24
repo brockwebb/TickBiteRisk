@@ -51,3 +51,11 @@ def test_weather_monthly_features_include_anomaly_fields() -> None:
     assert "temp_anomaly_vs_10yr double precision" in schema
     assert "precip_anomaly_vs_10yr double precision" in schema
     assert "humidity_anomaly_vs_10yr double precision" in schema
+
+
+def test_weather_monthly_features_include_completeness_fields() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+
+    assert "days_observed integer NOT NULL" in schema
+    assert "expected_days integer NOT NULL" in schema
+    assert "month_complete boolean NOT NULL" in schema
