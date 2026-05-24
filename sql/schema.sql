@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS lyme_county_year_reconciled (
     canonical_source_id text NOT NULL,
     source_values_summary text NOT NULL,
     reconciliation_status text NOT NULL,
-    data_quality_flags text NOT NULL DEFAULT '',
+    data_quality_flags text DEFAULT '',
     created_at timestamptz DEFAULT now(),
     PRIMARY KEY (county_fips, year)
 );
@@ -49,7 +49,9 @@ CREATE TABLE IF NOT EXISTS tick_vector_status (
     source_id text NOT NULL,
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
     ixodes_scapularis_status text,
+    ixodes_scapularis_source text,
     ixodes_pacificus_status text,
+    ixodes_pacificus_source text,
     created_at timestamptz DEFAULT now(),
     PRIMARY KEY (source_id, county_fips)
 );
