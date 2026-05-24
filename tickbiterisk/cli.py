@@ -15,7 +15,10 @@ from tickbiterisk.etl.noaa import (
 )
 from tickbiterisk.etl.noaa_backfill import (
     NoaaBackfillError,
+    resolve_maryland_noaa_county_fips,
     run_noaa_county_backfill,
+    run_noaa_maryland_backfill,
+    validate_noaa_backfill_args,
 )
 from tickbiterisk.etl.open_meteo import (
     build_open_meteo_archive_url,
@@ -221,6 +224,91 @@ def noaa_backfill_county(
         f"Wrote {result.daily_observation_count} daily observation row(s) "
         f"to {result.daily_output_path}"
     )
+
+
+@etl_app.command("noaa-backfill-maryland")
+def noaa_backfill_maryland(
+    start_date: str = typer.Option(..., help="Daily observation start date."),
+    end_date: str = typer.Option(..., help="Daily observation end date."),
+    output_dir: Path = typer.Option(
+        Path("build/etl"), help="Output directory for ETL artifacts."
+    ),
+    county_fips: list[str] | None = typer.Option(
+        None,
+        "--county-fips",
+        help="Optional Maryland county FIPS subset. Repeat for multiple counties.",
+    ),
+    station_limit: int = typer.Option(
+        1, help="Maximum number of selected NOAA stations per county."
+    ),
+    min_data_coverage: float = typer.Option(
+        0.5, help="Minimum NOAA station data coverage."
+    ),
+    max_end_lag_days: int = typer.Option(
+        14, help="Allowed station-reporting lag at the requested end date."
+    ),
+    fail_fast: bool = typer.Option(False, help="Stop at the first county failure."),
+    allow_partial: bool = typer.Option(
+        False, help="Exit successfully even when one or more counties fail."
+    ),
+    dry_run: bool = typer.Option(False, help="Print planned queries without fetching data."),
+) -> None:
+    parsed_start_date = _parse_iso_date(start_date, "start-date")
+    parsed_end_date = _parse_iso_date(end_date, "end-date")
+    try:
+        county_fips_values = resolve_maryland_noaa_county_fips(county_fips)
+    except NoaaBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    try:
+        validate_noaa_backfill_args(
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            station_limit=station_limit,
+        )
+    except NoaaBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if dry_run:
+        typer.echo(
+            f"Planned {len(county_fips_values)} Maryland NOAA county backfill(s)"
+        )
+        for value in county_fips_values:
+            typer.echo(
+                build_noaa_station_url(
+                    value,
+                    parsed_start_date,
+                    parsed_end_date,
+                )
+            )
+        typer.echo("daily URLs require station selection")
+        return
+
+    try:
+        result = run_noaa_maryland_backfill(
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            output_dir=output_dir,
+            token=get_noaa_token(),
+            county_fips_values=county_fips_values,
+            station_limit=station_limit,
+            min_data_coverage=min_data_coverage,
+            max_end_lag_days=max_end_lag_days,
+            continue_on_error=not fail_fast,
+        )
+    except NoaaBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    typer.echo(
+        f"Completed {result.success_count}/{result.county_count} "
+        "Maryland county backfill(s)"
+    )
+    typer.echo(f"Wrote {result.daily_observation_count} daily observation row(s)")
+    if result.failure_count:
+        typer.echo(f"Failures: {result.failure_count}")
+        for failure in result.failures:
+            typer.echo(f"{failure.county_fips}: {failure.error}")
+        if not allow_partial:
+            raise typer.Exit(1)
 
 
 def _parse_iso_date(value: str, option_name: str) -> date:

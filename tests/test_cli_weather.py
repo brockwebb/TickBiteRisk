@@ -2,7 +2,11 @@ import pytest
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
-from tickbiterisk.etl.noaa_backfill import NoaaCountyBackfillResult
+from tickbiterisk.etl.noaa_backfill import (
+    NoaaCountyBackfillFailure,
+    NoaaCountyBackfillResult,
+    NoaaMarylandBackfillResult,
+)
 
 
 runner = CliRunner()
@@ -160,3 +164,198 @@ def test_noaa_backfill_county_command_reports_result(
     assert result.exit_code == 0
     assert "Selected 1 station(s): GHCND:BWI" in result.stdout
     assert "Wrote 2 daily observation row(s)" in result.stdout
+
+
+def test_noaa_backfill_maryland_dry_run_prints_county_plan(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-maryland",
+            "--start-date",
+            "1992-01-01",
+            "--end-date",
+            "2026-05-24",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+            "--county-fips",
+            "24005",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Planned 2 Maryland NOAA county backfill(s)" in result.stdout
+    assert "FIPS%3A24003" in result.stdout
+    assert "FIPS%3A24005" in result.stdout
+    assert not (tmp_path / "noaa_ghcnd_daily_observations.csv").exists()
+
+
+def test_noaa_backfill_maryland_command_reports_summary(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_token() -> str:
+        return "token-value"
+
+    def fake_backfill(**kwargs) -> NoaaMarylandBackfillResult:
+        assert kwargs["token"] == "token-value"
+        assert kwargs["county_fips_values"] == ["24003"]
+        assert kwargs["output_dir"] == tmp_path
+        return NoaaMarylandBackfillResult(
+            county_results=[
+                NoaaCountyBackfillResult(
+                    county_fips="24003",
+                    selected_station_ids=["GHCND:BWI"],
+                    station_count=1,
+                    daily_observation_count=2,
+                    stations_output_path=tmp_path / "noaa_ghcnd_stations.csv",
+                    daily_output_path=tmp_path / "noaa_ghcnd_daily_observations.csv",
+                )
+            ],
+            failures=[],
+        )
+
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", fake_token)
+    monkeypatch.setattr("tickbiterisk.cli.run_noaa_maryland_backfill", fake_backfill)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-maryland",
+            "--start-date",
+            "1992-05-01",
+            "--end-date",
+            "1992-05-02",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Completed 1/1 Maryland county backfill(s)" in result.stdout
+    assert "Wrote 2 daily observation row(s)" in result.stdout
+
+
+def test_noaa_backfill_maryland_exits_nonzero_on_partial_failures(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_token() -> str:
+        return "token-value"
+
+    def fake_backfill(**kwargs) -> NoaaMarylandBackfillResult:
+        return NoaaMarylandBackfillResult(
+            county_results=[],
+            failures=[
+                NoaaCountyBackfillFailure(
+                    county_fips="24003",
+                    error="No NOAA GHCND station covers county_fips=24003",
+                )
+            ],
+        )
+
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", fake_token)
+    monkeypatch.setattr("tickbiterisk.cli.run_noaa_maryland_backfill", fake_backfill)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-maryland",
+            "--start-date",
+            "1992-05-01",
+            "--end-date",
+            "1992-05-02",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Failures: 1" in result.stdout
+    assert "24003: No NOAA GHCND station covers county_fips=24003" in result.stdout
+
+
+def test_noaa_backfill_maryland_allow_partial_exits_zero(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", lambda: "token-value")
+    monkeypatch.setattr(
+        "tickbiterisk.cli.run_noaa_maryland_backfill",
+        lambda **kwargs: NoaaMarylandBackfillResult(
+            county_results=[],
+            failures=[
+                NoaaCountyBackfillFailure(county_fips="24003", error="station miss")
+            ],
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-maryland",
+            "--start-date",
+            "1992-05-01",
+            "--end-date",
+            "1992-05-02",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+            "--allow-partial",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Failures: 1" in result.stdout
+
+
+def test_noaa_backfill_maryland_dry_run_rejects_non_maryland_fips(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-maryland",
+            "--start-date",
+            "1992-01-01",
+            "--end-date",
+            "1992-01-02",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "99999",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Unknown Maryland county FIPS: 99999" in result.output
+
+
+def test_noaa_backfill_maryland_dry_run_rejects_inverted_dates(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-backfill-maryland",
+            "--start-date",
+            "2026-05-24",
+            "--end-date",
+            "1992-01-01",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "end_date must be on or after start_date" in result.output

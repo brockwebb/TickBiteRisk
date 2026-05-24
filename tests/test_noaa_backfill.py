@@ -7,9 +7,11 @@ import pandas as pd
 import pytest
 
 from tickbiterisk.etl.noaa_backfill import (
+    NoaaBackfillCountyFipsError,
     NoaaBackfillDateRangeError,
     NoaaBackfillNoStationError,
     run_noaa_county_backfill,
+    run_noaa_maryland_backfill,
 )
 
 
@@ -195,3 +197,168 @@ def test_run_noaa_county_backfill_fetches_multiple_selected_stations(
     assert result.daily_observation_count == 2
     assert any("stationid=GHCND%3AFIRST" in call for call in calls)
     assert any("stationid=GHCND%3ASECOND" in call for call in calls)
+
+
+def test_run_noaa_maryland_backfill_runs_requested_county_subset(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    def fake_json_get(url: str, token: str) -> dict:
+        calls.append(url)
+        county = "24003" if "FIPS%3A24003" in url or "stationid=GHCND%3AMD24003" in url else "24005"
+        station_id = f"GHCND:MD{county}"
+        if "stations?" in url:
+            return {
+                "results": [
+                    {
+                        "id": station_id,
+                        "name": f"STATION {county}",
+                        "latitude": 39.0,
+                        "longitude": -76.0,
+                        "mindate": "1939-01-01",
+                        "maxdate": "2026-01-01",
+                        "datacoverage": 0.99,
+                    }
+                ]
+            }
+        return {
+            "results": [
+                {
+                    "date": "1992-05-01T00:00:00",
+                    "datatype": "TMAX",
+                    "station": station_id,
+                    "value": 72.0,
+                }
+            ]
+        }
+
+    result = run_noaa_maryland_backfill(
+        start_date=date(1992, 5, 1),
+        end_date=date(1992, 5, 1),
+        output_dir=tmp_path,
+        token="token-value",
+        county_fips_values=["24003", "24005"],
+        json_get=fake_json_get,
+    )
+
+    assert result.county_count == 2
+    assert result.success_count == 2
+    assert result.failure_count == 0
+    assert result.daily_observation_count == 2
+    assert [row.county_fips for row in result.county_results] == ["24003", "24005"]
+    assert any("FIPS%3A24003" in call for call in calls)
+    assert any("FIPS%3A24005" in call for call in calls)
+
+    daily = pd.read_csv(
+        tmp_path / "noaa_ghcnd_daily_observations.csv",
+        dtype={"county_fips": str},
+    )
+    assert list(daily["county_fips"]) == ["24003", "24005"]
+
+
+def test_run_noaa_maryland_backfill_records_county_failures_and_continues(
+    tmp_path: Path,
+) -> None:
+    def fake_json_get(url: str, token: str) -> dict:
+        if "FIPS%3A24003" in url:
+            return {"results": []}
+        if "stations?" in url:
+            return {
+                "results": [
+                    {
+                        "id": "GHCND:MD24005",
+                        "name": "STATION 24005",
+                        "latitude": 39.0,
+                        "longitude": -76.0,
+                        "mindate": "1939-01-01",
+                        "maxdate": "2026-01-01",
+                        "datacoverage": 0.99,
+                    }
+                ]
+            }
+        return {
+            "results": [
+                {
+                    "date": "1992-05-01T00:00:00",
+                    "datatype": "TMAX",
+                    "station": "GHCND:MD24005",
+                    "value": 72.0,
+                }
+            ]
+        }
+
+    result = run_noaa_maryland_backfill(
+        start_date=date(1992, 5, 1),
+        end_date=date(1992, 5, 1),
+        output_dir=tmp_path,
+        token="token-value",
+        county_fips_values=["24003", "24005"],
+        json_get=fake_json_get,
+    )
+
+    assert result.success_count == 1
+    assert result.failure_count == 1
+    assert result.failures[0].county_fips == "24003"
+    assert "No NOAA GHCND station covers county_fips=24003" in result.failures[0].error
+    assert result.county_results[0].county_fips == "24005"
+
+
+def test_run_noaa_maryland_backfill_records_unexpected_county_failures(
+    tmp_path: Path,
+) -> None:
+    def fake_json_get(url: str, token: str) -> dict:
+        if "FIPS%3A24003" in url:
+            raise ValueError("NOAA payload changed shape")
+        if "stations?" in url:
+            return {
+                "results": [
+                    {
+                        "id": "GHCND:MD24005",
+                        "name": "STATION 24005",
+                        "latitude": 39.0,
+                        "longitude": -76.0,
+                        "mindate": "1939-01-01",
+                        "maxdate": "2026-01-01",
+                        "datacoverage": 0.99,
+                    }
+                ]
+            }
+        return {
+            "results": [
+                {
+                    "date": "1992-05-01T00:00:00",
+                    "datatype": "TMAX",
+                    "station": "GHCND:MD24005",
+                    "value": 72.0,
+                }
+            ]
+        }
+
+    result = run_noaa_maryland_backfill(
+        start_date=date(1992, 5, 1),
+        end_date=date(1992, 5, 1),
+        output_dir=tmp_path,
+        token="token-value",
+        county_fips_values=["24003", "24005"],
+        json_get=fake_json_get,
+    )
+
+    assert result.success_count == 1
+    assert result.failure_count == 1
+    assert result.failures[0].county_fips == "24003"
+    assert result.failures[0].error == "ValueError: NOAA payload changed shape"
+
+
+def test_run_noaa_maryland_backfill_rejects_non_maryland_fips(tmp_path: Path) -> None:
+    with pytest.raises(NoaaBackfillCountyFipsError) as exc_info:
+        run_noaa_maryland_backfill(
+            start_date=date(1992, 5, 1),
+            end_date=date(1992, 5, 1),
+            output_dir=tmp_path,
+            token="token-value",
+            county_fips_values=["99999"],
+            json_get=lambda url, token: {"results": []},
+        )
+
+    assert "Unknown Maryland county FIPS: 99999" in str(exc_info.value)
