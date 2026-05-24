@@ -45,14 +45,8 @@ def build_census_intercensal_1990_population_url(
 ) -> str:
     return _build_census_url(
         CENSUS_INTERCENSAL_1990_DATASET,
-        get=["POP", "YEAR", "STATE", "COUNTY"],
-        predicates={
-            "for": "county:*",
-            "in": "state:24",
-            "AGEGRP": "0",
-            "RACE_SEX": "0",
-            "HISP": "0",
-        },
+        get=["POP", "YEAR", "AGEGRP", "RACE_SEX", "HISP", "STATE", "COUNTY"],
+        predicates={"for": "county:*", "in": "state:24"},
         api_key=api_key,
     )
 
@@ -88,7 +82,7 @@ def build_census_pep_2023_charv_population_url(
             "in": "state:24",
             "YEAR": str(year),
             "MONTH": "7",
-            "AGE": "999",
+            "AGE": "0000",
             "SEX": "0",
             "HISP": "0",
             "POPGROUP": "001",
@@ -148,16 +142,27 @@ def parse_census_intercensal_1990_population(
     min_year: int = 1990,
     max_year: int = 1999,
 ) -> list[CensusCountyPopulation]:
-    records = []
+    aggregates: dict[tuple[str, str, int], dict[str, Any]] = {}
     for row in _records(payload):
-        year = int(row["YEAR"])
+        year = _intercensal_1990_year(row["YEAR"])
         if not min_year <= year <= max_year:
             continue
+        state = str(row.get("state") or row.get("STATE") or "").zfill(2)
+        county = str(row.get("county") or row.get("COUNTY") or "").zfill(3)
+        key = (state, county, year)
+        if key not in aggregates:
+            aggregates[key] = {"row": row, "population": 0}
+        aggregates[key]["population"] += int(row["POP"])
+
+    records = []
+    for (_state, _county, year), aggregate in aggregates.items():
+        row = dict(aggregate["row"])
+        row["POP"] = str(aggregate["population"])
         records.append(
             _population_row(
                 row=row,
                 year=year,
-                population=int(row["POP"]),
+                population=aggregate["population"],
                 source_id="census_pep_intercensal_1990_2000",
                 census_dataset=CENSUS_INTERCENSAL_1990_DATASET,
                 vintage=2000,
@@ -229,7 +234,7 @@ def parse_census_pep_2023_charv_population(
     for row in _records(payload):
         if (
             row.get("MONTH") != "7"
-            or row.get("AGE") != "999"
+            or row.get("AGE") != "0000"
             or row.get("SEX") != "0"
             or row.get("HISP") != "0"
             or row.get("POPGROUP") != "001"
@@ -351,6 +356,13 @@ def _year_from_date_description(value: str) -> int | None:
     if match is None:
         return None
     return int(match.group(0))
+
+
+def _intercensal_1990_year(value: str) -> int:
+    year = int(value)
+    if 90 <= year <= 99:
+        return 1900 + year
+    return year
 
 
 def _url_hash(source_url: str) -> str:

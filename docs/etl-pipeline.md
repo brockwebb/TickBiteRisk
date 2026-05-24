@@ -58,10 +58,11 @@ transform_nlcd_edge.py  # rasterio windowed read
 * Calculates `%forest`, `%pasture`, and **edge density** (m of forest‑nonforest boundary / km²) for each county.
 * Writes to `cov_nlcd_edge`.
 
-### 2.5  ACS Population (`fetch_acs.sh`)
+### 2.5  Census Population (`tickbiterisk etl census-population`)
 
-* Uses Census API: `https://api.census.gov/data/2023/acs/acs5?get=B01003_001E&for=county:*`.
-* Loads into `cov_pop_density`.
+* Uses Census PEP/intercensal APIs for Maryland county-year denominators.
+* Reads `CENSUS_API_KEY` from the environment for live refreshes.
+* Writes `county_population_year.csv`; warehouse target is `county_population_year`.
 
 ### 2.6  CAPC Dog Serology (`fetch_capc.sh` – optional)
 
@@ -86,7 +87,7 @@ transform_nlcd_edge.py  # rasterio windowed read
 
 ## 4  Orchestration
 
-* **Annual job** (`cron/annual.sh`): runs `fetch_cdc_ticks.sh`, `fetch_fars.sh`, `fetch_nlcd.sh`, `fetch_acs.sh`, then transformation scripts, then triggers full PyMC MCMC.
+* **Annual job** (`cron/annual.sh`): runs `fetch_cdc_ticks.sh`, `fetch_fars.sh`, `fetch_nlcd.sh`, Census population refresh, then transformation scripts, then triggers full PyMC MCMC.
 * **Weekly job** (`cron/weekly.sh`): runs `fetch_ed.sh`, `derive_lambda_inputs.py`, incremental ADVI fit.
 
 All cron scripts exit non‑zero on failure, surfacing errors in GitHub Actions logs.

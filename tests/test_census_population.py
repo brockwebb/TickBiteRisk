@@ -36,10 +36,11 @@ def test_build_census_population_urls_append_key_without_leaking_in_sanitized_ur
 def test_parse_census_intercensal_1990_population_filters_requested_years() -> None:
     rows = parse_census_intercensal_1990_population(
         [
-            ["POP", "YEAR", "STATE", "COUNTY", "state", "county"],
-            ["427239", "1991", "24", "003", "24", "003"],
-            ["435756", "1992", "24", "003", "24", "003"],
-            ["489656", "1999", "24", "003", "24", "003"],
+            ["POP", "YEAR", "AGEGRP", "RACE_SEX", "HISP", "STATE", "COUNTY", "state", "county"],
+            ["10", "91", "00", "01", "1", "24", "003", "24", "003"],
+            ["20", "92", "00", "01", "1", "24", "003", "24", "003"],
+            ["30", "92", "00", "02", "1", "24", "003", "24", "003"],
+            ["40", "99", "00", "01", "1", "24", "003", "24", "003"],
         ],
         source_url="https://example.test/census?key=secret",
         min_year=1992,
@@ -48,7 +49,7 @@ def test_parse_census_intercensal_1990_population_filters_requested_years() -> N
 
     assert [row.year for row in rows] == [1992, 1999]
     assert rows[0].county_fips == "24003"
-    assert rows[0].population == 435756
+    assert rows[0].population == 50
     assert rows[0].source_id == "census_pep_intercensal_1990_2000"
     assert len(rows[0].source_url_hash) == 64
 
@@ -103,8 +104,8 @@ def test_parse_census_pep_2023_charv_population_keeps_total_july_estimates() -> 
     rows = parse_census_pep_2023_charv_population(
         [
             ["NAME", "POP", "YEAR", "MONTH", "AGE", "SEX", "HISP", "POPGROUP", "state", "county"],
-            ["Anne Arundel County, Maryland", "590336", "2023", "7", "999", "0", "0", "001", "24", "003"],
-            ["Anne Arundel County, Maryland", "42", "2023", "7", "999", "1", "0", "001", "24", "003"],
+            ["Anne Arundel County, Maryland", "590336", "2023", "7", "0000", "0", "0", "001", "24", "003"],
+            ["Anne Arundel County, Maryland", "42", "2023", "7", "0000", "1", "0", "001", "24", "003"],
         ],
         source_url="https://example.test/census",
     )
@@ -121,7 +122,11 @@ def test_fetch_maryland_county_population_estimates_combines_source_eras() -> No
     def fake_json_get(url: str) -> list[list[str]]:
         calls.append(url)
         if "/1990/pep/int_charagegroups" in url:
-            return [["POP", "YEAR", "STATE", "COUNTY"], ["100", "1992", "24", "003"]]
+            return [
+                ["POP", "YEAR", "AGEGRP", "RACE_SEX", "HISP", "STATE", "COUNTY"],
+                ["40", "92", "00", "01", "1", "24", "003"],
+                ["60", "92", "00", "02", "1", "24", "003"],
+            ]
         if "/2000/pep/int_population" in url:
             return [
                 ["GEONAME", "POP", "DATE_", "DATE_DESC", "state", "county"],
@@ -132,7 +137,7 @@ def test_fetch_maryland_county_population_estimates_combines_source_eras() -> No
         if "/2023/pep/charv" in url:
             return [
                 ["NAME", "POP", "YEAR", "MONTH", "AGE", "SEX", "HISP", "POPGROUP", "state", "county"],
-                ["Anne Arundel County, Maryland", "400", "2023", "7", "999", "0", "0", "001", "24", "003"],
+                ["Anne Arundel County, Maryland", "400", "2023", "7", "0000", "0", "0", "001", "24", "003"],
             ]
         raise AssertionError(url)
 
