@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slice is implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, and Postgres-ready schema. Weather acquisition and model backtesting are the next planned slices.
+Implementation status: the first ETL slice is implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, weather ETL scaffolding, and Postgres-ready schema. NOAA historical weather acquisition and model backtesting are the next planned slices.
 
 ## 1. Purpose
 
@@ -58,6 +58,8 @@ The system must:
 - Label every derived feature with source and transformation lineage.
 - Avoid redistributing restricted source data when terms are unclear.
 - Prefer derived risk scores and aggregate features for product output.
+- Keep raw/private data, credentials, and warehouse dumps out of git.
+- Publish only derived public data products unless a source is clearly redistributable.
 - Never imply that `no records` means absence of ticks or pathogens.
 
 ## 6. Functional Requirements
@@ -141,15 +143,16 @@ These are static/cumulative stratification layers. They are not prevalence estim
 The system must support Maryland daily weather acquisition and feature generation:
 
 - Build Maryland county weather locations from Census Gazetteer county internal points.
-- Use Open-Meteo historical archive as the default daily backfill source.
+- Use NOAA CDO/GHCND daily station observations as the primary observed historical weather backfill source.
+- Retain Open-Meteo historical weather/reanalysis as a secondary comparison or gap-fill source where useful.
 - Support bounded county/date backfills before full Maryland range runs.
-- Plan full Open-Meteo backfill coverage for 2000-01-01 through 2024-12-31.
+- Plan full NOAA historical weather coverage for at least 1992-01-01 through the current year.
 - Write normalized daily rows to `weather_daily`.
 - Derive monthly tick-activity features in `weather_features_monthly`.
 - Include `days_observed`, `expected_days`, and `month_complete` on monthly features so partial smoke/backfill ranges cannot be mistaken for complete months.
 - Compute trailing 10-year weather normals and anomalies without future leakage; a feature for month `M` may only use weather observations available before `M`.
 
-NOAA CDO is a validation branch only, not the primary backfill source. It must read credentials from environment variables such as `NOAA_TOKEN` only.
+NOAA CDO must read credentials from environment variables such as `NOAA_TOKEN` only.
 
 ### FR7: Host Ecology Features
 
@@ -242,6 +245,8 @@ Every normalized row must trace to a source ID, dataset ID or file checksum, and
 
 Tokens and credentials must not be committed to git. NOAA credentials are local-only and read from environment variables such as `NOAA_TOKEN`.
 
+Raw data directories, private warehouse outputs, and local database dumps must be ignored by git.
+
 ### NFR4: Performance
 
 The Maryland MVP may run locally. ETL jobs should be acceptable on a laptop. Heavy national geodata processing is optional unless needed for Maryland extraction.
@@ -250,9 +255,11 @@ The Maryland MVP may run locally. ETL jobs should be acceptable on a laptop. Hea
 
 The product must prefer honest source-quality labels over false precision.
 
+The public web product must use a derived data product with source citations and methodology notes. Raw source files, local warehouse dumps, and terms-unclear source extracts remain private.
+
 ### NFR6: Safety
 
-The product must display a non-medical-advice disclaimer. It must not recommend antibiotics, diagnosis, or treatment.
+The product must display plain language that it is informational and educational only, not medical advice, diagnosis, or treatment guidance. It must recommend following CDC guidance and consulting a qualified healthcare professional about individual situations.
 
 ## 8. Modeling Guidance
 
