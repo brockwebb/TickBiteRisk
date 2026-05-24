@@ -14,6 +14,15 @@ def _norm_status(value: object) -> str:
     return text
 
 
+def _clean_optional_text(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    if text.lower() in {"", "nan", "none"}:
+        return ""
+    return text
+
+
 def _read_excel_sheet(
     path: Path, sheet_name: str, required_columns: set[str]
 ) -> pd.DataFrame:
@@ -53,18 +62,18 @@ def parse_ixodes_status(path: Path, source_id: str) -> list[dict[str, object]]:
                 "ixodes_scapularis_status": _norm_status(
                     record["Ixodes_scapularis_County_Status"]
                 ),
-                "ixodes_scapularis_source": record.get(
-                    "Ixodes_scapularis_data_source", ""
+                "ixodes_scapularis_source": _clean_optional_text(
+                    record.get("Ixodes_scapularis_data_source", "")
                 ),
                 "ixodes_pacificus_status": _norm_status(
                     record["Ixodes_pacificus_county_status"]
                 ),
-                "ixodes_pacificus_source": record.get(
-                    "Ixodes_pacificus_data_source", ""
+                "ixodes_pacificus_source": _clean_optional_text(
+                    record.get("Ixodes_pacificus_data_source", "")
                 ),
             }
         )
-    return rows
+    return sorted(rows, key=lambda row: str(row["county_fips"]))
 
 
 def parse_pathogen_status(path: Path, source_id: str) -> list[dict[str, object]]:
@@ -106,7 +115,7 @@ def parse_pathogen_status(path: Path, source_id: str) -> list[dict[str, object]]
                 ),
             }
         )
-    return rows
+    return sorted(rows, key=lambda row: str(row["county_fips"]))
 
 
 def parse_lone_star_status(path: Path, source_id: str) -> list[dict[str, object]]:
@@ -123,8 +132,10 @@ def parse_lone_star_status(path: Path, source_id: str) -> list[dict[str, object]
                 "amblyomma_americanum_status": _norm_status(
                     record["County Status of A. americanum"]
                 ),
-                "status_source": record.get("Source", ""),
-                "source_comments": record.get("Source Comments", ""),
+                "status_source": _clean_optional_text(record.get("Source", "")),
+                "source_comments": _clean_optional_text(
+                    record.get("Source Comments", "")
+                ),
             }
         )
-    return rows
+    return sorted(rows, key=lambda row: str(row["county_fips"]))
