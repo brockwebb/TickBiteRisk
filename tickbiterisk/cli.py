@@ -5,6 +5,16 @@ from pathlib import Path
 
 import typer
 
+from tickbiterisk.etl.census_population import (
+    CensusApiResponseError,
+    build_census_intercensal_1990_population_url,
+    build_census_intercensal_2000_population_url,
+    build_census_pep_2019_population_url,
+    build_census_pep_2023_charv_population_url,
+    fetch_maryland_county_population_estimates,
+    get_census_api_key,
+    sanitize_census_url,
+)
 from tickbiterisk.etl.noaa import (
     build_noaa_daily_data_url,
     build_noaa_station_url,
@@ -25,6 +35,7 @@ from tickbiterisk.etl.open_meteo import (
     build_open_meteo_archive_url,
     fetch_open_meteo_archive,
 )
+from tickbiterisk.etl.population_build import write_county_population_output
 from tickbiterisk.etl.weather_build import (
     write_noaa_daily_observations_output,
     write_noaa_stations_output,
@@ -66,6 +77,30 @@ def weather_locations(
         load_maryland_weather_locations(), output_dir
     )
     typer.echo(f"Wrote {output}")
+
+
+@etl_app.command("census-population")
+def census_population(
+    output_dir: Path = typer.Option(
+        Path("build/etl"), help="Output directory for ETL artifacts."
+    ),
+    dry_run: bool = typer.Option(False, help="Print planned Census queries."),
+) -> None:
+    api_key = get_census_api_key()
+    urls = _census_population_urls(api_key=api_key)
+    if dry_run:
+        typer.echo(f"Planned Census population query(s): {len(urls)}")
+        for url in urls:
+            typer.echo(sanitize_census_url(url))
+        return
+
+    try:
+        rows = fetch_maryland_county_population_estimates(api_key=api_key)
+    except CensusApiResponseError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    output = write_county_population_output(rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} county-year population row(s) to {output}")
 
 
 @etl_app.command("weather-backfill-open-meteo")
@@ -405,6 +440,18 @@ def _parse_iso_date(value: str, option_name: str) -> date:
         raise typer.BadParameter(
             f"{option_name} must use YYYY-MM-DD format"
         ) from exc
+
+
+def _census_population_urls(*, api_key: str | None) -> list[str]:
+    return [
+        build_census_intercensal_1990_population_url(api_key=api_key),
+        build_census_intercensal_2000_population_url(api_key=api_key),
+        build_census_pep_2019_population_url(api_key=api_key),
+        *[
+            build_census_pep_2023_charv_population_url(year=year, api_key=api_key)
+            for year in range(2020, 2024)
+        ],
+    ]
 
 
 if __name__ == "__main__":

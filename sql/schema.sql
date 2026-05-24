@@ -78,6 +78,19 @@ CREATE TABLE IF NOT EXISTS lone_star_status (
     PRIMARY KEY (source_id, county_fips)
 );
 
+CREATE TABLE IF NOT EXISTS county_population_year (
+    county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
+    county_name text NOT NULL,
+    year integer NOT NULL,
+    population integer NOT NULL CHECK (population > 0),
+    source_id text NOT NULL,
+    census_dataset text NOT NULL,
+    vintage integer NOT NULL,
+    source_url_hash text NOT NULL,
+    ingested_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, year)
+);
+
 CREATE TABLE IF NOT EXISTS weather_locations (
     county_fips char(5) PRIMARY KEY REFERENCES md_jurisdictions(county_fips),
     state_fips char(2) NOT NULL DEFAULT '24',

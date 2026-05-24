@@ -5,9 +5,11 @@ from pathlib import Path
 import pandas as pd
 
 from tickbiterisk.etl.build import write_reconciled_lyme_outputs
+from tickbiterisk.etl.census_population import CensusCountyPopulation
 from tickbiterisk.etl.lyme import LymeCountyYearValue
 from tickbiterisk.etl.noaa import NoaaDailyObservation, NoaaStation
 from tickbiterisk.etl.open_meteo import WeatherDailyObservation
+from tickbiterisk.etl.population_build import write_county_population_output
 from tickbiterisk.etl.weather_build import (
     write_noaa_daily_observations_output,
     write_noaa_stations_output,
@@ -117,6 +119,19 @@ def sample_noaa_daily() -> NoaaDailyObservation:
     )
 
 
+def sample_population() -> CensusCountyPopulation:
+    return CensusCountyPopulation(
+        county_fips="24003",
+        county_name="Anne Arundel County",
+        year=2023,
+        population=590336,
+        source_id="census_pep_2023_charv",
+        census_dataset="2023/pep/charv",
+        vintage=2023,
+        source_url_hash="c" * 64,
+    )
+
+
 def test_write_weather_locations_output_creates_csv(tmp_path: Path) -> None:
     output = write_weather_locations_output(
         load_maryland_weather_locations()[:1], tmp_path
@@ -188,6 +203,40 @@ def test_write_weather_daily_output_appends_without_losing_prior_counties(
     df = pd.read_csv(tmp_path / "weather_daily.csv", dtype={"county_fips": str})
     assert list(df["county_fips"]) == ["24003", "24005"]
     assert list(df["temp_mean_f"]) == [55.0, 50.0]
+
+
+def test_write_county_population_output_creates_csv(tmp_path: Path) -> None:
+    output = write_county_population_output([sample_population()], tmp_path)
+
+    df = pd.read_csv(output, dtype={"county_fips": str})
+
+    assert output.name == "county_population_year.csv"
+    assert list(df.columns) == [
+        "county_fips",
+        "county_name",
+        "year",
+        "population",
+        "source_id",
+        "census_dataset",
+        "vintage",
+        "source_url_hash",
+    ]
+    assert df.loc[0, "county_fips"] == "24003"
+    assert int(df.loc[0, "population"]) == 590336
+
+
+def test_write_county_population_output_appends_and_dedupes_by_county_year(
+    tmp_path: Path,
+) -> None:
+    first = sample_population()
+    replacement = replace(first, population=590337)
+
+    write_county_population_output([first], tmp_path)
+    write_county_population_output([replacement], tmp_path, append=True)
+
+    df = pd.read_csv(tmp_path / "county_population_year.csv", dtype={"county_fips": str})
+    assert len(df) == 1
+    assert int(df.loc[0, "population"]) == 590337
 
 
 def test_write_weather_features_weekly_output_creates_csv(tmp_path: Path) -> None:

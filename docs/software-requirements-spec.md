@@ -101,6 +101,7 @@ Initial normalized tables:
 - `lone_star_status`
 - `all_tbd_2022_county`
 - `nssp_coverage`
+- `county_population_year`
 - `weather_locations`
 - `weather_daily`
 - `weather_features_weekly`
@@ -164,6 +165,18 @@ NOAA CDO must read credentials from environment variables such as `NOAA_TOKEN` o
 
 ### FR7: Host Ecology Features
 
+### FR7: Population Denominators
+
+The system must acquire Maryland county-year population denominators for incidence-rate modeling:
+
+- Use Census PEP/intercensal APIs as the primary county-year population source.
+- Cover Lyme outcome years starting in 1992 where Census API support is available.
+- Store denominators in `county_population_year` keyed by `county_fips, year`.
+- Preserve Census dataset, source ID, vintage, and source URL hash for provenance.
+- Read `CENSUS_API_KEY` from the environment when required; never print or commit the key.
+
+### FR8: Host Ecology Features
+
 The system must include host/ecology feature slots for:
 
 - Maryland deer harvest by county/year.
@@ -172,7 +185,7 @@ The system must include host/ecology feature slots for:
 
 These sources may be missing in the first ETL slice, but the schema and manifest must track them.
 
-### FR8: Risk Score
+### FR9: Risk Score
 
 The product risk score is 1-10.
 
@@ -193,7 +206,7 @@ Display categories:
 - `7-8`: high
 - `9-10`: very high
 
-### FR9: Model Backtesting
+### FR10: Model Backtesting
 
 Every candidate model must be evaluated through time-aware backtests.
 
@@ -210,7 +223,7 @@ Backtests must report:
 - Source version/checksums.
 - Whether weather is reconstruction mode or forecast mode.
 
-### FR10: Model Bake-Off
+### FR11: Model Bake-Off
 
 The system must support multiple modeling lanes before choosing a product model:
 
@@ -224,7 +237,7 @@ The system must support multiple modeling lanes before choosing a product model:
 
 No model family is accepted because it is fashionable or intuitive. Product use requires backtest evidence.
 
-### FR11: User Explanation
+### FR12: User Explanation
 
 For any generated score, the system must provide a compact explanation:
 
@@ -235,7 +248,7 @@ For any generated score, the system must provide a compact explanation:
 - Habitat/host contribution when available.
 - Source-quality warnings.
 
-### FR12: Export
+### FR13: Export
 
 The system must export model-ready tables as Parquet or CSV for analysis and reproducibility.
 

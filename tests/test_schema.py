@@ -11,6 +11,7 @@ def test_schema_defines_core_tables() -> None:
         "tick_vector_status",
         "tick_pathogen_status",
         "lone_star_status",
+        "county_population_year",
         "weather_locations",
         "noaa_ghcnd_stations",
         "noaa_ghcnd_daily_observations",
@@ -40,6 +41,15 @@ def test_weather_daily_defines_source_provenance_and_primary_key() -> None:
 
     assert "PRIMARY KEY (county_fips, date, source, weather_model)" in schema
     assert "source_url_hash text NOT NULL" in schema
+
+
+def test_county_population_year_defines_incidence_denominator_key() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+
+    assert "CREATE TABLE IF NOT EXISTS county_population_year" in schema
+    assert "population integer NOT NULL CHECK (population > 0)" in schema
+    assert "source_url_hash text NOT NULL" in schema
+    assert "PRIMARY KEY (county_fips, year)" in schema
 
 
 def test_noaa_ghcnd_daily_observations_defines_raw_station_primary_key() -> None:
