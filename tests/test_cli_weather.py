@@ -6,6 +6,7 @@ from tickbiterisk.etl.noaa_backfill import (
     NoaaCountyBackfillFailure,
     NoaaCountyBackfillResult,
     NoaaMarylandBackfillResult,
+    NoaaStationCoverageAuditResult,
 )
 
 
@@ -359,3 +360,70 @@ def test_noaa_backfill_maryland_dry_run_rejects_inverted_dates(tmp_path) -> None
 
     assert result.exit_code != 0
     assert "end_date must be on or after start_date" in result.output
+
+
+def test_noaa_audit_stations_dry_run_prints_station_urls(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-audit-stations",
+            "--start-date",
+            "1992-01-01",
+            "--end-date",
+            "2026-05-24",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+            "--county-fips",
+            "24005",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Planned 2 NOAA station audit query(s)" in result.stdout
+    assert "FIPS%3A24003" in result.stdout
+    assert "FIPS%3A24005" in result.stdout
+    assert not (tmp_path / "noaa_station_coverage_audit.csv").exists()
+
+
+def test_noaa_audit_stations_command_reports_summary(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_audit(**kwargs) -> NoaaStationCoverageAuditResult:
+        assert kwargs["county_fips_values"] == ["24003"]
+        assert kwargs["output_dir"] == tmp_path
+        assert kwargs["token"] == "token-value"
+        return NoaaStationCoverageAuditResult(
+            output_path=tmp_path / "noaa_station_coverage_audit.csv",
+            county_count=1,
+            ok_count=1,
+            needs_fallback_count=0,
+            error_count=0,
+        )
+
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", lambda: "token-value")
+    monkeypatch.setattr("tickbiterisk.cli.audit_noaa_station_coverage", fake_audit)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-audit-stations",
+            "--start-date",
+            "1992-01-01",
+            "--end-date",
+            "2026-05-24",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Audited 1 county station set(s)" in result.stdout
+    assert "ok=1, needs_fallback=0, errors=0" in result.stdout
+    assert "noaa_station_coverage_audit.csv" in result.stdout

@@ -10,6 +10,7 @@ from tickbiterisk.etl.noaa_backfill import (
     NoaaBackfillCountyFipsError,
     NoaaBackfillDateRangeError,
     NoaaBackfillNoStationError,
+    audit_noaa_station_coverage,
     run_noaa_county_backfill,
     run_noaa_maryland_backfill,
 )
@@ -362,3 +363,94 @@ def test_run_noaa_maryland_backfill_rejects_non_maryland_fips(tmp_path: Path) ->
         )
 
     assert "Unknown Maryland county FIPS: 99999" in str(exc_info.value)
+
+
+def test_audit_noaa_station_coverage_writes_county_report(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def fake_json_get(url: str, token: str) -> dict:
+        calls.append(url)
+        county = "24003" if "FIPS%3A24003" in url else "24005"
+        return {
+            "results": [
+                {
+                    "id": f"GHCND:BEST{county}",
+                    "name": f"BEST {county}",
+                    "latitude": 39.0,
+                    "longitude": -76.0,
+                    "mindate": "1939-01-01",
+                    "maxdate": "2026-05-20",
+                    "datacoverage": 0.99,
+                },
+                {
+                    "id": f"GHCND:SHORT{county}",
+                    "name": f"SHORT {county}",
+                    "latitude": 39.0,
+                    "longitude": -76.0,
+                    "mindate": "2010-01-01",
+                    "maxdate": "2026-05-20",
+                    "datacoverage": 1.0,
+                },
+            ]
+        }
+
+    result = audit_noaa_station_coverage(
+        start_date=date(1992, 1, 1),
+        end_date=date(2026, 5, 24),
+        output_dir=tmp_path,
+        token="token-value",
+        county_fips_values=["24003", "24005"],
+        json_get=fake_json_get,
+    )
+
+    assert result.output_path == tmp_path / "noaa_station_coverage_audit.csv"
+    assert result.ok_count == 2
+    assert result.needs_fallback_count == 0
+    assert result.error_count == 0
+    assert any("FIPS%3A24003" in call for call in calls)
+    assert any("FIPS%3A24005" in call for call in calls)
+
+    df = pd.read_csv(result.output_path, dtype={"county_fips": str})
+    assert list(df["county_fips"]) == ["24003", "24005"]
+    assert list(df["status"]) == ["ok", "ok"]
+    assert list(df["candidate_station_count"]) == [2, 2]
+    assert list(df["selected_station_ids"]) == [
+        "GHCND:BEST24003",
+        "GHCND:BEST24005",
+    ]
+    assert list(df["best_station_id"]) == ["GHCND:BEST24003", "GHCND:BEST24005"]
+
+
+def test_audit_noaa_station_coverage_records_no_selected_station(
+    tmp_path: Path,
+) -> None:
+    def fake_json_get(url: str, token: str) -> dict:
+        return {
+            "results": [
+                {
+                    "id": "GHCND:SHORT",
+                    "name": "SHORT",
+                    "latitude": 39.0,
+                    "longitude": -76.0,
+                    "mindate": "2010-01-01",
+                    "maxdate": "2026-05-20",
+                    "datacoverage": 1.0,
+                }
+            ]
+        }
+
+    result = audit_noaa_station_coverage(
+        start_date=date(1992, 1, 1),
+        end_date=date(2026, 5, 24),
+        output_dir=tmp_path,
+        token="token-value",
+        county_fips_values=["24003"],
+        json_get=fake_json_get,
+    )
+
+    df = pd.read_csv(result.output_path, dtype={"county_fips": str})
+    assert result.ok_count == 0
+    assert result.needs_fallback_count == 1
+    assert df.loc[0, "status"] == "needs_fallback"
+    assert int(df.loc[0, "candidate_station_count"]) == 1
+    assert "No selected station covers requested range" in df.loc[0, "error"]

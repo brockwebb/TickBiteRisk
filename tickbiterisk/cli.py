@@ -15,6 +15,7 @@ from tickbiterisk.etl.noaa import (
 )
 from tickbiterisk.etl.noaa_backfill import (
     NoaaBackfillError,
+    audit_noaa_station_coverage,
     resolve_maryland_noaa_county_fips,
     run_noaa_county_backfill,
     run_noaa_maryland_backfill,
@@ -309,6 +310,72 @@ def noaa_backfill_maryland(
             typer.echo(f"{failure.county_fips}: {failure.error}")
         if not allow_partial:
             raise typer.Exit(1)
+
+
+@etl_app.command("noaa-audit-stations")
+def noaa_audit_stations(
+    start_date: str = typer.Option(..., help="Coverage start date."),
+    end_date: str = typer.Option(..., help="Coverage end date."),
+    output_dir: Path = typer.Option(
+        Path("build/etl"), help="Output directory for ETL artifacts."
+    ),
+    county_fips: list[str] | None = typer.Option(
+        None,
+        "--county-fips",
+        help="Optional Maryland county FIPS subset. Repeat for multiple counties.",
+    ),
+    station_limit: int = typer.Option(
+        1, help="Maximum number of selected NOAA stations per county."
+    ),
+    min_data_coverage: float = typer.Option(
+        0.5, help="Minimum NOAA station data coverage."
+    ),
+    max_end_lag_days: int = typer.Option(
+        14, help="Allowed station-reporting lag at the requested end date."
+    ),
+    dry_run: bool = typer.Option(False, help="Print planned station queries."),
+) -> None:
+    parsed_start_date = _parse_iso_date(start_date, "start-date")
+    parsed_end_date = _parse_iso_date(end_date, "end-date")
+    try:
+        county_fips_values = resolve_maryland_noaa_county_fips(county_fips)
+        validate_noaa_backfill_args(
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            station_limit=station_limit,
+        )
+    except NoaaBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if dry_run:
+        typer.echo(f"Planned {len(county_fips_values)} NOAA station audit query(s)")
+        for value in county_fips_values:
+            typer.echo(
+                build_noaa_station_url(
+                    value,
+                    parsed_start_date,
+                    parsed_end_date,
+                )
+            )
+        return
+
+    result = audit_noaa_station_coverage(
+        start_date=parsed_start_date,
+        end_date=parsed_end_date,
+        output_dir=output_dir,
+        token=get_noaa_token(),
+        county_fips_values=county_fips_values,
+        station_limit=station_limit,
+        min_data_coverage=min_data_coverage,
+        max_end_lag_days=max_end_lag_days,
+    )
+    typer.echo(f"Audited {result.county_count} county station set(s)")
+    typer.echo(
+        f"ok={result.ok_count}, "
+        f"needs_fallback={result.needs_fallback_count}, "
+        f"errors={result.error_count}"
+    )
+    typer.echo(f"Wrote {result.output_path}")
 
 
 def _parse_iso_date(value: str, option_name: str) -> date:

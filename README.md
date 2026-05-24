@@ -68,11 +68,12 @@ tickbiterisk etl weather-backfill-open-meteo --county-fips 24003 --start-date 20
 tickbiterisk etl noaa-stations --county-fips 24003 --start-date 1992-01-01 --end-date 2026-05-24 --output-dir build/etl/noaa
 tickbiterisk etl noaa-daily --county-fips 24003 --station-id GHCND:USW00093721 --start-date 1992-05-01 --end-date 1992-05-07 --output-dir build/etl/noaa
 tickbiterisk etl noaa-backfill-county --county-fips 24003 --start-date 1992-01-01 --end-date 2026-05-24 --output-dir build/etl/noaa
+tickbiterisk etl noaa-audit-stations --start-date 1992-01-01 --end-date 2026-05-24 --output-dir build/etl/noaa-station-audit
 tickbiterisk etl noaa-backfill-maryland --start-date 1992-01-01 --end-date 2026-05-24 --output-dir build/etl/noaa --county-fips 24003 --dry-run
 tickbiterisk etl noaa-backfill-maryland --start-date 1992-01-01 --end-date 2026-05-24 --output-dir build/etl/noaa  # planned full run after smoke checks
 ```
 
-NOAA CDO/GHCND is the primary observed historical weather source and reads `NOAA_TOKEN` from the environment. `noaa-backfill-county` discovers county stations, selects long-coverage stations, and writes raw station plus daily observation CSVs with append/dedupe semantics. `noaa-backfill-maryland` loops that same county runner across all Maryland jurisdictions, or a repeated `--county-fips` subset for smoke runs. NOAA daily pulls are split into calendar-year windows and paginated, but daily station observations are still raw input; modeling uses weekly, monthly, and seasonal aggregates. Open-Meteo does not require an API key and remains a secondary reanalysis/gap-fill path.
+NOAA CDO/GHCND is the primary observed historical weather source and reads `NOAA_TOKEN` from the environment. `noaa-audit-stations` checks station metadata before a large daily pull; on 2026-05-24, the strict 1992-current internal-station audit found 11 of 24 Maryland jurisdictions ready and 13 needing fallback station logic. `noaa-backfill-county` discovers county stations, selects long-coverage stations, and writes raw station plus daily observation CSVs with append/dedupe semantics. `noaa-backfill-maryland` loops that same county runner across all Maryland jurisdictions, or a repeated `--county-fips` subset for smoke runs. NOAA daily pulls are split into calendar-year windows and paginated, but daily station observations are still raw input; modeling uses weekly, monthly, and seasonal aggregates. Open-Meteo does not require an API key and remains a secondary reanalysis/gap-fill path.
 
 ## api summary
 

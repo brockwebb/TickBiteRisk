@@ -147,6 +147,7 @@ The system must support Maryland daily weather acquisition and feature generatio
 - Retain Open-Meteo historical weather/reanalysis as a secondary comparison or gap-fill source where useful.
 - Support bounded county/date backfills before full Maryland range runs.
 - Plan full NOAA historical weather coverage for at least 1992-01-01 through the current year.
+- Provide a NOAA station coverage audit command that checks Maryland county station candidates against the requested historical range and records `ok`, `needs_fallback`, or `error` before a large daily pull.
 - Provide a bounded NOAA county backfill command that discovers county stations, selects long-coverage stations, fetches daily observations for selected stations, and writes both `noaa_ghcnd_stations` and `noaa_ghcnd_daily_observations` CSV outputs.
 - Provide a Maryland NOAA orchestration command that runs the county backfill for all Maryland jurisdictions or an explicit county subset, reports county failures, and supports small smoke runs before the full historical acquisition.
 - Split NOAA CDO daily requests into calendar-year windows and paginate station/daily responses before pivoting daily datatypes, so long historical backfills respect API date limits and do not silently stop at the first API page.
