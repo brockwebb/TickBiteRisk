@@ -6,6 +6,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+_NON_LOCAL_LOCATION_LABELS = {
+    "capc maps/data",
+    "census api",
+    "maryland dnr website",
+    "mrlc data portal",
+    "power bi dashboard",
+}
+
+
 @dataclass(frozen=True)
 class SourceRecord:
     source_id: str
@@ -21,7 +30,17 @@ class SourceRecord:
 
     @property
     def is_local(self) -> bool:
-        return not self.location.startswith(("http://", "https://"))
+        location = self.location.strip()
+        if not location or location.startswith(("http://", "https://")):
+            return False
+        if location.casefold() in _NON_LOCAL_LOCATION_LABELS:
+            return False
+        return (
+            Path(location).is_absolute()
+            or location.startswith(("./", "../", "~/"))
+            or "/" in location
+            or "\\" in location
+        )
 
 
 def compute_sha256(path: Path) -> str:
@@ -33,10 +52,7 @@ def compute_sha256(path: Path) -> str:
 
 
 def _clean_cell(value: str) -> str:
-    value = value.strip()
-    if value.startswith("`") and "`" in value[1:]:
-        return value.strip("`")
-    return value
+    return value.strip().replace("`", "")
 
 
 def _split_markdown_row(line: str) -> list[str]:

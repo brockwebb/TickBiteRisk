@@ -3,12 +3,57 @@ from pathlib import Path
 from tickbiterisk.etl.sources import compute_sha256, load_sources_from_markdown
 
 
+def _write_manifest(path: Path, rows: list[str]) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "# Test Manifest",
+                "",
+                "| ID | Source | Local path / URL | Format | Geography | Time coverage | Role | Status | Redistribution | SHA-256 / Notes |",
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+                *rows,
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_load_sources_from_markdown_table() -> None:
     sources = load_sources_from_markdown(Path("tests/fixtures/manifest-mini.md"))
     assert [source.source_id for source in sources] == ["fixture_csv", "remote_candidate"]
     assert sources[0].format == "CSV"
     assert sources[0].is_local is True
     assert sources[1].is_local is False
+
+
+def test_placeholder_locations_are_not_local_files(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.md"
+    _write_manifest(
+        manifest_path,
+        [
+            "| `census_api` | Census | Census API | CSV | County | 2022 | Covariate | candidate | Public | No local file |",
+            "| `fixture_csv` | Fixture CSV | `tests/fixtures/lyme_public_use_2022_2023_mini.csv` | CSV | County | 2022 | Outcome | acquired | Test fixture | local fixture |",
+        ],
+    )
+
+    sources = load_sources_from_markdown(manifest_path)
+
+    assert sources[0].is_local is False
+    assert sources[1].is_local is True
+
+
+def test_inline_code_spans_are_removed_from_cells_with_trailing_notes(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.md"
+    _write_manifest(
+        manifest_path,
+        [
+            "| `latin1_csv` | Latin1 CSV | `tests/fixtures/latin1.csv` | CSV | County | 2022 | Outcome | acquired | Restricted | `abc123`; requires latin1 |",
+        ],
+    )
+
+    sources = load_sources_from_markdown(manifest_path)
+
+    assert sources[0].notes == "abc123; requires latin1"
 
 
 def test_compute_sha256_for_local_file(tmp_path: Path) -> None:
