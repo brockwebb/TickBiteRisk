@@ -82,10 +82,11 @@ def parse_cdc_county_dashboard(path: Path, source_id: str) -> list[LymeCountyYea
         if column.lower().startswith("cases")
         and column.lower().replace("cases", "").isdigit()
     ]
+    md_fips = maryland_fips_set()
     rows: list[LymeCountyYearValue] = []
     for record in md.to_dict(orient="records"):
         county_fips = f"{int(record['stcode']):02d}{int(record['ctycode']):03d}"
-        if county_fips not in maryland_fips_set():
+        if county_fips not in md_fips:
             continue
         for column in year_columns:
             year = int(column.lower().replace("cases", ""))
@@ -119,18 +120,40 @@ def parse_cdc_lyme_geodata(path: Path, source_id: str) -> list[LymeCountyYearVal
 
     md = df[df["STUSPS"].eq("MD")].copy()
     md["fips"] = md["fips"].astype(str).str.split(".").str[0].str.zfill(5)
-    md = md[md["fips"].isin(maryland_fips_set())]
+    md = md[md["fips"].isin(maryland_fips_set())].copy()
+    md["year_int"] = md["year"].map(lambda value: int(float(value)))
+    md = md[(md["year_int"] >= 2000) & (md["year_int"] <= 2021)].copy()
+    md["confirmed_int"] = md["Lyme_Confirmed_Cases"].map(_frequency_to_int)
+    md["probable_int"] = md["Lyme_Probable_Cases"].map(_frequency_to_int)
+    md["total_int"] = md["Lyme_Confirmed_Probable_Cases"].map(_frequency_to_int)
 
     rows: list[LymeCountyYearValue] = []
-    for record in md.to_dict(orient="records"):
+    for (fips, year), group in md.groupby(["fips", "year_int"]):
+        totals = {int(value) for value in group["total_int"]}
+        if len(totals) > 1:
+            raise ValueError(
+                "Conflicting CDC Lyme geodata totals for county FIPS "
+                f"{fips} year {int(year)}: {sorted(totals)}"
+            )
+
+        components = {
+            (int(row.confirmed_int), int(row.probable_int))
+            for row in group.itertuples(index=False)
+        }
+        if len(components) == 1:
+            confirmed, probable = next(iter(components))
+        else:
+            confirmed = None
+            probable = None
+
         rows.append(
             LymeCountyYearValue(
                 source_id=source_id,
-                county_fips=record["fips"],
-                year=int(float(record["year"])),
-                confirmed_cases=_frequency_to_int(record["Lyme_Confirmed_Cases"]),
-                probable_cases=_frequency_to_int(record["Lyme_Probable_Cases"]),
-                total_cases=_frequency_to_int(record["Lyme_Confirmed_Probable_Cases"]),
+                county_fips=fips,
+                year=int(year),
+                confirmed_cases=confirmed,
+                probable_cases=probable,
+                total_cases=totals.pop(),
             )
         )
     return sorted(rows, key=lambda row: (row.county_fips, row.year, row.source_id))

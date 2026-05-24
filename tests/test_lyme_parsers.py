@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from tickbiterisk.etl.lyme import (
     _frequency_to_int,
     parse_cdc_county_dashboard,
@@ -52,7 +54,50 @@ def test_parse_cdc_lyme_geodata_reads_confirmed_probable_components() -> None:
         Path("tests/fixtures/lyme_geodata_mini.csv"),
         source_id="cdc_lyme_county_geodata_2000_2021",
     )
-    anne = next(row for row in rows if row.county_fips == "24003" and row.year == 2020)
-    assert anne.confirmed_cases == 53
-    assert anne.probable_cases == 18
-    assert anne.total_cases == 71
+    anne = next(row for row in rows if row.county_fips == "24003" and row.year == 2021)
+    assert anne.confirmed_cases == 60
+    assert anne.probable_cases == 21
+    assert anne.total_cases == 81
+
+
+def test_parse_cdc_lyme_geodata_dedupes_swapped_components_by_total() -> None:
+    rows = parse_cdc_lyme_geodata(
+        Path("tests/fixtures/lyme_geodata_mini.csv"),
+        source_id="cdc_lyme_county_geodata_2000_2021",
+    )
+    anne_2020 = [
+        row for row in rows if row.county_fips == "24003" and row.year == 2020
+    ]
+    assert len(anne_2020) == 1
+    assert anne_2020[0].total_cases == 71
+    assert anne_2020[0].confirmed_cases is None
+    assert anne_2020[0].probable_cases is None
+
+
+def test_parse_cdc_lyme_geodata_filters_to_2000_2021_source_scope() -> None:
+    rows = parse_cdc_lyme_geodata(
+        Path("tests/fixtures/lyme_geodata_mini.csv"),
+        source_id="cdc_lyme_county_geodata_2000_2021",
+    )
+    assert all(row.year <= 2021 for row in rows)
+
+
+def test_parse_cdc_lyme_geodata_rejects_duplicate_total_disagreement(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "geodata_total_disagreement.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "STATEFP,COUNTYFP,GEOID,NAME,STUSPS,STATE_NAME,fips,year,Lyme_Confirmed_Cases,Lyme_Probable_Cases,Lyme_Confirmed_Probable_Cases",
+                "24,003,24003,Anne Arundel,MD,Maryland,24003,2020,53,18,71",
+                "24,003,24003,Anne Arundel,MD,Maryland,24003,2020,53,19,72",
+            ]
+        )
+    )
+
+    with pytest.raises(ValueError, match="24003.*2020"):
+        parse_cdc_lyme_geodata(
+            path,
+            source_id="cdc_lyme_county_geodata_2000_2021",
+        )
