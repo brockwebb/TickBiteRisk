@@ -9,6 +9,17 @@ from tickbiterisk.etl.lyme import (
     parse_cdc_lyme_public_use,
 )
 
+_GEODATA_HEADER = (
+    "STATEFP,COUNTYFP,GEOID,NAME,STUSPS,STATE_NAME,fips,year,"
+    "Lyme_Confirmed_Cases,Lyme_Probable_Cases,Lyme_Confirmed_Probable_Cases"
+)
+
+
+def _write_geodata_csv(tmp_path: Path, rows: list[str]) -> Path:
+    path = tmp_path / "lyme_geodata_edge.csv"
+    path.write_text("\n".join([_GEODATA_HEADER, *rows]) + "\n")
+    return path
+
 
 def test_frequency_to_int_maps_nan_token_to_zero() -> None:
     assert _frequency_to_int("NaN") == 0
@@ -54,15 +65,24 @@ def test_parse_cdc_lyme_geodata_reads_confirmed_probable_components() -> None:
         Path("tests/fixtures/lyme_geodata_mini.csv"),
         source_id="cdc_lyme_county_geodata_2000_2021",
     )
-    anne = next(row for row in rows if row.county_fips == "24003" and row.year == 2021)
-    assert anne.confirmed_cases == 60
-    assert anne.probable_cases == 21
-    assert anne.total_cases == 81
+    anne = next(row for row in rows if row.county_fips == "24003" and row.year == 2020)
+    assert anne.confirmed_cases == 53
+    assert anne.probable_cases == 18
+    assert anne.total_cases == 71
 
 
-def test_parse_cdc_lyme_geodata_dedupes_swapped_components_by_total() -> None:
+def test_parse_cdc_lyme_geodata_dedupes_swapped_components_by_total(
+    tmp_path: Path,
+) -> None:
+    path = _write_geodata_csv(
+        tmp_path,
+        [
+            "24,003,24003,Anne Arundel,MD,Maryland,24003,2020,53,18,71",
+            "24,003,24003,Anne Arundel,MD,Maryland,24003,2020,18,53,71",
+        ],
+    )
     rows = parse_cdc_lyme_geodata(
-        Path("tests/fixtures/lyme_geodata_mini.csv"),
+        path,
         source_id="cdc_lyme_county_geodata_2000_2021",
     )
     anne_2020 = [
@@ -74,9 +94,18 @@ def test_parse_cdc_lyme_geodata_dedupes_swapped_components_by_total() -> None:
     assert anne_2020[0].probable_cases is None
 
 
-def test_parse_cdc_lyme_geodata_filters_to_2000_2021_source_scope() -> None:
+def test_parse_cdc_lyme_geodata_filters_to_2000_2021_source_scope(
+    tmp_path: Path,
+) -> None:
+    path = _write_geodata_csv(
+        tmp_path,
+        [
+            "24,003,24003,Anne Arundel,MD,Maryland,24003,2021,60,21,81",
+            "24,003,24003,Anne Arundel,MD,Maryland,24003,2022,61,22,83",
+        ],
+    )
     rows = parse_cdc_lyme_geodata(
-        Path("tests/fixtures/lyme_geodata_mini.csv"),
+        path,
         source_id="cdc_lyme_county_geodata_2000_2021",
     )
     assert all(row.year <= 2021 for row in rows)
@@ -85,15 +114,12 @@ def test_parse_cdc_lyme_geodata_filters_to_2000_2021_source_scope() -> None:
 def test_parse_cdc_lyme_geodata_rejects_duplicate_total_disagreement(
     tmp_path: Path,
 ) -> None:
-    path = tmp_path / "geodata_total_disagreement.csv"
-    path.write_text(
-        "\n".join(
-            [
-                "STATEFP,COUNTYFP,GEOID,NAME,STUSPS,STATE_NAME,fips,year,Lyme_Confirmed_Cases,Lyme_Probable_Cases,Lyme_Confirmed_Probable_Cases",
-                "24,003,24003,Anne Arundel,MD,Maryland,24003,2020,53,18,71",
-                "24,003,24003,Anne Arundel,MD,Maryland,24003,2020,53,19,72",
-            ]
-        )
+    path = _write_geodata_csv(
+        tmp_path,
+        [
+            "24,003,24003,Anne Arundel,MD,Maryland,24003,2020,53,18,71",
+            "24,003,24003,Anne Arundel,MD,Maryland,24003,2020,53,19,72",
+        ],
     )
 
     with pytest.raises(ValueError, match="24003.*2020"):
