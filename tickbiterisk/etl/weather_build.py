@@ -7,7 +7,7 @@ import pandas as pd
 
 from tickbiterisk.etl.noaa import NoaaDailyObservation, NoaaStation
 from tickbiterisk.etl.open_meteo import WeatherDailyObservation
-from tickbiterisk.etl.weather_features import WeatherMonthlyFeature
+from tickbiterisk.etl.weather_features import WeatherMonthlyFeature, WeatherWeeklyFeature
 from tickbiterisk.etl.weather_locations import WeatherLocation
 
 WEATHER_LOCATION_COLUMNS = [
@@ -68,6 +68,40 @@ NOAA_DAILY_COLUMNS = [
     "snow_inches",
     "snwd_inches",
     "source_url_hash",
+]
+
+WEATHER_WEEKLY_COLUMNS = [
+    "county_fips",
+    "iso_year",
+    "iso_week",
+    "week_start_date",
+    "week_end_date",
+    "source",
+    "weather_model",
+    "days_observed",
+    "expected_days",
+    "week_complete",
+    "days_above_40f",
+    "days_50_65f",
+    "days_70_85f",
+    "degree_days_above_40f",
+    "freeze_thaw_days",
+    "precip_total_mm",
+    "rain_total_mm",
+    "snowfall_total_mm",
+    "precip_days",
+    "dry_spell_max_days",
+    "humidity_days_above_85pct",
+    "soil_moisture_mean",
+    "soil_temp_above_40f_days",
+    "hot_dry_stress_days",
+    "evapotranspiration_total_mm",
+    "temp_mean_f",
+    "precip_mean_mm",
+    "humidity_mean_pct",
+    "temp_anomaly_vs_10yr",
+    "precip_anomaly_vs_10yr",
+    "humidity_anomaly_vs_10yr",
 ]
 
 WEATHER_MONTHLY_COLUMNS = [
@@ -186,6 +220,27 @@ def write_weather_features_monthly_output(
         output_path,
         append=append,
         key_columns=["county_fips", "year", "month", "source", "weather_model"],
+    )
+    return output_path
+
+
+def write_weather_features_weekly_output(
+    rows: list[WeatherWeeklyFeature], output_dir: Path, *, append: bool = False
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "weather_features_weekly.csv"
+    records = []
+    for row in rows:
+        record = asdict(row)
+        record["week_start_date"] = row.week_start_date.isoformat()
+        record["week_end_date"] = row.week_end_date.isoformat()
+        records.append(record)
+    _write_output(
+        records,
+        WEATHER_WEEKLY_COLUMNS,
+        output_path,
+        append=append,
+        key_columns=["county_fips", "iso_year", "iso_week", "source", "weather_model"],
     )
     return output_path
 

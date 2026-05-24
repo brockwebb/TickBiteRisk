@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from typer.testing import CliRunner
 
@@ -8,6 +10,7 @@ from tickbiterisk.etl.noaa_backfill import (
     NoaaMarylandBackfillResult,
     NoaaStationCoverageAuditResult,
 )
+from tickbiterisk.etl.open_meteo import WeatherDailyObservation
 
 
 runner = CliRunner()
@@ -46,6 +49,40 @@ def test_weather_backfill_dry_run_prints_open_meteo_url(tmp_path) -> None:
     assert "archive-api.open-meteo.com" in result.stdout
     assert "24003" in result.stdout
     assert not (tmp_path / "weather_daily.csv").exists()
+
+
+def test_weather_backfill_writes_weekly_and_monthly_features(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rows = [_weather_row(date(2020, 5, 1)), _weather_row(date(2020, 5, 2))]
+
+    monkeypatch.setattr(
+        "tickbiterisk.cli.fetch_open_meteo_archive",
+        lambda location, start_date, end_date: rows,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "weather-backfill-open-meteo",
+            "--county-fips",
+            "24003",
+            "--start-date",
+            "2020-05-01",
+            "--end-date",
+            "2020-05-02",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (tmp_path / "weather_daily.csv").exists()
+    assert (tmp_path / "weather_features_weekly.csv").exists()
+    assert (tmp_path / "weather_features_monthly.csv").exists()
+    assert "weather_features_weekly.csv" in result.stdout
+    assert "weather_features_monthly.csv" in result.stdout
 
 
 def test_noaa_stations_dry_run_prints_noaa_url(tmp_path) -> None:
@@ -495,3 +532,29 @@ def test_noaa_audit_stations_command_passes_nearest_station_fallback(
     )
 
     assert result.exit_code == 0
+
+
+def _weather_row(day: date) -> WeatherDailyObservation:
+    return WeatherDailyObservation(
+        county_fips="24003",
+        date=day,
+        source="open_meteo_archive",
+        weather_model="open_meteo_archive",
+        temp_mean_f=55.0,
+        temp_max_f=62.0,
+        temp_min_f=45.0,
+        humidity_mean_pct=82.0,
+        humidity_max_pct=95.0,
+        humidity_min_pct=65.0,
+        dew_point_mean_f=48.0,
+        precipitation_mm=0.0,
+        rain_mm=0.0,
+        snowfall_mm=0.0,
+        precipitation_hours=0.0,
+        soil_temp_0_7cm_f=48.0,
+        soil_moisture_0_7cm=0.30,
+        evapotranspiration_mm=1.0,
+        wind_mean_mph=5.0,
+        wind_max_mph=10.0,
+        source_url_hash="a" * 64,
+    )

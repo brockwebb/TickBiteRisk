@@ -103,6 +103,7 @@ Initial normalized tables:
 - `nssp_coverage`
 - `weather_locations`
 - `weather_daily`
+- `weather_features_weekly`
 - `weather_features_monthly`
 - `weather_features_seasonal`
 - `model_feature_matrix`
@@ -154,9 +155,10 @@ The system must support Maryland daily weather acquisition and feature generatio
 - Preserve the target county FIPS in fallback outputs while retaining the source NOAA station ID and station metadata for provenance.
 - Split NOAA CDO daily requests into calendar-year windows and paginate station/daily responses before pivoting daily datatypes, so long historical backfills respect API date limits and do not silently stop at the first API page.
 - Write raw NOAA GHCND station observations to `noaa_ghcnd_daily_observations`; daily is not the modeling granularity.
-- Aggregate daily weather to weekly, monthly, and seasonal features for modeling, including monthly tick-activity features in `weather_features_monthly`.
-- Include `days_observed`, `expected_days`, and `month_complete` on monthly features so partial smoke/backfill ranges cannot be mistaken for complete months.
-- Compute trailing 10-year weather normals and anomalies without future leakage; a feature for month `M` may only use weather observations available before `M`.
+- Aggregate daily weather to weekly, monthly, and seasonal features. `weather_features_weekly` is the primary weather modeling grain because warm, humid, or wet spells can matter inside a month.
+- Retain `weather_features_monthly` and seasonal features as slower climate/context features, not the primary tick-activity driver.
+- Include `days_observed`, `expected_days`, and completeness flags on weekly/monthly features so partial smoke/backfill ranges cannot be mistaken for complete periods.
+- Compute trailing 10-year weather normals and anomalies without future leakage; a feature for ISO week or month `T` may only use weather observations available before `T`.
 
 NOAA CDO must read credentials from environment variables such as `NOAA_TOKEN` only.
 
@@ -181,7 +183,7 @@ score_raw = 10 * modeled_risk / (1.2 * historical_high_benchmark)
 score = clamp(round(score_raw), 1, 10)
 ```
 
-The benchmark should initially be the 95th percentile of modeled Maryland county-month or county-year risk. The 20 percent headroom prevents a single historical maximum from saturating the scale.
+The benchmark should initially be the 95th percentile of modeled Maryland county-week risk, with monthly or county-year benchmarks retained for slower retrospective summaries. The 20 percent headroom prevents a single historical maximum from saturating the scale.
 
 Display categories:
 
@@ -311,5 +313,5 @@ The next build slice is accepted when:
 - Can Maryland DNR deer harvest be downloaded as structured county-year data?
 - Can mast survey reports be converted into a useful Western Maryland feature without over-generalizing statewide?
 - Can CAPC canine data be used legally and practically as a sentinel feature?
-- Should the first user-facing score be county-year, county-month, or date-with-seasonal-overlay?
+- Should the first user-facing score be county-week or date-with-seasonal-overlay?
 - Should ZIP-code lookup use Census ZCTA crosswalks or a commercial/local geocoder?

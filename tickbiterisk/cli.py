@@ -30,11 +30,14 @@ from tickbiterisk.etl.weather_build import (
     write_noaa_stations_output,
     write_weather_daily_output,
     write_weather_features_monthly_output,
+    write_weather_features_weekly_output,
     write_weather_locations_output,
 )
 from tickbiterisk.etl.weather_features import (
     add_trailing_monthly_anomalies,
+    add_trailing_weekly_anomalies,
     compute_monthly_weather_features,
+    compute_weekly_weather_features,
 )
 from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
 
@@ -92,6 +95,12 @@ def weather_backfill_open_meteo(
 
     rows = fetch_open_meteo_archive(location, parsed_start_date, parsed_end_date)
     daily_output = write_weather_daily_output(rows, output_dir, append=True)
+    weekly_features = add_trailing_weekly_anomalies(
+        compute_weekly_weather_features(rows)
+    )
+    weekly_output = write_weather_features_weekly_output(
+        weekly_features, output_dir, append=True
+    )
     monthly_features = add_trailing_monthly_anomalies(
         compute_monthly_weather_features(rows)
     )
@@ -99,6 +108,7 @@ def weather_backfill_open_meteo(
         monthly_features, output_dir, append=True
     )
     typer.echo(f"Wrote {daily_output}")
+    typer.echo(f"Wrote {weekly_output}")
     typer.echo(f"Wrote {monthly_output}")
 
 

@@ -4,7 +4,7 @@ Date: 2026-05-24
 
 ## Purpose
 
-Build the weather data subsystem for the Maryland tick risk model. This subsystem creates reproducible daily weather records and monthly/seasonal weather features for every Maryland county and Baltimore City.
+Build the weather data subsystem for the Maryland tick risk model. This subsystem creates reproducible daily weather records, primary ISO-week weather features, and slower monthly/seasonal context features for every Maryland county and Baltimore City.
 
 Weather is a predictive input, not the product by itself. It feeds the Maryland 1-10 tick risk score together with disease history, vector status, habitat, host ecology, and source reconciliation.
 
@@ -14,9 +14,9 @@ In scope:
 
 - Daily weather backfill for Maryland jurisdictions.
 - County/jurisdiction centroid-based pulls.
-- Open-Meteo historical archive as the primary source.
-- NOAA CDO as an optional validation and station-ground-truth branch.
-- Derived monthly and seasonal features for tick activity modeling.
+- NOAA CDO/GHCND as the primary observed historical source.
+- Open-Meteo historical archive as a secondary comparison or gap-fill source.
+- Derived ISO-week features for tick activity modeling, with monthly and seasonal context features retained.
 - Provenance tracking for every weather pull.
 - No credentials stored in code, docs, data files, or git history.
 
@@ -159,7 +159,44 @@ Primary key:
 county_fips, date, source, weather_model
 ```
 
+### `weather_features_weekly`
+
+Primary weather modeling grain. Uses ISO week numbering.
+
+```text
+county_fips
+iso_year
+iso_week
+week_start_date
+week_end_date
+source
+weather_model
+days_observed
+expected_days
+week_complete
+days_above_40f
+days_50_65f
+days_70_85f
+degree_days_above_40f
+freeze_thaw_days
+precip_total_mm
+rain_total_mm
+snowfall_total_mm
+precip_days
+dry_spell_max_days
+humidity_days_above_85pct
+soil_moisture_mean
+soil_temp_above_40f_days
+evapotranspiration_total_mm
+temp_anomaly_vs_10yr
+precip_anomaly_vs_10yr
+humidity_anomaly_vs_10yr
+created_at
+```
+
 ### `weather_features_monthly`
+
+Secondary slower-context feature grain.
 
 ```text
 county_fips
@@ -231,7 +268,7 @@ Use explicit, testable definitions:
 - `soil_temp_above_40f_days`: count of days where `soil_temp_0_7cm_f >= 40`.
 - `hot_dry_stress_days`: count of days where `temp_max_f >= 90` and `humidity_mean_pct < 55`.
 
-Anomaly features compare a county-month to the trailing 10-year average for the same county and month. For backtests, anomaly baselines must use only years available before the prediction year.
+Anomaly features compare a county ISO week or county-month to the trailing 10-year average for the same county and period. For backtests, anomaly baselines must use only years available before the prediction year.
 
 ## Backtest Rules
 
@@ -293,7 +330,7 @@ Required tests:
 ## Acceptance Criteria
 
 - A local command can backfill Maryland daily Open-Meteo weather for a small fixture date range.
-- A model-ready monthly feature table can be generated from daily fixture data.
+- A model-ready weekly feature table can be generated from daily fixture data.
 - A full-run plan exists for 2000-2024 Maryland weather without exceeding normal public API limits.
 - NOAA CDO token use is environment-only and secret-safe.
 - Weather features can be joined to Maryland county-year Lyme outcomes by `county_fips`, `year`, and month/season rollups.

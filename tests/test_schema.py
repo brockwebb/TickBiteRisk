@@ -15,6 +15,7 @@ def test_schema_defines_core_tables() -> None:
         "noaa_ghcnd_stations",
         "noaa_ghcnd_daily_observations",
         "weather_daily",
+        "weather_features_weekly",
         "weather_features_monthly",
     ]:
         assert f"CREATE TABLE IF NOT EXISTS {table}" in schema
@@ -63,6 +64,18 @@ def test_weather_monthly_features_include_anomaly_fields() -> None:
     assert "temp_anomaly_vs_10yr double precision" in schema
     assert "precip_anomaly_vs_10yr double precision" in schema
     assert "humidity_anomaly_vs_10yr double precision" in schema
+
+
+def test_weather_weekly_features_use_iso_week_and_completeness_fields() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+
+    assert "CREATE TABLE IF NOT EXISTS weather_features_weekly" in schema
+    assert "iso_year integer NOT NULL" in schema
+    assert "iso_week integer NOT NULL CHECK (iso_week BETWEEN 1 AND 53)" in schema
+    assert "week_start_date date NOT NULL" in schema
+    assert "week_end_date date NOT NULL" in schema
+    assert "week_complete boolean NOT NULL" in schema
+    assert "PRIMARY KEY (county_fips, iso_year, iso_week, source, weather_model)" in schema
 
 
 def test_weather_monthly_features_include_completeness_fields() -> None:

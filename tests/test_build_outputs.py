@@ -13,9 +13,13 @@ from tickbiterisk.etl.weather_build import (
     write_noaa_stations_output,
     write_weather_daily_output,
     write_weather_features_monthly_output,
+    write_weather_features_weekly_output,
     write_weather_locations_output,
 )
-from tickbiterisk.etl.weather_features import compute_monthly_weather_features
+from tickbiterisk.etl.weather_features import (
+    compute_monthly_weather_features,
+    compute_weekly_weather_features,
+)
 from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
 
 EXPECTED_RECONCILED_LYME_COLUMNS = [
@@ -182,6 +186,38 @@ def test_write_weather_daily_output_appends_without_losing_prior_counties(
     write_weather_daily_output([second], tmp_path, append=True)
 
     df = pd.read_csv(tmp_path / "weather_daily.csv", dtype={"county_fips": str})
+    assert list(df["county_fips"]) == ["24003", "24005"]
+    assert list(df["temp_mean_f"]) == [55.0, 50.0]
+
+
+def test_write_weather_features_weekly_output_creates_csv(tmp_path: Path) -> None:
+    features = compute_weekly_weather_features([sample_weather_daily()])
+    output = write_weather_features_weekly_output(features, tmp_path)
+
+    df = pd.read_csv(output, dtype={"county_fips": str})
+
+    assert output.name == "weather_features_weekly.csv"
+    assert df.loc[0, "county_fips"] == "24003"
+    assert int(df.loc[0, "iso_year"]) == 2020
+    assert int(df.loc[0, "iso_week"]) == 18
+    assert df.loc[0, "week_start_date"] == "2020-04-27"
+    assert df.loc[0, "week_end_date"] == "2020-05-03"
+    assert int(df.loc[0, "days_observed"]) == 1
+    assert bool(df.loc[0, "week_complete"]) is False
+
+
+def test_write_weather_features_weekly_output_appends_without_losing_prior_counties(
+    tmp_path: Path,
+) -> None:
+    first = compute_weekly_weather_features([sample_weather_daily()])[0]
+    second = replace(first, county_fips="24005", temp_mean_f=50.0)
+
+    write_weather_features_weekly_output([first], tmp_path)
+    write_weather_features_weekly_output([second], tmp_path, append=True)
+
+    df = pd.read_csv(
+        tmp_path / "weather_features_weekly.csv", dtype={"county_fips": str}
+    )
     assert list(df["county_fips"]) == ["24003", "24005"]
     assert list(df["temp_mean_f"]) == [55.0, 50.0]
 

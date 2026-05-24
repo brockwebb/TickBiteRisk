@@ -3,7 +3,9 @@ from datetime import date
 from tickbiterisk.etl.open_meteo import WeatherDailyObservation
 from tickbiterisk.etl.weather_features import (
     add_trailing_monthly_anomalies,
+    add_trailing_weekly_anomalies,
     compute_monthly_weather_features,
+    compute_weekly_weather_features,
 )
 
 
@@ -146,6 +148,108 @@ def test_trailing_monthly_anomalies_do_not_use_current_or_future_years() -> None
 
     with_anomalies = add_trailing_monthly_anomalies(features, baseline_years=10)
     year_2020 = next(feature for feature in with_anomalies if feature.year == 2020)
+
+    assert year_2020.temp_anomaly_vs_10yr == 18.0
+    assert year_2020.precip_anomaly_vs_10yr == 13.0
+    assert year_2020.humidity_anomaly_vs_10yr == 18.0
+
+
+def test_compute_weekly_weather_features_uses_iso_week() -> None:
+    rows = [
+        obs(
+            date(2020, 12, 28),
+            temp_mean_f=45.0,
+            temp_max_f=55.0,
+            temp_min_f=30.0,
+            humidity_mean_pct=90.0,
+            precipitation_mm=2.0,
+            rain_mm=2.0,
+            soil_temp_0_7cm_f=42.0,
+            soil_moisture_0_7cm=0.25,
+            evapotranspiration_mm=0.5,
+        ),
+        obs(
+            date(2021, 1, 3),
+            temp_mean_f=75.0,
+            temp_max_f=92.0,
+            temp_min_f=66.0,
+            humidity_mean_pct=50.0,
+            precipitation_mm=0.0,
+            soil_temp_0_7cm_f=70.0,
+            soil_moisture_0_7cm=0.20,
+            evapotranspiration_mm=2.0,
+        ),
+    ]
+
+    features = compute_weekly_weather_features(rows)
+
+    assert len(features) == 1
+    week = features[0]
+    assert week.iso_year == 2020
+    assert week.iso_week == 53
+    assert week.week_start_date == date(2020, 12, 28)
+    assert week.week_end_date == date(2021, 1, 3)
+    assert week.days_observed == 2
+    assert week.expected_days == 7
+    assert week.week_complete is False
+    assert week.days_above_40f == 2
+    assert week.days_70_85f == 1
+    assert week.degree_days_above_40f == 40.0
+    assert week.freeze_thaw_days == 1
+    assert week.precip_total_mm == 2.0
+    assert week.precip_days == 1
+    assert week.dry_spell_max_days == 1
+    assert week.humidity_days_above_85pct == 1
+    assert week.soil_moisture_mean == 0.225
+    assert week.soil_temp_above_40f_days == 2
+    assert week.hot_dry_stress_days == 1
+    assert week.evapotranspiration_total_mm == 2.5
+
+
+def test_complete_week_is_marked_complete() -> None:
+    rows = [obs(date.fromisocalendar(2020, 20, weekday)) for weekday in range(1, 8)]
+
+    features = compute_weekly_weather_features(rows)
+
+    assert features[0].days_observed == 7
+    assert features[0].expected_days == 7
+    assert features[0].week_complete is True
+
+
+def test_weekly_dry_spell_is_computed_within_each_iso_week() -> None:
+    rows = [
+        obs(date(2020, 5, 3), precipitation_mm=0.0),
+        obs(date(2020, 5, 4), precipitation_mm=0.0),
+        obs(date(2020, 5, 5), precipitation_mm=1.0),
+    ]
+
+    features = compute_weekly_weather_features(rows)
+    by_week = {feature.iso_week: feature for feature in features}
+
+    assert by_week[18].dry_spell_max_days == 1
+    assert by_week[19].dry_spell_max_days == 1
+
+
+def test_trailing_weekly_anomalies_do_not_use_current_or_future_years() -> None:
+    features = []
+    for year, temp, precip, humidity in [
+        (2010, 50.0, 10.0, 70.0),
+        (2011, 52.0, 12.0, 72.0),
+        (2012, 54.0, 14.0, 74.0),
+        (2020, 70.0, 25.0, 90.0),
+    ]:
+        week_rows = [
+            obs(
+                date.fromisocalendar(year, 20, 1),
+                temp_mean_f=temp,
+                precipitation_mm=precip,
+                humidity_mean_pct=humidity,
+            )
+        ]
+        features.extend(compute_weekly_weather_features(week_rows))
+
+    with_anomalies = add_trailing_weekly_anomalies(features, baseline_years=10)
+    year_2020 = next(feature for feature in with_anomalies if feature.iso_year == 2020)
 
     assert year_2020.temp_anomaly_vs_10yr == 18.0
     assert year_2020.precip_anomaly_vs_10yr == 13.0

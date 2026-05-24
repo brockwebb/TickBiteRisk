@@ -129,7 +129,8 @@ Then join model-ready fields:
 ```text
 population
 incidence_per_100k
-weather_features
+weather_features_weekly
+weather_features_monthly_context
 tick_vector_status
 tick_pathogen_status
 lone_star_status
