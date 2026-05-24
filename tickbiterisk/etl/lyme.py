@@ -22,7 +22,7 @@ def _frequency_to_int(value: object) -> int:
     if pd.isna(value):
         return 0
     text = str(value).strip().replace(",", "")
-    if text in {"", "-", "N", "U", "Suppressed"}:
+    if text.lower() in {"", "-", "n", "nan", "suppressed", "u"}:
         return 0
     return int(float(text))
 

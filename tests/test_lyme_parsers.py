@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from tickbiterisk.etl.lyme import parse_cdc_lyme_public_use
+from tickbiterisk.etl.lyme import _frequency_to_int, parse_cdc_lyme_public_use
+
+
+def test_frequency_to_int_maps_nan_token_to_zero() -> None:
+    assert _frequency_to_int("NaN") == 0
 
 
 def test_parse_cdc_lyme_public_use_filters_maryland_counties() -> None:
