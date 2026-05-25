@@ -47,6 +47,16 @@ from tickbiterisk.etl.deer_harvest import (
     source_id_from_deer_harvest_url,
 )
 from tickbiterisk.etl.ecology_sources import ECOLOGY_RAW_DIR, ECOLOGY_SOURCE_FILES
+from tickbiterisk.etl.ecology_sources import MARYLAND_DNR_MAST_REPORT_URLS
+from tickbiterisk.etl.mast_acorn import (
+    build_mast_acorn_from_pdf,
+    read_manual_mast_observations,
+)
+from tickbiterisk.etl.mast_acorn_build import (
+    write_manual_mast_observations_output,
+    write_mast_acorn_output,
+    write_mast_acorn_summary_output,
+)
 from tickbiterisk.etl.noaa import (
     build_noaa_daily_data_url,
     build_noaa_station_url,
@@ -233,6 +243,58 @@ def contact_pressure(
     )
     output = write_contact_pressure_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} contact pressure feature row(s) to {output}")
+
+
+@etl_app.command("mast-acorn")
+def mast_acorn(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/ecology/mast"),
+        help="Raw directory containing Maryland DNR mast/acorn PDFs.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/mast"),
+        help="Output directory for mast/acorn ETL artifacts.",
+    ),
+    parser: str = typer.Option(
+        "pypdfium",
+        help="PDF parser: pypdfium or docling.",
+    ),
+    manual_observations_path: Path | None = typer.Option(
+        None,
+        help="Optional manual mast observation CSV.",
+    ),
+) -> None:
+    if parser not in {"pypdfium", "docling"}:
+        raise typer.BadParameter("parser must be pypdfium or docling")
+    rows = []
+    summaries = []
+    for source in MARYLAND_DNR_MAST_REPORT_URLS:
+        source_file = raw_dir / Path(source.raw_relative_path).name
+        if not source_file.exists():
+            raise typer.BadParameter(f"mast source file not found: {source_file}")
+        source_rows, summary = build_mast_acorn_from_pdf(
+            source_file,
+            year=source.year,
+            source_id=source.source_id,
+            source_url=source.url,
+            parser=parser,
+        )
+        rows.extend(source_rows)
+        summaries.append(summary)
+    rows_output = write_mast_acorn_output(rows, output_dir)
+    summary_output = write_mast_acorn_summary_output(summaries, output_dir)
+    typer.echo(f"Wrote {len(rows)} mast/acorn row(s) to {rows_output}")
+    typer.echo(
+        f"Wrote {len(summaries)} mast/acorn extraction summary row(s) "
+        f"to {summary_output}"
+    )
+    if manual_observations_path is not None:
+        manual_rows = read_manual_mast_observations(manual_observations_path)
+        manual_output = write_manual_mast_observations_output(manual_rows, output_dir)
+        typer.echo(
+            f"Wrote {len(manual_rows)} manual mast observation row(s) to "
+            f"{manual_output}"
+        )
 
 
 @etl_app.command("deer-harvest")
