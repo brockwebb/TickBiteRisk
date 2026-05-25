@@ -89,6 +89,23 @@ data/raw/ecology/mast/maryland_dnr_wmd_mast_survey_2021.pdf
 
 These are localized Western Maryland mast/acorn reports. They must not be generalized statewide without explicit quality flags.
 
+### Manual Or Local Mast Observations
+
+Official mast/acorn data may be regional, sparse, or unavailable for central Maryland counties. The ETL design should allow a local manual-observation input as a separate staging lane, not as an official data substitute.
+
+Example observation to preserve outside committed source data:
+
+```text
+county_fips=24003
+county_name=Anne Arundel County
+year=2025
+mast_rating=bumper
+observation_basis=local resident observation of unusually heavy acorn fall
+feature_quality_flags=manual_observation,anecdotal,not_official,not_model_default
+```
+
+Manual observations can inform product notes, exploratory priors, or future validation prompts. They must not be mixed with Maryland DNR survey rows or used as calibrated model inputs unless a later review process validates them against official or repeatable sources.
+
 ## Output 1: Contact Pressure Features
 
 Output file:
@@ -215,6 +232,36 @@ source_id, parser
 
 The summary file is required for every mast/acorn run. It records whether each PDF produced structured rows, no supported table values, parser failure, or OCR-pending status. This keeps failed or low-confidence document extraction visible without fabricating county-year feature rows.
 
+## Optional Output 4: Manual Mast Observations
+
+Output file:
+
+```text
+build/etl/mast/manual_mast_observations_county_year.csv
+```
+
+Columns:
+
+```text
+county_fips
+county_name
+year
+mast_rating
+observation_basis
+observer_scope
+source_id
+feature_quality_flags
+notes
+```
+
+Natural key:
+
+```text
+county_fips, year, source_id
+```
+
+This output is optional and should be generated only when a local manual-observation input file is provided. It exists to preserve potentially useful field observations without laundering them into official ecology data. Every row must carry `manual_observation`, `anecdotal`, `not_official`, and `not_model_default` unless a future validation process defines stronger evidence levels.
+
 ## CLI Design
 
 Add two ETL commands:
@@ -267,6 +314,7 @@ Mast/acorn tests should cover:
 - no-table/low-confidence behavior
 - extraction summary output for every source
 - quality flags for Western Maryland/regional-only rows
+- optional manual-observation input with noncanonical quality flags
 - CLI invocation without requiring real OCR
 
 ## Documentation Updates
@@ -282,6 +330,7 @@ Docs must say plainly that:
 
 - Construction pressure is a proxy, not a causal claim.
 - Mast/acorn data is localized and sparse.
+- Manual mast observations are anecdotal and excluded from calibrated model inputs by default.
 - NLCD/CDL raster feature extraction remains pending.
 - OCR may be used later, but low-confidence OCR values should not enter model features without review.
 
@@ -292,6 +341,7 @@ Docs must say plainly that:
 - No NLCD/CDL raster processing.
 - No county adjacency/spillover modeling.
 - No forced OCR of scanned or low-quality PDFs into numeric features.
+- No promotion of anecdotal mast observations into calibrated model features.
 - No redistribution of raw acquired source files through git.
 
 ## Acceptance Criteria
