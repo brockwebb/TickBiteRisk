@@ -3,9 +3,14 @@ from pathlib import Path
 import pandas as pd
 
 from tickbiterisk.etl.tick_status import (
+    build_tick_status_county_features,
     parse_ixodes_status,
     parse_lone_star_status,
     parse_pathogen_status,
+)
+from tickbiterisk.etl.tick_status_build import (
+    TICK_STATUS_FEATURE_COLUMNS,
+    write_tick_status_outputs,
 )
 
 
@@ -147,3 +152,119 @@ def test_parse_lone_star_status(tmp_path: Path) -> None:
     assert rows[0]["county_fips"] == "24003"
     assert rows[0]["amblyomma_americanum_status"] == "established"
     assert rows[0]["source_comments"] == ""
+
+
+def test_build_tick_status_county_features_combines_sources_and_flags_limits() -> None:
+    rows = build_tick_status_county_features(
+        ixodes_rows=[
+            {
+                "source_id": "cdc_ixodes_county_status_2025",
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "ixodes_scapularis_status": "established",
+                "ixodes_scapularis_source": "CDC historical record",
+                "ixodes_pacificus_status": "no_records",
+                "ixodes_pacificus_source": "",
+            }
+        ],
+        pathogen_rows=[
+            {
+                "source_id": "cdc_ixodes_pathogen_status_2025",
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "borrelia_burgdorferi_status": "present",
+                "borrelia_miyamotoi_status": "no_records",
+                "anaplasma_phagocytophilum_status": "present",
+                "babesia_microti_status": "no_records",
+                "powassan_virus_status": "no_records",
+            }
+        ],
+        lone_star_rows=[
+            {
+                "source_id": "cdc_lone_star_status_2024",
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "amblyomma_americanum_status": "established",
+                "status_source": "CDC map",
+                "source_comments": "",
+            }
+        ],
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.county_fips == "24003"
+    assert row.ixodes_scapularis_status == "established"
+    assert row.borrelia_burgdorferi_status == "present"
+    assert row.amblyomma_americanum_status == "established"
+    assert row.tick_status_source_ids == (
+        "cdc_ixodes_county_status_2025,"
+        "cdc_ixodes_pathogen_status_2025,"
+        "cdc_lone_star_status_2024"
+    )
+    assert set(row.tick_status_feature_quality_flags.split(",")) == {
+        "current_status_retrospective_proxy",
+        "no_records_not_absence",
+        "status_only_not_prevalence",
+    }
+
+
+def test_write_tick_status_outputs_writes_source_tables_and_feature_table(
+    tmp_path: Path,
+) -> None:
+    ixodes_rows = [
+        {
+            "source_id": "cdc_ixodes_county_status_2025",
+            "county_fips": "24003",
+            "county_name": "Anne Arundel County",
+            "ixodes_scapularis_status": "established",
+            "ixodes_scapularis_source": "CDC historical record",
+            "ixodes_pacificus_status": "no_records",
+            "ixodes_pacificus_source": "",
+        }
+    ]
+    pathogen_rows = [
+        {
+            "source_id": "cdc_ixodes_pathogen_status_2025",
+            "county_fips": "24003",
+            "county_name": "Anne Arundel County",
+            "borrelia_burgdorferi_status": "present",
+            "borrelia_miyamotoi_status": "no_records",
+            "anaplasma_phagocytophilum_status": "present",
+            "babesia_microti_status": "no_records",
+            "powassan_virus_status": "no_records",
+        }
+    ]
+    lone_star_rows = [
+        {
+            "source_id": "cdc_lone_star_status_2024",
+            "county_fips": "24003",
+            "county_name": "Anne Arundel County",
+            "amblyomma_americanum_status": "established",
+            "status_source": "CDC map",
+            "source_comments": "",
+        }
+    ]
+    feature_rows = build_tick_status_county_features(
+        ixodes_rows=ixodes_rows,
+        pathogen_rows=pathogen_rows,
+        lone_star_rows=lone_star_rows,
+    )
+
+    outputs = write_tick_status_outputs(
+        ixodes_rows=ixodes_rows,
+        pathogen_rows=pathogen_rows,
+        lone_star_rows=lone_star_rows,
+        feature_rows=feature_rows,
+        output_dir=tmp_path,
+    )
+
+    assert outputs.vector_path.name == "tick_vector_status.csv"
+    assert outputs.pathogen_path.name == "tick_pathogen_status.csv"
+    assert outputs.lone_star_path.name == "lone_star_status.csv"
+    assert outputs.features_path.name == "tick_status_county_features.csv"
+
+    feature_df = pd.read_csv(outputs.features_path, dtype=str)
+    assert list(feature_df.columns) == TICK_STATUS_FEATURE_COLUMNS
+    assert feature_df.loc[0, "county_fips"] == "24003"
+    assert feature_df.loc[0, "borrelia_burgdorferi_status"] == "present"

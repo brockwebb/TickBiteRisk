@@ -127,6 +127,32 @@ def test_build_model_feature_matrix_aggregates_required_and_optional_inputs(
             },
         ],
     )
+    tick_status = _write_csv(
+        tmp_path / "tick_status.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "ixodes_scapularis_status": "established",
+                "ixodes_pacificus_status": "no_records",
+                "borrelia_burgdorferi_status": "present",
+                "borrelia_miyamotoi_status": "no_records",
+                "anaplasma_phagocytophilum_status": "present",
+                "babesia_microti_status": "no_records",
+                "powassan_virus_status": "no_records",
+                "amblyomma_americanum_status": "established",
+                "tick_status_source_ids": (
+                    "cdc_ixodes_county_status_2025,"
+                    "cdc_ixodes_pathogen_status_2025,"
+                    "cdc_lone_star_status_2024"
+                ),
+                "tick_status_feature_quality_flags": (
+                    "current_status_retrospective_proxy,"
+                    "no_records_not_absence,status_only_not_prevalence"
+                ),
+            }
+        ],
+    )
 
     rows = build_model_feature_matrix(
         lyme_outcomes_path=lyme,
@@ -134,6 +160,7 @@ def test_build_model_feature_matrix_aggregates_required_and_optional_inputs(
         weather_weekly_path=weather,
         contact_pressure_path=contact,
         deer_harvest_path=deer,
+        tick_status_path=tick_status,
     )
 
     assert len(rows) == 1
@@ -167,9 +194,17 @@ def test_build_model_feature_matrix_aggregates_required_and_optional_inputs(
     assert row.deer_total_harvest_prior_season == 1600
     assert row.deer_harvest_per_sqmi_prior_season == 3.25
     assert row.deer_is_derived_total is True
+    assert row.ixodes_scapularis_status == "established"
+    assert row.borrelia_burgdorferi_status == "present"
+    assert row.amblyomma_americanum_status == "established"
+    assert row.tick_status_feature_quality_flags == (
+        "current_status_retrospective_proxy,"
+        "no_records_not_absence,status_only_not_prevalence"
+    )
     assert row.model_feature_quality_flags == (
         "reviewed,legacy_source,partial_weather_year,"
-        "deer_prior_season_derived_total"
+        "deer_prior_season_derived_total,current_status_retrospective_proxy,"
+        "no_records_not_absence,status_only_not_prevalence"
     )
 
 
@@ -230,6 +265,81 @@ def test_build_model_feature_matrix_preserves_rows_when_optional_inputs_missing(
         "lyme_source_conflict,missing_contact_pressure,"
         "missing_deer_harvest_prior_season"
     )
+
+
+def test_build_model_feature_matrix_flags_missing_tick_status_only_when_opted_in(
+    tmp_path: Path,
+) -> None:
+    lyme, population, weather = _minimal_required_inputs(tmp_path, county_fips="24003")
+    tick_status = _write_csv(
+        tmp_path / "tick_status.csv",
+        [
+            {
+                "county_fips": "24005",
+                "county_name": "Baltimore County",
+                "ixodes_scapularis_status": "established",
+                "ixodes_pacificus_status": "no_records",
+                "borrelia_burgdorferi_status": "present",
+                "borrelia_miyamotoi_status": "no_records",
+                "anaplasma_phagocytophilum_status": "no_records",
+                "babesia_microti_status": "no_records",
+                "powassan_virus_status": "no_records",
+                "amblyomma_americanum_status": "established",
+                "tick_status_source_ids": "cdc_ixodes_county_status_2025",
+                "tick_status_feature_quality_flags": (
+                    "current_status_retrospective_proxy,"
+                    "status_only_not_prevalence,no_records_not_absence"
+                ),
+            }
+        ],
+    )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme,
+        population_path=population,
+        weather_weekly_path=weather,
+        tick_status_path=tick_status,
+    )
+
+    assert len(rows) == 1
+    assert "missing_tick_status" in rows[0].model_feature_quality_flags.split(",")
+
+
+def test_build_model_feature_matrix_adds_no_records_guard_from_status_values(
+    tmp_path: Path,
+) -> None:
+    lyme, population, weather = _minimal_required_inputs(tmp_path, county_fips="24003")
+    tick_status = _write_csv(
+        tmp_path / "tick_status.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "ixodes_scapularis_status": "established",
+                "ixodes_pacificus_status": "no_records",
+                "borrelia_burgdorferi_status": "present",
+                "borrelia_miyamotoi_status": "no_records",
+                "anaplasma_phagocytophilum_status": "present",
+                "babesia_microti_status": "no_records",
+                "powassan_virus_status": "no_records",
+                "amblyomma_americanum_status": "established",
+                "tick_status_source_ids": "cdc_ixodes_county_status_2025",
+                "tick_status_feature_quality_flags": (
+                    "current_status_retrospective_proxy,"
+                    "status_only_not_prevalence"
+                ),
+            }
+        ],
+    )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme,
+        population_path=population,
+        weather_weekly_path=weather,
+        tick_status_path=tick_status,
+    )
+
+    assert "no_records_not_absence" in rows[0].model_feature_quality_flags.split(",")
 
 
 def test_build_model_feature_matrix_apportions_boundary_weeks_to_calendar_year(
@@ -354,6 +464,45 @@ def _weather_row(**overrides: str) -> dict[str, str]:
     return row
 
 
+def _minimal_required_inputs(
+    tmp_path: Path,
+    *,
+    county_fips: str,
+) -> tuple[Path, Path, Path]:
+    lyme = _write_csv(
+        tmp_path / "lyme.csv",
+        [
+            {
+                "county_fips": county_fips,
+                "year": "2022",
+                "confirmed_cases": "4",
+                "probable_cases": "1",
+                "total_cases": "5",
+                "canonical_source_id": "cdc_2022",
+                "source_values_summary": "",
+                "reconciliation_status": "matched",
+                "data_quality_flags": "",
+            }
+        ],
+    )
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [
+            {
+                "county_fips": county_fips,
+                "county_name": "Anne Arundel County",
+                "year": "2022",
+                "population": "100000",
+            }
+        ],
+    )
+    weather = _write_csv(
+        tmp_path / "weather.csv",
+        [_weather_row(county_fips=county_fips, week_start_date="2022-01-03")],
+    )
+    return lyme, population, weather
+
+
 def _model_row(
     *,
     county_fips: str,
@@ -405,5 +554,15 @@ def _model_row(
         deer_total_harvest_prior_season=None,
         deer_harvest_per_sqmi_prior_season=None,
         deer_is_derived_total=None,
+        ixodes_scapularis_status=None,
+        ixodes_pacificus_status=None,
+        borrelia_burgdorferi_status=None,
+        borrelia_miyamotoi_status=None,
+        anaplasma_phagocytophilum_status=None,
+        babesia_microti_status=None,
+        powassan_virus_status=None,
+        amblyomma_americanum_status=None,
+        tick_status_source_ids=None,
+        tick_status_feature_quality_flags=None,
         model_feature_quality_flags="",
     )

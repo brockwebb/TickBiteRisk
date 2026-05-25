@@ -91,6 +91,13 @@ from tickbiterisk.etl.open_meteo import (
 )
 from tickbiterisk.etl.population_build import write_county_population_output
 from tickbiterisk.etl.raw_download import download_source_files
+from tickbiterisk.etl.tick_status import (
+    build_tick_status_county_features,
+    parse_ixodes_status,
+    parse_lone_star_status,
+    parse_pathogen_status,
+)
+from tickbiterisk.etl.tick_status_build import write_tick_status_outputs
 from tickbiterisk.etl.weather_build import (
     read_noaa_daily_observations_input,
     write_noaa_daily_observations_output,
@@ -257,6 +264,71 @@ def contact_pressure(
     typer.echo(f"Wrote {len(rows)} contact pressure feature row(s) to {output}")
 
 
+@etl_app.command("tick-status")
+def tick_status(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/tick-status"),
+        help="Raw directory containing CDC tick status XLSX files.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/tick-status"),
+        help="Output directory for normalized tick status artifacts.",
+    ),
+) -> None:
+    source_files = [
+        (
+            "cdc_ixodes_county_status_2025.xlsx",
+            "cdc_ixodes_county_status_2025",
+            parse_ixodes_status,
+        ),
+        (
+            "cdc_ixodes_pathogen_status_2025.xlsx",
+            "cdc_ixodes_pathogen_status_2025",
+            parse_pathogen_status,
+        ),
+        (
+            "cdc_lone_star_status_2024.xlsx",
+            "cdc_lone_star_status_2024",
+            parse_lone_star_status,
+        ),
+    ]
+    for filename, _, _ in source_files:
+        source_path = raw_dir / filename
+        if not source_path.exists():
+            raise typer.BadParameter(
+                f"tick status source file not found: {source_path}"
+            )
+
+    ixodes_rows = parse_ixodes_status(
+        raw_dir / "cdc_ixodes_county_status_2025.xlsx",
+        source_id="cdc_ixodes_county_status_2025",
+    )
+    pathogen_rows = parse_pathogen_status(
+        raw_dir / "cdc_ixodes_pathogen_status_2025.xlsx",
+        source_id="cdc_ixodes_pathogen_status_2025",
+    )
+    lone_star_rows = parse_lone_star_status(
+        raw_dir / "cdc_lone_star_status_2024.xlsx",
+        source_id="cdc_lone_star_status_2024",
+    )
+    feature_rows = build_tick_status_county_features(
+        ixodes_rows=ixodes_rows,
+        pathogen_rows=pathogen_rows,
+        lone_star_rows=lone_star_rows,
+    )
+    outputs = write_tick_status_outputs(
+        ixodes_rows=ixodes_rows,
+        pathogen_rows=pathogen_rows,
+        lone_star_rows=lone_star_rows,
+        feature_rows=feature_rows,
+        output_dir=output_dir,
+    )
+    typer.echo(
+        f"Wrote {len(feature_rows)} tick status feature row(s) to "
+        f"{outputs.features_path}"
+    )
+
+
 @etl_app.command("model-features")
 def model_features(
     lyme_outcomes_path: Path = typer.Option(
@@ -279,6 +351,13 @@ def model_features(
         Path("build/etl/deer-harvest/maryland_dnr_deer_harvest.csv"),
         help="Optional Maryland deer harvest CSV.",
     ),
+    tick_status_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional county tick vector/pathogen status feature CSV. Supplying "
+            "this opts into current cumulative status as a retrospective proxy."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/model"),
         help="Output directory for model-ready feature artifacts.",
@@ -292,6 +371,8 @@ def model_features(
         raise typer.BadParameter(
             f"Weekly weather features file not found: {weather_weekly_path}"
         )
+    if tick_status_path is not None and not tick_status_path.exists():
+        raise typer.BadParameter(f"Tick status file not found: {tick_status_path}")
 
     rows = build_model_feature_matrix(
         lyme_outcomes_path=lyme_outcomes_path,
@@ -301,6 +382,7 @@ def model_features(
             contact_pressure_path if contact_pressure_path.exists() else None
         ),
         deer_harvest_path=deer_harvest_path if deer_harvest_path.exists() else None,
+        tick_status_path=tick_status_path,
     )
     output = write_model_feature_matrix_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} model feature row(s) to {output}")

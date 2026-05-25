@@ -37,6 +37,28 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
         ],
     )
     weather = _write_csv(tmp_path / "weather.csv", [_weather_row()])
+    tick_status = _write_csv(
+        tmp_path / "tick_status.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "ixodes_scapularis_status": "established",
+                "ixodes_pacificus_status": "no_records",
+                "borrelia_burgdorferi_status": "present",
+                "borrelia_miyamotoi_status": "no_records",
+                "anaplasma_phagocytophilum_status": "present",
+                "babesia_microti_status": "no_records",
+                "powassan_virus_status": "no_records",
+                "amblyomma_americanum_status": "established",
+                "tick_status_source_ids": "cdc_ixodes_county_status_2025",
+                "tick_status_feature_quality_flags": (
+                    "current_status_retrospective_proxy,"
+                    "status_only_not_prevalence"
+                ),
+            }
+        ],
+    )
     output_dir = tmp_path / "out"
 
     result = runner.invoke(
@@ -54,6 +76,8 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
             str(tmp_path / "missing-contact.csv"),
             "--deer-harvest-path",
             str(tmp_path / "missing-deer.csv"),
+            "--tick-status-path",
+            str(tick_status),
             "--output-dir",
             str(output_dir),
         ],
@@ -68,8 +92,12 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
         rows = list(csv.DictReader(handle))
     assert rows[0]["county_fips"] == "24003"
     assert rows[0]["lyme_incidence_per_100k"] == "2.5"
+    assert rows[0]["ixodes_scapularis_status"] == "established"
+    assert rows[0]["borrelia_burgdorferi_status"] == "present"
     assert rows[0]["model_feature_quality_flags"] == (
-        "missing_contact_pressure,missing_deer_harvest_prior_season"
+        "missing_contact_pressure,missing_deer_harvest_prior_season,"
+        "current_status_retrospective_proxy,status_only_not_prevalence,"
+        "no_records_not_absence"
     )
 
 
@@ -107,6 +135,62 @@ def test_model_features_command_fails_cleanly_when_required_path_missing(
 
     assert result.exit_code != 0
     assert "Lyme outcomes file not found" in result.output
+    assert "Traceback" not in result.output
+    assert not (tmp_path / "out" / "model_features_county_year.csv").exists()
+
+
+def test_model_features_command_fails_cleanly_when_explicit_tick_status_missing(
+    tmp_path: Path,
+) -> None:
+    lyme = _write_csv(
+        tmp_path / "lyme.csv",
+        [
+            {
+                "county_fips": "24003",
+                "year": "2022",
+                "confirmed_cases": "10",
+                "probable_cases": "5",
+                "total_cases": "15",
+                "canonical_source_id": "cdc_2022",
+                "source_values_summary": "",
+                "reconciliation_status": "matched",
+                "data_quality_flags": "",
+            }
+        ],
+    )
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2022",
+                "population": "600000",
+            }
+        ],
+    )
+    weather = _write_csv(tmp_path / "weather.csv", [_weather_row()])
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-features",
+            "--lyme-outcomes-path",
+            str(lyme),
+            "--population-path",
+            str(population),
+            "--weather-weekly-path",
+            str(weather),
+            "--tick-status-path",
+            str(tmp_path / "missing-tick-status.csv"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Tick status file not found" in result.output
     assert "Traceback" not in result.output
     assert not (tmp_path / "out" / "model_features_county_year.csv").exists()
 

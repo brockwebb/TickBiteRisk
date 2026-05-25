@@ -55,6 +55,16 @@ class ModelCountyYearFeature:
     deer_total_harvest_prior_season: int | None
     deer_harvest_per_sqmi_prior_season: float | None
     deer_is_derived_total: bool | None
+    ixodes_scapularis_status: str | None
+    ixodes_pacificus_status: str | None
+    borrelia_burgdorferi_status: str | None
+    borrelia_miyamotoi_status: str | None
+    anaplasma_phagocytophilum_status: str | None
+    babesia_microti_status: str | None
+    powassan_virus_status: str | None
+    amblyomma_americanum_status: str | None
+    tick_status_source_ids: str | None
+    tick_status_feature_quality_flags: str | None
     model_feature_quality_flags: str
 
 
@@ -65,11 +75,14 @@ def build_model_feature_matrix(
     weather_weekly_path: Path,
     contact_pressure_path: Path | None = None,
     deer_harvest_path: Path | None = None,
+    tick_status_path: Path | None = None,
 ) -> list[ModelCountyYearFeature]:
     population = _read_population(population_path)
     weather = _aggregate_weather_weekly(weather_weekly_path)
     contact = _read_contact_pressure(contact_pressure_path)
     deer = _read_deer_harvest(deer_harvest_path)
+    tick_status = _read_tick_status(tick_status_path)
+    tick_status_enabled = tick_status_path is not None
 
     rows = []
     for lyme in _read_csv(lyme_outcomes_path):
@@ -85,6 +98,7 @@ def build_model_feature_matrix(
 
         contact_row = contact.get((county_fips, year))
         deer_row = deer.get((county_fips, year))
+        tick_status_row = tick_status.get(county_fips)
         total_cases = _parse_int(lyme["total_cases"])
         weather_ratio = weather_row["weather_observation_ratio"]
         flags = _model_quality_flags(
@@ -96,6 +110,8 @@ def build_model_feature_matrix(
             deer_is_derived_total=(
                 None if deer_row is None else deer_row["deer_is_derived_total"]
             ),
+            tick_status_missing=tick_status_enabled and tick_status_row is None,
+            tick_status_flags=_tick_status_quality_flags(tick_status_row),
         )
         rows.append(
             ModelCountyYearFeature(
@@ -139,6 +155,36 @@ def build_model_feature_matrix(
                 ),
                 deer_is_derived_total=(
                     None if deer_row is None else deer_row["deer_is_derived_total"]
+                ),
+                ixodes_scapularis_status=_tick_status_text(
+                    tick_status_row, "ixodes_scapularis_status"
+                ),
+                ixodes_pacificus_status=_tick_status_text(
+                    tick_status_row, "ixodes_pacificus_status"
+                ),
+                borrelia_burgdorferi_status=_tick_status_text(
+                    tick_status_row, "borrelia_burgdorferi_status"
+                ),
+                borrelia_miyamotoi_status=_tick_status_text(
+                    tick_status_row, "borrelia_miyamotoi_status"
+                ),
+                anaplasma_phagocytophilum_status=_tick_status_text(
+                    tick_status_row, "anaplasma_phagocytophilum_status"
+                ),
+                babesia_microti_status=_tick_status_text(
+                    tick_status_row, "babesia_microti_status"
+                ),
+                powassan_virus_status=_tick_status_text(
+                    tick_status_row, "powassan_virus_status"
+                ),
+                amblyomma_americanum_status=_tick_status_text(
+                    tick_status_row, "amblyomma_americanum_status"
+                ),
+                tick_status_source_ids=_tick_status_text(
+                    tick_status_row, "tick_status_source_ids"
+                ),
+                tick_status_feature_quality_flags=_tick_status_text(
+                    tick_status_row, "tick_status_feature_quality_flags"
                 ),
                 model_feature_quality_flags=",".join(flags),
             )
@@ -284,6 +330,15 @@ def _read_deer_harvest(path: Path | None) -> dict[tuple[str, int], dict[str, Any
     return rows
 
 
+def _read_tick_status(path: Path | None) -> dict[str, dict[str, str]]:
+    if path is None:
+        return {}
+    return {
+        str(row["county_fips"]).zfill(5): row
+        for row in _read_csv(path)
+    }
+
+
 def _model_quality_flags(
     *,
     lyme_flags: str,
@@ -292,6 +347,8 @@ def _model_quality_flags(
     contact_missing: bool,
     deer_missing: bool,
     deer_is_derived_total: bool | None,
+    tick_status_missing: bool,
+    tick_status_flags: str,
 ) -> list[str]:
     flags = _split_flags(lyme_flags)
     if reconciliation_status != "matched":
@@ -304,6 +361,9 @@ def _model_quality_flags(
         flags.append("missing_deer_harvest_prior_season")
     if deer_is_derived_total:
         flags.append("deer_prior_season_derived_total")
+    if tick_status_missing:
+        flags.append("missing_tick_status")
+    flags.extend(_split_flags(tick_status_flags))
     return _dedupe_preserve_order(flags)
 
 
@@ -317,6 +377,32 @@ def _contact_float(row: dict[str, str] | None, column: str) -> float | None:
     if row is None:
         return None
     return _parse_float_or_none(row.get(column, ""))
+
+
+def _tick_status_text(row: dict[str, str] | None, column: str) -> str | None:
+    if row is None:
+        return None
+    text = str(row.get(column, "")).strip()
+    return text or None
+
+
+def _tick_status_quality_flags(row: dict[str, str] | None) -> str:
+    if row is None:
+        return ""
+    flags = _split_flags(row.get("tick_status_feature_quality_flags", ""))
+    status_columns = [
+        "ixodes_scapularis_status",
+        "ixodes_pacificus_status",
+        "borrelia_burgdorferi_status",
+        "borrelia_miyamotoi_status",
+        "anaplasma_phagocytophilum_status",
+        "babesia_microti_status",
+        "powassan_virus_status",
+        "amblyomma_americanum_status",
+    ]
+    if any(str(row.get(column, "")).strip() == "no_records" for column in status_columns):
+        flags.append("no_records_not_absence")
+    return ",".join(_dedupe_preserve_order(flags))
 
 
 def _sum_int(rows: list[dict[str, str]], column: str) -> float | None:

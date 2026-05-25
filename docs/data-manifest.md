@@ -43,9 +43,9 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 | `cdc_demographic_age_sex_rates_2023` | CDC Lyme rates by age group and sex | `/Users/brock/Downloads/2023_Demographic-Lyme-Disease-Rates-Among-Cases-by-Age-Group-and-Sex.xlsx` | XLSX | United States | 2010-2023 | Reference, optional risk communication | acquired, optional | Public CDC dashboard export | `119d42a59a42450f6a728ea8bac3de1edb8c62aec7a97a018bead4e08fbe2bca` |
 | `cdc_demographic_age_year_percent_2023` | CDC Lyme percent of total cases by age group/year | `/Users/brock/Downloads/2023_Demographic-Lyme-Disease-Percent-of-Total-Cases-by-Age-Group-and-Year.xlsx` | XLSX | United States | 2010-2023 | Reference, optional risk communication | acquired, optional | Public CDC dashboard export | `87b3957734a7f179e9565e96a2f5c3d19bd5d90dc110d78699b4b0022484b727` |
 | `cdc_demographic_race_cases_2023` | CDC Lyme cases by race | `/Users/brock/Downloads/2023_Demographic-Lyme-Disease-Number-of-Cases-by-Race.csv` | CSV | United States | 2010-2023 | Reference only | acquired, optional | Public CDC dashboard export | `79d614dd89e12d9827eb242b3d15fb784112f217a36e6299260a211861a182d0` |
-| `cdc_ixodes_county_status_2025` | CDC ArboNET Ixodes county status | `/Users/brock/Downloads/Public_Use_Ixodes_County_Table_2026_03252026.xlsx` | XLSX | County | Through 2025 | Vector status predictor | acquired, needs_etl, etl_supported | Restricted data-use language; do not redistribute raw/derived full table without review | `e35a5066a7c77b2e79c50f315a18e042405ab7baa8a414a1a907792bb25d2adc` |
-| `cdc_ixodes_pathogen_status_2025` | CDC ArboNET Ixodes pathogen status | `/Users/brock/Downloads/Public_Use_Ixodes_Pathogens_County_Table_2026_04292026.xlsx` | XLSX | County | Through 2025 | Pathogen status predictor | acquired, needs_etl, etl_supported | Restricted data-use language; status only, not prevalence | `68baef5f20b1e41821d0e6955cbb1809262e0f3624e387e88c04f6ddb0266f2f` |
-| `cdc_lone_star_status_2024` | CDC Amblyomma americanum surveillance map data | `/Users/brock/Downloads/2024-A.americanum-Surveillance-Map-Data.xlsx` | XLSX | County | Through 2024 | Vector status predictor for ehrlichiosis/SFR/tularemia context | acquired, needs_etl, etl_supported | Public CDC workbook; verify terms | `6db7d7e40ca1ddd340edac762bab9d8e12b0b4ba8ecfbd6dd15991118de101d7` |
+| `cdc_ixodes_county_status_2025` | CDC ArboNET Ixodes county status | `/Users/brock/Downloads/Public_Use_Ixodes_County_Table_2026_03252026.xlsx` | XLSX | County | Through 2025 | Vector status predictor | acquired, etl_supported, etl_materialized | Restricted data-use language; do not redistribute raw/derived full table without review | `e35a5066a7c77b2e79c50f315a18e042405ab7baa8a414a1a907792bb25d2adc`; live smoke wrote 24 Maryland rows |
+| `cdc_ixodes_pathogen_status_2025` | CDC ArboNET Ixodes pathogen status | `/Users/brock/Downloads/Public_Use_Ixodes_Pathogens_County_Table_2026_04292026.xlsx` | XLSX | County | Through 2025 | Pathogen status predictor | acquired, etl_supported, etl_materialized | Restricted data-use language; status only, not prevalence | `68baef5f20b1e41821d0e6955cbb1809262e0f3624e387e88c04f6ddb0266f2f`; live smoke wrote 24 Maryland rows |
+| `cdc_lone_star_status_2024` | CDC Amblyomma americanum surveillance map data | `/Users/brock/Downloads/2024-A.americanum-Surveillance-Map-Data.xlsx` | XLSX | County | Through 2024 | Vector status predictor for ehrlichiosis/SFR/tularemia context | acquired, etl_supported, etl_materialized | Public CDC workbook; verify terms | `6db7d7e40ca1ddd340edac762bab9d8e12b0b4ba8ecfbd6dd15991118de101d7`; live smoke wrote 24 Maryland rows |
 | `cdc_all_tbd_2022_public` | CDC all tickborne disease county counts 2022 | `/Users/brock/Downloads/AllTBD2022_Public.xlsx` | XLSX | County | 2022 | Noncanonical comparator, multi-disease context | acquired, needs_etl, needs_reconciliation | Public workbook but source definition needs verification | `2368973bae062df40e7815815917ed9311de52873e1e31820cb7d36d885e8584`; MD Lyme total conflicts with CDC/MDH Lyme public totals |
 | `nssp_coverage_2024` | NSSP coverage map table | `/Users/brock/Downloads/Coverage_Map_Tbl_2024Jul01.csv` | CSV | County | 2024 coverage status | Data availability, ED tracker feasibility | acquired, needs_etl | Public coverage table | `8860232ead3606315678386b0e3917180b899f78567bbb661aa07f0cbb82704b`; all MD jurisdictions show recent NSSP data |
 | `selected_tbd_monthly` | Selected tickborne disease cases by month | `/Users/brock/Downloads/Selected_Tickborne_Disease_Cases_by_Month.csv` | CSV | United States | 2016-2023 | National seasonality, multi-disease context | acquired, optional | Public CDC/dashboard export | `9d686c6d95671e071603d73c0c1e57772c7af7560f8c4b4ea9aafc0ff438a617` |
@@ -73,9 +73,10 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 - CDC Lyme county dashboard export through 2023; materialized into `build/etl/lyme/lyme_county_year_reconciled.csv`.
 - CDC Lyme county geodata for 2000-2021; materialized into `build/etl/lyme/lyme_county_year_reconciled.csv`.
 - CDC dashboard seasonality exports.
-- CDC Ixodes vector status workbook.
-- CDC Ixodes pathogen status workbook.
-- CDC lone star tick status workbook.
+- CDC Ixodes vector status workbook; materialized into `build/etl/tick-status/tick_vector_status.csv`.
+- CDC Ixodes pathogen status workbook; materialized into `build/etl/tick-status/tick_pathogen_status.csv`.
+- CDC lone star tick status workbook; materialized into `build/etl/tick-status/lone_star_status.csv`.
+- Combined tick status feature table; materialized into `build/etl/tick-status/tick_status_county_features.csv`.
 - NSSP coverage table.
 - `AllTBD2022_Public` comparator workbook.
 - Maryland weather county internal points from Census Gazetteer 2024.
@@ -146,7 +147,10 @@ incidence_per_100k
 calendar-year weather features from weekly NOAA
 optional contact-pressure features
 optional prior-season deer harvest features
+optional current cumulative tick vector/pathogen status features
 model_feature_quality_flags
 ```
 
-Still pending for later feature matrix versions: tick vector/pathogen status, lone star status, habitat/NLCD summaries, mast/acorn features where usable, 2024+ population denominators, and ZIP/ZCTA lookup.
+When `--tick-status-path` is supplied, the feature matrix appends static/cumulative vector and pathogen statuses by county and flags rows with `current_status_retrospective_proxy`, `status_only_not_prevalence`, and `no_records_not_absence` as applicable. The 2026-05-25 tick-status smoke wrote 24 county feature rows; the explicit model-feature smoke joined these fields into 676 county-year rows.
+
+Still pending for later feature matrix versions: habitat/NLCD summaries, mast/acorn features where usable, 2024+ population denominators, and ZIP/ZCTA lookup.

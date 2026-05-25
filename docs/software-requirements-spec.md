@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, and Postgres-ready schema. Model feature assembly and backtesting are the next planned slices.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, and Postgres-ready schema. Backtesting is the next planned slice.
 
 ## 1. Purpose
 
@@ -141,6 +141,8 @@ The system must ingest county-level vector/pathogen status from local CDC workbo
 - Lone star tick status.
 
 These are static/cumulative stratification layers. They are not prevalence estimates.
+
+The model feature assembly must treat these layers as opt-in historical proxies. If current cumulative tick status is joined into county-year training rows, the output must flag `current_status_retrospective_proxy`, `status_only_not_prevalence`, and `no_records_not_absence` where applicable.
 
 ### FR6: Weather Acquisition
 

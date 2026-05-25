@@ -51,6 +51,16 @@ MODEL_FEATURE_COLUMNS = [
     "deer_total_harvest_prior_season",
     "deer_harvest_per_sqmi_prior_season",
     "deer_is_derived_total",
+    "ixodes_scapularis_status",
+    "ixodes_pacificus_status",
+    "borrelia_burgdorferi_status",
+    "borrelia_miyamotoi_status",
+    "anaplasma_phagocytophilum_status",
+    "babesia_microti_status",
+    "powassan_virus_status",
+    "amblyomma_americanum_status",
+    "tick_status_source_ids",
+    "tick_status_feature_quality_flags",
     "model_feature_quality_flags",
 ]
 

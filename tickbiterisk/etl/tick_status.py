@@ -1,10 +1,27 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
 
 from tickbiterisk.etl.maryland import maryland_fips_set
+
+
+@dataclass(frozen=True)
+class TickStatusCountyFeature:
+    county_fips: str
+    county_name: str
+    ixodes_scapularis_status: str | None
+    ixodes_pacificus_status: str | None
+    borrelia_burgdorferi_status: str | None
+    borrelia_miyamotoi_status: str | None
+    anaplasma_phagocytophilum_status: str | None
+    babesia_microti_status: str | None
+    powassan_virus_status: str | None
+    amblyomma_americanum_status: str | None
+    tick_status_source_ids: str
+    tick_status_feature_quality_flags: str
 
 
 def _norm_status(value: object) -> str:
@@ -139,3 +156,106 @@ def parse_lone_star_status(path: Path, source_id: str) -> list[dict[str, object]
             }
         )
     return sorted(rows, key=lambda row: str(row["county_fips"]))
+
+
+def build_tick_status_county_features(
+    *,
+    ixodes_rows: list[dict[str, object]],
+    pathogen_rows: list[dict[str, object]],
+    lone_star_rows: list[dict[str, object]],
+) -> list[TickStatusCountyFeature]:
+    ixodes = _index_by_county(ixodes_rows)
+    pathogens = _index_by_county(pathogen_rows)
+    lone_star = _index_by_county(lone_star_rows)
+    county_fips_values = sorted(set(ixodes) | set(pathogens) | set(lone_star))
+    rows = []
+    for county_fips in county_fips_values:
+        ixodes_row = ixodes.get(county_fips)
+        pathogen_row = pathogens.get(county_fips)
+        lone_star_row = lone_star.get(county_fips)
+        status_values = [
+            _text_or_none(ixodes_row, "ixodes_scapularis_status"),
+            _text_or_none(ixodes_row, "ixodes_pacificus_status"),
+            _text_or_none(pathogen_row, "borrelia_burgdorferi_status"),
+            _text_or_none(pathogen_row, "borrelia_miyamotoi_status"),
+            _text_or_none(pathogen_row, "anaplasma_phagocytophilum_status"),
+            _text_or_none(pathogen_row, "babesia_microti_status"),
+            _text_or_none(pathogen_row, "powassan_virus_status"),
+            _text_or_none(lone_star_row, "amblyomma_americanum_status"),
+        ]
+        rows.append(
+            TickStatusCountyFeature(
+                county_fips=county_fips,
+                county_name=_county_name(ixodes_row, pathogen_row, lone_star_row),
+                ixodes_scapularis_status=status_values[0],
+                ixodes_pacificus_status=status_values[1],
+                borrelia_burgdorferi_status=status_values[2],
+                borrelia_miyamotoi_status=status_values[3],
+                anaplasma_phagocytophilum_status=status_values[4],
+                babesia_microti_status=status_values[5],
+                powassan_virus_status=status_values[6],
+                amblyomma_americanum_status=status_values[7],
+                tick_status_source_ids=",".join(
+                    _source_ids(ixodes_row, pathogen_row, lone_star_row)
+                ),
+                tick_status_feature_quality_flags=",".join(
+                    _feature_quality_flags(
+                        status_values,
+                        ixodes_missing=ixodes_row is None,
+                        pathogen_missing=pathogen_row is None,
+                        lone_star_missing=lone_star_row is None,
+                    )
+                ),
+            )
+        )
+    return rows
+
+
+def _index_by_county(
+    rows: list[dict[str, object]]
+) -> dict[str, dict[str, object]]:
+    return {str(row["county_fips"]).zfill(5): row for row in rows}
+
+
+def _county_name(*rows: dict[str, object] | None) -> str:
+    for row in rows:
+        if row is not None:
+            return str(row.get("county_name", ""))
+    return ""
+
+
+def _source_ids(*rows: dict[str, object] | None) -> list[str]:
+    return [
+        source_id
+        for row in rows
+        if row is not None and (source_id := str(row.get("source_id", "")).strip())
+    ]
+
+
+def _feature_quality_flags(
+    status_values: list[str | None],
+    *,
+    ixodes_missing: bool,
+    pathogen_missing: bool,
+    lone_star_missing: bool,
+) -> list[str]:
+    flags = [
+        "current_status_retrospective_proxy",
+        "status_only_not_prevalence",
+    ]
+    if any(value == "no_records" for value in status_values):
+        flags.append("no_records_not_absence")
+    if ixodes_missing:
+        flags.append("missing_ixodes_status")
+    if pathogen_missing:
+        flags.append("missing_pathogen_status")
+    if lone_star_missing:
+        flags.append("missing_lone_star_status")
+    return flags
+
+
+def _text_or_none(row: dict[str, object] | None, column: str) -> str | None:
+    if row is None:
+        return None
+    value = str(row.get(column, "")).strip()
+    return value or None
