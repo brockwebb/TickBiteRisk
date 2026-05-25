@@ -91,6 +91,13 @@ from tickbiterisk.etl.open_meteo import (
 )
 from tickbiterisk.etl.population_build import write_county_population_output
 from tickbiterisk.etl.raw_download import download_source_files
+from tickbiterisk.etl.seasonality import (
+    SeasonalityInputError,
+    build_seasonality_baseline,
+    parse_cdc_lyme_monthly_onset,
+    parse_cdc_lyme_weekly_onset,
+)
+from tickbiterisk.etl.seasonality_build import write_seasonality_outputs
 from tickbiterisk.etl.tick_status import (
     build_tick_status_county_features,
     parse_ixodes_status,
@@ -328,6 +335,54 @@ def tick_status(
     typer.echo(
         f"Wrote {len(feature_rows)} tick status feature row(s) to "
         f"{outputs.features_path}"
+    )
+
+
+@etl_app.command("seasonality-baseline")
+def seasonality_baseline(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/seasonality"),
+        help="Raw directory containing CDC Lyme seasonality CSV files.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/seasonality"),
+        help="Output directory for seasonality baseline ETL artifacts.",
+    ),
+) -> None:
+    monthly_path = raw_dir / "cdc_lyme_monthly_onset_2010_2023.csv"
+    weekly_path = raw_dir / "cdc_lyme_weekly_onset_2010_2023.csv"
+    for source_path in [monthly_path, weekly_path]:
+        if not source_path.exists():
+            raise typer.BadParameter(
+                f"seasonality source file not found: {source_path}"
+            )
+
+    try:
+        observations = [
+            *parse_cdc_lyme_monthly_onset(
+                monthly_path,
+                source_id="cdc_seasonality_month_2023",
+            ),
+            *parse_cdc_lyme_weekly_onset(
+                weekly_path,
+                source_id="cdc_seasonality_week_2023",
+            ),
+        ]
+    except SeasonalityInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    baseline_rows = build_seasonality_baseline(observations)
+    outputs = write_seasonality_outputs(
+        observations=observations,
+        baseline_rows=baseline_rows,
+        output_dir=output_dir,
+    )
+    typer.echo(
+        f"Wrote {len(observations)} seasonality observation row(s) to "
+        f"{outputs.observations_path}"
+    )
+    typer.echo(
+        f"Wrote {len(baseline_rows)} seasonality baseline row(s) to "
+        f"{outputs.baseline_path}"
     )
 
 

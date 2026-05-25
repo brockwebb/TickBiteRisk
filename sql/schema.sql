@@ -261,3 +261,55 @@ CREATE TABLE IF NOT EXISTS weather_features_monthly (
     created_at timestamptz DEFAULT now(),
     PRIMARY KEY (county_fips, year, month, source, weather_model)
 );
+
+CREATE TABLE IF NOT EXISTS seasonality_observations (
+    source_id text NOT NULL,
+    disease text NOT NULL,
+    grain text NOT NULL CHECK (grain IN ('month', 'mmwr_week')),
+    year integer NOT NULL CHECK (year >= 0),
+    period integer NOT NULL CHECK (period >= 1),
+    period_label text NOT NULL,
+    cases integer NOT NULL CHECK (cases >= 0),
+    annual_cases integer NOT NULL CHECK (annual_cases >= 0),
+    seasonal_share double precision NOT NULL CHECK (
+        seasonal_share >= 0 AND seasonal_share <= 1
+    ),
+    ingested_at timestamptz DEFAULT now(),
+    PRIMARY KEY (source_id, disease, grain, year, period)
+);
+
+CREATE TABLE IF NOT EXISTS seasonality_baseline (
+    source_id text NOT NULL,
+    disease text NOT NULL,
+    grain text NOT NULL CHECK (grain IN ('month', 'mmwr_week')),
+    period integer NOT NULL CHECK (period >= 1),
+    period_label text NOT NULL,
+    years_observed integer NOT NULL CHECK (years_observed > 0),
+    mean_cases double precision NOT NULL CHECK (mean_cases >= 0),
+    median_cases double precision NOT NULL CHECK (median_cases >= 0),
+    min_cases integer NOT NULL CHECK (min_cases >= 0),
+    max_cases integer NOT NULL CHECK (max_cases >= 0),
+    mean_share double precision NOT NULL CHECK (mean_share >= 0 AND mean_share <= 1),
+    median_share double precision NOT NULL CHECK (
+        median_share >= 0 AND median_share <= 1
+    ),
+    lower_80_share double precision NOT NULL CHECK (
+        lower_80_share >= 0 AND lower_80_share <= 1
+    ),
+    upper_80_share double precision NOT NULL CHECK (
+        upper_80_share >= 0 AND upper_80_share <= 1
+    ),
+    lower_95_share double precision NOT NULL CHECK (
+        lower_95_share >= 0 AND lower_95_share <= 1
+    ),
+    upper_95_share double precision NOT NULL CHECK (
+        upper_95_share >= 0 AND upper_95_share <= 1
+    ),
+    peak_rank integer NOT NULL CHECK (peak_rank >= 1),
+    cumulative_mean_share double precision NOT NULL CHECK (
+        cumulative_mean_share >= 0 AND cumulative_mean_share <= 1
+    ),
+    feature_quality_flags text DEFAULT '',
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (source_id, disease, grain, period)
+);

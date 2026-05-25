@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, and Postgres-ready schema.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, and Postgres-ready schema.
 
 ## 1. Purpose
 
@@ -109,6 +109,8 @@ Initial normalized tables:
 - `weather_features_weekly`
 - `weather_features_monthly`
 - `weather_features_seasonal`
+- `seasonality_observations`
+- `seasonality_baseline`
 - `model_feature_matrix`
 - `model_backtest_runs`
 - `risk_scores`
@@ -131,6 +133,26 @@ The reconciliation output must include:
 - selected canonical value
 - selection rule
 - flags for conflicts and source discontinuities
+
+### FR4A: Disease-Onset Seasonality
+
+The system must ingest CDC Lyme disease-onset seasonality exports:
+
+- Monthly onset cases by year.
+- MMWR-week onset cases by year.
+
+The seasonality ETL must normalize each period to an annual share within year and grain, because dashboard onset totals may not equal final annual surveillance totals.
+
+The seasonality baseline output must include empirical period summaries and prediction bands:
+
+- mean, median, minimum, and maximum cases.
+- mean and median annual share.
+- 80 percent and 95 percent empirical share bands.
+- peak rank.
+- cumulative mean share.
+- feature quality flags.
+
+The baseline is a national disease-onset prior, not a county-specific predictor. Outputs must carry `national_curve_not_county_specific`, `shares_normalized_by_annual_total`, and `empirical_prediction_band`.
 
 ### FR5: Tick and Pathogen Status
 
@@ -344,6 +366,7 @@ The next build slice is accepted when:
 - Maryland county-year Lyme canonical table can be produced for available years.
 - Reconciliation checks identify mismatches between CDC, MDH, geodata, and `AllTBD2022_Public`.
 - Weather acquisition has a runnable small-range fixture path.
+- CDC Lyme seasonality baselines can be materialized for monthly and MMWR-week disease-onset curves.
 - At least one baseline backtest can run on a Maryland county-year panel.
 
 ## 10. Open Questions
@@ -352,5 +375,6 @@ The next build slice is accepted when:
 - Are 2007-08 through 2010-11 Maryland DNR deer annual report tables worth OCR/manual extraction, given older tick outcome years are less reliable and land-use/ecology may have shifted?
 - Can mast survey reports be converted into a useful Western Maryland feature without over-generalizing statewide?
 - Can CAPC canine data be used legally and practically as a sentinel feature?
+- Can park attendance or trail-use records become a useful exposure denominator, despite the gap between recreation location and Lyme residence/reporting county?
 - Should the first user-facing score be county-week or date-with-seasonal-overlay?
 - Should ZIP-code lookup use Census ZCTA crosswalks or a commercial/local geocoder?

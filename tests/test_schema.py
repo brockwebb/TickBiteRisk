@@ -20,6 +20,8 @@ def test_schema_defines_core_tables() -> None:
         "weather_daily",
         "weather_features_weekly",
         "weather_features_monthly",
+        "seasonality_observations",
+        "seasonality_baseline",
     ]:
         assert f"CREATE TABLE IF NOT EXISTS {table}" in schema
 
@@ -135,3 +137,16 @@ def test_weather_monthly_features_include_completeness_fields() -> None:
     assert "days_observed integer NOT NULL" in schema
     assert "expected_days integer NOT NULL" in schema
     assert "month_complete boolean NOT NULL" in schema
+
+
+def test_seasonality_tables_define_period_keys_and_share_bands() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+
+    assert "CREATE TABLE IF NOT EXISTS seasonality_observations" in schema
+    assert "seasonal_share double precision NOT NULL" in schema
+    assert "PRIMARY KEY (source_id, disease, grain, year, period)" in schema
+    assert "CREATE TABLE IF NOT EXISTS seasonality_baseline" in schema
+    assert "lower_80_share double precision NOT NULL" in schema
+    assert "upper_95_share double precision NOT NULL" in schema
+    assert "feature_quality_flags text DEFAULT ''" in schema
+    assert "PRIMARY KEY (source_id, disease, grain, period)" in schema
