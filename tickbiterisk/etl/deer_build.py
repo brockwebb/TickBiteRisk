@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import asdict
 from pathlib import Path
-
-import pandas as pd
 
 from tickbiterisk.etl.deer_harvest import MarylandDeerHarvest
 
@@ -33,20 +32,22 @@ def write_deer_harvest_output(
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "maryland_dnr_deer_harvest.csv"
-    df = pd.DataFrame([asdict(row) for row in rows], columns=DEER_HARVEST_COLUMNS)
+    records = [_record_from_row(row) for row in rows]
     if append and output_path.exists():
-        existing = pd.read_csv(output_path, dtype={"county_fips": str})
-        df = pd.concat([existing, df], ignore_index=True)
-    if not df.empty:
-        df["county_fips"] = df["county_fips"].astype(str).str.zfill(5)
-        df = df.drop_duplicates(
-            subset=["county_fips", "season_start_year", "species"],
-            keep="last",
-        )
-        df = df.sort_values(
-            ["county_fips", "season_start_year", "species"]
-        ).reset_index(drop=True)
-    df.to_csv(output_path, index=False)
+        records = [*_read_existing_records(output_path), *records]
+    keyed = {_record_key(record): record for record in records}
+    ordered = sorted(
+        keyed.values(),
+        key=lambda record: (
+            record["county_fips"],
+            int(record["season_start_year"]),
+            record["species"],
+        ),
+    )
+    with output_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=DEER_HARVEST_COLUMNS)
+        writer.writeheader()
+        writer.writerows(ordered)
     return output_path
 
 
@@ -59,4 +60,30 @@ def dedupe_deer_harvest_rows(
     return sorted(
         keyed.values(),
         key=lambda row: (row.county_fips, row.season_start_year, row.species),
+    )
+
+
+def _record_from_row(row: MarylandDeerHarvest) -> dict[str, object]:
+    record = asdict(row)
+    record["county_fips"] = str(record["county_fips"]).zfill(5)
+    return record
+
+
+def _read_existing_records(output_path: Path) -> list[dict[str, str]]:
+    with output_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        return [
+            {
+                **record,
+                "county_fips": str(record["county_fips"]).zfill(5),
+            }
+            for record in reader
+        ]
+
+
+def _record_key(record: dict[str, object]) -> tuple[str, int, str]:
+    return (
+        str(record["county_fips"]).zfill(5),
+        int(record["season_start_year"]),
+        str(record["species"]),
     )

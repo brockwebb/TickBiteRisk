@@ -29,10 +29,12 @@ from tickbiterisk.etl.deer_build import (
     write_deer_harvest_output,
 )
 from tickbiterisk.etl.deer_harvest import (
+    MARYLAND_DNR_DEER_ANNUAL_REPORT_URLS,
     MARYLAND_DNR_DEER_HARVEST_URLS,
     attach_deer_harvest_density,
     fetch_maryland_dnr_deer_harvest_html,
     parse_maryland_dnr_deer_harvest_html,
+    parse_maryland_dnr_deer_harvest_pdf,
     source_id_from_deer_harvest_url,
 )
 from tickbiterisk.etl.noaa import (
@@ -156,19 +158,44 @@ def deer_harvest(
         "--url",
         help="Maryland DNR deer harvest source URL. Repeat to override defaults.",
     ),
+    include_annual_report_pdfs: bool = typer.Option(
+        False,
+        help="Include DNR annual report PDFs from the Deer Project archive.",
+    ),
+    skip_news_html: bool = typer.Option(
+        False,
+        help="Skip DNR news-page HTML harvest tables.",
+    ),
+    annual_report_parser: str = typer.Option(
+        "pypdfium",
+        help="Annual report PDF parser: pypdfium or docling.",
+    ),
 ) -> None:
+    if annual_report_parser not in {"pypdfium", "docling"}:
+        raise typer.BadParameter("annual-report-parser must be pypdfium or docling")
     county_references = read_county_reference_output(county_reference_path)
     source_urls = url or MARYLAND_DNR_DEER_HARVEST_URLS
     rows = []
-    for source_url in source_urls:
-        html = fetch_maryland_dnr_deer_harvest_html(source_url)
-        rows.extend(
-            parse_maryland_dnr_deer_harvest_html(
-                html,
-                source_url=source_url,
-                source_id=source_id_from_deer_harvest_url(source_url),
+    if not skip_news_html:
+        for source_url in source_urls:
+            html = fetch_maryland_dnr_deer_harvest_html(source_url)
+            rows.extend(
+                parse_maryland_dnr_deer_harvest_html(
+                    html,
+                    source_url=source_url,
+                    source_id=source_id_from_deer_harvest_url(source_url),
+                )
             )
-        )
+    if include_annual_report_pdfs:
+        for source in MARYLAND_DNR_DEER_ANNUAL_REPORT_URLS:
+            rows.extend(
+                parse_maryland_dnr_deer_harvest_pdf(
+                    source.url,
+                    source_url=source.url,
+                    source_id=source.source_id,
+                    parser=annual_report_parser,
+                )
+            )
     rows = dedupe_deer_harvest_rows(
         attach_deer_harvest_density(rows, county_references)
     )

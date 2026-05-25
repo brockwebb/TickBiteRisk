@@ -50,7 +50,8 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 | `census_county_reference` | Census Gazetteer county reference/area | `https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_counties_national.zip` | ZIP/TXT | County | 2024 reference | Geography, FIPS validation, land-area denominator for density features | acquired, etl_supported | Public federal data | 2026-05-24 live pull wrote 24 Maryland rows to `county_reference.csv` with land/water square miles and internal points |
 | `census_population` | Census PEP/intercensal county population | Census API | API JSON table | County | 1992-2023 | Incidence denominator | acquired, etl_supported, key_needed_for_live_refresh | Public federal data | ETL supports annual Maryland county denominators from 1990/2000 intercensal, 2019 PEP, and 2023 charv APIs. 2026-05-24 live pull with `CENSUS_API_KEY` wrote 768 rows covering 24 jurisdictions x 1992-2023; 2024+ API source still needs confirmation |
 | `nlcd_habitat` | USGS/MRLC NLCD land cover | MRLC data portal | GeoTIFF/raster or summary CSV | Raster/county summary | 2021 or annual NLCD | Habitat predictor | candidate, missing | Public federal data | For MVP, precomputed county summaries are preferred over 15GB raw raster |
-| `maryland_dnr_deer_harvest` | Maryland DNR deer harvest reports | Maryland DNR News harvest pages, 2021-2026 | HTML tables | County/season/species | 2019-20 through 2025-26 | Host ecology predictor, deer-density proxy | acquired, etl_supported | Public state data; publish derived density features with citation | 2026-05-24 live pull wrote 231 county-season-species rows to `maryland_dnr_deer_harvest.csv`; covers 23 Maryland counties, excludes Baltimore City, derives all-deer totals for Caroline, Dorchester, Somerset, Wicomico, and Worcester from white-tailed deer + sika deer rows |
+| `maryland_dnr_deer_harvest_news` | Maryland DNR deer harvest news reports | Maryland DNR News harvest pages, 2021-2026 | HTML tables | County/season/species | 2019-20 through 2025-26 | Host ecology predictor, deer-density proxy | acquired, etl_supported | Public state data; publish derived density features with citation | 2026-05-24 live pull wrote 231 county-season-species rows to `maryland_dnr_deer_harvest.csv`; covers 23 Maryland counties, excludes Baltimore City, derives all-deer totals for Caroline, Dorchester, Somerset, Wicomico, and Worcester from white-tailed deer + sika deer rows |
+| `maryland_dnr_deer_annual_reports` | Maryland DNR deer/big game annual reports | `https://dnr.maryland.gov/wildlife/Pages/hunt_trap/Deer_AnnualReports.aspx` | PDF | County/season/species | 2011-12 through 2024-25 text-extractable; 2007-08 through 2010-11 OCR-pending | Host ecology predictor, deer-density proxy | acquired, etl_supported | Public state data; publish derived density features with citation | `tickbiterisk etl deer-harvest --include-annual-report-pdfs` uses `pypdfium2` by default and supports `--annual-report-parser docling`; live parser smoke extracted 460 rows for 2011-12 through 2024-25, while 2007-08 through 2010-11 did not expose reliable table text and should not be forced into the model without OCR review |
 | `maryland_dnr_mast_survey` | Maryland DNR mast/acorn survey | Maryland DNR wildlife reports | PDF/HTML | Western MD plots/counties | Annual where available | Host/reservoir ecology predictor | candidate, missing | Public state data likely | Likely Western MD only; use lagged features carefully |
 | `capc_canine_serology` | CAPC canine tickborne disease testing | CAPC maps/data | Unknown/API/scrape/license | County/year | Annual/monthly likely | Veterinary sentinel predictor | optional, missing | Licensing/access unresolved | Useful for undercount correction if legally available |
 | `cdc_tick_bite_tracker` | CDC Tick Bite Data Tracker | Power BI dashboard | Dashboard, no bulk file found | HHS region/week | Current/historical dashboard | Activity overlay | candidate, missing | Public dashboard; backing data unknown | Scrape/FOIA/later; not needed for first county-year model |
@@ -69,7 +70,8 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 - NSSP coverage table.
 - `AllTBD2022_Public` comparator workbook.
 - Maryland weather county internal points from Census Gazetteer 2024.
-- Maryland DNR deer harvest tables for 2019-20 through 2025-26.
+- Maryland DNR deer harvest news tables for 2019-20 through 2025-26.
+- Maryland DNR annual deer/big-game report PDFs for text-extractable 2011-12 through 2024-25.
 
 ### Needs Reconciliation Before Modeling
 
@@ -85,6 +87,7 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 - Maryland county population denominators for 2024+ once a newer Census PEP API source is confirmed.
 - Maryland county boundary geometries from Census/TIGER or equivalent for maps and habitat joins.
 - Open-Meteo reanalysis comparison/gap-fill backfill if archive endpoint is reliable.
+- OCR or manual review for Maryland DNR annual deer reports from 2007-08 through 2010-11 if those older host-proxy years become worth the effort.
 - Mast/acorn survey data where usable.
 - Habitat county summaries from NLCD or an equivalent precomputed source.
 - ZIP-to-county/ZCTA mapping for user lookup.

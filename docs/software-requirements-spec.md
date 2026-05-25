@@ -197,11 +197,13 @@ The system must include host/ecology feature slots for:
 Maryland deer harvest ETL must:
 
 - Pull published Maryland DNR harvest report tables.
+- Pull text-extractable Maryland DNR annual report PDFs where they add practical history.
 - Normalize harvest seasons to `season_start_year` and `season_label`.
 - Preserve species rows where DNR splits white-tailed deer and sika deer.
 - Derive all-deer totals for split counties when the source table only provides species rows.
 - Join Census land square miles and compute `harvest_per_sqmi`.
 - Treat the result as a deer abundance/activity proxy, not a direct deer population estimate.
+- Catalogue older scanned/image-heavy annual reports separately instead of forcing unreliable OCR output into the model.
 
 Mast/acorn and veterinary sentinel sources may be missing in the first ETL slice, but the schema and manifest must track them.
 
@@ -343,7 +345,7 @@ The next build slice is accepted when:
 ## 10. Open Questions
 
 - Which source should be canonical for 2024 county Lyme counts after MDH PDF extraction?
-- Can Maryland DNR deer harvest be downloaded as structured county-year data?
+- Are 2007-08 through 2010-11 Maryland DNR deer annual report tables worth OCR/manual extraction, given older tick outcome years are less reliable and land-use/ecology may have shifted?
 - Can mast survey reports be converted into a useful Western Maryland feature without over-generalizing statewide?
 - Can CAPC canine data be used legally and practically as a sentinel feature?
 - Should the first user-facing score be county-week or date-with-seasonal-overlay?

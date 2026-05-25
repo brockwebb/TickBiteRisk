@@ -1,6 +1,7 @@
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
+from tickbiterisk.etl.deer_harvest import MarylandDnrDeerAnnualReportSource
 
 
 runner = CliRunner()
@@ -50,3 +51,69 @@ def test_deer_harvest_command_writes_density_output(tmp_path, monkeypatch) -> No
     assert result.exit_code == 0
     assert "Wrote 2 deer harvest row(s)" in result.stdout
     assert (tmp_path / "maryland_dnr_deer_harvest.csv").exists()
+
+
+def test_deer_harvest_command_can_use_annual_report_pdfs(tmp_path, monkeypatch) -> None:
+    county_reference = tmp_path / "county_reference.csv"
+    county_reference.write_text(
+        "\n".join(
+            [
+                "county_fips,state_fips,state,county_name,aland_sqmi,awater_sqmi,intptlat,intptlon,geography_source,source_url_hash",
+                "24001,24,MD,Allegany County,422.199,5.68,39.612313,-78.703104,Census Gazetteer 2024 counties,cccc",
+                "24011,24,MD,Caroline County,319.416,6.04,38.871531,-75.829040,Census Gazetteer 2024 counties,cccc",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    sample_markdown = """
+    Maryland Reported Antlered and Antlerless Harvest for
+    Archery, Firearm, and Muzzleloader Hunting Seasons
+    by County, 2024-2025
+
+    | County | Archery Antlered | Archery Antlerless | Archery Total | Firearm Antlered | Firearm Antlerless | Firearm Total | Muzzleloader Antlered | Muzzleloader Antlerless | Muzzleloader Total | Total Antlered | Total Antlerless | Total |
+    | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+    | Allegany | 528 | 389 | 917 | 1,015 | 757 | 1,772 | 325 | 398 | 723 | 1,868 | 1,544 | 3,412 |
+    | Caroline | | | | | | | | | | | | |
+    | White-Tailed | 291 | 425 | 716 | 456 | 1,454 | 1,910 | 131 | 383 | 514 | 878 | 2,262 | 3,140 |
+    | Sika | 1 | 1 | 2 | 1 | 0 | 1 | 0 | 1 | 1 | 2 | 2 | 4 |
+    """
+
+    monkeypatch.setattr("tickbiterisk.cli.MARYLAND_DNR_DEER_HARVEST_URLS", [])
+    monkeypatch.setattr(
+        "tickbiterisk.cli.MARYLAND_DNR_DEER_ANNUAL_REPORT_URLS",
+        [
+            MarylandDnrDeerAnnualReportSource(
+                season_start_year=2024,
+                season_label="2024-25",
+                url="https://example.test/report.pdf",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "tickbiterisk.cli.parse_maryland_dnr_deer_harvest_pdf",
+        lambda source, *, source_url, source_id, parser: __import__(
+            "tickbiterisk.etl.deer_harvest",
+            fromlist=["parse_maryland_dnr_deer_harvest_text"],
+        ).parse_maryland_dnr_deer_harvest_text(
+            sample_markdown,
+            source_url=source_url,
+            source_id=source_id,
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "deer-harvest",
+            "--county-reference-path",
+            str(county_reference),
+            "--output-dir",
+            str(tmp_path),
+            "--include-annual-report-pdfs",
+            "--skip-news-html",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 4 deer harvest row(s)" in result.stdout
