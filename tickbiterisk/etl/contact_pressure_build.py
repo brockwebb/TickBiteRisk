@@ -54,7 +54,14 @@ def _record_from_row(row: ContactPressureFeature) -> dict[str, object]:
 
 def _read_existing_records(output_path: Path) -> list[dict[str, str]]:
     with output_path.open("r", encoding="utf-8", newline="") as handle:
-        return list(csv.DictReader(handle))
+        reader = csv.DictReader(handle)
+        return [
+            {
+                **record,
+                "county_fips": str(record["county_fips"]).zfill(5),
+            }
+            for record in reader
+        ]
 
 
 def _record_key(record: dict[str, object]) -> tuple[str, int]:

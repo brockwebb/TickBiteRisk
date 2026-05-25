@@ -88,10 +88,10 @@ def _read_county_reference(path: Path) -> dict[str, dict[str, float | None]]:
     return rows
 
 
-def _read_population(path: Path) -> dict[tuple[str, int], int]:
+def _read_population(path: Path) -> dict[tuple[str, int], int | None]:
     rows = {}
     for row in _read_csv(path):
-        rows[(str(row["county_fips"]).zfill(5), int(row["year"]))] = _parse_int(
+        rows[(str(row["county_fips"]).zfill(5), int(row["year"]))] = _parse_int_or_none(
             row["population"]
         )
     return rows
@@ -106,6 +106,13 @@ def _year_counts(rows: list[dict[str, str]]) -> dict[int, int]:
 
 def _parse_int(value: str) -> int:
     return int(str(value).strip().replace(",", ""))
+
+
+def _parse_int_or_none(value: str) -> int | None:
+    cleaned = str(value).strip()
+    if not cleaned:
+        return None
+    return _parse_int(cleaned)
 
 
 def _parse_float_or_none(value: str) -> float | None:

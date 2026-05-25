@@ -200,6 +200,123 @@ def test_build_contact_pressure_features_flags_missing_population(tmp_path) -> N
     assert "construction_proxy_only" in anne_2024.feature_quality_flags
 
 
+def test_build_contact_pressure_features_treats_blank_population_as_missing(
+    tmp_path,
+) -> None:
+    bps, county_reference, population = _sample_inputs(tmp_path)
+    _write(
+        population,
+        [
+            "county_fips",
+            "county_name",
+            "year",
+            "population",
+            "source_id",
+            "census_dataset",
+            "vintage",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "Anne Arundel County",
+                "2023",
+                "",
+                "census_population_2023",
+                "pep",
+                "2023",
+                "pop",
+            ],
+        ],
+    )
+
+    rows = build_contact_pressure_features(
+        building_permits_path=bps,
+        county_reference_path=county_reference,
+        population_path=population,
+    )
+
+    anne_2023 = next(row for row in rows if row.county_fips == "24003" and row.year == 2023)
+    assert anne_2023.population is None
+    assert anne_2023.units_authorized_per_100k is None
+    assert "missing_population" in anne_2023.feature_quality_flags
+
+
+def test_build_contact_pressure_features_flags_blank_land_area(tmp_path) -> None:
+    bps, county_reference, population = _sample_inputs(tmp_path)
+    _write(
+        county_reference,
+        [
+            "county_fips",
+            "state_fips",
+            "state",
+            "county_name",
+            "aland_sqmi",
+            "awater_sqmi",
+            "intptlat",
+            "intptlon",
+            "geography_source",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "24",
+                "MD",
+                "Anne Arundel County",
+                "",
+                "172.995",
+                "38.99",
+                "-76.56",
+                "Census Gazetteer",
+                "geo",
+            ],
+        ],
+    )
+
+    rows = build_contact_pressure_features(
+        building_permits_path=bps,
+        county_reference_path=county_reference,
+        population_path=population,
+    )
+
+    anne_2023 = next(row for row in rows if row.county_fips == "24003" and row.year == 2023)
+    assert anne_2023.land_area_sqmi is None
+    assert anne_2023.units_authorized_per_sqmi is None
+    assert "missing_land_area" in anne_2023.feature_quality_flags
+
+
+def test_build_contact_pressure_features_flags_missing_land_area(tmp_path) -> None:
+    bps, county_reference, population = _sample_inputs(tmp_path)
+    _write(
+        county_reference,
+        [
+            "county_fips",
+            "state_fips",
+            "state",
+            "county_name",
+            "aland_sqmi",
+            "awater_sqmi",
+            "intptlat",
+            "intptlon",
+            "geography_source",
+            "source_url_hash",
+        ],
+        [],
+    )
+
+    rows = build_contact_pressure_features(
+        building_permits_path=bps,
+        county_reference_path=county_reference,
+        population_path=population,
+    )
+
+    anne_2023 = next(row for row in rows if row.county_fips == "24003" and row.year == 2023)
+    assert anne_2023.land_area_sqmi is None
+    assert anne_2023.units_authorized_per_sqmi is None
+    assert "missing_land_area" in anne_2023.feature_quality_flags
+
+
 def test_write_contact_pressure_output_appends_and_dedupes(tmp_path) -> None:
     row = ContactPressureFeature(
         county_fips="24003",
@@ -227,3 +344,33 @@ def test_write_contact_pressure_output_appends_and_dedupes(tmp_path) -> None:
     assert len(records) == 1
     assert records[0]["county_fips"] == "24003"
     assert records[0]["residential_units_authorized"] == "121"
+
+
+def test_write_contact_pressure_output_normalizes_existing_county_fips(tmp_path) -> None:
+    output = tmp_path / "contact_pressure_features_county_year.csv"
+    _write(
+        output,
+        CONTACT_PRESSURE_COLUMNS,
+        [
+            [
+                "2403",
+                "Anne Arundel County",
+                "2024",
+                "120",
+                "0.289292",
+                "",
+                "43000000",
+                "414.806",
+                "",
+                "census_bps_county_2024",
+                "hash2024",
+                "construction_proxy_only,missing_population",
+            ],
+        ],
+    )
+
+    write_contact_pressure_output([], tmp_path, append=True)
+
+    with output.open("r", encoding="utf-8", newline="") as handle:
+        records = list(csv.DictReader(handle))
+    assert records[0]["county_fips"] == "02403"
