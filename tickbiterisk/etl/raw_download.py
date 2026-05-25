@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -17,10 +18,28 @@ class RawDownloadResult:
     row_count: int
 
 
-def fetch_url_bytes(url: str) -> bytes:
+def fetch_url_bytes(
+    url: str,
+    *,
+    attempts: int = 3,
+    timeout_seconds: int = 60,
+    retry_delay_seconds: float = 1,
+) -> bytes:
+    if attempts < 1:
+        raise ValueError("attempts must be at least 1")
+
     request = Request(url, headers={"User-Agent": "tickbiterisk-etl/0.1"})
-    with urlopen(request, timeout=60) as response:
-        return response.read()
+    for attempt in range(attempts):
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                return response.read()
+        except OSError:
+            if attempt == attempts - 1:
+                raise
+            if retry_delay_seconds:
+                time.sleep(retry_delay_seconds)
+
+    raise RuntimeError("unreachable")
 
 
 def download_source_files(

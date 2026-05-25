@@ -1,5 +1,44 @@
 from tickbiterisk.etl.ecology_sources import EcologySourceFile
-from tickbiterisk.etl.raw_download import download_source_files
+from tickbiterisk.etl import raw_download
+from tickbiterisk.etl.raw_download import download_source_files, fetch_url_bytes
+
+
+class FakeBytesResponse:
+    def __init__(self, content: bytes) -> None:
+        self.content = content
+
+    def __enter__(self) -> "FakeBytesResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.content
+
+
+def test_fetch_url_bytes_retries_transient_oserror_then_returns_bytes(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def flaky_urlopen(request, *, timeout: int):
+        calls.append((request, timeout))
+        if len(calls) == 1:
+            raise TimeoutError("timed out before first byte")
+        return FakeBytesResponse(b"ok")
+
+    monkeypatch.setattr(raw_download, "urlopen", flaky_urlopen)
+
+    content = fetch_url_bytes(
+        "https://example.test/file",
+        retry_delay_seconds=0,
+    )
+
+    assert content == b"ok"
+    assert len(calls) == 2
+    assert calls[0][0].headers["User-agent"] == "tickbiterisk-etl/0.1"
+    assert calls[0][1] == 60
 
 
 def test_download_source_files_writes_files_and_manifest(tmp_path) -> None:

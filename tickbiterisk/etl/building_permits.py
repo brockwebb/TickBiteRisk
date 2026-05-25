@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import time
 from dataclasses import dataclass
 from urllib.request import Request, urlopen
 
@@ -38,10 +39,28 @@ def source_id_from_census_bps_year(year: int) -> str:
     return f"census_bps_county_{year}"
 
 
-def fetch_census_bps_county_text(url: str) -> str:
+def fetch_census_bps_county_text(
+    url: str,
+    *,
+    attempts: int = 3,
+    timeout_seconds: int = 60,
+    retry_delay_seconds: float = 1,
+) -> str:
+    if attempts < 1:
+        raise ValueError("attempts must be at least 1")
+
     request = Request(url, headers={"User-Agent": "tickbiterisk-etl/0.1"})
-    with urlopen(request, timeout=60) as response:
-        return response.read().decode("latin1")
+    for attempt in range(attempts):
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                return response.read().decode("latin1")
+        except OSError:
+            if attempt == attempts - 1:
+                raise
+            if retry_delay_seconds:
+                time.sleep(retry_delay_seconds)
+
+    raise RuntimeError("unreachable")
 
 
 def parse_census_bps_county_text(

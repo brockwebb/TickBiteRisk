@@ -1,7 +1,9 @@
 from dataclasses import replace
 
+from tickbiterisk.etl import building_permits
 from tickbiterisk.etl.building_permits import (
     build_census_bps_county_annual_url,
+    fetch_census_bps_county_text,
     parse_census_bps_county_text,
 )
 from tickbiterisk.etl.building_permits_build import write_building_permits_output
@@ -16,10 +18,48 @@ Date,State,County,Code,Code,Name,Bldgs,Units,Value,Bldgs,Units,Value,Bldgs,Units
 """
 
 
+class FakeTextResponse:
+    def __init__(self, content: bytes) -> None:
+        self.content = content
+
+    def __enter__(self) -> "FakeTextResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.content
+
+
 def test_build_census_bps_county_annual_url_uses_december_ytd_file() -> None:
     assert build_census_bps_county_annual_url(2024) == (
         "https://www2.census.gov/econ/bps/County/co2412y.txt"
     )
+
+
+def test_fetch_census_bps_county_text_retries_transient_oserror_then_decodes_latin1(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def flaky_urlopen(request, *, timeout: int):
+        calls.append((request, timeout))
+        if len(calls) == 1:
+            raise OSError("connection reset")
+        return FakeTextResponse("Prince George\xeds".encode("latin1"))
+
+    monkeypatch.setattr(building_permits, "urlopen", flaky_urlopen)
+
+    text = fetch_census_bps_county_text(
+        "https://www2.census.gov/econ/bps/County/co2412y.txt",
+        retry_delay_seconds=0,
+    )
+
+    assert text == "Prince George\xeds"
+    assert len(calls) == 2
+    assert calls[0][0].headers["User-agent"] == "tickbiterisk-etl/0.1"
+    assert calls[0][1] == 60
 
 
 def test_parse_census_bps_county_text_filters_maryland_and_totals_units() -> None:
