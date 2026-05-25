@@ -80,7 +80,17 @@ transform_nlcd_edge.py  # rasterio windowed read
 * Converts NOAA inches to millimeters for precipitation and snow features.
 * Leaves unsupported NOAA humidity, soil, evapotranspiration, and rain-split fields null and records those limits in `feature_quality_flags`.
 
-### 2.8  CAPC Dog Serology (`fetch_capc.sh` – optional)
+### 2.8  Maryland DNR Deer Harvest (`tickbiterisk etl deer-harvest`)
+
+* Reads Maryland DNR harvest report HTML tables for recent hunting seasons.
+* Normalizes county names to Maryland FIPS codes.
+* Preserves `all_deer`, `white_tailed_deer`, and `sika_deer` rows.
+* Derives all-deer totals for split Eastern Shore counties where the source table reports white-tailed deer and sika deer separately.
+* Joins `county_reference.csv` land area and writes `harvest_per_sqmi`.
+* Writes `maryland_dnr_deer_harvest.csv`; warehouse target is `maryland_dnr_deer_harvest`.
+* The 2026-05-24 live pull produced 231 rows for 2019-20 through 2025-26 across 23 Maryland counties. Baltimore City is not included in the DNR harvest tables.
+
+### 2.9  CAPC Dog Serology (`fetch_capc.sh` – optional)
 
 * Scrapes county JSON; user must set `CAPC_OK=1` env var acknowledging CC‑BY‑NC.
 * Writes to `cov_dog_lyme`; not redistributed.

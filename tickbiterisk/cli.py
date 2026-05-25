@@ -20,7 +20,21 @@ from tickbiterisk.etl.county_reference import (
     fetch_census_gazetteer_counties_text,
     parse_census_gazetteer_counties,
 )
-from tickbiterisk.etl.county_reference_build import write_county_reference_output
+from tickbiterisk.etl.county_reference_build import (
+    read_county_reference_output,
+    write_county_reference_output,
+)
+from tickbiterisk.etl.deer_build import (
+    dedupe_deer_harvest_rows,
+    write_deer_harvest_output,
+)
+from tickbiterisk.etl.deer_harvest import (
+    MARYLAND_DNR_DEER_HARVEST_URLS,
+    attach_deer_harvest_density,
+    fetch_maryland_dnr_deer_harvest_html,
+    parse_maryland_dnr_deer_harvest_html,
+    source_id_from_deer_harvest_url,
+)
 from tickbiterisk.etl.noaa import (
     build_noaa_daily_data_url,
     build_noaa_station_url,
@@ -125,6 +139,41 @@ def census_population(
 
     output = write_county_population_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} county-year population row(s) to {output}")
+
+
+@etl_app.command("deer-harvest")
+def deer_harvest(
+    county_reference_path: Path = typer.Option(
+        Path("build/etl/county-reference/county_reference.csv"),
+        help="County reference CSV with Census land area.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/deer-harvest"),
+        help="Output directory for deer harvest ETL artifacts.",
+    ),
+    url: list[str] | None = typer.Option(
+        None,
+        "--url",
+        help="Maryland DNR deer harvest source URL. Repeat to override defaults.",
+    ),
+) -> None:
+    county_references = read_county_reference_output(county_reference_path)
+    source_urls = url or MARYLAND_DNR_DEER_HARVEST_URLS
+    rows = []
+    for source_url in source_urls:
+        html = fetch_maryland_dnr_deer_harvest_html(source_url)
+        rows.extend(
+            parse_maryland_dnr_deer_harvest_html(
+                html,
+                source_url=source_url,
+                source_id=source_id_from_deer_harvest_url(source_url),
+            )
+        )
+    rows = dedupe_deer_harvest_rows(
+        attach_deer_harvest_density(rows, county_references)
+    )
+    output = write_deer_harvest_output(rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} deer harvest row(s) to {output}")
 
 
 @etl_app.command("weather-backfill-open-meteo")

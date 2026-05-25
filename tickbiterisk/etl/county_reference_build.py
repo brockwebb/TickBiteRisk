@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import asdict
 from pathlib import Path
 
@@ -34,3 +35,23 @@ def write_county_reference_output(
         df = df.sort_values(["county_fips"]).reset_index(drop=True)
     df.to_csv(output_path, index=False)
     return output_path
+
+
+def read_county_reference_output(input_path: Path) -> list[CountyReference]:
+    with input_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        return [
+            CountyReference(
+                county_fips=str(row["county_fips"]).zfill(5),
+                state_fips=str(row["state_fips"]).zfill(2),
+                state=row["state"],
+                county_name=row["county_name"],
+                aland_sqmi=float(row["aland_sqmi"]),
+                awater_sqmi=float(row["awater_sqmi"]),
+                intptlat=float(row["intptlat"]),
+                intptlon=float(row["intptlon"]),
+                geography_source=row["geography_source"],
+                source_url_hash=row["source_url_hash"],
+            )
+            for row in reader
+        ]

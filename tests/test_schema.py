@@ -12,6 +12,7 @@ def test_schema_defines_core_tables() -> None:
         "tick_pathogen_status",
         "lone_star_status",
         "county_reference",
+        "maryland_dnr_deer_harvest",
         "county_population_year",
         "weather_locations",
         "noaa_ghcnd_stations",
@@ -61,6 +62,20 @@ def test_county_reference_defines_area_and_internal_point_fields() -> None:
     assert "awater_sqmi double precision NOT NULL CHECK (awater_sqmi >= 0)" in schema
     assert "intptlat double precision NOT NULL" in schema
     assert "intptlon double precision NOT NULL" in schema
+
+
+def test_maryland_dnr_deer_harvest_defines_density_proxy_fields() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+
+    assert "CREATE TABLE IF NOT EXISTS maryland_dnr_deer_harvest" in schema
+    assert "season_start_year integer NOT NULL" in schema
+    assert "species text NOT NULL" in schema
+    assert "harvest_per_sqmi double precision" in schema
+    assert "is_derived_total boolean NOT NULL" in schema
+    assert (
+        "PRIMARY KEY (county_fips, season_start_year, species, source_id)"
+        in schema
+    )
 
 
 def test_noaa_ghcnd_daily_observations_defines_raw_station_primary_key() -> None:

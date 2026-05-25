@@ -92,6 +92,24 @@ CREATE TABLE IF NOT EXISTS county_reference (
     ingested_at timestamptz DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS maryland_dnr_deer_harvest (
+    county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
+    county_name text NOT NULL,
+    season_start_year integer NOT NULL,
+    season_label text NOT NULL,
+    species text NOT NULL,
+    antlered_harvest integer NOT NULL CHECK (antlered_harvest >= 0),
+    antlerless_harvest integer NOT NULL CHECK (antlerless_harvest >= 0),
+    total_harvest integer NOT NULL CHECK (total_harvest >= 0),
+    land_area_sqmi double precision,
+    harvest_per_sqmi double precision,
+    is_derived_total boolean NOT NULL,
+    source_id text NOT NULL,
+    source_url_hash text NOT NULL,
+    ingested_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, season_start_year, species, source_id)
+);
+
 CREATE TABLE IF NOT EXISTS county_population_year (
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
     county_name text NOT NULL,

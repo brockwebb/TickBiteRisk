@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, Census county reference/area, Census population denominators, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, and Postgres-ready schema. Model feature assembly and backtesting are the next planned slices.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, and Postgres-ready schema. Model feature assembly and backtesting are the next planned slices.
 
 ## 1. Purpose
 
@@ -102,6 +102,7 @@ Initial normalized tables:
 - `all_tbd_2022_county`
 - `nssp_coverage`
 - `county_reference`
+- `maryland_dnr_deer_harvest`
 - `county_population_year`
 - `weather_locations`
 - `weather_daily`
@@ -193,7 +194,16 @@ The system must include host/ecology feature slots for:
 - Maryland mast/acorn survey indicators where available.
 - Optional canine sentinel data if licensing/access can be resolved.
 
-These sources may be missing in the first ETL slice, but the schema and manifest must track them.
+Maryland deer harvest ETL must:
+
+- Pull published Maryland DNR harvest report tables.
+- Normalize harvest seasons to `season_start_year` and `season_label`.
+- Preserve species rows where DNR splits white-tailed deer and sika deer.
+- Derive all-deer totals for split counties when the source table only provides species rows.
+- Join Census land square miles and compute `harvest_per_sqmi`.
+- Treat the result as a deer abundance/activity proxy, not a direct deer population estimate.
+
+Mast/acorn and veterinary sentinel sources may be missing in the first ETL slice, but the schema and manifest must track them.
 
 ### FR10: Risk Score
 

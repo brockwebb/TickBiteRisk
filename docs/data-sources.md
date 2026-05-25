@@ -4,6 +4,7 @@
 | --------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ----------------------------------- | ---------------------------------- | ------------------------------ |
 | **CDC\_TICK**   | [CDC Tick Surveillance](https://www.cdc.gov/ticks/surveillance/index.html) CSV                                     | County‑level *Ixodes* presence & % **B. burgdorferi**‑positive nymphs | ~~Annual (Oct–Nov)~~ *ad hoc 2023→* | US Public Domain (17 U.S.C. § 105) | `pipelines/fetch_cdc_ticks.sh` |
 | **FARS\_DEER**  | [FARS + CRSS](https://www.nhtsa.gov/research-data/fatality-analysis-reporting-system-fars) animal‑collision tables | Crash records with deer flag; county FIPS                             | Annual (Sept)                       | US Public Domain                   | `pipelines/fetch_fars.sh`      |
+| **MD\_DNR\_DEER** | [Maryland DNR deer harvest reports](https://news.maryland.gov/dnr/)                                             | County/season deer harvest; white-tailed deer and sika deer where split | Annual (Feb)                      | Public state data                  | `tickbiterisk etl deer-harvest` |
 | **NSSP\_ED**    | [NSSP Tick‑Bite Visit Indicator](https://www.cdc.gov/nssp/)                                                        | Weekly ED visits coded “tick bite” by state/HHS region                | Weekly (Mon)                        | US Public Domain                   | `pipelines/fetch_ed.sh`        |
 | **NLCD**        | [NLCD 2021 Land‑Cover 30 m](https://www.mrlc.gov/) GeoTIFF                                                         | Raster land‑cover classes; forest/pasture edge metrics                | Static (updated \~5 yr)             | US Public Domain                   | `pipelines/fetch_nlcd.sh`      |
 | **ACS\_POP**    | [American Community Survey 5‑yr](https://api.census.gov/)                                                          | Population density, rural %, housing units (county)                   | Annual (Dec)                        | US Public Domain                   | `pipelines/fetch_acs.sh`       |
@@ -27,4 +28,3 @@ All processed/derived tables (`theta_{year}.parquet`, `lambda_weekly.parquet`) a
 ---
 
 *Last updated: 2025‑06‑08 (draft v0.1)*
-
