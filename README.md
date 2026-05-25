@@ -58,7 +58,7 @@ tickbiterisk runserver           # http://127.0.0.1:8000
 
 Full details: [`/docs/data-sources.md`](docs/data-sources.md)
 
-## maryland weather ETL
+## maryland ETL
 
 The Maryland weather ETL has two acquisition paths: NOAA CDO/GHCND for observed station history, and Open-Meteo as a secondary reanalysis/gap-fill source using Census Gazetteer county internal points. The planned NOAA backfill range is 1992-01-01 through the current year.
 

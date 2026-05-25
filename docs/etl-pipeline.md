@@ -1,6 +1,6 @@
 # TickBiteRisk – ETL Pipeline Specification
 
-> **File location:** `/docs/ETL_PIPELINE.md`
+> **File location:** `docs/etl-pipeline.md`
 
 The ETL layer converts raw public datasets into tidy county tables and covariates consumed by the Bayesian model.  Each feed is 100 % reproducible from public URLs—no credentials required except where noted.
 
@@ -109,7 +109,7 @@ transform_nlcd_edge.py  # rasterio windowed read
 
 * Downloads December year-to-date county ASCII files from the Census BPS county index.
 * Filters Maryland jurisdictions and computes total residential units authorized from 1-unit, 2-unit, 3-4 unit, and 5+ unit columns.
-* Writes `maryland_building_permits_county_year.csv`; warehouse target is `contact_pressure_features` or a future raw staging table.
+* Writes `maryland_building_permits_county_year.csv`; no warehouse table exists yet, and the CSV is ready for a proposed downstream contact-pressure feature or raw staging table.
 * Treats construction as a contact/land-use pressure proxy, not direct evidence of tick or deer migration.
 * Retries transient source fetch failures because `www2.census.gov` can intermittently stall before first byte.
 * The 2024 smoke wrote 24 rows; the first sorted row was `24001`, 2024, 24 units and the last was `24510`, 2024, 1273 units. The 2000-2025 smoke wrote 435 deduped Maryland county-year rows: 2000-2004 have 16 jurisdictions, 2005-2014 have 14, 2015-2021 have 17, and 2022-2025 have 24. Census source files include duplicate St. Mary's rows in 2015 and 2016 with apostrophe spelling differences; the writer dedupes by `county_fips` and `year`.

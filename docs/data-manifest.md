@@ -1,7 +1,7 @@
 # TickBiteRisk Data Manifest
 
 Version: 0.1 draft  
-Date: 2026-05-24  
+Date: 2026-05-25
 Scope: Maryland-first tick-risk warehouse and modeling inputs
 
 ## Status Legend
