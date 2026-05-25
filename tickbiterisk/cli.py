@@ -15,6 +15,13 @@ from tickbiterisk.etl.census_population import (
     get_census_api_key,
     sanitize_census_url,
 )
+from tickbiterisk.etl.building_permits import (
+    build_census_bps_county_annual_url,
+    fetch_census_bps_county_text,
+    parse_census_bps_county_text,
+    source_id_from_census_bps_year,
+)
+from tickbiterisk.etl.building_permits_build import write_building_permits_output
 from tickbiterisk.etl.county_reference import (
     CENSUS_GAZETTEER_COUNTIES_2024_URL,
     fetch_census_gazetteer_counties_text,
@@ -37,6 +44,7 @@ from tickbiterisk.etl.deer_harvest import (
     parse_maryland_dnr_deer_harvest_pdf,
     source_id_from_deer_harvest_url,
 )
+from tickbiterisk.etl.ecology_sources import ECOLOGY_RAW_DIR, ECOLOGY_SOURCE_FILES
 from tickbiterisk.etl.noaa import (
     build_noaa_daily_data_url,
     build_noaa_station_url,
@@ -58,6 +66,7 @@ from tickbiterisk.etl.open_meteo import (
     fetch_open_meteo_archive,
 )
 from tickbiterisk.etl.population_build import write_county_population_output
+from tickbiterisk.etl.raw_download import download_source_files
 from tickbiterisk.etl.weather_build import (
     read_noaa_daily_observations_input,
     write_noaa_daily_observations_output,
@@ -141,6 +150,54 @@ def census_population(
 
     output = write_county_population_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} county-year population row(s) to {output}")
+
+
+@etl_app.command("ecology-sources")
+def ecology_sources(
+    raw_dir: Path = typer.Option(
+        ECOLOGY_RAW_DIR,
+        help="Ignored raw-data directory for ecology source files.",
+    ),
+    manifest_path: Path = typer.Option(
+        Path("build/etl/ecology/source_manifest.csv"),
+        help="Output CSV manifest for downloaded ecology source files.",
+    ),
+) -> None:
+    result = download_source_files(
+        ECOLOGY_SOURCE_FILES,
+        raw_dir=raw_dir,
+        manifest_path=manifest_path,
+    )
+    typer.echo(
+        f"Downloaded/catalogued {result.row_count} ecology source file(s) "
+        f"to {result.manifest_path}"
+    )
+
+
+@etl_app.command("building-permits")
+def building_permits(
+    start_year: int = typer.Option(2000, help="First BPS annual county file year."),
+    end_year: int = typer.Option(2025, help="Last BPS annual county file year."),
+    output_dir: Path = typer.Option(
+        Path("build/etl/building-permits"),
+        help="Output directory for building permit ETL artifacts.",
+    ),
+) -> None:
+    if start_year > end_year:
+        raise typer.BadParameter("start-year must be less than or equal to end-year")
+    rows = []
+    for year in range(start_year, end_year + 1):
+        source_url = build_census_bps_county_annual_url(year)
+        text = fetch_census_bps_county_text(source_url)
+        rows.extend(
+            parse_census_bps_county_text(
+                text,
+                source_url=source_url,
+                source_id=source_id_from_census_bps_year(year),
+            )
+        )
+    output = write_building_permits_output(rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} building permit row(s) to {output}")
 
 
 @etl_app.command("deer-harvest")
