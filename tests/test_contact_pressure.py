@@ -242,6 +242,46 @@ def test_build_contact_pressure_features_treats_blank_population_as_missing(
     assert "missing_population" in anne_2023.feature_quality_flags
 
 
+def test_build_contact_pressure_features_flags_zero_population(tmp_path) -> None:
+    bps, county_reference, population = _sample_inputs(tmp_path)
+    _write(
+        population,
+        [
+            "county_fips",
+            "county_name",
+            "year",
+            "population",
+            "source_id",
+            "census_dataset",
+            "vintage",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "Anne Arundel County",
+                "2023",
+                "0",
+                "census_population_2023",
+                "pep",
+                "2023",
+                "pop",
+            ],
+        ],
+    )
+
+    rows = build_contact_pressure_features(
+        building_permits_path=bps,
+        county_reference_path=county_reference,
+        population_path=population,
+    )
+
+    anne_2023 = next(row for row in rows if row.county_fips == "24003" and row.year == 2023)
+    assert anne_2023.population == 0
+    assert anne_2023.units_authorized_per_100k is None
+    assert "missing_population" in anne_2023.feature_quality_flags
+
+
 def test_build_contact_pressure_features_flags_blank_land_area(tmp_path) -> None:
     bps, county_reference, population = _sample_inputs(tmp_path)
     _write(
