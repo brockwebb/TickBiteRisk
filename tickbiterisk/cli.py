@@ -266,6 +266,10 @@ def mast_acorn(
 ) -> None:
     if parser not in {"pypdfium", "docling"}:
         raise typer.BadParameter("parser must be pypdfium or docling")
+    if manual_observations_path is not None and not manual_observations_path.exists():
+        raise typer.BadParameter(
+            f"manual mast observation file not found: {manual_observations_path}"
+        )
     rows = []
     summaries = []
     for source in MARYLAND_DNR_MAST_REPORT_URLS:
