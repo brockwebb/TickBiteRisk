@@ -31,6 +31,7 @@ class MastAcornCountyYear:
     coverage_complete: bool | None
     source_id: str
     source_url_hash: str
+    extracted_text_excerpt: str
     feature_quality_flags: str
 
 
@@ -116,6 +117,7 @@ def parse_mast_acorn_text(
                 coverage_complete=coverage_complete,
                 source_id=source_id,
                 source_url_hash=source_url_hash,
+                extracted_text_excerpt=_excerpt(text),
                 feature_quality_flags="western_maryland_only",
             )
         )

@@ -43,6 +43,12 @@ def test_parse_mast_acorn_text_extracts_supported_county_values() -> None:
     assert row.expected_plots == 20
     assert row.coverage_complete is True
     assert "western_maryland_only" in row.feature_quality_flags
+    assert (
+        "Western Maryland Mast Survey 2021 Region: Western Maryland"
+        in row.extracted_text_excerpt
+    )
+    assert "\n" not in row.extracted_text_excerpt
+    assert len(row.extracted_text_excerpt) <= 500
 
 
 def test_build_mast_acorn_from_pdf_uses_injected_text_extractor(tmp_path) -> None:
