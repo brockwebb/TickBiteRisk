@@ -6,6 +6,14 @@ from pathlib import Path
 
 import typer
 
+from tickbiterisk.etl.build import write_reconciled_lyme_outputs
+from tickbiterisk.etl.building_permits import (
+    build_census_bps_county_annual_url,
+    fetch_census_bps_county_text,
+    parse_census_bps_county_text,
+    source_id_from_census_bps_year,
+)
+from tickbiterisk.etl.building_permits_build import write_building_permits_output
 from tickbiterisk.etl.census_population import (
     CensusApiResponseError,
     build_census_intercensal_1990_population_url,
@@ -16,14 +24,6 @@ from tickbiterisk.etl.census_population import (
     get_census_api_key,
     sanitize_census_url,
 )
-from tickbiterisk.etl.building_permits import (
-    build_census_bps_county_annual_url,
-    fetch_census_bps_county_text,
-    parse_census_bps_county_text,
-    source_id_from_census_bps_year,
-)
-from tickbiterisk.etl.building_permits_build import write_building_permits_output
-from tickbiterisk.etl.build import write_reconciled_lyme_outputs
 from tickbiterisk.etl.contact_pressure import build_contact_pressure_features
 from tickbiterisk.etl.contact_pressure_build import write_contact_pressure_output
 from tickbiterisk.etl.county_reference import (
@@ -48,8 +48,16 @@ from tickbiterisk.etl.deer_harvest import (
     parse_maryland_dnr_deer_harvest_pdf,
     source_id_from_deer_harvest_url,
 )
-from tickbiterisk.etl.ecology_sources import ECOLOGY_RAW_DIR, ECOLOGY_SOURCE_FILES
-from tickbiterisk.etl.ecology_sources import MARYLAND_DNR_MAST_REPORT_URLS
+from tickbiterisk.etl.ecology_sources import (
+    ECOLOGY_RAW_DIR,
+    ECOLOGY_SOURCE_FILES,
+    MARYLAND_DNR_MAST_REPORT_URLS,
+)
+from tickbiterisk.etl.lyme import (
+    parse_cdc_county_dashboard,
+    parse_cdc_lyme_geodata,
+    parse_cdc_lyme_public_use,
+)
 from tickbiterisk.etl.mast_acorn import (
     build_mast_acorn_from_pdf,
     read_manual_mast_observations,
@@ -59,11 +67,8 @@ from tickbiterisk.etl.mast_acorn_build import (
     write_mast_acorn_output,
     write_mast_acorn_summary_output,
 )
-from tickbiterisk.etl.lyme import (
-    parse_cdc_county_dashboard,
-    parse_cdc_lyme_geodata,
-    parse_cdc_lyme_public_use,
-)
+from tickbiterisk.etl.model_features import build_model_feature_matrix
+from tickbiterisk.etl.model_features_build import write_model_feature_matrix_output
 from tickbiterisk.etl.noaa import (
     build_noaa_daily_data_url,
     build_noaa_station_url,
@@ -98,9 +103,9 @@ from tickbiterisk.etl.weather_build import (
 from tickbiterisk.etl.weather_features import (
     add_trailing_monthly_anomalies,
     add_trailing_weekly_anomalies,
+    compute_monthly_weather_features,
     compute_noaa_monthly_weather_features,
     compute_noaa_weekly_weather_features,
-    compute_monthly_weather_features,
     compute_weekly_weather_features,
 )
 from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
@@ -250,6 +255,55 @@ def contact_pressure(
     )
     output = write_contact_pressure_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} contact pressure feature row(s) to {output}")
+
+
+@etl_app.command("model-features")
+def model_features(
+    lyme_outcomes_path: Path = typer.Option(
+        Path("build/etl/lyme/lyme_county_year_reconciled.csv"),
+        help="Input reconciled Lyme county-year outcome CSV.",
+    ),
+    population_path: Path = typer.Option(
+        Path("build/etl/population/county_population_year.csv"),
+        help="Input county-year population CSV.",
+    ),
+    weather_weekly_path: Path = typer.Option(
+        Path("build/etl/noaa-md-1992-2026/weather_features_weekly.csv"),
+        help="Input weekly county weather feature CSV.",
+    ),
+    contact_pressure_path: Path = typer.Option(
+        Path("build/etl/contact-pressure/contact_pressure_features_county_year.csv"),
+        help="Optional contact pressure county-year feature CSV.",
+    ),
+    deer_harvest_path: Path = typer.Option(
+        Path("build/etl/deer-harvest/maryland_dnr_deer_harvest.csv"),
+        help="Optional Maryland deer harvest CSV.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/model"),
+        help="Output directory for model-ready feature artifacts.",
+    ),
+) -> None:
+    if not lyme_outcomes_path.exists():
+        raise typer.BadParameter(f"Lyme outcomes file not found: {lyme_outcomes_path}")
+    if not population_path.exists():
+        raise typer.BadParameter(f"Population file not found: {population_path}")
+    if not weather_weekly_path.exists():
+        raise typer.BadParameter(
+            f"Weekly weather features file not found: {weather_weekly_path}"
+        )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme_outcomes_path,
+        population_path=population_path,
+        weather_weekly_path=weather_weekly_path,
+        contact_pressure_path=(
+            contact_pressure_path if contact_pressure_path.exists() else None
+        ),
+        deer_harvest_path=deer_harvest_path if deer_harvest_path.exists() else None,
+    )
+    output = write_model_feature_matrix_output(rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} model feature row(s) to {output}")
 
 
 @etl_app.command("lyme-outcomes")

@@ -60,6 +60,7 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 | `maryland_dnr_deer_harvest_news` | Maryland DNR deer harvest news reports | Maryland DNR News harvest pages, 2021-2026 | HTML tables | County/season/species | 2019-20 through 2025-26 | Host ecology predictor, deer-density proxy | acquired, etl_supported | Public state data; publish derived density features with citation | 2026-05-24 live pull wrote 231 county-season-species rows to `maryland_dnr_deer_harvest.csv`; covers 23 Maryland counties, excludes Baltimore City, derives all-deer totals for Caroline, Dorchester, Somerset, Wicomico, and Worcester from white-tailed deer + sika deer rows |
 | `maryland_dnr_deer_annual_reports` | Maryland DNR deer/big game annual reports | `https://dnr.maryland.gov/wildlife/Pages/hunt_trap/Deer_AnnualReports.aspx` | PDF | County/season/species | 2011-12 through 2024-25 text-extractable; 2007-08 through 2010-11 OCR-pending | Host ecology predictor, deer-density proxy | acquired, etl_supported | Public state data; publish derived density features with citation | `tickbiterisk etl deer-harvest --include-annual-report-pdfs` uses `pypdfium2` by default and supports `--annual-report-parser docling`; live parser smoke extracted 460 rows for 2011-12 through 2024-25, while 2007-08 through 2010-11 did not expose reliable table text and should not be forced into the model without OCR review |
 | `maryland_dnr_mast_survey` | Maryland DNR Western Maryland mast/acorn survey reports | Maryland DNR Game Mammals page plus known PDF reports | PDF/HTML | Western Maryland study plots/counties | 2017, 2020, 2021 known report PDFs acquired | Host/reservoir ecology context | acquired, source_manifested, parser_scaffolded, etl_supported_limited | Public state data likely | Localized public-land plot reports; do not generalize statewide without quality flags. The 2026-05-25 live smoke wrote 0 structured rows and 3 extraction-summary rows, all `no_supported_values` with `ocr_pending,parser_low_confidence`; optional manual mast observations are stored separately when supplied, flagged anecdotal, and are not model-default. |
+| `model_features_county_year` | Maryland county-year model feature matrix | `build/etl/model/model_features_county_year.csv` | CSV | County-year | 1992-2023 | Model-ready training panel | etl_materialized | Derived from public sources; publish with source citations and quality flags | Built by `tickbiterisk etl model-features`; 2026-05-25 live smoke wrote 676 rows across 24 Maryland jurisdictions. Required joins: Lyme outcomes, population, calendar-apportioned weekly NOAA weather. Optional joins: contact pressure present for 385 rows, prior-season deer harvest present for 92 rows; 36 rows flagged `partial_weather_year`. |
 | `usda_nass_maryland_cdl` | USDA NASS Maryland Cropland Data Layer | `https://data.nass.usda.gov/Statistics_by_State/Maryland/Publications/Cropland_Data_Layer/index.php` plus CropScape | HTML/catalog now; raster/service extraction later | Maryland/CONUS raster products | Annual CDL products, source page current snapshot | Agriculture/land-use context | acquired, source_manifested, feature_extraction_pending | Public federal data | Raw source pages downloaded by `tickbiterisk etl ecology-sources`; county agriculture feature extraction deferred until raster/service workflow is selected |
 | `capc_canine_serology` | CAPC canine tickborne disease testing | CAPC maps/data | Unknown/API/scrape/license | County/year | Annual/monthly likely | Veterinary sentinel predictor | optional, missing | Licensing/access unresolved | Useful for undercount correction if legally available |
 | `cdc_tick_bite_tracker` | CDC Tick Bite Data Tracker | Power BI dashboard | Dashboard, no bulk file found | HHS region/week | Current/historical dashboard | Activity overlay | candidate, missing | Public dashboard; backing data unknown | Scrape/FOIA/later; not needed for first county-year model |
@@ -137,16 +138,15 @@ reconciliation_status
 
 `county_name` remains a later geography/reference join field and is not emitted by the current `lyme_county_year_reconciled.csv`. In the warehouse, `data_quality_flags` may be empty or nullable; use `COALESCE(data_quality_flags, '')` where string behavior is required.
 
-Then join model-ready fields:
+The first model-ready join now materializes these fields in `model_features_county_year.csv`:
 
 ```text
 population
 incidence_per_100k
-weather_features_weekly
-weather_features_monthly_context
-tick_vector_status
-tick_pathogen_status
-lone_star_status
-host_ecology_features
-habitat_features
+calendar-year weather features from weekly NOAA
+optional contact-pressure features
+optional prior-season deer harvest features
+model_feature_quality_flags
 ```
+
+Still pending for later feature matrix versions: tick vector/pathogen status, lone star status, habitat/NLCD summaries, mast/acorn features where usable, 2024+ population denominators, and ZIP/ZCTA lookup.
