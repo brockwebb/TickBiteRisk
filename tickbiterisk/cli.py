@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from datetime import date
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from tickbiterisk.etl.building_permits import (
     source_id_from_census_bps_year,
 )
 from tickbiterisk.etl.building_permits_build import write_building_permits_output
+from tickbiterisk.etl.build import write_reconciled_lyme_outputs
 from tickbiterisk.etl.contact_pressure import build_contact_pressure_features
 from tickbiterisk.etl.contact_pressure_build import write_contact_pressure_output
 from tickbiterisk.etl.county_reference import (
@@ -56,6 +58,11 @@ from tickbiterisk.etl.mast_acorn_build import (
     write_manual_mast_observations_output,
     write_mast_acorn_output,
     write_mast_acorn_summary_output,
+)
+from tickbiterisk.etl.lyme import (
+    parse_cdc_county_dashboard,
+    parse_cdc_lyme_geodata,
+    parse_cdc_lyme_public_use,
 )
 from tickbiterisk.etl.noaa import (
     build_noaa_daily_data_url,
@@ -243,6 +250,60 @@ def contact_pressure(
     )
     output = write_contact_pressure_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} contact pressure feature row(s) to {output}")
+
+
+@etl_app.command("lyme-outcomes")
+def lyme_outcomes(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/lyme"),
+        help="Raw directory containing CDC Lyme source CSV files.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/lyme"),
+        help="Output directory for reconciled Lyme ETL artifacts.",
+    ),
+) -> None:
+    source_files = [
+        (
+            "cdc_lyme_public_1992_2007.csv",
+            "cdc_lyme_public_1992_2007",
+            parse_cdc_lyme_public_use,
+        ),
+        (
+            "cdc_lyme_public_2008_2021.csv",
+            "cdc_lyme_public_2008_2021",
+            parse_cdc_lyme_public_use,
+        ),
+        (
+            "cdc_lyme_public_2022_2023.csv",
+            "cdc_lyme_public_2022_2023",
+            parse_cdc_lyme_public_use,
+        ),
+        (
+            "cdc_lyme_county_dashboard_2023.csv",
+            "cdc_lyme_county_dashboard_2023",
+            parse_cdc_county_dashboard,
+        ),
+        (
+            "cdc_lyme_county_geodata_2000_2021.csv",
+            "cdc_lyme_county_geodata_2000_2021",
+            parse_cdc_lyme_geodata,
+        ),
+    ]
+    for filename, source_id, parser in source_files:
+        source_path = raw_dir / filename
+        if not source_path.exists():
+            raise typer.BadParameter(f"Lyme source file not found: {source_path}")
+
+    rows = []
+    for filename, source_id, parser in source_files:
+        source_path = raw_dir / filename
+        rows.extend(parser(source_path, source_id=source_id))
+
+    output = write_reconciled_lyme_outputs(rows, output_dir)
+    with output.open(newline="", encoding="utf-8") as handle:
+        row_count = sum(1 for _ in csv.DictReader(handle))
+    typer.echo(f"Wrote {row_count} reconciled Lyme county-year outcome row(s) to {output}")
 
 
 @etl_app.command("mast-acorn")
