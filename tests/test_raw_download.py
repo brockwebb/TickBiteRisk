@@ -43,10 +43,11 @@ def test_download_source_files_overwrites_idempotently(tmp_path) -> None:
         expected_format="pdf",
     )
     calls = []
+    payloads = iter([b"OLD", b"NEW"])
 
     def fake_fetch(url: str) -> bytes:
         calls.append(url)
-        return b"PDF"
+        return next(payloads)
 
     download_source_files(
         [source],
@@ -62,4 +63,4 @@ def test_download_source_files_overwrites_idempotently(tmp_path) -> None:
     )
 
     assert calls == ["https://example.test/file.pdf", "https://example.test/file.pdf"]
-    assert (tmp_path / "raw" / "example" / "file.pdf").read_bytes() == b"PDF"
+    assert (tmp_path / "raw" / "example" / "file.pdf").read_bytes() == b"NEW"
