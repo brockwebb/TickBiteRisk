@@ -120,7 +120,7 @@ transform_nlcd_edge.py  # rasterio windowed read
 * Writes `contact_pressure_features_county_year.csv`.
 * Computes residential units authorized per square mile and per 100,000 residents.
 * Carries `construction_proxy_only`, `missing_population`, `missing_land_area`, and historical coverage flags.
-* The 2026-05-25 live smoke wrote 435 feature rows with 0 rows flagged `missing_population`.
+* The 2026-05-25 live smoke wrote 435 feature rows with 48 rows flagged `missing_population`.
 
 ### 2.13  Mast/Acorn Features (`tickbiterisk etl mast-acorn`)
 
