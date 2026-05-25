@@ -34,6 +34,40 @@ def test_building_permits_command_writes_county_year_output(
     assert (tmp_path / "maryland_building_permits_county_year.csv").exists()
 
 
+def test_building_permits_command_reports_deduped_written_row_count(
+    tmp_path, monkeypatch
+) -> None:
+    duplicate_anne_arundel = (
+        "202412,24,003,3,5,Anne Arundel County,"
+        "1150,1150,412000000,4,8,1800000,3,9,2100000,12,360,85000000,"
+        "1150,1150,412000000,4,8,1800000,3,9,2100000,12,360,85000000"
+    )
+    monkeypatch.setattr(
+        "tickbiterisk.cli.fetch_census_bps_county_text",
+        lambda url: f"{BPS_SAMPLE}\n{duplicate_anne_arundel}\n",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "building-permits",
+            "--start-year",
+            "2024",
+            "--end-year",
+            "2024",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    output = tmp_path / "maryland_building_permits_county_year.csv"
+    assert result.exit_code == 0
+    assert "Wrote 2 building permit row(s)" in result.stdout
+    assert output.exists()
+    assert output.read_text(encoding="utf-8").count("\n") == 3
+
+
 def test_building_permits_rejects_unsupported_year_without_traceback(tmp_path) -> None:
     result = runner.invoke(
         app,

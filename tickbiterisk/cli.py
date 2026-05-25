@@ -201,7 +201,8 @@ def building_permits(
             )
         )
     output = write_building_permits_output(rows, output_dir)
-    typer.echo(f"Wrote {len(rows)} building permit row(s) to {output}")
+    written_row_count = len({(row.county_fips.zfill(5), row.year) for row in rows})
+    typer.echo(f"Wrote {written_row_count} building permit row(s) to {output}")
 
 
 @etl_app.command("deer-harvest")
