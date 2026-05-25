@@ -1,7 +1,10 @@
+from dataclasses import replace
+
 from tickbiterisk.etl.building_permits import (
     build_census_bps_county_annual_url,
     parse_census_bps_county_text,
 )
+from tickbiterisk.etl.building_permits_build import write_building_permits_output
 
 
 BPS_SAMPLE = """Survey,FIPS,FIPS,Region,Division,County,,1-unit,,,2-units,,,3-4 units,,,5+ units,,,1-unit rep,,,2-units rep,,,3-4 units rep,,, 5+units rep
@@ -39,3 +42,21 @@ def test_parse_census_bps_county_text_filters_maryland_and_totals_units() -> Non
     assert anne_arundel.total_units_authorized == 1527
     assert anne_arundel.total_value_dollars == 500900000
     assert len(anne_arundel.source_url_hash) == 64
+
+
+def test_write_building_permits_output_appends_and_dedupes(tmp_path) -> None:
+    row = parse_census_bps_county_text(
+        BPS_SAMPLE,
+        source_url="https://www2.census.gov/econ/bps/County/co2412y.txt",
+        source_id="census_bps_county_2024",
+    )[0]
+    replacement = replace(row, total_units_authorized=1600)
+
+    write_building_permits_output([row], tmp_path)
+    output = write_building_permits_output([replacement], tmp_path, append=True)
+
+    text = output.read_text(encoding="utf-8")
+    assert output.name == "maryland_building_permits_county_year.csv"
+    assert "county_fips,county_name,year,month" in text
+    assert text.count("24003") == 1
+    assert "1600" in text
