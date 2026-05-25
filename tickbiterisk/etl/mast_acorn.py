@@ -39,6 +39,7 @@ class MastAcornCountyYear:
 class MastAcornExtractionSummary:
     year: int
     source_id: str
+    source_path: str
     source_url_hash: str
     parser: str
     extraction_status: str
@@ -53,17 +54,12 @@ class ManualMastObservation:
     county_fips: str
     county_name: str
     year: int
-    region: str | None
-    mast_category: str | None
-    mast_index: float | None
-    hard_mast_index: float | None
-    soft_mast_index: float | None
-    acorn_index: float | None
-    mast_rating: str | None
-    observation_notes: str | None
+    mast_rating: str
+    observation_basis: str
+    observer_scope: str
     source_id: str
-    source_url_hash: str
     feature_quality_flags: str
+    notes: str
 
 
 def parse_mast_acorn_text(
@@ -157,6 +153,7 @@ def build_mast_acorn_from_pdf(
         summary = MastAcornExtractionSummary(
             year=year,
             source_id=source_id,
+            source_path=str(source_path),
             source_url_hash=source_url_hash,
             parser=parser,
             extraction_status="parser_failed",
@@ -171,6 +168,7 @@ def build_mast_acorn_from_pdf(
         summary = MastAcornExtractionSummary(
             year=year,
             source_id=source_id,
+            source_path=str(source_path),
             source_url_hash=source_url_hash,
             parser=parser,
             extraction_status="no_supported_values",
@@ -184,6 +182,7 @@ def build_mast_acorn_from_pdf(
     summary = MastAcornExtractionSummary(
         year=year,
         source_id=source_id,
+        source_path=str(source_path),
         source_url_hash=source_url_hash,
         parser=parser,
         extraction_status="structured",
@@ -196,37 +195,28 @@ def build_mast_acorn_from_pdf(
 
 
 def read_manual_mast_observations(input_path: str | Path) -> list[ManualMastObservation]:
-    required_flags = {
+    required_flags = (
         "manual_observation",
         "anecdotal",
         "not_official",
         "not_model_default",
-    }
+    )
     observations = []
     with Path(input_path).open("r", encoding="utf-8", newline="") as handle:
         for row in csv.DictReader(handle):
             county_fips = str(row.get("county_fips", "")).strip().zfill(5)
-            source_url_hash = str(row.get("source_url_hash", "")).strip()
-            source_url = str(row.get("source_url", "")).strip()
-            if not source_url_hash and source_url:
-                source_url_hash = hashlib.sha256(source_url.encode("utf-8")).hexdigest()
             flags = _merge_flags(row.get("feature_quality_flags", ""), required_flags)
             observations.append(
                 ManualMastObservation(
                     county_fips=county_fips,
                     county_name=str(row.get("county_name", "")).strip(),
                     year=int(str(row.get("year", "")).strip()),
-                    region=_optional_text(row.get("region", "")),
-                    mast_category=_optional_text(row.get("mast_category", "")),
-                    mast_index=_parse_float_or_none(row.get("mast_index", "")),
-                    hard_mast_index=_parse_float_or_none(row.get("hard_mast_index", "")),
-                    soft_mast_index=_parse_float_or_none(row.get("soft_mast_index", "")),
-                    acorn_index=_parse_float_or_none(row.get("acorn_index", "")),
-                    mast_rating=_optional_text(row.get("mast_rating", "")),
-                    observation_notes=_optional_text(row.get("observation_notes", "")),
+                    mast_rating=str(row.get("mast_rating", "")).strip(),
+                    observation_basis=str(row.get("observation_basis", "")).strip(),
+                    observer_scope=str(row.get("observer_scope", "")).strip(),
                     source_id=str(row.get("source_id", "")).strip(),
-                    source_url_hash=source_url_hash,
                     feature_quality_flags=flags,
+                    notes=str(row.get("notes", "")).strip(),
                 )
             )
     return sorted(
@@ -245,8 +235,7 @@ def _county_blocks(text: str) -> list[tuple[str, str]]:
     blocks = []
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        block_start = 0 if index == 0 else match.start()
-        blocks.append((match.group("county").strip(), text[block_start:end]))
+        blocks.append((match.group("county").strip(), text[match.start() : end]))
     return blocks
 
 
@@ -285,11 +274,6 @@ def _parse_float_or_none(value: object) -> float | None:
     return float(cleaned)
 
 
-def _optional_text(value: object) -> str | None:
-    cleaned = str(value).strip()
-    return cleaned or None
-
-
 def _jurisdictions_by_county_key() -> dict[str, MarylandJurisdiction]:
     return {
         _county_key(jurisdiction.county_name): jurisdiction
@@ -308,14 +292,14 @@ def _excerpt(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()[:500]
 
 
-def _merge_flags(existing_flags: object, required_flags: set[str]) -> str:
+def _merge_flags(existing_flags: object, required_flags: tuple[str, ...]) -> str:
     flags = [
         flag.strip()
         for flag in str(existing_flags).split(",")
         if flag.strip()
     ]
     seen = set(flags)
-    for flag in sorted(required_flags):
+    for flag in required_flags:
         if flag not in seen:
             flags.append(flag)
             seen.add(flag)
