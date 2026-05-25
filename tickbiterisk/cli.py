@@ -185,6 +185,10 @@ def building_permits(
 ) -> None:
     if start_year > end_year:
         raise typer.BadParameter("start-year must be less than or equal to end-year")
+    if start_year < 2000 or end_year > 2025:
+        raise typer.BadParameter(
+            "Census BPS county annual ASCII files are supported for 2000-2025"
+        )
     rows = []
     for year in range(start_year, end_year + 1):
         source_url = build_census_bps_county_annual_url(year)
