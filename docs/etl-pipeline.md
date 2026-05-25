@@ -109,10 +109,27 @@ transform_nlcd_edge.py  # rasterio windowed read
 
 * Downloads December year-to-date county ASCII files from the Census BPS county index.
 * Filters Maryland jurisdictions and computes total residential units authorized from 1-unit, 2-unit, 3-4 unit, and 5+ unit columns.
-* Writes `maryland_building_permits_county_year.csv`; no warehouse table exists yet, and the CSV is ready for a proposed downstream contact-pressure feature or raw staging table.
+* Writes `maryland_building_permits_county_year.csv`; no warehouse table exists yet, and the CSV feeds the downstream contact-pressure feature table or a future raw staging table.
 * Treats construction as a contact/land-use pressure proxy, not direct evidence of tick or deer migration.
 * Retries transient source fetch failures because `www2.census.gov` can intermittently stall before first byte.
 * The 2024 smoke wrote 24 rows; the first sorted row was `24001`, 2024, 24 units and the last was `24510`, 2024, 1273 units. The 2000-2025 smoke wrote 435 deduped Maryland county-year rows: 2000-2004 have 16 jurisdictions, 2005-2014 have 14, 2015-2021 have 17, and 2022-2025 have 24. Census source files include duplicate St. Mary's rows in 2015 and 2016 with apostrophe spelling differences; the writer dedupes by `county_fips` and `year`.
+
+### 2.12  Contact Pressure Features (`tickbiterisk etl contact-pressure`)
+
+* Reads normalized Census BPS, county reference, and county population CSVs.
+* Writes `contact_pressure_features_county_year.csv`.
+* Computes residential units authorized per square mile and per 100,000 residents.
+* Carries `construction_proxy_only`, `missing_population`, `missing_land_area`, and historical coverage flags.
+* The 2026-05-25 live smoke wrote 435 feature rows with 0 rows flagged `missing_population`.
+
+### 2.13  Mast/Acorn Features (`tickbiterisk etl mast-acorn`)
+
+* Reads acquired Maryland DNR Western Maryland mast survey PDFs.
+* Uses `pypdfium2` by default and Docling on request.
+* Writes structured mast rows only when text supports them.
+* Always writes an extraction summary so OCR-pending or low-confidence sources stay visible.
+* Optional manual observations are stored separately and flagged anecdotal/not-model-default.
+* The 2026-05-25 live smoke wrote 0 structured rows and 3 extraction-summary rows; all 3 summaries had `extraction_status=no_supported_values` and `feature_quality_flags=ocr_pending,parser_low_confidence`.
 
 ---
 
