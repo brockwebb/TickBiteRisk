@@ -22,6 +22,8 @@ from tickbiterisk.etl.building_permits import (
     source_id_from_census_bps_year,
 )
 from tickbiterisk.etl.building_permits_build import write_building_permits_output
+from tickbiterisk.etl.contact_pressure import build_contact_pressure_features
+from tickbiterisk.etl.contact_pressure_build import write_contact_pressure_output
 from tickbiterisk.etl.county_reference import (
     CENSUS_GAZETTEER_COUNTIES_2024_URL,
     fetch_census_gazetteer_counties_text,
@@ -203,6 +205,34 @@ def building_permits(
     output = write_building_permits_output(rows, output_dir)
     written_row_count = len({(row.county_fips.zfill(5), row.year) for row in rows})
     typer.echo(f"Wrote {written_row_count} building permit row(s) to {output}")
+
+
+@etl_app.command("contact-pressure")
+def contact_pressure(
+    building_permits_path: Path = typer.Option(
+        Path("build/etl/building-permits/maryland_building_permits_county_year.csv"),
+        help="Input Maryland building permits county-year CSV.",
+    ),
+    county_reference_path: Path = typer.Option(
+        Path("build/etl/county-reference/county_reference.csv"),
+        help="County reference CSV with Census land area.",
+    ),
+    population_path: Path = typer.Option(
+        Path("build/etl/population/county_population_year.csv"),
+        help="County-year population denominator CSV.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/contact-pressure"),
+        help="Output directory for contact pressure feature artifacts.",
+    ),
+) -> None:
+    rows = build_contact_pressure_features(
+        building_permits_path=building_permits_path,
+        county_reference_path=county_reference_path,
+        population_path=population_path,
+    )
+    output = write_contact_pressure_output(rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} contact pressure feature row(s) to {output}")
 
 
 @etl_app.command("deer-harvest")
