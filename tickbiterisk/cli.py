@@ -116,6 +116,8 @@ from tickbiterisk.etl.weather_features import (
     compute_weekly_weather_features,
 )
 from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
+from tickbiterisk.modeling.backtest import BacktestInputError, run_baseline_backtests
+from tickbiterisk.modeling.backtest_build import write_model_backtest_outputs
 
 app = typer.Typer(help="TickBiteRisk ETL utilities")
 etl_app = typer.Typer(help="ETL commands")
@@ -386,6 +388,68 @@ def model_features(
     )
     output = write_model_feature_matrix_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} model feature row(s) to {output}")
+
+
+@etl_app.command("model-backtest")
+def model_backtest(
+    model_features_path: Path = typer.Option(
+        Path("build/etl/model/model_features_county_year.csv"),
+        help="Input model feature matrix CSV.",
+    ),
+    start_year: int = typer.Option(
+        2007,
+        help="First held-out test year to evaluate.",
+    ),
+    end_year: int | None = typer.Option(
+        None,
+        help="Last held-out test year to evaluate. Defaults to max year in input.",
+    ),
+    min_train_years: int = typer.Option(
+        5,
+        help="Minimum prior county years required for a prediction.",
+    ),
+    lookback_years: int = typer.Option(
+        5,
+        help="Maximum number of prior county/state years used by baseline models.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/backtest"),
+        help="Output directory for backtest prediction and metric artifacts.",
+    ),
+) -> None:
+    if not model_features_path.exists():
+        raise typer.BadParameter(
+            f"Model features file not found: {model_features_path}"
+        )
+    if min_train_years < 1:
+        raise typer.BadParameter("min-train-years must be at least 1")
+    if lookback_years < min_train_years:
+        raise typer.BadParameter(
+            "lookback-years must be greater than or equal to min-train-years"
+        )
+    if end_year is not None and start_year > end_year:
+        raise typer.BadParameter("start-year must be less than or equal to end-year")
+
+    try:
+        result = run_baseline_backtests(
+            model_features_path=model_features_path,
+            start_year=start_year,
+            end_year=end_year,
+            min_train_years=min_train_years,
+            lookback_years=lookback_years,
+        )
+    except BacktestInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_model_backtest_outputs(result, output_dir)
+    typer.echo(f"Wrote 1 backtest run row(s) to {outputs.runs_path}")
+    typer.echo(
+        f"Wrote {len(result.predictions)} backtest prediction row(s) to "
+        f"{outputs.predictions_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.metrics)} backtest metric row(s) to "
+        f"{outputs.metrics_path}"
+    )
 
 
 @etl_app.command("lyme-outcomes")

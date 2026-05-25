@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, and Postgres-ready schema. Backtesting is the next planned slice.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, and Postgres-ready schema.
 
 ## 1. Purpose
 
@@ -246,6 +246,8 @@ Backtests must report:
 - Metrics.
 - Source version/checksums.
 - Whether weather is reconstruction mode or forecast mode.
+
+The first backtest lane is an annual county-year baseline benchmark. It does not prove causal effects or intervention impact. Outputs must flag that results are observational, intervention history is unmodeled, and surveillance/reporting changes can alter the target.
 
 ### FR12: Model Bake-Off
 
