@@ -68,7 +68,7 @@ Used for:
 Input file:
 
 ```text
-build/etl/census-population/county_population_year.csv
+build/etl/population/county_population_year.csv
 ```
 
 Used for:
