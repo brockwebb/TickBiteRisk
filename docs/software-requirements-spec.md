@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, county-week seasonal risk baselines, and Postgres-ready schema.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, county-week seasonal risk baselines, runtime lookup/static export, and Postgres-ready schema.
 
 ## 1. Purpose
 
@@ -184,6 +184,21 @@ The lookup must:
 
 The lookup output must not be presented as per-bite infection probability, diagnosis, treatment guidance, or weather-adjusted forecast.
 
+### FR4D: Static Public Risk Export
+
+The system must expose a static export command over the derived county-week risk baseline for a public web/runtime bundle.
+
+The export must:
+
+- read `county_week_seasonal_risk_baseline.csv` without requiring raw source files, Postgres credentials, or live network access.
+- require one unambiguous score branch across model name, seasonality source, score-scale settings, and source artifact versions.
+- publish the latest available baseline row per county/MMWR week rather than all historical held-out rows.
+- write `md_county_risk_weekly.json`, `md_county_metadata.json`, `model_card.json`, `source_catalog.json`, and `static_export_manifest.json`.
+- include CDC guidance links, plain-language caveats, source SHA-256 provenance, score-scale metadata, quality flags, and a clinical disclaimer.
+- avoid raw source tables, private warehouse rows, credentials, and terms-unclear source extracts.
+
+The static export must be framed as a relative Maryland county-week Lyme baseline, not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.
+
 ### FR5: Tick and Pathogen Status
 
 The system must ingest county-level vector/pathogen status from local CDC workbooks:
@@ -284,7 +299,7 @@ Display categories:
 
 The first product-shaped risk artifact is a relative county-week seasonal baseline. It combines annual baseline backtest predictions with the CDC national MMWR-week disease-onset curve and maps the resulting weekly incidence estimate to the 1-10 scale. It must be labeled as `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted` until weather, habitat, host, and intervention modifiers are explicitly added.
 
-The first runtime surface for this score is the local `tickbiterisk risk lookup` command. It returns API-ready JSON for a county/date lookup while preserving the non-medical, relative-baseline framing.
+The first runtime surfaces for this score are the local `tickbiterisk risk lookup` command and the `tickbiterisk risk export-static` public JSON bundle. Both preserve the non-medical, relative-baseline framing.
 
 ### FR11: Model Backtesting
 

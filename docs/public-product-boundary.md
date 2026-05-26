@@ -47,10 +47,10 @@ For a static public web product, prefer compact derived files:
 
 ```text
 public/data/md_county_risk_weekly.json
-public/data/md_county_risk_monthly.json
 public/data/md_county_metadata.json
 public/data/model_card.json
 public/data/source_catalog.json
+public/data/static_export_manifest.json
 ```
 
 The public runtime should not need database credentials or raw data files.
@@ -59,6 +59,14 @@ The first implemented runtime bridge reads the derived
 `county_week_seasonal_risk_baseline.csv` artifact and returns a JSON response for
 county/date lookups. It must keep the score framed as a relative seasonal Lyme
 baseline, not a per-bite infection probability or treatment recommendation.
+
+The static export bridge, `tickbiterisk risk export-static`, reads that same
+derived artifact and writes public-safe JSON files. It selects one explicit
+model/source/scale branch, publishes the latest available baseline row per
+county/MMWR week, and includes county metadata, a model card, source catalog,
+manifest, CDC guidance links, and plain-language caveats. It must not publish
+raw downloaded files, private warehouse tables, credentials, or ambiguous model
+branches.
 
 ## Guidance Links
 

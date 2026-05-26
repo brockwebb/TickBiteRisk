@@ -150,7 +150,7 @@ class RiskLookupStore:
 
     @classmethod
     def from_csv(cls, scores_path: Path) -> RiskLookupStore:
-        return cls(_read_score_records(scores_path))
+        return cls(read_county_week_risk_records(scores_path))
 
     def lookup(
         self,
@@ -161,6 +161,7 @@ class RiskLookupStore:
         seasonality_source_id: str = "cdc_seasonality_week_2023",
         benchmark_quantile: float | None = None,
         headroom_multiplier: float | None = None,
+        score_denominator: float | None = None,
         source_prediction_run_id: str | None = None,
         source_prediction_sha256: str | None = None,
         source_seasonality_sha256: str | None = None,
@@ -194,6 +195,12 @@ class RiskLookupStore:
                 for record in week_records
                 if record.headroom_multiplier == headroom_multiplier
             ]
+        if score_denominator is not None:
+            week_records = [
+                record
+                for record in week_records
+                if record.score_denominator == score_denominator
+            ]
         if source_prediction_run_id is not None:
             week_records = [
                 record
@@ -218,13 +225,17 @@ class RiskLookupStore:
                 f"county_fips={normalized_fips}, mmwr_week={week}"
             )
         scale_configs = {
-            (record.benchmark_quantile, record.headroom_multiplier)
+            (
+                record.benchmark_quantile,
+                record.headroom_multiplier,
+                record.score_denominator,
+            )
             for record in week_records
         }
         if len(scale_configs) > 1:
             raise RiskLookupInputError(
                 "Multiple risk score scale configurations found; provide "
-                "benchmark_quantile and headroom_multiplier"
+                "benchmark_quantile, headroom_multiplier, and score_denominator"
             )
         source_configs = {
             (
@@ -321,6 +332,14 @@ def mmwr_year_week(value: str | date) -> tuple[int, int]:
         mmwr_year = parsed_date.year
     week = ((parsed_date - _mmwr_year_start(mmwr_year)).days // 7) + 1
     return mmwr_year, week
+
+
+def read_county_week_risk_records(scores_path: Path) -> list[CountyWeekRiskRecord]:
+    return _read_score_records(scores_path)
+
+
+def split_quality_flags(value: str) -> list[str]:
+    return _split_flags(value)
 
 
 def _read_score_records(path: Path) -> list[CountyWeekRiskRecord]:

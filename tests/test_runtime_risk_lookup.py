@@ -98,6 +98,38 @@ def test_lookup_requires_unambiguous_score_scale_when_configs_overlap(
     assert response.score_scale["headroom_multiplier"] == 1.1
 
 
+def test_lookup_requires_unambiguous_score_denominator_when_scale_overlaps(
+    tmp_path: Path,
+) -> None:
+    path = _write_csv(
+        tmp_path / "scores.csv",
+        [
+            _score_row("24003", "Anne Arundel County", "2023", "1", "7"),
+            {
+                **_score_row("24003", "Anne Arundel County", "2023", "1", "8"),
+                "score_denominator": "4.5",
+            },
+        ],
+    )
+    store = RiskLookupStore.from_csv(path)
+
+    try:
+        store.lookup(county_fips="24003", query_date="2023-01-01")
+    except RiskLookupInputError as exc:
+        assert "Multiple risk score scale configurations found" in str(exc)
+    else:
+        raise AssertionError("Expected ambiguous denominator lookup to fail")
+
+    response = store.lookup(
+        county_fips="24003",
+        query_date="2023-01-01",
+        score_denominator=4.5,
+    )
+
+    assert response.risk_score == 8
+    assert response.score_scale["score_denominator"] == 4.5
+
+
 def test_lookup_requires_unambiguous_source_version_when_same_scale_overlaps(
     tmp_path: Path,
 ) -> None:

@@ -136,6 +136,10 @@ from tickbiterisk.runtime.risk_lookup import (
     RiskLookupInputError,
     RiskLookupStore,
 )
+from tickbiterisk.runtime.static_export import (
+    StaticExportInputError,
+    export_static_risk_data,
+)
 
 app = typer.Typer(help="TickBiteRisk ETL utilities")
 etl_app = typer.Typer(help="ETL commands")
@@ -185,6 +189,10 @@ def risk_lookup(
         None,
         help="Optional score-scale headroom multiplier selector.",
     ),
+    score_denominator: float | None = typer.Option(
+        None,
+        help="Optional score-scale denominator selector.",
+    ),
     source_prediction_run_id: str | None = typer.Option(
         None,
         help="Optional source prediction run selector.",
@@ -213,6 +221,7 @@ def risk_lookup(
             seasonality_source_id=seasonality_source_id,
             benchmark_quantile=benchmark_quantile,
             headroom_multiplier=headroom_multiplier,
+            score_denominator=score_denominator,
             source_prediction_run_id=source_prediction_run_id,
             source_prediction_sha256=source_prediction_sha256,
             source_seasonality_sha256=source_seasonality_sha256,
@@ -220,6 +229,74 @@ def risk_lookup(
     except RiskLookupInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(json.dumps(asdict(response), indent=2 if pretty else None))
+
+
+@risk_app.command("export-static")
+def risk_export_static(
+    scores_path: Path = typer.Option(
+        Path("build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv"),
+        help="County-week seasonal risk baseline CSV.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("public/data"),
+        help="Output directory for public static JSON artifacts.",
+    ),
+    model_name: str = typer.Option(
+        "linear_blend_baseline",
+        help="Risk score model branch to export.",
+    ),
+    seasonality_source_id: str = typer.Option(
+        "cdc_seasonality_week_2023",
+        help="Weekly seasonality source_id to export.",
+    ),
+    benchmark_quantile: float | None = typer.Option(
+        None,
+        help="Optional score-scale benchmark quantile selector.",
+    ),
+    headroom_multiplier: float | None = typer.Option(
+        None,
+        help="Optional score-scale headroom multiplier selector.",
+    ),
+    score_denominator: float | None = typer.Option(
+        None,
+        help="Optional score-scale denominator selector.",
+    ),
+    source_prediction_run_id: str | None = typer.Option(
+        None,
+        help="Optional source prediction run selector.",
+    ),
+    source_prediction_sha256: str | None = typer.Option(
+        None,
+        help="Optional source prediction SHA-256 selector.",
+    ),
+    source_seasonality_sha256: str | None = typer.Option(
+        None,
+        help="Optional source seasonality SHA-256 selector.",
+    ),
+) -> None:
+    if not scores_path.exists():
+        raise typer.BadParameter(f"Risk score file not found: {scores_path}")
+    try:
+        outputs = export_static_risk_data(
+            scores_path=scores_path,
+            output_dir=output_dir,
+            model_name=model_name,
+            seasonality_source_id=seasonality_source_id,
+            benchmark_quantile=benchmark_quantile,
+            headroom_multiplier=headroom_multiplier,
+            score_denominator=score_denominator,
+            source_prediction_run_id=source_prediction_run_id,
+            source_prediction_sha256=source_prediction_sha256,
+            source_seasonality_sha256=source_seasonality_sha256,
+        )
+    except StaticExportInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Wrote static public risk export to {output_dir}")
+    typer.echo(f"Wrote {outputs.weekly_risk_path}")
+    typer.echo(f"Wrote {outputs.county_metadata_path}")
+    typer.echo(f"Wrote {outputs.model_card_path}")
+    typer.echo(f"Wrote {outputs.source_catalog_path}")
+    typer.echo(f"Wrote {outputs.export_manifest_path}")
 
 
 @etl_app.command("weather-locations")
