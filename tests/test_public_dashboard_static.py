@@ -29,3 +29,36 @@ def test_dashboard_css_defines_risk_classes_and_focus_styles() -> None:
         ":focus-visible",
     ]:
         assert class_name in css
+
+
+def test_dashboard_javascript_has_expected_runtime_functions() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "function mmwrYearWeek",
+        "function riskClass",
+        "function indexWeeklyRecords",
+        "function renderCountyList",
+        "function renderMap",
+        "function selectCounty",
+        "function renderSources",
+        "function renderLoadError",
+        "fetchJson",
+    ]:
+        assert token in js
+
+
+def test_dashboard_javascript_renders_one_accessible_svg_path_map() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "<svg",
+        "<path",
+        "role=\"button\"",
+        "tabindex=\"0\"",
+        "aria-pressed",
+        "keydown",
+        "event.key === \"Enter\"",
+        "event.key === \" \"",
+    ]:
+        assert token in js
