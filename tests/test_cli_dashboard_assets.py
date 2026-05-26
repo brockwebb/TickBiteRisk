@@ -1,0 +1,57 @@
+import json
+from pathlib import Path
+
+from typer.testing import CliRunner
+
+from tests.test_runtime_risk_lookup import _write_scores
+from tickbiterisk.cli import app
+
+
+runner = CliRunner()
+
+
+def test_dashboard_build_assets_writes_public_data_files(tmp_path: Path) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    output_dir = tmp_path / "public" / "data"
+
+    result = runner.invoke(
+        app,
+        [
+            "dashboard",
+            "build-assets",
+            "--scores-path",
+            str(scores_path),
+            "--output-dir",
+            str(output_dir),
+            "--use-fixture-geometry",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote dashboard assets" in result.stdout
+    assert (output_dir / "md_county_risk_weekly.json").exists()
+    assert (output_dir / "md_counties.geojson").exists()
+    geojson = json.loads(
+        (output_dir / "md_counties.geojson").read_text(encoding="utf-8")
+    )
+    assert geojson["metadata"]["feature_count"] == 24
+
+
+def test_dashboard_build_assets_fails_cleanly_when_scores_missing(
+    tmp_path: Path,
+) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "dashboard",
+            "build-assets",
+            "--scores-path",
+            str(tmp_path / "missing.csv"),
+            "--output-dir",
+            str(tmp_path / "public" / "data"),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Risk score file not found" in result.output
+    assert "Traceback" not in result.output

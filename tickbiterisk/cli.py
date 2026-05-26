@@ -8,6 +8,7 @@ from pathlib import Path
 
 import typer
 
+from tickbiterisk.dashboard_assets import write_dashboard_assets
 from tickbiterisk.etl.build import write_reconciled_lyme_outputs
 from tickbiterisk.etl.building_permits import (
     build_census_bps_county_annual_url,
@@ -144,8 +145,10 @@ from tickbiterisk.runtime.static_export import (
 app = typer.Typer(help="TickBiteRisk ETL utilities")
 etl_app = typer.Typer(help="ETL commands")
 risk_app = typer.Typer(help="Runtime risk lookup commands")
+dashboard_app = typer.Typer(help="Static dashboard asset commands")
 app.add_typer(etl_app, name="etl")
 app.add_typer(risk_app, name="risk")
+app.add_typer(dashboard_app, name="dashboard")
 
 
 @etl_app.command("check")
@@ -297,6 +300,59 @@ def risk_export_static(
     typer.echo(f"Wrote {outputs.model_card_path}")
     typer.echo(f"Wrote {outputs.source_catalog_path}")
     typer.echo(f"Wrote {outputs.export_manifest_path}")
+
+
+def _fixture_maryland_geojson() -> dict[str, object]:
+    features = []
+    for index in range(24):
+        county_fips = f"24{index + 1:03d}"
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "GEOID": county_fips,
+                    "NAME": f"Fixture County {index + 1}",
+                    "STATE": "24",
+                    "COUNTY": f"{index + 1:03d}",
+                },
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [-77.0 + index * 0.01, 39.0],
+                },
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}
+
+
+@dashboard_app.command("build-assets")
+def dashboard_build_assets(
+    scores_path: Path = typer.Option(
+        Path("build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv"),
+        help="County-week seasonal risk baseline CSV.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("public/data"),
+        help="Output directory for dashboard static data assets.",
+    ),
+    use_fixture_geometry: bool = typer.Option(
+        False,
+        help="Use generated fixture geometry instead of Census TIGERweb.",
+    ),
+) -> None:
+    if not scores_path.exists():
+        raise typer.BadParameter(f"Risk score file not found: {scores_path}")
+    fetcher = _fixture_maryland_geojson if use_fixture_geometry else None
+    try:
+        outputs = write_dashboard_assets(
+            scores_path=scores_path,
+            output_dir=output_dir,
+            fetch_geojson=fetcher,
+        )
+    except StaticExportInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Wrote dashboard assets to {output_dir}")
+    typer.echo(f"Wrote {outputs.weekly_risk_path}")
+    typer.echo(f"Wrote {outputs.county_geojson_path}")
 
 
 @etl_app.command("weather-locations")
