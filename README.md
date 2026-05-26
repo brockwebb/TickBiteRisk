@@ -103,6 +103,11 @@ python -m http.server 8000 --directory public
 
 Open `http://localhost:8000`.
 
+GitHub Pages deployment is handled by GitHub Actions from the committed `public/`
+directory. In repository Settings > Pages, set the source to GitHub Actions; no
+secrets or raw data access are required because `public/data` is the public-safe
+committed data product used by the static dashboard.
+
 ## api summary
 
 Implemented local lookup:
