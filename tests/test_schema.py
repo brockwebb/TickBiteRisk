@@ -22,6 +22,8 @@ def test_schema_defines_core_tables() -> None:
         "weather_features_monthly",
         "seasonality_observations",
         "seasonality_baseline",
+        "county_week_seasonal_risk_baseline",
+        "risk_score_scale",
     ]:
         assert f"CREATE TABLE IF NOT EXISTS {table}" in schema
 
@@ -150,3 +152,35 @@ def test_seasonality_tables_define_period_keys_and_share_bands() -> None:
     assert "upper_95_share double precision NOT NULL" in schema
     assert "feature_quality_flags text DEFAULT ''" in schema
     assert "PRIMARY KEY (source_id, disease, grain, period)" in schema
+
+
+def test_county_week_risk_tables_define_score_bounds_and_keys() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+
+    assert "CREATE TABLE IF NOT EXISTS county_week_seasonal_risk_baseline" in schema
+    assert "mmwr_week integer NOT NULL CHECK (mmwr_week BETWEEN 1 AND 53)" in schema
+    assert "risk_score integer NOT NULL CHECK (risk_score BETWEEN 1 AND 10)" in schema
+    assert "risk_category text NOT NULL" in schema
+    assert "score_denominator double precision NOT NULL" in schema
+    assert "seasonality_source_id text NOT NULL" in schema
+    assert (
+        "seasonality_source_id,\n"
+        "        benchmark_quantile,\n"
+        "        headroom_multiplier,\n"
+        "        source_prediction_sha256,\n"
+        "        source_seasonality_sha256"
+    ) in schema
+    assert "CREATE TABLE IF NOT EXISTS risk_score_scale" in schema
+    assert "benchmark_quantile double precision NOT NULL" in schema
+    assert "headroom_multiplier double precision NOT NULL" in schema
+    assert (
+        "PRIMARY KEY (\n"
+        "        model_name,\n"
+        "        grain,\n"
+        "        seasonality_source_id,\n"
+        "        source_prediction_sha256,\n"
+        "        source_seasonality_sha256,\n"
+        "        benchmark_quantile,\n"
+        "        headroom_multiplier\n"
+        "    )"
+    ) in schema

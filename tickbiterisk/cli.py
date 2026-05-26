@@ -125,6 +125,11 @@ from tickbiterisk.etl.weather_features import (
 from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
 from tickbiterisk.modeling.backtest import BacktestInputError, run_baseline_backtests
 from tickbiterisk.modeling.backtest_build import write_model_backtest_outputs
+from tickbiterisk.modeling.risk_score import (
+    RiskScoreInputError,
+    build_seasonal_risk_scores,
+)
+from tickbiterisk.modeling.risk_score_build import write_seasonal_risk_score_outputs
 
 app = typer.Typer(help="TickBiteRisk ETL utilities")
 etl_app = typer.Typer(help="ETL commands")
@@ -505,6 +510,73 @@ def model_backtest(
         f"Wrote {len(result.metrics)} backtest metric row(s) to "
         f"{outputs.metrics_path}"
     )
+
+
+@etl_app.command("county-week-risk")
+def county_week_risk(
+    backtest_predictions_path: Path = typer.Option(
+        Path("build/etl/backtest/model_backtest_predictions.csv"),
+        help="Input backtest prediction CSV with annual county predictions.",
+    ),
+    seasonality_baseline_path: Path = typer.Option(
+        Path("build/etl/seasonality/seasonality_baseline.csv"),
+        help="Input CDC Lyme seasonality baseline CSV.",
+    ),
+    model_name: str = typer.Option(
+        "linear_blend_baseline",
+        help="Annual backtest model branch to convert into weekly risk scores.",
+    ),
+    seasonality_source_id: str = typer.Option(
+        "cdc_seasonality_week_2023",
+        help="Seasonality baseline source_id to use for the weekly Lyme curve.",
+    ),
+    benchmark_quantile: float = typer.Option(
+        0.95,
+        help="Quantile of generated weekly incidence used as score benchmark.",
+    ),
+    headroom_multiplier: float = typer.Option(
+        1.2,
+        help="Multiplier applied to benchmark before mapping onto the 1-10 scale.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/county-week-risk"),
+        help="Output directory for county-week risk score artifacts.",
+    ),
+    append: bool = typer.Option(
+        True,
+        "--append/--replace",
+        help=(
+            "Append to existing score artifacts with key-based dedupe, or replace "
+            "the output files."
+        ),
+    ),
+) -> None:
+    if not backtest_predictions_path.exists():
+        raise typer.BadParameter(
+            f"Backtest predictions file not found: {backtest_predictions_path}"
+        )
+    if not seasonality_baseline_path.exists():
+        raise typer.BadParameter(
+            f"Seasonality baseline file not found: {seasonality_baseline_path}"
+        )
+
+    try:
+        result = build_seasonal_risk_scores(
+            predictions_path=backtest_predictions_path,
+            seasonality_baseline_path=seasonality_baseline_path,
+            model_name=model_name,
+            seasonality_source_id=seasonality_source_id,
+            benchmark_quantile=benchmark_quantile,
+            headroom_multiplier=headroom_multiplier,
+        )
+    except RiskScoreInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_seasonal_risk_score_outputs(result, output_dir, append=append)
+    typer.echo(
+        f"Wrote {len(result.rows)} county-week risk score row(s) to "
+        f"{outputs.scores_path}"
+    )
+    typer.echo(f"Wrote 1 risk score scale row(s) to {outputs.scale_path}")
 
 
 @etl_app.command("lyme-outcomes")

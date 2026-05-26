@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, and Postgres-ready schema.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, county-week seasonal risk baselines, and Postgres-ready schema.
 
 ## 1. Purpose
 
@@ -113,6 +113,8 @@ Initial normalized tables:
 - `seasonality_baseline`
 - `model_feature_matrix`
 - `model_backtest_runs`
+- `county_week_seasonal_risk_baseline`
+- `risk_score_scale`
 - `risk_scores`
 
 ### FR4: Lyme Outcome Reconciliation
@@ -153,6 +155,20 @@ The seasonality baseline output must include empirical period summaries and pred
 - feature quality flags.
 
 The baseline is a national disease-onset prior, not a county-specific predictor. Outputs must carry `national_curve_not_county_specific`, `shares_normalized_by_annual_total`, and `empirical_prediction_band`.
+
+### FR4B: County-Week Seasonal Risk Baseline
+
+The system must convert annual held-out Lyme prediction rows into a product-shaped county-week risk baseline by combining:
+
+- one selected annual model branch from `model_backtest_predictions.csv`.
+- one selected weekly seasonality branch from `seasonality_baseline.csv`.
+- an explicit relative score scale defined by benchmark quantile and headroom multiplier.
+
+The county-week output must include predicted weekly incidence, empirical seasonality bands, predicted weekly cases, a bounded 1-10 relative risk score, risk category, seasonality source id, scale denominator, and feature quality flags.
+
+The scale output must preserve the selected model name, seasonality source id, benchmark quantile, headroom multiplier, input file SHA-256 values, benchmark weekly incidence, denominator, and score-row count. Distinct model/source/scale configurations must be able to coexist without overwriting each other.
+
+This baseline is not a weather-adjusted forecast. Outputs must carry `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted`.
 
 ### FR5: Tick and Pathogen Status
 
@@ -251,6 +267,8 @@ Display categories:
 - `5-6`: moderate
 - `7-8`: high
 - `9-10`: very high
+
+The first product-shaped risk artifact is a relative county-week seasonal baseline. It combines annual baseline backtest predictions with the CDC national MMWR-week disease-onset curve and maps the resulting weekly incidence estimate to the 1-10 scale. It must be labeled as `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted` until weather, habitat, host, and intervention modifiers are explicitly added.
 
 ### FR11: Model Backtesting
 
@@ -368,6 +386,7 @@ The next build slice is accepted when:
 - Weather acquisition has a runnable small-range fixture path.
 - CDC Lyme seasonality baselines can be materialized for monthly and MMWR-week disease-onset curves.
 - At least one baseline backtest can run on a Maryland county-year panel.
+- A county-week seasonal risk baseline can be materialized from baseline backtest predictions and CDC MMWR-week seasonality.
 
 ## 10. Open Questions
 

@@ -313,3 +313,114 @@ CREATE TABLE IF NOT EXISTS seasonality_baseline (
     created_at timestamptz DEFAULT now(),
     PRIMARY KEY (source_id, disease, grain, period)
 );
+
+CREATE TABLE IF NOT EXISTS county_week_seasonal_risk_baseline (
+    source_prediction_run_id text NOT NULL,
+    source_prediction_sha256 text NOT NULL,
+    source_seasonality_sha256 text NOT NULL,
+    model_name text NOT NULL,
+    model_family text NOT NULL,
+    target_definition text NOT NULL,
+    feature_set text NOT NULL,
+    evaluation_mode text NOT NULL,
+    weather_mode text NOT NULL,
+    county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
+    county_name text NOT NULL,
+    year integer NOT NULL,
+    mmwr_week integer NOT NULL CHECK (mmwr_week BETWEEN 1 AND 53),
+    period_label text NOT NULL,
+    predicted_annual_incidence_per_100k double precision NOT NULL CHECK (
+        predicted_annual_incidence_per_100k >= 0
+    ),
+    predicted_annual_cases double precision NOT NULL CHECK (
+        predicted_annual_cases >= 0
+    ),
+    seasonal_mean_share double precision NOT NULL CHECK (
+        seasonal_mean_share >= 0 AND seasonal_mean_share <= 1
+    ),
+    seasonal_lower_80_share double precision NOT NULL CHECK (
+        seasonal_lower_80_share >= 0 AND seasonal_lower_80_share <= 1
+    ),
+    seasonal_upper_80_share double precision NOT NULL CHECK (
+        seasonal_upper_80_share >= 0 AND seasonal_upper_80_share <= 1
+    ),
+    seasonal_lower_95_share double precision NOT NULL CHECK (
+        seasonal_lower_95_share >= 0 AND seasonal_lower_95_share <= 1
+    ),
+    seasonal_upper_95_share double precision NOT NULL CHECK (
+        seasonal_upper_95_share >= 0 AND seasonal_upper_95_share <= 1
+    ),
+    predicted_weekly_incidence_per_100k double precision NOT NULL CHECK (
+        predicted_weekly_incidence_per_100k >= 0
+    ),
+    lower_80_weekly_incidence_per_100k double precision NOT NULL CHECK (
+        lower_80_weekly_incidence_per_100k >= 0
+    ),
+    upper_80_weekly_incidence_per_100k double precision NOT NULL CHECK (
+        upper_80_weekly_incidence_per_100k >= 0
+    ),
+    lower_95_weekly_incidence_per_100k double precision NOT NULL CHECK (
+        lower_95_weekly_incidence_per_100k >= 0
+    ),
+    upper_95_weekly_incidence_per_100k double precision NOT NULL CHECK (
+        upper_95_weekly_incidence_per_100k >= 0
+    ),
+    predicted_weekly_cases double precision NOT NULL CHECK (
+        predicted_weekly_cases >= 0
+    ),
+    benchmark_quantile double precision NOT NULL CHECK (
+        benchmark_quantile > 0 AND benchmark_quantile <= 1
+    ),
+    headroom_multiplier double precision NOT NULL CHECK (headroom_multiplier > 0),
+    score_denominator double precision NOT NULL CHECK (score_denominator >= 0),
+    risk_score_raw double precision NOT NULL CHECK (risk_score_raw >= 0),
+    risk_score integer NOT NULL CHECK (risk_score BETWEEN 1 AND 10),
+    risk_category text NOT NULL,
+    seasonality_source_id text NOT NULL,
+    model_feature_quality_flags text DEFAULT '',
+    seasonality_feature_quality_flags text DEFAULT '',
+    feature_quality_flags text DEFAULT '',
+    backtest_assumption_flags text DEFAULT '',
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (
+        county_fips,
+        year,
+        mmwr_week,
+        source_prediction_run_id,
+        model_name,
+        seasonality_source_id,
+        benchmark_quantile,
+        headroom_multiplier,
+        source_prediction_sha256,
+        source_seasonality_sha256
+    )
+);
+
+CREATE TABLE IF NOT EXISTS risk_score_scale (
+    model_name text NOT NULL,
+    grain text NOT NULL,
+    target_definition text NOT NULL,
+    seasonality_source_id text NOT NULL,
+    benchmark_quantile double precision NOT NULL CHECK (
+        benchmark_quantile > 0 AND benchmark_quantile <= 1
+    ),
+    headroom_multiplier double precision NOT NULL CHECK (headroom_multiplier > 0),
+    benchmark_weekly_incidence_per_100k double precision NOT NULL CHECK (
+        benchmark_weekly_incidence_per_100k >= 0
+    ),
+    score_denominator double precision NOT NULL CHECK (score_denominator >= 0),
+    n_score_rows integer NOT NULL CHECK (n_score_rows >= 0),
+    source_prediction_sha256 text NOT NULL,
+    source_seasonality_sha256 text NOT NULL,
+    scale_quality_flags text DEFAULT '',
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (
+        model_name,
+        grain,
+        seasonality_source_id,
+        source_prediction_sha256,
+        source_seasonality_sha256,
+        benchmark_quantile,
+        headroom_multiplier
+    )
+);
