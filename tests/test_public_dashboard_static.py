@@ -44,6 +44,7 @@ def test_dashboard_javascript_has_expected_runtime_functions() -> None:
         "function selectCounty",
         "function renderSources",
         "function renderLoadError",
+        "function safeUrl",
         "fetchJson",
     ]:
         assert token in js
@@ -78,3 +79,81 @@ def test_dashboard_javascript_renders_one_accessible_svg_path_map() -> None:
         "event.key === \" \"",
     ]:
         assert token in js
+
+
+def test_dashboard_javascript_translates_quality_flags_to_readable_caveats() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "const flagLabels",
+        "relative_seasonal_baseline",
+        "Relative seasonal baseline",
+        "static_seasonality_prior",
+        "static CDC onset seasonality",
+        "not county-specific",
+        "not_weather_adjusted",
+        "not a weather-adjusted forecast",
+        "intervention_caveat",
+        "Prevention and intervention effects are not modeled",
+        "surveillance_change_caveat",
+        "Surveillance and reporting changes can affect comparisons",
+        "surveillance_reporting_sensitive",
+        "lyme_case_definition_change",
+        "Lyme case definitions changed over time",
+        "national_curve_not_county_specific",
+        "CDC national onset seasonality is not county-specific",
+        "empirical_prediction_band",
+        "not clinical confidence for an individual bite",
+        "observational_not_causal",
+        "This observational baseline does not prove causes",
+    ]:
+        assert token in js
+
+
+def test_dashboard_javascript_renders_deduplicated_flag_caveats_in_county_panel() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "function readableFlagLabel",
+        "function renderFlagCaveats",
+        "feature_quality_flags",
+        "backtest_assumption_flags",
+        "new Set",
+        "replaceAll(\"_\", \" \")",
+        "What to know about this score",
+        "<ul class=\"flag-list\">",
+        "${renderFlagCaveats(record)}",
+        "not a per-bite infection probability, diagnosis, or medical advice",
+    ]:
+        assert token in js
+
+
+def test_dashboard_javascript_escapes_panel_values_and_sanitizes_links() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "escapeHtml(record.mmwr_week)",
+        "escapeHtml(record.data_year)",
+        "escapeHtml(record.risk_score)",
+        "escapeHtml(score)",
+        "escapeAttribute(safeUrl(link.url))",
+        "function safeUrl",
+        "http:",
+        "https:",
+        "startsWith(\"/\")",
+        "startsWith(\"./\")",
+        "about:blank",
+    ]:
+        assert token in js
+
+
+def test_dashboard_css_styles_flag_caveats_without_visual_noise() -> None:
+    css = (PUBLIC_DIR / "styles.css").read_text(encoding="utf-8")
+
+    for token in [
+        ".flag-caveats",
+        ".flag-caveats h4",
+        ".flag-list",
+        ".flag-list li",
+    ]:
+        assert token in css

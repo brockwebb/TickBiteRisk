@@ -211,6 +211,29 @@ h1 {
   margin-bottom: 0.5rem;
 }
 
+.flag-caveats {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f9fbfa;
+}
+
+.flag-caveats h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.flag-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+}
+
+.flag-list li {
+  margin: 0.25rem 0;
+}
+
 .risk-unavailable {
   background: #edf0f2;
   fill: #edf0f2;

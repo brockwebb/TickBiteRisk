@@ -15,6 +15,42 @@ const dataPaths = {
   sourceCatalog: "data/source_catalog.json",
 };
 
+const flagLabels = {
+  relative_seasonal_baseline: "Relative seasonal baseline",
+  static_seasonality_prior:
+    "Uses static CDC onset seasonality and is not county-specific",
+  not_weather_adjusted: "This is not a weather-adjusted forecast",
+  intervention_caveat: "Prevention and intervention effects are not modeled",
+  intervention_history_unmodeled:
+    "Prevention and intervention effects are not modeled",
+  surveillance_change_caveat:
+    "Surveillance and reporting changes can affect comparisons",
+  surveillance_reporting_sensitive:
+    "Surveillance and reporting changes can affect comparisons",
+  lyme_case_definition_change:
+    "Lyme case definitions changed over time, which affects comparisons",
+  current_status_retrospective_proxy:
+    "Current tick status is used as retrospective context, not historical proof",
+  status_only_not_prevalence:
+    "Tick surveillance status indicates presence categories, not infection prevalence",
+  no_records_not_absence:
+    "No tick record does not prove the tick or pathogen is absent",
+  national_curve_not_county_specific:
+    "CDC national onset seasonality is not county-specific",
+  shares_normalized_by_annual_total:
+    "Seasonal shares are normalized from annual totals",
+  empirical_prediction_band:
+    "Uncertainty bands are empirical model intervals, not clinical confidence for an individual bite",
+  deer_prior_season_derived_total:
+    "Deer harvest is a prior-season ecological proxy, not a direct disease driver",
+  partial_weather_year:
+    "Weather features are partial for this year",
+  missing_deer_harvest_prior_season:
+    "Prior-season deer harvest data are missing for this county-year",
+  observational_not_causal:
+    "This observational baseline does not prove causes",
+};
+
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
@@ -195,7 +231,7 @@ function countyListButton(feature) {
 
   return `<button type="button" data-county="${escapeHtml(props.county_fips)}" aria-pressed="${props.county_fips === state.selectedCounty ? "true" : "false"}">
     <span>${escapeHtml(props.county_name)}<br><small>${escapeHtml(category)}</small></span>
-    <span class="score-badge ${badgeClass}">${score}/10</span>
+    <span class="score-badge ${badgeClass}">${escapeHtml(score)}/10</span>
   </button>`;
 }
 
@@ -214,15 +250,37 @@ function selectCounty(countyFips) {
 
   const interval95 = record.predicted_weekly_incidence_95_interval || [0, 0];
   panel.innerHTML = `<div class="score-card">
-    <p class="muted">MMWR week ${record.mmwr_week}, data year ${record.data_year}</p>
+    <p class="muted">MMWR week ${escapeHtml(record.mmwr_week)}, data year ${escapeHtml(record.data_year)}</p>
     <h3>${escapeHtml(record.county_name)}</h3>
-    <p><span class="score-badge ${riskClass(record.risk_score)}">${record.risk_score}/10</span> ${escapeHtml(categoryLabel(record.risk_category))}</p>
+    <p><span class="score-badge ${riskClass(record.risk_score)}">${escapeHtml(record.risk_score)}/10</span> ${escapeHtml(categoryLabel(record.risk_category))}</p>
     <p>${escapeHtml(sentenceCase(record.risk_category))} relative seasonal baseline for Lyme reports in Maryland counties like this one during this week.</p>
     <p>Predicted weekly incidence: ${formatNumber(record.predicted_weekly_incidence_per_100k)} per 100k.</p>
     <p>95% empirical interval: ${formatNumber(interval95[0])} to ${formatNumber(interval95[1])} per 100k.</p>
-    <p class="disclaimer">This is not a personal infection probability or medical advice.</p>
+    ${renderFlagCaveats(record)}
+    <p class="disclaimer">This is not a per-bite infection probability, diagnosis, or medical advice.</p>
   </div>`;
   updateSelectedControls();
+}
+
+function renderFlagCaveats(record) {
+  const flags = new Set([
+    ...(record.feature_quality_flags || []),
+    ...(record.backtest_assumption_flags || []),
+  ]);
+  if (!flags.size) return "";
+
+  const items = Array.from(flags)
+    .map((flag) => `<li>${escapeHtml(readableFlagLabel(flag))}</li>`)
+    .join("");
+
+  return `<section class="flag-caveats" aria-labelledby="flag-caveats-heading">
+    <h4 id="flag-caveats-heading">What to know about this score</h4>
+    <ul class="flag-list">${items}</ul>
+  </section>`;
+}
+
+function readableFlagLabel(flag) {
+  return flagLabels[flag] || sentenceCase(String(flag).replaceAll("_", " "));
 }
 
 function findCountyFeature(countyFips) {
@@ -248,7 +306,7 @@ function renderSources() {
     [];
   const sourceRows = (state.sourceCatalog && state.sourceCatalog.sources) || [];
   const links = guidanceLinks
-    .map((link) => `<li><a href="${escapeAttribute(link.url)}">${escapeHtml(link.title)}</a></li>`)
+    .map((link) => `<li><a href="${escapeAttribute(safeUrl(link.url))}">${escapeHtml(link.title)}</a></li>`)
     .join("");
   const sources = sourceRows
     .map((source) => `<li>${escapeHtml(source.source_id)}: ${escapeHtml(source.notes || source.artifact_type)}</li>`)
@@ -339,6 +397,24 @@ function formatNumber(value) {
 
 function escapeAttribute(value) {
   return escapeHtml(value).replaceAll("`", "&#096;");
+}
+
+function safeUrl(value) {
+  const rawValue = String(value || "");
+  if (rawValue.startsWith("/") || rawValue.startsWith("./")) {
+    return rawValue;
+  }
+  try {
+    const base =
+      typeof window === "undefined" ? "https://tickbiterisk.local/" : window.location.href;
+    const url = new URL(rawValue, base);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.href;
+    }
+  } catch {
+    return "about:blank";
+  }
+  return "about:blank";
 }
 
 function escapeHtml(value) {
