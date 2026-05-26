@@ -4,10 +4,12 @@
     "md_county_risk_weekly.json",
     "md_county_metadata.json",
     "model_card.json",
-    "source_catalog.json"
+    "source_catalog.json",
+    "md_counties.geojson"
   ],
   "generated_at": "2026-05-26T14:18:11+00:00",
   "record_counts": {
+    "county_geojson_features": 24,
     "county_metadata": 24,
     "weekly_risk": 1272
   },

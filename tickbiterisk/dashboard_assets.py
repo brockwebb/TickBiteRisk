@@ -64,6 +64,11 @@ def write_dashboard_assets(
         json.dumps(normalized_geojson, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    _augment_manifest_with_county_geojson(
+        static_paths.export_manifest_path,
+        county_geojson_path=county_geojson_path,
+        feature_count=len(normalized_geojson["features"]),
+    )
     return _paths_from_static(output_dir, static_paths, county_geojson_path)
 
 
@@ -140,4 +145,22 @@ def _paths_from_static(
         source_catalog_path=static_paths.source_catalog_path,
         export_manifest_path=static_paths.export_manifest_path,
         county_geojson_path=county_geojson_path,
+    )
+
+
+def _augment_manifest_with_county_geojson(
+    manifest_path: Path,
+    *,
+    county_geojson_path: Path,
+    feature_count: int,
+) -> None:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files = manifest.setdefault("files", [])
+    if county_geojson_path.name not in files:
+        files.append(county_geojson_path.name)
+    record_counts = manifest.setdefault("record_counts", {})
+    record_counts["county_geojson_features"] = feature_count
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )

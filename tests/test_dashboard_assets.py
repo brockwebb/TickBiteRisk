@@ -49,9 +49,12 @@ def test_write_dashboard_assets_writes_risk_json_and_geojson(
 
     weekly = json.loads(result.weekly_risk_path.read_text(encoding="utf-8"))
     counties = json.loads(result.county_geojson_path.read_text(encoding="utf-8"))
+    manifest = json.loads(result.export_manifest_path.read_text(encoding="utf-8"))
 
     assert weekly["record_count"] == 2
     assert counties["metadata"]["feature_count"] == 24
+    assert "md_counties.geojson" in manifest["files"]
+    assert manifest["record_counts"]["county_geojson_features"] == 24
     assert any(
         feature["properties"]["county_fips"] == "24003"
         for feature in counties["features"]
