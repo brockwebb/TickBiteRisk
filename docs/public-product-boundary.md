@@ -51,9 +51,15 @@ public/data/md_county_metadata.json
 public/data/model_card.json
 public/data/source_catalog.json
 public/data/static_export_manifest.json
+public/data/md_counties.geojson
 ```
 
 The public runtime should not need database credentials or raw data files.
+
+The static dashboard root is `public/`. The dashboard may publish a simplified
+Maryland county GeoJSON derived from public Census TIGERweb geometry. Geometry
+must include only county FIPS, county name, and geometry; it must not include
+raw surveillance records.
 
 The first implemented runtime bridge reads the derived
 `county_week_seasonal_risk_baseline.csv` artifact and returns a JSON response for

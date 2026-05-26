@@ -199,6 +199,15 @@ The export must:
 
 The static export must be framed as a relative Maryland county-week Lyme baseline, not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.
 
+### FR4E: Static Dashboard Prototype
+
+The system must expose a static dashboard under `public/` that reads only
+`public/data` assets, requires no backend credentials, and presents the
+county-week Lyme baseline with accessible map, county list, detail panel, CDC
+guidance links, and plain-language caveats. The dashboard must not describe the
+score as diagnosis, treatment guidance, personal infection probability, or
+weather-adjusted forecast.
+
 ### FR5: Tick and Pathogen Status
 
 The system must ingest county-level vector/pathogen status from local CDC workbooks:
