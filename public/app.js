@@ -75,22 +75,32 @@ function mmwrYearWeek(dateString) {
   if (Number.isNaN(date.getTime())) {
     return [new Date().getUTCFullYear(), 1];
   }
-
-  const day = date.getUTCDay();
-  const sunday = new Date(date);
-  sunday.setUTCDate(date.getUTCDate() - day);
-
-  const thursday = new Date(sunday);
-  thursday.setUTCDate(sunday.getUTCDate() + 4);
-  const mmwrYear = thursday.getUTCFullYear();
-
-  const jan4 = new Date(Date.UTC(mmwrYear, 0, 4, 12));
-  const firstSunday = new Date(jan4);
-  firstSunday.setUTCDate(jan4.getUTCDate() - jan4.getUTCDay());
+  const calendarYear = date.getUTCFullYear();
+  const yearStart = firstMmwrSunday(calendarYear);
+  const nextYearStart = firstMmwrSunday(calendarYear + 1);
+  let mmwrYear = calendarYear;
+  if (date < yearStart) {
+    mmwrYear = calendarYear - 1;
+  } else if (date >= nextYearStart) {
+    mmwrYear = calendarYear + 1;
+  }
+  const firstSunday = firstMmwrSunday(mmwrYear);
   const millisecondsPerWeek = 7 * 24 * 60 * 60 * 1000;
-  const week = Math.floor((sunday - firstSunday) / millisecondsPerWeek) + 1;
+  const week = Math.floor((date - firstSunday) / millisecondsPerWeek) + 1;
 
   return [mmwrYear, week];
+}
+
+function firstMmwrSunday(year) {
+  const jan1 = new Date(Date.UTC(year, 0, 1, 12));
+  const jan1Day = jan1.getUTCDay();
+  const firstSunday = new Date(jan1);
+  if (jan1Day <= 3) {
+    firstSunday.setUTCDate(jan1.getUTCDate() - jan1Day);
+  } else {
+    firstSunday.setUTCDate(jan1.getUTCDate() + (7 - jan1Day));
+  }
+  return firstSunday;
 }
 
 function updateWeekLabel() {
@@ -133,7 +143,7 @@ function renderMap() {
   const height = 520;
   const paths = features.map((feature) => countyPath(feature, bounds, width, height)).join("");
 
-  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Maryland counties colored by relative Lyme seasonal baseline">${paths}</svg>`;
+  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="group" aria-label="Maryland counties colored by relative Lyme seasonal baseline">${paths}</svg>`;
   container.querySelectorAll("[data-county]").forEach((shape) => {
     shape.addEventListener("click", () => selectCounty(shape.dataset.county));
     shape.addEventListener("keydown", (event) => {

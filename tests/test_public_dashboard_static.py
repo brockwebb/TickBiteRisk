@@ -36,6 +36,7 @@ def test_dashboard_javascript_has_expected_runtime_functions() -> None:
 
     for token in [
         "function mmwrYearWeek",
+        "function firstMmwrSunday",
         "function riskClass",
         "function indexWeeklyRecords",
         "function renderCountyList",
@@ -48,12 +49,27 @@ def test_dashboard_javascript_has_expected_runtime_functions() -> None:
         assert token in js
 
 
+def test_dashboard_javascript_mmwr_logic_handles_year_boundaries() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "const yearStart = firstMmwrSunday(calendarYear)",
+        "const nextYearStart = firstMmwrSunday(calendarYear + 1)",
+        "if (date < yearStart)",
+        "mmwrYear = calendarYear - 1",
+        "date >= nextYearStart",
+        "mmwrYear = calendarYear + 1",
+    ]:
+        assert token in js
+
+
 def test_dashboard_javascript_renders_one_accessible_svg_path_map() -> None:
     js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
 
     for token in [
         "<svg",
         "<path",
+        "role=\"group\"",
         "role=\"button\"",
         "tabindex=\"0\"",
         "aria-pressed",

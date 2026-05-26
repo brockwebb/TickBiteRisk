@@ -37,6 +37,12 @@ def write_dashboard_assets(
     output_dir: Path,
     model_name: str = "linear_blend_baseline",
     seasonality_source_id: str = "cdc_seasonality_week_2023",
+    benchmark_quantile: float | None = None,
+    headroom_multiplier: float | None = None,
+    score_denominator: float | None = None,
+    source_prediction_run_id: str | None = None,
+    source_prediction_sha256: str | None = None,
+    source_seasonality_sha256: str | None = None,
     fetch_geojson: Callable[[], dict[str, Any]] | None = None,
 ) -> DashboardAssetPaths:
     static_paths = export_static_risk_data(
@@ -44,6 +50,12 @@ def write_dashboard_assets(
         output_dir=output_dir,
         model_name=model_name,
         seasonality_source_id=seasonality_source_id,
+        benchmark_quantile=benchmark_quantile,
+        headroom_multiplier=headroom_multiplier,
+        score_denominator=score_denominator,
+        source_prediction_run_id=source_prediction_run_id,
+        source_prediction_sha256=source_prediction_sha256,
+        source_seasonality_sha256=source_seasonality_sha256,
     )
     raw_geojson = fetch_geojson() if fetch_geojson else fetch_maryland_county_geojson()
     normalized_geojson = normalize_maryland_county_geojson(raw_geojson)

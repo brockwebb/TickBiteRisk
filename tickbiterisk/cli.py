@@ -334,6 +334,38 @@ def dashboard_build_assets(
         Path("public/data"),
         help="Output directory for dashboard static data assets.",
     ),
+    model_name: str = typer.Option(
+        "linear_blend_baseline",
+        help="Risk score model branch to export.",
+    ),
+    seasonality_source_id: str = typer.Option(
+        "cdc_seasonality_week_2023",
+        help="Weekly seasonality source_id to export.",
+    ),
+    benchmark_quantile: float | None = typer.Option(
+        None,
+        help="Optional score-scale benchmark quantile selector.",
+    ),
+    headroom_multiplier: float | None = typer.Option(
+        None,
+        help="Optional score-scale headroom multiplier selector.",
+    ),
+    score_denominator: float | None = typer.Option(
+        None,
+        help="Optional score-scale denominator selector.",
+    ),
+    source_prediction_run_id: str | None = typer.Option(
+        None,
+        help="Optional source prediction run selector.",
+    ),
+    source_prediction_sha256: str | None = typer.Option(
+        None,
+        help="Optional source prediction SHA-256 selector.",
+    ),
+    source_seasonality_sha256: str | None = typer.Option(
+        None,
+        help="Optional source seasonality SHA-256 selector.",
+    ),
     use_fixture_geometry: bool = typer.Option(
         False,
         help="Use generated fixture geometry instead of Census TIGERweb.",
@@ -346,6 +378,14 @@ def dashboard_build_assets(
         outputs = write_dashboard_assets(
             scores_path=scores_path,
             output_dir=output_dir,
+            model_name=model_name,
+            seasonality_source_id=seasonality_source_id,
+            benchmark_quantile=benchmark_quantile,
+            headroom_multiplier=headroom_multiplier,
+            score_denominator=score_denominator,
+            source_prediction_run_id=source_prediction_run_id,
+            source_prediction_sha256=source_prediction_sha256,
+            source_seasonality_sha256=source_seasonality_sha256,
             fetch_geojson=fetcher,
         )
     except StaticExportInputError as exc:
