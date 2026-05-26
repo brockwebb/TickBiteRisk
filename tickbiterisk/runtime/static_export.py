@@ -23,6 +23,7 @@ PUBLIC_CAVEATS = [
     "Does not diagnose disease or determine whether a person is infected.",
     "Not a treatment recommendation or substitute for a healthcare professional.",
     "Relative Maryland county-week Lyme baseline, not a per-bite infection probability.",
+    "Not a personal infection probability.",
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
     "Surveillance/reporting changes and interventions are unmodeled.",
@@ -426,6 +427,7 @@ def _manifest_payload(
             paths.county_metadata_path.name,
             paths.model_card_path.name,
             paths.source_catalog_path.name,
+            paths.export_manifest_path.name,
         ],
         "record_counts": {
             "weekly_risk": int(weekly_payload["record_count"]),

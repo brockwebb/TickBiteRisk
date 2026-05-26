@@ -5,6 +5,7 @@
     "md_county_metadata.json",
     "model_card.json",
     "source_catalog.json",
+    "static_export_manifest.json",
     "md_counties.geojson"
   ],
   "generated_at": "2026-05-26T14:18:11+00:00",

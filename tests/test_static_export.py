@@ -41,6 +41,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         "Relative Maryland county-week Lyme baseline, not a per-bite infection probability."
         in weekly["caveats"]
     )
+    assert "Not a personal infection probability." in weekly["caveats"]
     assert weekly["records"][0]["county_fips"] == "24003"
     assert weekly["records"][0]["year"] == 2023
     assert weekly["records"][0]["risk_score"] == 7
@@ -63,6 +64,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         "Relative seasonal Lyme baseline"
     )
     assert "not medical advice" in model_card["clinical_disclaimer"].lower()
+    assert "Not a personal infection probability." in model_card["caveats"]
     assert model_card["quality_flags"] == [
         "relative_seasonal_baseline",
         "static_seasonality_prior",
@@ -75,6 +77,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         "md_county_metadata.json",
         "model_card.json",
         "source_catalog.json",
+        "static_export_manifest.json",
     ]
     assert manifest["record_counts"]["weekly_risk"] == 2
 
