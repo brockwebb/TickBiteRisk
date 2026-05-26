@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TickBiteRisk Maryland Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#county-panel">Skip to county risk details</a>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Maryland county-week Lyme baseline</p>
+        <h1>TickBiteRisk</h1>
+        <p class="lede">Relative seasonal Lyme risk context by Maryland county.</p>
+      </div>
+      <p class="disclaimer">
+        Informational only. Not medical advice. Follow CDC guidance and contact
+        a healthcare professional about your situation.
+      </p>
+    </header>
+
+    <main class="dashboard" aria-live="polite">
+      <section class="controls" aria-labelledby="controls-title">
+        <h2 id="controls-title">Choose a date and county</h2>
+        <label for="date-input">Date</label>
+        <input id="date-input" type="date" />
+        <p id="week-label" class="muted">Loading week...</p>
+      </section>
+
+      <section class="map-section" aria-labelledby="map-title">
+        <h2 id="map-title">Maryland county map</h2>
+        <div
+          id="risk-map"
+          class="risk-map"
+          role="group"
+          aria-label="Maryland county risk map"
+        >
+          <p class="loading">Loading map...</p>
+        </div>
+        <div class="legend" aria-label="Risk score legend">
+          <span><b class="swatch risk-very-low"></b>1-2 very low</span>
+          <span><b class="swatch risk-low"></b>3-4 low</span>
+          <span><b class="swatch risk-moderate"></b>5-6 moderate</span>
+          <span><b class="swatch risk-high"></b>7-8 high</span>
+          <span><b class="swatch risk-very-high"></b>9-10 very high</span>
+        </div>
+      </section>
+
+      <aside id="county-panel" class="county-panel" aria-labelledby="panel-title">
+        <h2 id="panel-title">County risk details</h2>
+        <div id="panel-content">
+          <p>Select a county to see its relative seasonal Lyme baseline.</p>
+        </div>
+      </aside>
+
+      <section class="county-list-section" aria-labelledby="county-list-title">
+        <h2 id="county-list-title">County list</h2>
+        <div id="county-list" class="county-list"></div>
+      </section>
+
+      <section class="sources" aria-labelledby="sources-title">
+        <h2 id="sources-title">Sources and notes</h2>
+        <details>
+          <summary>Model and source details</summary>
+          <div id="source-content">
+            <p>Loading source notes...</p>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
