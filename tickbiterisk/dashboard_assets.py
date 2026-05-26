@@ -62,6 +62,8 @@ def fetch_maryland_county_geojson() -> dict[str, Any]:
             "outFields": "GEOID,NAME,STATE,COUNTY",
             "returnGeometry": "true",
             "outSR": "4326",
+            "geometryPrecision": "5",
+            "maxAllowableOffset": "0.001",
             "f": "geojson",
         }
     )
