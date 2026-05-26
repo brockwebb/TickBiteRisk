@@ -1,0 +1,39 @@
+{
+  "export_type": "source_catalog",
+  "generated_at": "2026-05-26T14:18:11+00:00",
+  "guidance_links": [
+    {
+      "title": "CDC: What to do after a tick bite",
+      "url": "https://www.cdc.gov/ticks/after-a-tick-bite/index.html"
+    },
+    {
+      "title": "CDC: Preventing tick bites",
+      "url": "https://www.cdc.gov/ticks/prevention/index.html"
+    },
+    {
+      "title": "CDC: Lyme disease signs and symptoms",
+      "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
+    }
+  ],
+  "input_artifact_sha256": "6b24f1fa36d4e321ee13c1598b42919b4a56c8392d6968a5c854e6aff5fab0b8",
+  "schema_version": "county-week-risk-static-v1",
+  "source_prediction_run_id": "baseline_backtest_start2007_end2023_mintrain5_lookback5",
+  "source_prediction_sha256": "a8c25f4c5e14ccb99aa639050106bdb0ac693bfbb88e802eec4bbaae0e1c02f8",
+  "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
+  "sources": [
+    {
+      "artifact_type": "derived",
+      "notes": "Do not publish raw restricted or terms-unclear source extracts.",
+      "redistribution": "public derived data",
+      "sha256": "6b24f1fa36d4e321ee13c1598b42919b4a56c8392d6968a5c854e6aff5fab0b8",
+      "source_id": "county_week_seasonal_risk_baseline"
+    },
+    {
+      "artifact_type": "derived seasonality baseline",
+      "notes": "CDC national onset seasonality; not county-specific.",
+      "redistribution": "public derived data",
+      "sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
+      "source_id": "cdc_seasonality_week_2023"
+    }
+  ]
+}

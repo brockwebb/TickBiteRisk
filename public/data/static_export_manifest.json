@@ -1,0 +1,15 @@
+{
+  "export_type": "static_export_manifest",
+  "files": [
+    "md_county_risk_weekly.json",
+    "md_county_metadata.json",
+    "model_card.json",
+    "source_catalog.json"
+  ],
+  "generated_at": "2026-05-26T14:18:11+00:00",
+  "record_counts": {
+    "county_metadata": 24,
+    "weekly_risk": 1272
+  },
+  "schema_version": "county-week-risk-static-v1"
+}
