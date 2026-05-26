@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import json
+from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
@@ -130,10 +132,16 @@ from tickbiterisk.modeling.risk_score import (
     build_seasonal_risk_scores,
 )
 from tickbiterisk.modeling.risk_score_build import write_seasonal_risk_score_outputs
+from tickbiterisk.runtime.risk_lookup import (
+    RiskLookupInputError,
+    RiskLookupStore,
+)
 
 app = typer.Typer(help="TickBiteRisk ETL utilities")
 etl_app = typer.Typer(help="ETL commands")
+risk_app = typer.Typer(help="Runtime risk lookup commands")
 app.add_typer(etl_app, name="etl")
+app.add_typer(risk_app, name="risk")
 
 
 @etl_app.command("check")
@@ -144,6 +152,74 @@ def etl_check(
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     typer.echo(f"ETL output directory ready: {output_dir}")
+
+
+@risk_app.command("lookup")
+def risk_lookup(
+    county_fips: str = typer.Option(
+        ...,
+        help="Five-digit Maryland county FIPS code.",
+    ),
+    lookup_date: str = typer.Option(
+        date.today().isoformat(),
+        "--date",
+        help="Calendar date to convert to MMWR week.",
+    ),
+    scores_path: Path = typer.Option(
+        Path("build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv"),
+        help="County-week seasonal risk baseline CSV.",
+    ),
+    model_name: str = typer.Option(
+        "linear_blend_baseline",
+        help="Risk score model branch to query.",
+    ),
+    seasonality_source_id: str = typer.Option(
+        "cdc_seasonality_week_2023",
+        help="Weekly seasonality source_id to query.",
+    ),
+    benchmark_quantile: float | None = typer.Option(
+        None,
+        help="Optional score-scale benchmark quantile selector.",
+    ),
+    headroom_multiplier: float | None = typer.Option(
+        None,
+        help="Optional score-scale headroom multiplier selector.",
+    ),
+    source_prediction_run_id: str | None = typer.Option(
+        None,
+        help="Optional source prediction run selector.",
+    ),
+    source_prediction_sha256: str | None = typer.Option(
+        None,
+        help="Optional source prediction SHA-256 selector.",
+    ),
+    source_seasonality_sha256: str | None = typer.Option(
+        None,
+        help="Optional source seasonality SHA-256 selector.",
+    ),
+    pretty: bool = typer.Option(
+        False,
+        help="Pretty-print JSON output.",
+    ),
+) -> None:
+    if not scores_path.exists():
+        raise typer.BadParameter(f"Risk score file not found: {scores_path}")
+    try:
+        store = RiskLookupStore.from_csv(scores_path)
+        response = store.lookup(
+            county_fips=county_fips,
+            query_date=lookup_date,
+            model_name=model_name,
+            seasonality_source_id=seasonality_source_id,
+            benchmark_quantile=benchmark_quantile,
+            headroom_multiplier=headroom_multiplier,
+            source_prediction_run_id=source_prediction_run_id,
+            source_prediction_sha256=source_prediction_sha256,
+            source_seasonality_sha256=source_seasonality_sha256,
+        )
+    except RiskLookupInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(json.dumps(asdict(response), indent=2 if pretty else None))
 
 
 @etl_app.command("weather-locations")

@@ -71,6 +71,7 @@ All scripts are POSIX‑shell or Python 3.11; run inside the Docker image so de
 * Maps weekly incidence to a bounded 1-10 Maryland-relative score using `benchmark_quantile` x `headroom_multiplier`; defaults are 95th percentile and 1.2 headroom.
 * Writes `county_week_seasonal_risk_baseline.csv` and `risk_score_scale.csv`; `--append/--replace` defaults to append with key-based dedupe, and both outputs retain the seasonality source, benchmark quantile, headroom multiplier, and input SHA-256 values so alternate score branches can coexist.
 * Carries `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted`, because this is a product-shaped baseline, not a weather-adjusted disease forecast.
+* Runtime lookup is available with `tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26`; it converts the calendar date to CDC MMWR week and returns JSON from the derived baseline artifact.
 * The 2026-05-25 live smoke with `linear_blend_baseline` wrote 21,571 county-week score rows for 24 Maryland jurisdictions across prediction years 2007-2023, plus 1 scale row.
 
 ### 2.5  CDC Tick Surveillance (`fetch_cdc_ticks.sh`)

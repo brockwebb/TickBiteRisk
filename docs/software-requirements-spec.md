@@ -170,6 +170,20 @@ The scale output must preserve the selected model name, seasonality source id, b
 
 This baseline is not a weather-adjusted forecast. Outputs must carry `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted`.
 
+### FR4C: Runtime Risk Lookup
+
+The system must expose a local runtime lookup over the derived county-week risk baseline before the full HTTP API is implemented.
+
+The lookup must:
+
+- read `county_week_seasonal_risk_baseline.csv` without requiring raw source files, Postgres credentials, or live network access.
+- accept `county_fips` and calendar date, convert the date to CDC MMWR year/week, and return the matching county-week baseline row.
+- use the requested MMWR year when present and otherwise fall back to the latest available baseline year for that county/week with explicit quality flags.
+- require explicit score-scale selectors when multiple benchmark/headroom configurations overlap for the same county/week.
+- return JSON-friendly fields for risk score, category, weekly incidence bands, model/source metadata, feature quality flags, backtest assumption flags, CDC guidance links, and a plain-language medical disclaimer.
+
+The lookup output must not be presented as per-bite infection probability, diagnosis, treatment guidance, or weather-adjusted forecast.
+
 ### FR5: Tick and Pathogen Status
 
 The system must ingest county-level vector/pathogen status from local CDC workbooks:
@@ -269,6 +283,8 @@ Display categories:
 - `9-10`: very high
 
 The first product-shaped risk artifact is a relative county-week seasonal baseline. It combines annual baseline backtest predictions with the CDC national MMWR-week disease-onset curve and maps the resulting weekly incidence estimate to the 1-10 scale. It must be labeled as `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted` until weather, habitat, host, and intervention modifiers are explicitly added.
+
+The first runtime surface for this score is the local `tickbiterisk risk lookup` command. It returns API-ready JSON for a county/date lookup while preserving the non-medical, relative-baseline framing.
 
 ### FR11: Model Backtesting
 

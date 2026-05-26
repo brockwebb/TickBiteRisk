@@ -6,7 +6,9 @@
 
 ## 1  Overview
 
-A single REST endpoint returns the posterior probability that a tick bite acquired in a given U.S. county, with specified attachment duration(s), will result in Lyme disease infection.  Results include 95 % credible intervals and metadata flags indicating data freshness.
+Roadmap target: a single REST endpoint returns the posterior probability that a tick bite acquired in a given U.S. county, with specified attachment duration(s), will result in Lyme disease infection.  Results include 95 % credible intervals and metadata flags indicating data freshness.
+
+Current implemented bridge: `tickbiterisk risk lookup` reads the derived Maryland county-week seasonal baseline CSV and returns local JSON for county/date lookup. That response is a relative 1-10 Lyme seasonality baseline, not the posterior per-bite probability described by this HTTP API draft.
 
 Base URL (Docker default)
 
@@ -27,7 +29,7 @@ Production deployments SHOULD serve the API behind HTTPS.
 | `fips`   | string (5‑digit)               | ✅                         | `24003`                   | County FIPS code. Leading zeros allowed.                                                                |
 | `tau`    | number **or** array of numbers | ✅                         | `24`  or  `tau=12&tau=36` | Attachment duration(s) in hours. Each must be ≥0 & ≤168.                                                |
 | `k`      | integer                        | optional, default `1`     | `2`                       | Number of attached nymphs (identical τ assumed for each).                                               |
-| `date`   | `YYYY‑MM‑DD`                   | optional, default *today* | `2025‑07‑15`              | Returns risk based on priors valid for ISO week of this date. Useful for querying historical baselines. |
+| `date`   | `YYYY‑MM‑DD`                   | optional, default *today* | `2025‑07‑15`              | Returns risk based on priors valid for CDC MMWR week of this date. Useful for querying historical baselines. |
 | `pretty` | boolean                        | optional                  | `true`                    | If `true`, JSON is indented for human reading (no effect on content).                                   |
 
 ### 2.2  Successful response (`200 OK`)
@@ -141,4 +143,3 @@ Full YAML lives at `/api/openapi.yaml`; FastAPI auto‑serves interactive docs a
 ---
 
 *Last updated: 2025‑06‑08 (draft v0.1)*
-

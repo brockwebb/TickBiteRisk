@@ -46,6 +46,7 @@ Avoid publishing without a source-specific review:
 For a static public web product, prefer compact derived files:
 
 ```text
+public/data/md_county_risk_weekly.json
 public/data/md_county_risk_monthly.json
 public/data/md_county_metadata.json
 public/data/model_card.json
@@ -53,6 +54,11 @@ public/data/source_catalog.json
 ```
 
 The public runtime should not need database credentials or raw data files.
+
+The first implemented runtime bridge reads the derived
+`county_week_seasonal_risk_baseline.csv` artifact and returns a JSON response for
+county/date lookups. It must keep the score framed as a relative seasonal Lyme
+baseline, not a per-bite infection probability or treatment recommendation.
 
 ## Guidance Links
 
