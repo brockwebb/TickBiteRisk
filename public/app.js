@@ -76,6 +76,7 @@ async function init() {
     renderMap();
     renderCountyList();
     renderSources();
+    renderValidationSummary();
     selectCounty(state.selectedCounty);
   } catch (error) {
     renderLoadError(error);
@@ -297,8 +298,33 @@ function renderBiteResult() {
     <p>${escapeHtml(result.risk_interpretation)}</p>
     <p><b>CDC criteria:</b> ${escapeHtml(readableModelName(result.pep_consideration))}</p>
     <ul class="criteria-list">${criteriaItems}</ul>
+    ${renderBiteCaveats(result.caveats)}
     <p class="disclaimer">This is not an absolute infection probability, diagnosis, or treatment recommendation.</p>
   </section>`;
+}
+
+function renderBiteCaveats(caveats) {
+  if (!caveats || !caveats.length) return "";
+  const items = caveats
+    .map((caveat) => `<li>${escapeHtml(readableBiteCaveat(caveat))}</li>`)
+    .join("");
+  return `<section class="bite-caveats" aria-labelledby="bite-caveats-title">
+    <h5 id="bite-caveats-title">Bite-specific caveats</h5>
+    <ul>${items}</ul>
+  </section>`;
+}
+
+function readableBiteCaveat(caveat) {
+  const labels = {
+    maryland_high_incidence_geography_floor:
+      "Maryland high-incidence context keeps this from being treated as a near-zero bite concern.",
+    non_ixodes_lyme_vector_unlikely: "non ixodes Lyme vector unlikely",
+    not_calibrated_absolute_probability:
+      "not calibrated as an absolute infection probability",
+    not_diagnosis_or_treatment_recommendation:
+      "not a diagnosis or treatment recommendation",
+  };
+  return labels[caveat] || sentenceCase(String(caveat).replaceAll("_", " "));
 }
 
 function readBiteInputs() {
@@ -591,10 +617,102 @@ function renderSources() {
     <p>Source branch: ${escapeHtml(state.weekly.model_name)} / ${escapeHtml(state.weekly.seasonality_source_id)}</p>`;
 }
 
+function renderValidationSummary() {
+  const target = document.getElementById("validation-content");
+  const modelCard = state.modelCard || {};
+  const annualSource = modelCard.annual_prediction_source || {};
+  const validation = modelCard.validation_summary || {};
+  const selectedModel = readableModelName(annualSource.model_name || modelCard.model_name);
+  const evaluationMode =
+    annualSource.evaluation_mode === "rolling_origin_prior_years"
+      ? "rolling-origin prior-years validation"
+      : readableModelName(annualSource.evaluation_mode || "not specified");
+  const weatherMode = readableWeatherMode(annualSource.weather_mode || "");
+  const outcomeItems = validationOutcomeItems(selectedModel, evaluationMode, validation);
+  const limitItems = validationLimitItems(modelCard, weatherMode);
+
+  target.innerHTML = `<div class="validation-grid">
+    <section aria-labelledby="validation-outcomes-title">
+      <h3 id="validation-outcomes-title">What the v0 score supports</h3>
+      <ul class="validation-list">${outcomeItems.map(renderValidationItem).join("")}</ul>
+    </section>
+    <section aria-labelledby="validation-limits-title">
+      <h3 id="validation-limits-title">Limits before release</h3>
+      <ul class="validation-list">${limitItems.map(renderValidationItem).join("")}</ul>
+    </section>
+  </div>
+  <p class="validation-note">Validation and limits are part of the public score, not hidden operator notes.</p>`;
+}
+
+function validationOutcomeItems(selectedModel, evaluationMode, validation) {
+  return [
+    {
+      label: "selected model branch",
+      value: selectedModel || "unknown",
+    },
+    {
+      label: "rank_by_mae",
+      value: publishedMetricValue(validation.rank_by_mae, (value) => `${value} by MAE`),
+    },
+    {
+      label: "mae_incidence_per_100k",
+      value: publishedMetricValue(
+        validation.mae_incidence_per_100k,
+        (value) => `${formatNumber(value)} per 100k`
+      ),
+    },
+    {
+      label: "n_predictions",
+      value: publishedMetricValue(
+        validation.n_predictions,
+        (value) => `${value} held-out county-years`
+      ),
+    },
+    {
+      label: "Backtest frame",
+      value: evaluationMode || "rolling-origin prior-years validation",
+    },
+    {
+      label: "Intended signal",
+      value: "prevention timing and Maryland county-season context",
+    },
+  ];
+}
+
+function publishedMetricValue(value, formatValue) {
+  if (value === undefined || value === null) return "not published";
+  return formatValue(value);
+}
+
+function validationLimitItems(modelCard, weatherMode) {
+  const notFor = new Set(modelCard.not_for || []);
+  return [
+    {
+      label: "Weather",
+      value: weatherMode || "not weather-adjusted",
+    },
+    {
+      label: "Medical boundary",
+      value: "not a diagnosis or treatment recommendation",
+    },
+    {
+      label: "Bite probability",
+      value: notFor.has("per-bite infection probability")
+        ? "not an absolute infection probability"
+        : "not calibrated as a personal infection probability",
+    },
+  ];
+}
+
+function renderValidationItem(item) {
+  return `<li><b>${escapeHtml(item.label)}</b><span>${escapeHtml(item.value)}</span></li>`;
+}
+
 function renderLoadError(error) {
   document.getElementById("risk-map").innerHTML = `<p role="alert">${escapeHtml(error.message)}</p>`;
   document.getElementById("county-list").innerHTML = "";
   document.getElementById("panel-content").innerHTML = "<p>Dashboard data bundle is unavailable.</p>";
+  document.getElementById("validation-content").innerHTML = "<p>Validation notes are unavailable.</p>";
   document.getElementById("source-content").innerHTML = "<p>Source notes are unavailable.</p>";
 }
 

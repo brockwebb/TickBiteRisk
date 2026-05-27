@@ -110,6 +110,7 @@ h1 {
 .map-section,
 .county-panel,
 .county-list-section,
+.validation-summary,
 .sources {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -349,6 +350,62 @@ h1 {
   font-weight: 700;
 }
 
+.bite-caveats {
+  margin: 0.75rem 0;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f9fbfa;
+}
+
+.bite-caveats h5 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.bite-caveats ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+}
+
+.validation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.validation-grid h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.validation-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.validation-list li {
+  display: grid;
+  gap: 0.15rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.65rem;
+  background: #f9fbfa;
+}
+
+.validation-list span {
+  color: var(--muted);
+}
+
+.validation-note {
+  margin: 1rem 0 0;
+  color: var(--muted);
+}
+
 .risk-unavailable {
   background: #edf0f2;
   fill: #edf0f2;
@@ -374,6 +431,7 @@ h1 {
 
   .controls,
   .county-list-section,
+  .validation-summary,
   .sources {
     grid-column: 1 / -1;
   }

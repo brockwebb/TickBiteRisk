@@ -145,6 +145,15 @@ def test_model_card_matches_weekly_export_metadata() -> None:
         weekly["selected_score_config"]["source_prediction_sha256"]
     )
     assert "model-comparison" in model_card["method_summary"]
+    validation = model_card["validation_summary"]
+    assert validation["model_name"] == weekly["model_name"]
+    assert validation["run_id"] == weekly["selected_score_config"]["source_prediction_run_id"]
+    assert validation["rank_by_mae"] == 1
+    assert validation["n_predictions"] == 408
+    assert validation["mae_incidence_per_100k"] == 18.240783
+    assert validation["rmse_incidence_per_100k"] == 29.536604
+    assert validation["pearson_correlation"] == 0.755185
+    assert "observational_not_causal" in validation["comparison_assumption_flags"]
 
 
 def test_source_catalog_exposes_selected_annual_prediction_branch() -> None:

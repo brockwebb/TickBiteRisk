@@ -107,12 +107,15 @@ For a static web product, export a public-safe derived JSON bundle:
 ```bash
 tickbiterisk risk export-static \
   --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --model-summary-path build/etl/model-comparison/model_comparison_summary.csv \
   --output-dir public/data
 ```
 
 The static dashboard reads only the committed `public/data` bundle, including
 `public/data/md_counties.geojson`. It does not need raw data, Postgres
 credentials, NOAA tokens, Census tokens, or private ETL extracts.
+Including `--model-summary-path` publishes the selected model branch's
+rolling-origin validation metrics in `model_card.json`.
 
 Run the static dashboard locally:
 

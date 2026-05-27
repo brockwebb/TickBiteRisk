@@ -43,6 +43,7 @@ def write_dashboard_assets(
     source_prediction_run_id: str | None = None,
     source_prediction_sha256: str | None = None,
     source_seasonality_sha256: str | None = None,
+    model_summary_path: Path | None = None,
     fetch_geojson: Callable[[], dict[str, Any]] | None = None,
 ) -> DashboardAssetPaths:
     static_paths = export_static_risk_data(
@@ -56,6 +57,7 @@ def write_dashboard_assets(
         source_prediction_run_id=source_prediction_run_id,
         source_prediction_sha256=source_prediction_sha256,
         source_seasonality_sha256=source_seasonality_sha256,
+        model_summary_path=model_summary_path,
     )
     raw_geojson = fetch_geojson() if fetch_geojson else fetch_maryland_county_geojson()
     normalized_geojson = normalize_maryland_county_geojson(raw_geojson)

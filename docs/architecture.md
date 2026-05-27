@@ -80,6 +80,7 @@ The static runtime bridge is:
 ```bash
 tickbiterisk risk export-static \
   --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --model-summary-path build/etl/model-comparison/model_comparison_summary.csv \
   --output-dir public/data
 ```
 

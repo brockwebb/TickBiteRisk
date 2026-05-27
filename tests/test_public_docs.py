@@ -27,6 +27,7 @@ def test_user_guide_matches_implemented_maryland_baseline_product() -> None:
         "tickbiterisk risk lookup",
         "tickbiterisk risk single-bite",
         "tickbiterisk risk export-static",
+        "--model-summary-path",
         "Informational and educational only",
         "Follow CDC guidance",
     ]:
@@ -99,6 +100,7 @@ def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() ->
     assert "tickbiterisk risk lookup" in quick_start
     assert "tickbiterisk risk single-bite" in quick_start
     assert "tickbiterisk risk export-static" in quick_start
+    assert "--model-summary-path build/etl/model-comparison/model_comparison_summary.csv" in quick_start
     assert "python -m http.server 8000 --directory public" in quick_start
     assert "quick start (docker)" not in quick_start
     assert "docker compose up -d" not in quick_start
@@ -138,6 +140,7 @@ def test_operational_runbook_documents_static_pages_v0_not_live_api_stack() -> N
         ".github/workflows/pages.yml",
         "no runtime secrets",
         "tickbiterisk risk export-static",
+        "--model-summary-path",
         "python -m http.server",
         "attached tick calculator",
         "CDC criteria breakdown",

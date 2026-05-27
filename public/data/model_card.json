@@ -21,7 +21,7 @@
   ],
   "clinical_disclaimer": "TickBiteRisk is for informational and educational purposes only. It is not medical advice, does not diagnose disease, and does not determine whether you are infected. Follow CDC guidance and contact a qualified healthcare professional about your situation.",
   "export_type": "model_card",
-  "generated_at": "2026-05-27T02:21:06+00:00",
+  "generated_at": "2026-05-27T14:01:32+00:00",
   "method_summary": "Selected annual model-comparison prediction rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
   "model_name": "linear_blend_baseline",
   "not_for": [
@@ -38,5 +38,20 @@
   ],
   "schema_version": "county-week-risk-static-v1",
   "score_interpretation": "Relative seasonal Lyme baseline on a 1-10 Maryland scale; not a per-bite infection probability.",
-  "target_definition": "lyme_incidence_per_100k"
+  "target_definition": "lyme_incidence_per_100k",
+  "validation_summary": {
+    "comparison_assumption_flags": [
+      "observational_not_causal",
+      "retrospective_weather_reconstruction",
+      "intervention_history_unmodeled",
+      "surveillance_reporting_sensitive"
+    ],
+    "mae_incidence_per_100k": 18.240783,
+    "model_name": "linear_blend_baseline",
+    "n_predictions": 408,
+    "pearson_correlation": 0.755185,
+    "rank_by_mae": 1,
+    "rmse_incidence_per_100k": 29.536604,
+    "run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0"
+  }
 }

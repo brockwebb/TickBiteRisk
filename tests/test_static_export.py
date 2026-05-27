@@ -10,10 +10,12 @@ from tickbiterisk.runtime.static_export import (
 
 def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> None:
     scores_path = _write_scores(tmp_path / "scores.csv")
+    model_summary_path = _write_model_summary(tmp_path / "model_summary.csv")
 
     outputs = export_static_risk_data(
         scores_path=scores_path,
         output_dir=tmp_path / "public-data",
+        model_summary_path=model_summary_path,
     )
 
     assert outputs.weekly_risk_path.name == "md_county_risk_weekly.json"
@@ -79,6 +81,19 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert model_card["annual_prediction_source"]["weather_mode"] == (
         "not_used_by_baseline"
     )
+    assert model_card["validation_summary"] == {
+        "run_id": "run1",
+        "model_name": "linear_blend_baseline",
+        "rank_by_mae": 1,
+        "n_predictions": 408,
+        "mae_incidence_per_100k": 18.24,
+        "rmse_incidence_per_100k": 29.54,
+        "pearson_correlation": 0.76,
+        "comparison_assumption_flags": [
+            "observational_not_causal",
+            "intervention_history_unmodeled",
+        ],
+    }
     assert "model-comparison" in model_card["method_summary"]
     assert source_catalog["sources"][0]["artifact_type"] == "derived"
     assert "model-comparison annual predictions" in source_catalog["sources"][0]["notes"]
@@ -164,6 +179,54 @@ def test_export_static_risk_data_rejects_ambiguous_score_denominator(
     assert weekly["records"][0]["risk_score"] == 8
 
 
+def test_export_static_risk_data_rejects_missing_model_summary_match(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    model_summary_path = _write_model_summary(
+        tmp_path / "model_summary.csv",
+        model_name="prior_year_incidence",
+    )
+
+    try:
+        export_static_risk_data(
+            scores_path=scores_path,
+            output_dir=tmp_path / "public-data",
+            model_summary_path=model_summary_path,
+        )
+    except StaticExportInputError as exc:
+        assert "No model comparison summary row matched" in str(exc)
+    else:
+        raise AssertionError("Expected missing summary match export to fail")
+
+
+def test_export_static_risk_data_keeps_blank_optional_validation_metrics_null(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    model_summary_path = _write_model_summary(
+        tmp_path / "model_summary.csv",
+        n_predictions="",
+        mae_incidence_per_100k="",
+        rmse_incidence_per_100k="",
+        pearson_correlation="",
+    )
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "public-data",
+        model_summary_path=model_summary_path,
+    )
+
+    model_card = _read_json(outputs.model_card_path)
+    validation = model_card["validation_summary"]
+
+    assert validation["n_predictions"] is None
+    assert validation["mae_incidence_per_100k"] is None
+    assert validation["rmse_incidence_per_100k"] is None
+    assert validation["pearson_correlation"] is None
+
+
 def _write_ambiguous_scores(path: Path) -> Path:
     return _write_csv(
         path,
@@ -176,6 +239,38 @@ def _write_ambiguous_scores(path: Path) -> Path:
             },
         ],
     )
+
+
+def _write_model_summary(
+    path: Path,
+    *,
+    model_name: str = "linear_blend_baseline",
+    n_predictions: str = "408",
+    mae_incidence_per_100k: str = "18.24",
+    rmse_incidence_per_100k: str = "29.54",
+    pearson_correlation: str = "0.76",
+) -> Path:
+    path.write_text(
+        "\n".join(
+            [
+                (
+                    "run_id,rank_by_mae,model_name,model_family,feature_profile,"
+                    "n_predictions,mae_incidence_per_100k,rmse_incidence_per_100k,"
+                    "pearson_correlation,comparison_assumption_flags"
+                ),
+                (
+                    f"run1,1,{model_name},ensemble,lagged_outcome_blend,"
+                    f"{n_predictions},"
+                    f"{mae_incidence_per_100k},{rmse_incidence_per_100k},"
+                    f"{pearson_correlation},"
+                    "\"observational_not_causal,intervention_history_unmodeled\""
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def _read_json(path: Path) -> dict:

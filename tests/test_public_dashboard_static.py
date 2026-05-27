@@ -8,13 +8,18 @@ def test_dashboard_html_has_accessible_landmarks_and_data_hooks() -> None:
     html = (PUBLIC_DIR / "index.html").read_text(encoding="utf-8")
 
     assert '<a class="skip-link" href="#county-panel">' in html
-    assert "<main" in html
+    assert '<main class="dashboard">' in html
+    assert '<main class="dashboard" aria-live=' not in html
     assert 'id="risk-map"' in html
     assert 'id="county-list"' in html
     assert 'id="county-panel"' in html
+    assert 'id="panel-content" aria-live="polite"' in html
     assert 'id="date-input"' in html
     assert 'id="bite-form"' in html
     assert 'id="bite-result"' in html
+    assert 'id="validation-summary"' in html
+    assert 'id="validation-content"' in html
+    assert 'id="week-label" class="muted" aria-live="polite"' in html
     assert "Informational only. Not medical advice." in html
     assert "app.js" in html
 
@@ -65,11 +70,16 @@ def test_dashboard_javascript_has_expected_runtime_functions() -> None:
         "function readableModelName",
         "function readableWeatherMode",
         "function renderSources",
+        "function renderValidationSummary",
+        "function validationOutcomeItems",
+        "function validationLimitItems",
         "function renderLoadError",
         "function safeUrl",
         "function handleBiteSubmit",
         "function estimateSingleBiteRisk",
         "function renderBiteResult",
+        "function renderBiteCaveats",
+        "function readableBiteCaveat",
         "fetchJson",
     ]:
         assert token in js
@@ -89,6 +99,30 @@ def test_dashboard_javascript_has_single_bite_scoring_logic() -> None:
         "function locationSeasonModifier",
         "function pepCriteria",
         "function pepConsideration",
+        "non ixodes Lyme vector unlikely",
+        "not calibrated as an absolute infection probability",
+        "Bite-specific caveats",
+    ]:
+        assert token in js
+
+
+def test_dashboard_javascript_renders_validation_and_limits_summary() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "Validation and limits",
+        "rolling-origin prior-years validation",
+        "selected model branch",
+        "mae_incidence_per_100k",
+        "rank_by_mae",
+        "n_predictions",
+        "prevention timing",
+        "not weather-adjusted",
+        "not a diagnosis",
+        "not an absolute infection probability",
+        "renderValidationSummary()",
+        "function publishedMetricValue",
+        "value === null",
     ]:
         assert token in js
 
@@ -240,7 +274,20 @@ def test_dashboard_css_styles_single_bite_calculator() -> None:
         ".bite-calculator",
         ".bite-form-grid",
         ".bite-result",
+        ".bite-caveats",
         ".criteria-list",
         ".criteria-status",
+    ]:
+        assert token in css
+
+
+def test_dashboard_css_styles_validation_summary() -> None:
+    css = (PUBLIC_DIR / "styles.css").read_text(encoding="utf-8")
+
+    for token in [
+        ".validation-summary",
+        ".validation-grid",
+        ".validation-list",
+        ".validation-note",
     ]:
         assert token in css

@@ -34,12 +34,14 @@ def test_write_dashboard_assets_writes_risk_json_and_geojson(
     tmp_path: Path,
 ) -> None:
     scores_path = _write_scores(tmp_path / "scores.csv")
+    model_summary_path = _write_model_summary(tmp_path / "model_summary.csv")
     output_dir = tmp_path / "public" / "data"
     fake_geojson = _fixture_geojson()
 
     result = write_dashboard_assets(
         scores_path=scores_path,
         output_dir=output_dir,
+        model_summary_path=model_summary_path,
         fetch_geojson=lambda: fake_geojson,
     )
 
@@ -48,10 +50,12 @@ def test_write_dashboard_assets_writes_risk_json_and_geojson(
     assert result.county_geojson_path.name == "md_counties.geojson"
 
     weekly = json.loads(result.weekly_risk_path.read_text(encoding="utf-8"))
+    model_card = json.loads(result.model_card_path.read_text(encoding="utf-8"))
     counties = json.loads(result.county_geojson_path.read_text(encoding="utf-8"))
     manifest = json.loads(result.export_manifest_path.read_text(encoding="utf-8"))
 
     assert weekly["record_count"] == 2
+    assert model_card["validation_summary"]["rank_by_mae"] == 1
     assert counties["metadata"]["feature_count"] == 24
     assert "md_counties.geojson" in manifest["files"]
     assert manifest["record_counts"]["county_geojson_features"] == 24
@@ -95,6 +99,24 @@ def _fixture_geojson() -> dict:
             for index, (county_fips, county_name) in enumerate(county_rows)
         ],
     }
+
+
+def _write_model_summary(path: Path) -> Path:
+    path.write_text(
+        "\n".join(
+            [
+                (
+                    "run_id,rank_by_mae,model_name,model_family,feature_profile,"
+                    "n_predictions,mae_incidence_per_100k,rmse_incidence_per_100k,"
+                    "pearson_correlation,comparison_assumption_flags"
+                ),
+                "run1,1,linear_blend_baseline,ensemble,lagged_outcome_blend,2,1.25,2.5,0.7,observational_not_causal",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def _county_feature(county_fips: str, county_name: str, index: int) -> dict:

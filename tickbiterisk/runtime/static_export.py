@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 from dataclasses import dataclass
@@ -64,6 +65,7 @@ def export_static_risk_data(
     source_prediction_run_id: str | None = None,
     source_prediction_sha256: str | None = None,
     source_seasonality_sha256: str | None = None,
+    model_summary_path: Path | None = None,
 ) -> StaticRiskExportPaths:
     try:
         records = read_county_week_risk_records(scores_path)
@@ -103,7 +105,11 @@ def export_static_risk_data(
         source_records=source_records,
         generated_at=generated_at,
     )
-    model_card_payload = _model_card_payload(selected, generated_at=generated_at)
+    model_card_payload = _model_card_payload(
+        selected,
+        generated_at=generated_at,
+        model_summary_path=model_summary_path,
+    )
     source_catalog_payload = _source_catalog_payload(
         selected,
         generated_at=generated_at,
@@ -341,9 +347,10 @@ def _model_card_payload(
     records: list[CountyWeekRiskRecord],
     *,
     generated_at: str,
+    model_summary_path: Path | None,
 ) -> dict[str, object]:
     first = records[0]
-    return {
+    payload: dict[str, object] = {
         "schema_version": STATIC_EXPORT_SCHEMA_VERSION,
         "export_type": "model_card",
         "generated_at": generated_at,
@@ -373,6 +380,50 @@ def _model_card_payload(
         ],
         "caveats": PUBLIC_CAVEATS,
     }
+    if model_summary_path is not None:
+        payload["validation_summary"] = _validation_summary_payload(
+            first,
+            model_summary_path,
+        )
+    return payload
+
+
+def _validation_summary_payload(
+    selected: CountyWeekRiskRecord,
+    model_summary_path: Path,
+) -> dict[str, object]:
+    if not model_summary_path.exists():
+        raise StaticExportInputError(
+            f"Model comparison summary file not found: {model_summary_path}"
+        )
+    with model_summary_path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            if (
+                row.get("run_id") == selected.source_prediction_run_id
+                and row.get("model_name") == selected.model_name
+            ):
+                return {
+                    "run_id": str(row["run_id"]),
+                    "model_name": str(row["model_name"]),
+                    "rank_by_mae": _optional_int(row.get("rank_by_mae")),
+                    "n_predictions": _optional_int(row.get("n_predictions")),
+                    "mae_incidence_per_100k": _optional_float(
+                        row.get("mae_incidence_per_100k")
+                    ),
+                    "rmse_incidence_per_100k": _optional_float(
+                        row.get("rmse_incidence_per_100k")
+                    ),
+                    "pearson_correlation": _optional_float(
+                        row.get("pearson_correlation")
+                    ),
+                    "comparison_assumption_flags": split_quality_flags(
+                        row.get("comparison_assumption_flags", "")
+                    ),
+                }
+    raise StaticExportInputError(
+        "No model comparison summary row matched selected run_id="
+        f"{selected.source_prediction_run_id} and model_name={selected.model_name}"
+    )
 
 
 def _source_catalog_payload(
@@ -492,3 +543,15 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _optional_int(value: str | None) -> int | None:
+    if value is None or value == "":
+        return None
+    return int(value)
+
+
+def _optional_float(value: str | None) -> float | None:
+    if value is None or value == "":
+        return None
+    return float(value)

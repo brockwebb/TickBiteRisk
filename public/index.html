@@ -20,12 +20,12 @@
       </p>
     </header>
 
-    <main class="dashboard" aria-live="polite">
+    <main class="dashboard">
       <section class="controls" aria-labelledby="controls-title">
         <h2 id="controls-title">Choose a date and county</h2>
         <label for="date-input">Date</label>
         <input id="date-input" type="date" />
-        <p id="week-label" class="muted">Loading week...</p>
+        <p id="week-label" class="muted" aria-live="polite">Loading week...</p>
       </section>
 
       <section class="map-section" aria-labelledby="map-title">
@@ -49,7 +49,7 @@
 
       <aside id="county-panel" class="county-panel" aria-labelledby="panel-title">
         <h2 id="panel-title">County risk details</h2>
-        <div id="panel-content">
+        <div id="panel-content" aria-live="polite">
           <p>Select a county to see its relative seasonal Lyme baseline.</p>
         </div>
         <section class="bite-calculator" aria-labelledby="bite-title">
@@ -107,6 +107,17 @@
       <section class="county-list-section" aria-labelledby="county-list-title">
         <h2 id="county-list-title">County list</h2>
         <div id="county-list" class="county-list"></div>
+      </section>
+
+      <section
+        id="validation-summary"
+        class="validation-summary"
+        aria-labelledby="validation-title"
+      >
+        <h2 id="validation-title">Validation and limits</h2>
+        <div id="validation-content">
+          <p>Loading validation notes...</p>
+        </div>
       </section>
 
       <section class="sources" aria-labelledby="sources-title">

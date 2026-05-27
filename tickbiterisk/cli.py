@@ -372,9 +372,17 @@ def risk_export_static(
         None,
         help="Optional source seasonality SHA-256 selector.",
     ),
+    model_summary_path: Path | None = typer.Option(
+        None,
+        help="Optional model comparison summary CSV for public validation metrics.",
+    ),
 ) -> None:
     if not scores_path.exists():
         raise typer.BadParameter(f"Risk score file not found: {scores_path}")
+    if model_summary_path is not None and not model_summary_path.exists():
+        raise typer.BadParameter(
+            f"Model comparison summary file not found: {model_summary_path}"
+        )
     try:
         outputs = export_static_risk_data(
             scores_path=scores_path,
@@ -387,6 +395,7 @@ def risk_export_static(
             source_prediction_run_id=source_prediction_run_id,
             source_prediction_sha256=source_prediction_sha256,
             source_seasonality_sha256=source_seasonality_sha256,
+            model_summary_path=model_summary_path,
         )
     except StaticExportInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -462,6 +471,10 @@ def dashboard_build_assets(
         None,
         help="Optional source seasonality SHA-256 selector.",
     ),
+    model_summary_path: Path | None = typer.Option(
+        None,
+        help="Optional model comparison summary CSV for public validation metrics.",
+    ),
     use_fixture_geometry: bool = typer.Option(
         False,
         help="Use generated fixture geometry instead of Census TIGERweb.",
@@ -469,6 +482,10 @@ def dashboard_build_assets(
 ) -> None:
     if not scores_path.exists():
         raise typer.BadParameter(f"Risk score file not found: {scores_path}")
+    if model_summary_path is not None and not model_summary_path.exists():
+        raise typer.BadParameter(
+            f"Model comparison summary file not found: {model_summary_path}"
+        )
     fetcher = _fixture_maryland_geojson if use_fixture_geometry else None
     try:
         outputs = write_dashboard_assets(
@@ -482,6 +499,7 @@ def dashboard_build_assets(
             source_prediction_run_id=source_prediction_run_id,
             source_prediction_sha256=source_prediction_sha256,
             source_seasonality_sha256=source_seasonality_sha256,
+            model_summary_path=model_summary_path,
             fetch_geojson=fetcher,
         )
     except StaticExportInputError as exc:
