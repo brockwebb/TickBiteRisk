@@ -480,8 +480,6 @@ def _spatial_neighbor_features(
     rows_by_year: dict[int, list[dict[str, str]]],
     county_neighbors: dict[str, list[str]],
 ) -> dict[str, str]:
-    if not county_neighbors:
-        return {}
     county_fips = row["county_fips"]
     year = int(row["year"])
     prior_rows_by_county = {

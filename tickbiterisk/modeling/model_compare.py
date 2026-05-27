@@ -491,23 +491,26 @@ def _predict_models(
             forecast_ridge_prediction,
         )
     )
-    spatial_columns = [
-        column for column in feature_columns if _is_forecast_spatial_feature_column(column)
-    ]
-    spatial_ridge_prediction = _ridge_prediction(
-        row=row,
-        train_rows=train_rows,
-        feature_columns=spatial_columns,
-        ridge_alpha=ridge_alpha,
-    )
-    predictions.append(
-        (
-            "ridge_forecast_spatial",
-            "regularized_linear",
-            "forecast_safe_lagged_spatial",
-            spatial_ridge_prediction,
+    if any(column in FORECAST_SPATIAL_EXACT_FEATURES for column in feature_columns):
+        spatial_columns = [
+            column
+            for column in feature_columns
+            if _is_forecast_spatial_feature_column(column)
+        ]
+        spatial_ridge_prediction = _ridge_prediction(
+            row=row,
+            train_rows=train_rows,
+            feature_columns=spatial_columns,
+            ridge_alpha=ridge_alpha,
         )
-    )
+        predictions.append(
+            (
+                "ridge_forecast_spatial",
+                "regularized_linear",
+                "forecast_safe_lagged_spatial",
+                spatial_ridge_prediction,
+            )
+        )
     ecology_columns = [
         column for column in feature_columns if _is_forecast_ecology_feature_column(column)
     ]

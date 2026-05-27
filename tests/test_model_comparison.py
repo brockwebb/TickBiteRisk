@@ -128,6 +128,22 @@ def test_run_model_comparison_includes_empirical_bayes_and_metrics(
     assert result.run.n_predictions == len(result.predictions)
 
 
+def test_run_model_comparison_omits_spatial_lane_without_spatial_features(
+    tmp_path: Path,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv", include_spatial=False)
+
+    result = run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+    )
+
+    model_names = {row.model_name for row in result.predictions}
+    assert "ridge_forecast_spatial" not in model_names
+    assert "ridge_forecast_safe" in model_names
+
+
 def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     assert model_compare._is_forecast_safe_feature_column(
         "feature_trailing_3yr_mean_lyme_incidence_per_100k"
@@ -287,7 +303,7 @@ def test_write_model_comparison_outputs_orders_and_dedupes(
     assert summary[0]["rank_by_mae"] == "1"
 
 
-def _write_design_matrix(path: Path) -> Path:
+def _write_design_matrix(path: Path, *, include_spatial: bool = True) -> Path:
     rows = []
     values = {
         "24001": [10, 20, 30, 40],
@@ -301,29 +317,49 @@ def _write_design_matrix(path: Path) -> Path:
             history = cases_by_year[:offset]
             trailing = sum(history[-2:]) / len(history[-2:]) if history else 0
             state_prior = _state_prior(values, offset)
-            rows.append(
-                {
-                    "county_fips": county_fips,
-                    "county_name": county_name,
-                    "year": str(year),
-                    "target_total_cases": str(cases),
-                    "target_lyme_incidence_per_100k": str(float(cases)),
-                    "target_population": "100000",
-                    "feature_year": str(year),
-                    "feature_prior_year_lyme_incidence_per_100k": str(float(prior_cases)),
-                    "feature_trailing_2yr_mean_lyme_incidence_per_100k": str(float(trailing)),
-                    "feature_trailing_history_years": str(offset),
-                    "feature_missing_prior_year_lyme_incidence": "1" if offset == 0 else "0",
-                    "feature_state_prior_year_lyme_incidence_per_100k": str(float(state_prior)),
-                    "feature_missing_state_prior_year_lyme_incidence": "1" if offset == 0 else "0",
-                    "feature_weather_temp_mean_f": str(50 + cases / 10),
-                    "feature_weather_precip_total_mm": str(900 + cases),
-                    "feature_deer_harvest_per_sqmi_prior_season": str(cases / 20),
-                    "feature_missing_deer_harvest_prior_season": "0",
-                    "feature_flag_current_status_retrospective_proxy": "1",
-                    "model_feature_quality_flags": "current_status_retrospective_proxy",
-                }
-            )
+            row = {
+                "county_fips": county_fips,
+                "county_name": county_name,
+                "year": str(year),
+                "target_total_cases": str(cases),
+                "target_lyme_incidence_per_100k": str(float(cases)),
+                "target_population": "100000",
+                "feature_year": str(year),
+                "feature_prior_year_lyme_incidence_per_100k": str(float(prior_cases)),
+                "feature_trailing_2yr_mean_lyme_incidence_per_100k": str(float(trailing)),
+                "feature_trailing_history_years": str(offset),
+                "feature_missing_prior_year_lyme_incidence": (
+                    "1" if offset == 0 else "0"
+                ),
+                "feature_state_prior_year_lyme_incidence_per_100k": str(
+                    float(state_prior)
+                ),
+                "feature_missing_state_prior_year_lyme_incidence": (
+                    "1" if offset == 0 else "0"
+                ),
+                "feature_weather_temp_mean_f": str(50 + cases / 10),
+                "feature_weather_precip_total_mm": str(900 + cases),
+                "feature_deer_harvest_per_sqmi_prior_season": str(cases / 20),
+                "feature_missing_deer_harvest_prior_season": "0",
+                "feature_flag_current_status_retrospective_proxy": "1",
+                "model_feature_quality_flags": "current_status_retrospective_proxy",
+            }
+            if include_spatial:
+                row.update(
+                    {
+                        "feature_neighbor_prior_year_lyme_incidence_mean": str(
+                            float(state_prior)
+                        ),
+                        "feature_neighbor_prior_year_lyme_incidence_max": str(
+                            float(state_prior)
+                        ),
+                        "feature_neighbor_prior_year_count": "1" if offset else "0",
+                        "feature_missing_neighbor_prior_year_lyme_incidence": (
+                            "0" if offset else "1"
+                        ),
+                    }
+                )
+            rows.append(row)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()

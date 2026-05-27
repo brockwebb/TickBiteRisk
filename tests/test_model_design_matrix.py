@@ -169,6 +169,28 @@ def test_build_model_design_matrix_adds_prior_year_neighbor_incidence_features(
     assert baltimore_2019["feature_neighbor_prior_year_count"] == "1"
 
 
+def test_build_model_design_matrix_flags_empty_adjacency_as_missing(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+    adjacency = _write_empty_adjacency(tmp_path / "empty_adjacency.csv")
+
+    result = build_model_design_matrix(
+        model_features_path=feature_matrix,
+        lookback_years=2,
+        county_adjacency_path=adjacency,
+    )
+
+    row = next(
+        item
+        for item in result.rows
+        if item["county_fips"] == "24003" and item["year"] == "2020"
+    )
+    assert row["feature_neighbor_prior_year_lyme_incidence_mean"] == "0.0"
+    assert row["feature_neighbor_prior_year_count"] == "0"
+    assert row["feature_missing_neighbor_prior_year_lyme_incidence"] == "1"
+
+
 def _write_feature_matrix(path: Path) -> Path:
     rows = []
     for county_fips, county_name, yearly_cases in [
@@ -398,6 +420,25 @@ def _write_adjacency(path: Path) -> Path:
             "adjacency_method": "fixture",
             "feature_quality_flags": "county_adjacency_from_fixture",
         },
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_empty_adjacency(path: Path) -> Path:
+    rows = [
+        {
+            "county_fips": "24003",
+            "county_name": "Anne Arundel County",
+            "neighbor_county_fips": "24003",
+            "neighbor_county_name": "Anne Arundel County",
+            "shared_boundary_segment_count": "0",
+            "adjacency_method": "fixture",
+            "feature_quality_flags": "self_row_ignored",
+        }
     ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
