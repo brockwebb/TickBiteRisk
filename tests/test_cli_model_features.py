@@ -76,6 +76,8 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
             str(tmp_path / "missing-contact.csv"),
             "--deer-harvest-path",
             str(tmp_path / "missing-deer.csv"),
+            "--mast-acorn-path",
+            str(tmp_path / "missing-mast.csv"),
             "--tick-status-path",
             str(tick_status),
             "--output-dir",
@@ -193,6 +195,110 @@ def test_model_features_command_fails_cleanly_when_explicit_tick_status_missing(
     assert "Tick status file not found" in result.output
     assert "Traceback" not in result.output
     assert not (tmp_path / "out" / "model_features_county_year.csv").exists()
+
+
+def test_model_features_command_accepts_mast_acorn_path(tmp_path: Path) -> None:
+    lyme = _write_csv(
+        tmp_path / "lyme.csv",
+        [
+            {
+                "county_fips": "24001",
+                "year": "2022",
+                "confirmed_cases": "10",
+                "probable_cases": "0",
+                "total_cases": "10",
+                "canonical_source_id": "cdc_2022",
+                "source_values_summary": "",
+                "reconciliation_status": "matched",
+                "data_quality_flags": "",
+            }
+        ],
+    )
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [
+            {
+                "county_fips": "24001",
+                "county_name": "Allegany County",
+                "year": "2022",
+                "population": "100000",
+            }
+        ],
+    )
+    weather = _write_csv(
+        tmp_path / "weather.csv",
+        [_weather_row(county_fips="24001", iso_year="2022")],
+    )
+    mast = _write_csv(
+        tmp_path / "mast.csv",
+        [
+            {
+                "county_fips": "24001",
+                "county_name": "Allegany County",
+                "year": "2021",
+                "region": "Western Maryland",
+                "mast_category": "oak_acorn_abundance",
+                "mast_index": "1.92",
+                "mast_rating": "mast_failure",
+                "acorn_index": "1.92",
+                "hard_mast_index": "1.92",
+                "soft_mast_index": "",
+                "plots_observed": "",
+                "expected_plots": "",
+                "coverage_complete": "",
+                "source_id": "maryland_dnr_wmd_mast_survey_2021",
+                "source_url_hash": "hash",
+                "source_report_year": "2021",
+                "parser_method": "pypdfium_table_text",
+                "extraction_confidence": "high",
+                "black_oak_acorns_per_branch": "1.97",
+                "white_oak_acorns_per_branch": "1.90",
+                "unit_average_acorns_per_branch": "1.92",
+                "black_oak_mast_rating": "I",
+                "white_oak_mast_rating": "I",
+                "unit_average_mast_rating": "I",
+                "white_oak_subjective_crown_pct": "3.75",
+                "black_oak_subjective_crown_pct": "1.45",
+                "feature_quality_flags": (
+                    "western_maryland_only,study_plot_not_countywide"
+                ),
+                "extracted_text_excerpt": "excerpt",
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-features",
+            "--lyme-outcomes-path",
+            str(lyme),
+            "--population-path",
+            str(population),
+            "--weather-weekly-path",
+            str(weather),
+            "--contact-pressure-path",
+            str(tmp_path / "missing-contact.csv"),
+            "--deer-harvest-path",
+            str(tmp_path / "missing-deer.csv"),
+            "--mast-acorn-path",
+            str(mast),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    with (output_dir / "model_features_county_year.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["mast_index_prior_year"] == "1.92"
+    assert rows[0]["black_oak_acorns_per_branch_prior_year"] == "1.97"
+    assert "western_maryland_only" in rows[0]["model_feature_quality_flags"]
 
 
 def _write_csv(path: Path, rows: list[dict[str, str]]) -> Path:
