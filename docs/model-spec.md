@@ -33,6 +33,7 @@ The comparison harness supports these current branches:
 | `linear_blend_baseline` | Selected v0 branch combining persistence and trailing mean behavior |
 | `empirical_bayes_shrinkage` | County estimates shrunk toward broader Maryland behavior when data are sparse |
 | `ridge_forecast_safe` | Regularized annual model using conservative non-leaky features |
+| `ridge_forecast_spatial` | Regularized model adding timing-safe prior-year neighbor incidence |
 | `ridge_forecast_ecology` | Regularized model including timing-safe ecology candidates |
 | `ridge_lag_weather_ecology` | Experimental retrospective weather/drought/ecology branch for comparison |
 
@@ -46,6 +47,7 @@ Current model-ready feature groups include:
 - Historical Lyme incidence and population-normalized rates.
 - NOAA weekly weather aggregates rolled to county-year predictors.
 - CDC Lyme seasonality shares by week and month of onset.
+- Prior-year Lyme incidence in counties sharing a land boundary.
 - Maryland deer harvest density proxy.
 - Maryland DNR Western Maryland mast/acorn study-plot observations, joined only
   as prior-year ecology features.
@@ -86,6 +88,11 @@ the timing-safe ecology lane. Held-out MAE still ranked
 `linear_blend_baseline` first; `ridge_forecast_ecology` worsened to 21.782782
 MAE per 100k after the prior-year drought addition. These features remain
 available for research lanes but are not promoted into the public score.
+
+The next spatial-lag comparison added county adjacency from public Census
+geometry and a `ridge_forecast_spatial` lane using only prior-year neighbor
+incidence. It ranked behind the simple blend and conservative safe ridge, with
+MAE 19.222024 per 100k, so it remains a diagnostic research lane.
 
 ## Public score transform
 

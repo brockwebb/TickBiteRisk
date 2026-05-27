@@ -74,25 +74,31 @@ candidates until backtesting shows they improve the public score.
       matrix.
     - Writes `model_features_county_year.csv`.
 
-14. `tickbiterisk etl model-design-matrix`
+14. `tickbiterisk etl county-adjacency`
+    - Derives directed Maryland county-neighbor pairs from public county
+      GeoJSON using shared boundary segments.
+    - Writes `md_county_adjacency.csv`.
+
+15. `tickbiterisk etl model-design-matrix`
     - Converts the feature panel into numeric model inputs with missingness
-      indicators and a schema sidecar.
+      indicators, optional prior-year neighbor incidence features, and a schema
+      sidecar.
     - Writes `model_design_matrix_county_year.csv` and
       `model_design_matrix_schema.json`.
 
-15. `tickbiterisk etl model-compare`
+16. `tickbiterisk etl model-compare`
     - Runs rolling-origin comparisons across transparent baseline and ridge
-      branches.
+      branches, including the forecast spatial diagnostic lane.
     - Writes `model_comparison_runs.csv`,
       `model_comparison_predictions.csv`, `model_comparison_metrics.csv`, and
       `model_comparison_summary.csv`.
 
-16. `tickbiterisk etl county-week-risk`
+17. `tickbiterisk etl county-week-risk`
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.
     - Writes `county_week_seasonal_risk_baseline.csv` and
       `risk_score_scale.csv`.
 
-17. `tickbiterisk risk export-static`
+18. `tickbiterisk risk export-static`
     - Selects one unambiguous model/source/scale branch for public use.
     - Writes dashboard JSON files under `public/data`.
 
@@ -131,5 +137,7 @@ probability or a treatment recommendation.
   change.
 - Same-year weather branches are retrospective comparisons unless replaced by a
   true forecast-time feature set.
+- Spatial lag features use prior-year neighbor outcomes only; same-year
+  neighbor outcomes are not forecast-safe.
 
 Last updated: 2026-05-27.
