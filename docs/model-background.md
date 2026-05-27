@@ -1,74 +1,68 @@
-# TickBiteRisk – Model Background & Design Rationale
+# TickBiteRisk Model Background
 
-> **File location:** `/docs/model-background.md`
+## Current rationale
 
-This document explains **why** TickBiteRisk is built on a Bayesian state‑space framework, how each prior is constructed, and why alternatives (frequentist GLM, black‑box ML) were rejected for v1.
+TickBiteRisk started with the bigger idea of estimating disease risk after a
+specific tick encounter. The current shipped work is narrower: a Maryland
+county-week seasonal Lyme baseline derived from historical surveillance,
+seasonality, and model comparison.
 
----
+That narrower scope is intentional. The data support a transparent public
+baseline before they support a bite-specific disease calculator.
 
-## 1 Why Bayesian?
+## Why the current model is comparison-first
 
-| Requirement                                                     | Frequentist limitation                               | Bayesian advantage                                                                                                    |
-| --------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **Sparse tick-testing data** (60 % of U.S. counties have n = 0) | GLM yields infinite SE or forces imputation          | Hierarchical **CAR prior** borrows strength from neighbors and covariates, giving finite θᵢ with wide—but honest—CrI. |
-| **Irregular data feeds** (weekly ED visits may drop out)        | GLM must drop rows or carry last obs forward         | State‑space filter: when `y` missing, model falls back to process prior and automatically widens λᵢ,t uncertainty.    |
-| **Need real-time updates without retraining**                   | Re‑estimate full model or refit GLM each week        | Posterior becomes new prior; incremental ADVI update <30 s.                                                           |
-| **End‑user uncertainty communication**                          | CI often misinterpreted; p‑values irrelevant to risk | Credible interval directly states 95 % probability risk is within bounds; easy for clinicians.                        |
-| **Composability with ML v2**                                    | Difficult to inject priors into XGBoost              | Bayesian λ layer can accept ML‑generated covariate priors seamlessly.                                                 |
+The current model layer is an ensemble-ready comparison harness, not a single
+black-box answer. It keeps several branches side by side so we can see whether
+extra features actually improve held-out performance:
 
----
+- prior-year persistence,
+- trailing historical mean,
+- `linear_blend_baseline`,
+- empirical-Bayes shrinkage,
+- forecast-safe ridge profiles,
+- ecology/weather experimental profiles.
 
-## 2 Construction of the three priors
+This makes the work useful for public-health timing questions without implying
+personal medical precision. A simple branch that validates well is preferable
+to a sophisticated branch that cannot be explained.
 
-### 2.1 θᵢ : Infected‑nymph prevalence
+## Why not bite-specific yet
 
-1. **Likelihood** `yᵢ ∼ Binom(nᵢ, θᵢ)` from CDC tick CSV.
-2. **Linear predictor** on logit scale with covariates: deer crashes, dog serology, forest‑edge density.
-3. **Spatial smoothing** via BYM2/CAR random effect (`ρ`, `σ²`) on county adjacency graph.
-4. **Priors** `α₀, αⱼ ∼ Normal(0,2)`, `ρ ∼ Uniform(0,1)`, `σ ∼ HalfNormal(1)`.
+A bite-specific risk estimate needs more than county incidence:
 
-Outcome: even if `nᵢ = 0`, θᵢ draws center on ecologically plausible estimates with wide dispersion.
+- tick species and life stage,
+- attachment duration or engorgement,
+- pathogen prevalence in the local tick population,
+- uncertainty from sparse tick testing,
+- clinical guidance wording reviewed by appropriate experts.
 
-### 2.2 λᵢ,t : Human–tick encounter intensity
+Those inputs are uneven, and some are not observable for many users. The public
+v0 product therefore stays with relative county-week context and official CDC
+guidance links.
 
-* **Seasonal backbone** `f_season(t)` = Fourier(2) fitted to historical ED scaler.
-* **Observation model** `ED_visits ∼ NegBinom(g(λᵢ,t))` where `g` maps λ to expected visits.
-* **Weekly scaler** `EDScaler = log(visits_this_week / baseline)`. When missing >14 d, variance inflated (`σ_miss`).
+## Bayesian modeling remains a research lane
 
-### 2.3 p(τ) : Attachment‑time transmission curve
+Bayesian modeling remains a research lane, not the current runtime. It may
+become useful for combining sparse pathogen surveillance, geography, weather,
+and bite-specific evidence while preserving uncertainty.
 
-* Logistic form pooled from Piesman 1988, Eisen 2018 meta‑analysis: `γ₀ ~ Normal(-7,1)`, `γ₁ ~ Normal(0.10,0.02)`.
-* Gives median p(24h)=1 %, p(48h)=10 %, p(72h)=55 % in line with controlled studies.
+For this project, a future Bayesian branch must earn its way in by improving
+validation, explainability, and public-health usefulness. It should not replace
+the current plain-language public product just because the math is attractive.
 
----
+## Future Bayesian research
 
-## 3 Updating mechanics
+Future research may revisit:
 
-1. **Annual** – full NUTS MCMC on θ; refresh Fourier coefficients for λ.
-2. **Weekly** – incremental ADVI on β₁ (ED scaler) with latest visits; θ frozen.
-3. **Query time** – FastAPI pulls latest NetCDF posterior and computes `P = 1 − (1−θp(τ))ᵏ` on the fly.
+- hierarchical county-level incidence models,
+- spatial smoothing for sparse tick/pathogen observations,
+- bite-specific probability models using attachment duration and tick stage,
+- uncertainty intervals tied to the actual modeled quantity,
+- ensemble combinations where multiple validated branches improve calibration.
 
----
+Any future personal-risk interface must keep the same boundary: informational
+and educational only, follow CDC guidance, and consult healthcare professionals
+about personal medical situations.
 
-## 4 Why not ML‑only (v1)?
-
-| Concern                         | ML‑only outcome                             | Bayesian outcome                                 |
-| ------------------------------- | ------------------------------------------- | ------------------------------------------------ |
-| Interpretability for clinicians | SHAP plots, but per‑bite math opaque        | Direct probability formula with traceable priors |
-| Data hunger                     | Needs dense labels (county‑week Lyme cases) | Works with sparse tick + ED proxies              |
-| Real‑time update cost           | Re‑train boosted model weekly               | ADVI update <30 s                                |
-
-ML covariates will arrive in **v1.1** (λ prior enhancement) but Bayesian core remains unchanged.
-
----
-
-## 5 Key references
-
-* Gelman A. et al. *Bayesian Data Analysis* 4e (2021)
-* Besag J., York J., Mollié A. (1991) “Bayesian image restoration”
-* Piesman J. & Sinsky R. (1988) “Ability of nymphal Ixodes dammini to transmit Lyme disease after different attachment times.”
-* Eisen R. & Eisen L. (2018) “Duration of tick attachment and Borrelia transmission.”
-
----
-
-*Last updated: 2025-06-08 (draft v0.1)*
+Last updated: 2026-05-27.

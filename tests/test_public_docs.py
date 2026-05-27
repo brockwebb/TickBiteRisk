@@ -9,6 +9,10 @@ USER_GUIDE = Path("docs/user-guide.md")
 ROADMAP = Path("docs/roadmap.md")
 VISION_SCOPE = Path("docs/vision-scope.md")
 MODEL_SPEC = Path("docs/model-spec.md")
+DATA_SOURCES = Path("docs/data-sources.md")
+TESTING_CI_PLAN = Path("docs/testing-ci-plan.md")
+ETL_PIPELINE = Path("docs/etl-pipeline.md")
+MODEL_BACKGROUND = Path("docs/model-background.md")
 
 
 def test_user_guide_matches_implemented_maryland_baseline_product() -> None:
@@ -204,5 +208,97 @@ def test_model_spec_leads_with_implemented_comparison_model_before_research_mode
         "NUTS",
         "p(τ)",
         "posterior probability",
+    ]:
+        assert token not in current_section
+
+
+def test_data_sources_catalog_matches_current_v0_artifacts() -> None:
+    catalog = DATA_SOURCES.read_text(encoding="utf-8")
+
+    for token in [
+        "Current source catalog",
+        "Current v0 derived artifacts",
+        "Status",
+        "model_feature_matrix",
+        "model_comparison_predictions",
+        "county_week_seasonal_risk_baseline",
+        "risk_baseline.json",
+    ]:
+        assert token in catalog
+
+    for token in [
+        "theta_{year}.parquet",
+        "lambda_weekly.parquet",
+        "Posterior draws per season",
+        "pipelines/fetch_ed.sh",
+    ]:
+        assert token not in catalog
+
+
+def test_testing_ci_plan_documents_current_static_pipeline_not_future_model_service() -> None:
+    ci_plan = TESTING_CI_PLAN.read_text(encoding="utf-8")
+
+    for token in [
+        "Current CI plan",
+        "ruff check .",
+        "pytest -q",
+        "node --check public/app.js",
+        "public data JSON parses",
+        "GitHub Pages",
+    ]:
+        assert token in ci_plan
+
+    for token in [
+        "PyMC fit",
+        "Docker image",
+        "OpenAPI JSON",
+        "NetCDF",
+        "OpenAPI schema diff clean",
+    ]:
+        assert token not in ci_plan
+
+
+def test_etl_pipeline_doc_has_current_cli_flow_without_unimplemented_lambda_stack() -> None:
+    etl = ETL_PIPELINE.read_text(encoding="utf-8")
+
+    for token in [
+        "Current v0 ETL pipeline",
+        "tickbiterisk etl lyme-outcomes",
+        "tickbiterisk etl model-features",
+        "tickbiterisk etl model-compare",
+        "tickbiterisk etl county-week-risk",
+        "tickbiterisk risk export-static",
+        "No live weekly ED scaler is wired into the current product",
+    ]:
+        assert token in etl
+
+    for token in [
+        "derive_lambda_inputs.py",
+        "lambda_input.parquet",
+        "PyMC incremental ADVI",
+        "triggers full PyMC MCMC",
+        "cron/annual.sh",
+    ]:
+        assert token not in etl
+
+
+def test_model_background_frames_bayesian_work_as_future_research_not_current_runtime() -> None:
+    background = MODEL_BACKGROUND.read_text(encoding="utf-8")
+
+    for token in [
+        "Current rationale",
+        "ensemble-ready comparison",
+        "Bayesian modeling remains a research lane",
+        "not the current runtime",
+        "plain-language public product",
+    ]:
+        assert token in background
+
+    current_section = background.split("## Future Bayesian research", maxsplit=1)[0]
+    for token in [
+        "FastAPI",
+        "NetCDF",
+        "incremental ADVI",
+        "built on a Bayesian state-space framework",
     ]:
         assert token not in current_section
