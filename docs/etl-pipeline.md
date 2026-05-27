@@ -51,17 +51,17 @@ candidates until backtesting shows they improve the public score.
    - Writes `contact_pressure_features_county_year.csv`.
 
 9. `tickbiterisk etl mast-acorn`
-   - Attempts structured extraction from Maryland mast/acorn reports.
-   - Writes extraction summaries even when OCR or text extraction is not model
-     ready.
+   - Extracts text-supported Western Maryland DNR rolling mast/acorn tables.
+   - Writes source-report rows and extraction summaries with study-plot caveats.
 
 10. `tickbiterisk etl seasonality-baseline`
     - Normalizes CDC Lyme onset exports by month and MMWR week.
     - Writes `seasonality_observations.csv` and `seasonality_baseline.csv`.
 
 11. `tickbiterisk etl model-features`
-    - Joins Lyme outcomes, population, weather, deer, contact-pressure, and
-      optional surveillance features into the county-year feature matrix.
+    - Joins Lyme outcomes, population, weather, deer, contact-pressure,
+      prior-year mast/acorn, and optional surveillance features into the
+      county-year feature matrix.
     - Writes `model_features_county_year.csv`.
 
 12. `tickbiterisk etl model-design-matrix`
@@ -112,8 +112,8 @@ probability or a treatment recommendation.
 - Deer harvest is a host-pressure proxy, not direct deer population.
 - Building permits are a contact/land-use pressure proxy, not proof of
   migration or exposure.
-- Mast/acorn extraction is currently low-confidence and excluded from default
-  model behavior unless manually reviewed.
+- Mast/acorn values are Western Maryland study-plot observations, not statewide
+  countywide mast production; model joins use only prior-year values.
 - Same-year weather branches are retrospective comparisons unless replaced by a
   true forecast-time feature set.
 

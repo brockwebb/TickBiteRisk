@@ -47,6 +47,8 @@ Current model-ready feature groups include:
 - NOAA weekly weather aggregates rolled to county-year predictors.
 - CDC Lyme seasonality shares by week and month of onset.
 - Maryland deer harvest density proxy.
+- Maryland DNR Western Maryland mast/acorn study-plot observations, joined only
+  as prior-year ecology features.
 - Land-cover and habitat proxy fields where acquired data support them.
 - CDC tick vector and pathogen surveillance status fields.
 - Data quality and assumption flags for missingness, source vintage, and
@@ -67,6 +69,12 @@ The practical questions for v0 are:
   missing ecological features?
 - Does adding weather or ecology improve held-out performance enough to justify
   the extra explanation burden?
+
+Prior-year mast/acorn features are available only for Garrett, Allegany,
+Washington, and Frederick from Western Maryland DNR study plots. They are
+included in ecology comparison lanes, not in the conservative forecast-safe
+baseline, and should be read as localized ecological context rather than
+countywide or statewide mast production.
 
 ## Public score transform
 

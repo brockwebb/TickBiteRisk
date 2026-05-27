@@ -22,6 +22,17 @@ USDA_CROPSCAPE_URL = "https://www.nass.usda.gov/Research_and_Science/Cropland/Vi
 MARYLAND_DNR_GAME_MAMMALS_URL = (
     "https://dnr.maryland.gov/wildlife/Pages/hunt_trap/GameMammals.aspx"
 )
+EPA_ENVIROATLAS_DATA_DOWNLOAD_URL = "https://www.epa.gov/enviroatlas/data-download"
+USDA_FIA_EVALIDATOR_URL = (
+    "https://research.fs.usda.gov/products/dataandtools/evalidator-and-fiadb-api"
+)
+USDA_FIA_API_DOCS_URL = "https://apps.fs.usda.gov/fiadb-api"
+MARYLAND_DNR_ARCHERY_HUNTER_SURVEY_URL = (
+    "https://dnr.maryland.gov/wildlife/pages/hunt_trap/bhsurvey.aspx"
+)
+MARYLAND_DNR_BOWHUNTER_SURVEY_REPORT_URL = (
+    "https://dnr.maryland.gov/wildlife/Documents/BowHunterSurveyReport.pdf"
+)
 
 
 @dataclass(frozen=True)
@@ -149,6 +160,46 @@ ECOLOGY_SOURCE_FILES = [
         raw_relative_path="mast/maryland_dnr_game_mammals.html",
         description="Maryland DNR Game Mammals page linking mast survey reports",
         expected_format="html",
+    ),
+    EcologySourceFile(
+        source_id="epa_enviroatlas_data_download",
+        family="habitat",
+        url=EPA_ENVIROATLAS_DATA_DOWNLOAD_URL,
+        raw_relative_path="enviroatlas/epa_enviroatlas_data_download.html",
+        description="EPA EnviroAtlas national data download page with county CSV batch tables",
+        expected_format="html",
+    ),
+    EcologySourceFile(
+        source_id="usda_fia_evalidator",
+        family="forest_inventory",
+        url=USDA_FIA_EVALIDATOR_URL,
+        raw_relative_path="forest_inventory/usda_fia_evalidator.html",
+        description="USDA Forest Service FIA EVALIDator and FIADB API landing page",
+        expected_format="html",
+    ),
+    EcologySourceFile(
+        source_id="usda_fia_api_docs",
+        family="forest_inventory",
+        url=USDA_FIA_API_DOCS_URL,
+        raw_relative_path="forest_inventory/usda_fia_api_docs.html",
+        description="USDA Forest Service FIADB API documentation",
+        expected_format="html",
+    ),
+    EcologySourceFile(
+        source_id="maryland_dnr_archery_hunter_survey",
+        family="wildlife_observation",
+        url=MARYLAND_DNR_ARCHERY_HUNTER_SURVEY_URL,
+        raw_relative_path="wildlife_observation/maryland_dnr_archery_hunter_survey.html",
+        description="Maryland DNR Archery Hunter Survey page for wildlife observations",
+        expected_format="html",
+    ),
+    EcologySourceFile(
+        source_id="maryland_dnr_bowhunter_survey_report",
+        family="wildlife_observation",
+        url=MARYLAND_DNR_BOWHUNTER_SURVEY_REPORT_URL,
+        raw_relative_path="wildlife_observation/maryland_dnr_bowhunter_survey_report.pdf",
+        description="Maryland DNR Bowhunter Survey report PDF",
+        expected_format="pdf",
     ),
     *[source.as_source_file() for source in MARYLAND_DNR_MAST_REPORT_URLS],
 ]

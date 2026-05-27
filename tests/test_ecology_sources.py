@@ -1,7 +1,9 @@
 from tickbiterisk.etl.ecology_sources import (
     CENSUS_BPS_COUNTY_INDEX_URL,
     ECOLOGY_SOURCE_FILES,
+    EPA_ENVIROATLAS_DATA_DOWNLOAD_URL,
     MARYLAND_DNR_MAST_REPORT_URLS,
+    USDA_FIA_EVALIDATOR_URL,
     USDA_MARYLAND_CDL_URL,
     USGS_ANNUAL_NLCD_ACCESS_URL,
     EcologySourceFile,
@@ -15,6 +17,9 @@ def test_ecology_source_registry_has_primary_source_families() -> None:
     assert "census_bps_county_index" in source_ids
     assert "usda_nass_maryland_cdl" in source_ids
     assert "maryland_dnr_game_mammals_mast_link" in source_ids
+    assert "epa_enviroatlas_data_download" in source_ids
+    assert "usda_fia_evalidator" in source_ids
+    assert "maryland_dnr_archery_hunter_survey" in source_ids
 
 
 def test_ecology_source_urls_are_official_sources() -> None:
@@ -25,6 +30,12 @@ def test_ecology_source_urls_are_official_sources() -> None:
     assert USDA_MARYLAND_CDL_URL == (
         "https://data.nass.usda.gov/Statistics_by_State/Maryland/"
         "Publications/Cropland_Data_Layer/index.php"
+    )
+    assert EPA_ENVIROATLAS_DATA_DOWNLOAD_URL == (
+        "https://www.epa.gov/enviroatlas/data-download"
+    )
+    assert USDA_FIA_EVALIDATOR_URL == (
+        "https://research.fs.usda.gov/products/dataandtools/evalidator-and-fiadb-api"
     )
 
 
