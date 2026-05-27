@@ -604,17 +604,72 @@ function renderSources() {
     (state.weekly && state.weekly.guidance_links) ||
     [];
   const sourceRows = (state.sourceCatalog && state.sourceCatalog.sources) || [];
+  const sourceChain = sourceChainItems(sourceRows)
+    .map(
+      (source) => `<li>
+        <b>${escapeHtml(source.title)}</b>
+        <span>${escapeHtml(source.description)}</span>
+      </li>`
+    )
+    .join("");
   const links = guidanceLinks
     .map((link) => `<li><a href="${escapeAttribute(safeUrl(link.url))}">${escapeHtml(link.title)}</a></li>`)
     .join("");
   const sources = sourceRows
-    .map((source) => `<li>${escapeHtml(source.source_id)}: ${escapeHtml(source.notes || source.artifact_type)}</li>`)
+    .map((source) => `<li><b>${escapeHtml(readableSourceTitle(source.source_id))}</b>: ${escapeHtml(source.notes || source.artifact_type)}</li>`)
     .join("");
 
-  target.innerHTML = `<p>${escapeHtml(state.modelCard.score_interpretation)}</p>
+  target.innerHTML = `<section class="source-chain" aria-labelledby="source-chain-title">
+      <h3 id="source-chain-title">Public source chain</h3>
+      <ol>${sourceChain}</ol>
+    </section>
+    <p>${escapeHtml(state.modelCard.score_interpretation)}</p>
     <ul>${links}</ul>
-    ${sources ? `<ul>${sources}</ul>` : ""}
+    ${sources ? `<ul class="source-detail-list">${sources}</ul>` : ""}
     <p>Source branch: ${escapeHtml(state.weekly.model_name)} / ${escapeHtml(state.weekly.seasonality_source_id)}</p>`;
+}
+
+function sourceChainItems(sourceRows) {
+  const byId = new Map(sourceRows.map((source) => [source.source_id, source]));
+  const baseline = byId.get("county_week_seasonal_risk_baseline") || {};
+  const annualPrediction = byId.get("annual_prediction_branch") || {};
+  const seasonality =
+    sourceRows.find((source) => String(source.source_id || "").includes("seasonality")) ||
+    {};
+  return [
+    {
+      title: "Selected model-comparison predictions",
+      description:
+        annualPrediction.notes ||
+        "Annual Maryland Lyme prediction branch selected from rolling-origin model comparison.",
+    },
+    {
+      title: "CDC Lyme onset seasonality",
+      description:
+        seasonality.notes ||
+        "CDC national Lyme disease onset timing allocates annual predictions across MMWR weeks.",
+    },
+    {
+      title: "Derived county-week risk baseline",
+      description:
+        baseline.notes ||
+        "Public-safe county-week score derived from selected predictions and seasonality.",
+    },
+    {
+      title: "US Census TIGERweb county geometry",
+      description:
+        "Maryland county boundaries are simplified to public map geometry and county labels.",
+    },
+  ];
+}
+
+function readableSourceTitle(sourceId) {
+  const labels = {
+    annual_prediction_branch: "Selected model-comparison predictions",
+    cdc_seasonality_week_2023: "CDC Lyme onset seasonality",
+    county_week_seasonal_risk_baseline: "Derived county-week risk baseline",
+  };
+  return labels[sourceId] || readableModelName(sourceId);
 }
 
 function renderValidationSummary() {

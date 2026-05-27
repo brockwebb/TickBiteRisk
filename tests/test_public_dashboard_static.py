@@ -19,6 +19,7 @@ def test_dashboard_html_has_accessible_landmarks_and_data_hooks() -> None:
     assert 'id="bite-result"' in html
     assert 'id="validation-summary"' in html
     assert 'id="validation-content"' in html
+    assert "<details open>" in html
     assert 'id="week-label" class="muted" aria-live="polite"' in html
     assert "Informational only. Not medical advice." in html
     assert "app.js" in html
@@ -70,6 +71,8 @@ def test_dashboard_javascript_has_expected_runtime_functions() -> None:
         "function readableModelName",
         "function readableWeatherMode",
         "function renderSources",
+        "function sourceChainItems",
+        "function readableSourceTitle",
         "function renderValidationSummary",
         "function validationOutcomeItems",
         "function validationLimitItems",
@@ -81,6 +84,21 @@ def test_dashboard_javascript_has_expected_runtime_functions() -> None:
         "function renderBiteCaveats",
         "function readableBiteCaveat",
         "fetchJson",
+    ]:
+        assert token in js
+
+
+def test_dashboard_javascript_renders_visible_plain_language_source_chain() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "Public source chain",
+        "CDC Lyme onset seasonality",
+        "Selected model-comparison predictions",
+        "Derived county-week risk baseline",
+        "US Census TIGERweb county geometry",
+        "source-chain",
+        "source-detail-list",
     ]:
         assert token in js
 
@@ -289,5 +307,17 @@ def test_dashboard_css_styles_validation_summary() -> None:
         ".validation-grid",
         ".validation-list",
         ".validation-note",
+    ]:
+        assert token in css
+
+
+def test_dashboard_css_styles_visible_source_chain() -> None:
+    css = (PUBLIC_DIR / "styles.css").read_text(encoding="utf-8")
+
+    for token in [
+        ".source-chain",
+        ".source-chain h3",
+        ".source-chain ol",
+        ".source-detail-list",
     ]:
         assert token in css
