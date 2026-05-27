@@ -47,42 +47,52 @@ candidates until backtesting shows they improve the public score.
 
 8. `tickbiterisk etl contact-pressure`
    - Combines building permits, population, and county area into per-capita and
-     per-square-mile features.
+     per-square-mile features, including prior-year and trailing construction
+     pressure lags for modeling.
    - Writes `contact_pressure_features_county_year.csv`.
 
 9. `tickbiterisk etl mast-acorn`
    - Extracts text-supported Western Maryland DNR rolling mast/acorn tables.
    - Writes source-report rows and extraction summaries with study-plot caveats.
 
-10. `tickbiterisk etl seasonality-baseline`
+10. `tickbiterisk etl usdm-drought`
+    - Pulls U.S. Drought Monitor county weekly DSCI and severity statistics.
+    - Writes `usdm_drought_weekly.csv` and `usdm_drought_county_year.csv`.
+
+11. `tickbiterisk etl enviroatlas-habitat`
+    - Pulls EPA EnviroAtlas county landscape habitat fields for Maryland.
+    - Writes `enviroatlas_county_habitat.csv`.
+
+12. `tickbiterisk etl seasonality-baseline`
     - Normalizes CDC Lyme onset exports by month and MMWR week.
     - Writes `seasonality_observations.csv` and `seasonality_baseline.csv`.
 
-11. `tickbiterisk etl model-features`
+13. `tickbiterisk etl model-features`
     - Joins Lyme outcomes, population, weather, deer, contact-pressure,
-      prior-year mast/acorn, and optional surveillance features into the
-      county-year feature matrix.
+      construction lags, prior-year mast/acorn, USDM drought, EnviroAtlas
+      habitat, and optional surveillance features into the county-year feature
+      matrix.
     - Writes `model_features_county_year.csv`.
 
-12. `tickbiterisk etl model-design-matrix`
+14. `tickbiterisk etl model-design-matrix`
     - Converts the feature panel into numeric model inputs with missingness
       indicators and a schema sidecar.
     - Writes `model_design_matrix_county_year.csv` and
       `model_design_matrix_schema.json`.
 
-13. `tickbiterisk etl model-compare`
+15. `tickbiterisk etl model-compare`
     - Runs rolling-origin comparisons across transparent baseline and ridge
       branches.
     - Writes `model_comparison_runs.csv`,
       `model_comparison_predictions.csv`, `model_comparison_metrics.csv`, and
       `model_comparison_summary.csv`.
 
-14. `tickbiterisk etl county-week-risk`
+16. `tickbiterisk etl county-week-risk`
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.
     - Writes `county_week_seasonal_risk_baseline.csv` and
       `risk_score_scale.csv`.
 
-15. `tickbiterisk risk export-static`
+17. `tickbiterisk risk export-static`
     - Selects one unambiguous model/source/scale branch for public use.
     - Writes dashboard JSON files under `public/data`.
 
@@ -114,6 +124,10 @@ probability or a treatment recommendation.
   migration or exposure.
 - Mast/acorn values are Western Maryland study-plot observations, not statewide
   countywide mast production; model joins use only prior-year values.
+- USDM drought values are same-year retrospective observed conditions in the
+  current comparison, not a forecast-time drought forecast.
+- EnviroAtlas habitat fields are static county context, not annual land-cover
+  change.
 - Same-year weather branches are retrospective comparisons unless replaced by a
   true forecast-time feature set.
 

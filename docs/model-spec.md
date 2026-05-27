@@ -33,8 +33,8 @@ The comparison harness supports these current branches:
 | `linear_blend_baseline` | Selected v0 branch combining persistence and trailing mean behavior |
 | `empirical_bayes_shrinkage` | County estimates shrunk toward broader Maryland behavior when data are sparse |
 | `ridge_forecast_safe` | Regularized annual model using conservative non-leaky features |
-| `ridge_forecast_ecology` | Regularized model including ecological feature candidates |
-| `ridge_lag_weather_ecology` | Experimental lagged weather/ecology branch for comparison |
+| `ridge_forecast_ecology` | Regularized model including timing-safe ecology candidates |
+| `ridge_lag_weather_ecology` | Experimental retrospective weather/drought/ecology branch for comparison |
 
 The selected dashboard branch is currently `linear_blend_baseline` because it
 is transparent, stable, and defensible for a first public baseline.
@@ -49,7 +49,11 @@ Current model-ready feature groups include:
 - Maryland deer harvest density proxy.
 - Maryland DNR Western Maryland mast/acorn study-plot observations, joined only
   as prior-year ecology features.
-- Land-cover and habitat proxy fields where acquired data support them.
+- U.S. Drought Monitor county-year summaries, labeled as same-year
+  retrospective observed drought context.
+- EPA EnviroAtlas static county habitat fields.
+- Census BPS construction/contact pressure, including prior-year and trailing
+  construction lags.
 - CDC tick vector and pathogen surveillance status fields.
 - Data quality and assumption flags for missingness, source vintage, and
   non-comparable years.
@@ -75,6 +79,12 @@ Washington, and Frederick from Western Maryland DNR study plots. They are
 included in ecology comparison lanes, not in the conservative forecast-safe
 baseline, and should be read as localized ecological context rather than
 countywide or statewide mast production.
+
+The 2026-05-27 expanded feature comparison added USDM drought, EnviroAtlas
+habitat, and construction-lag features. Held-out MAE still ranked
+`linear_blend_baseline` first, with `ridge_forecast_ecology` and
+`ridge_lag_weather_ecology` worse than the simple blend. These features remain
+available for research lanes but are not promoted into the public score.
 
 ## Public score transform
 
