@@ -108,8 +108,8 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 - Maryland county boundary geometries from Census/TIGER or equivalent for maps and habitat joins.
 - Open-Meteo reanalysis comparison/gap-fill backfill if archive endpoint is reliable.
 - OCR or manual review for Maryland DNR annual deer reports from 2007-08 through 2010-11 if those older host-proxy years become worth the effort.
-- Mast/acorn survey data where usable.
-- Habitat county summaries from NLCD or an equivalent precomputed source.
+- Additional mast/acorn years if Maryland DNR publishes more official reports.
+- Habitat county summaries from EnviroAtlas, NLCD, FIA, or an equivalent precomputed source.
 - ZIP-to-county/ZCTA mapping for user lookup.
 
 ### Optional / Later
