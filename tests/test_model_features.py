@@ -267,6 +267,110 @@ def test_build_model_feature_matrix_preserves_rows_when_optional_inputs_missing(
     )
 
 
+def test_build_model_feature_matrix_joins_mast_acorn_as_prior_year_feature(
+    tmp_path: Path,
+) -> None:
+    lyme = _write_csv(
+        tmp_path / "lyme.csv",
+        [
+            _lyme_row("24001", 2020, 8),
+            _lyme_row("24001", 2021, 10),
+            _lyme_row("24001", 2022, 12),
+        ],
+    )
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [
+            _population_row("24001", "Allegany County", 2020),
+            _population_row("24001", "Allegany County", 2021),
+            _population_row("24001", "Allegany County", 2022),
+        ],
+    )
+    weather = _write_csv(
+        tmp_path / "weather.csv",
+        [
+            _weather_row(
+                county_fips="24001",
+                iso_year="2020",
+                week_start_date="2020-01-06",
+            ),
+            _weather_row(
+                county_fips="24001",
+                iso_year="2021",
+                week_start_date="2021-01-04",
+            ),
+            _weather_row(
+                county_fips="24001",
+                iso_year="2022",
+                week_start_date="2022-01-03",
+            ),
+        ],
+    )
+    mast = _write_csv(
+        tmp_path / "mast.csv",
+        [
+            _mast_row(
+                county_fips="24001",
+                county_name="Allegany County",
+                year=2020,
+                source_report_year=2020,
+                mast_index="7.76",
+                black_oak="0.75",
+                source_id="maryland_dnr_wmd_mast_survey_2020",
+            ),
+            _mast_row(
+                county_fips="24001",
+                county_name="Allegany County",
+                year=2020,
+                source_report_year=2021,
+                mast_index="99.0",
+                black_oak="88.0",
+                source_id="maryland_dnr_wmd_mast_survey_2021",
+            ),
+            _mast_row(
+                county_fips="24001",
+                county_name="Allegany County",
+                year=2021,
+                source_report_year=2021,
+                mast_index="1.92",
+                black_oak="1.97",
+                source_id="maryland_dnr_wmd_mast_survey_2021",
+            ),
+        ],
+    )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme,
+        population_path=population,
+        weather_weekly_path=weather,
+        mast_acorn_path=mast,
+    )
+
+    row_2020 = next(row for row in rows if row.year == 2020)
+    assert row_2020.mast_index_prior_year is None
+    assert "missing_mast_acorn_prior_year" in row_2020.model_feature_quality_flags
+
+    row_2021 = next(row for row in rows if row.year == 2021)
+    assert row_2021.mast_index_prior_year == 99.0
+    assert row_2021.acorn_index_prior_year == 99.0
+    assert row_2021.hard_mast_index_prior_year == 99.0
+    assert row_2021.black_oak_acorns_per_branch_prior_year == 88.0
+    assert row_2021.white_oak_acorns_per_branch_prior_year == 14.77
+    assert row_2021.unit_average_acorns_per_branch_prior_year == 99.0
+    assert row_2021.white_oak_subjective_crown_pct_prior_year == 1.75
+    assert row_2021.black_oak_subjective_crown_pct_prior_year == 34.0
+    assert row_2021.mast_source_ids_prior_year == "maryland_dnr_wmd_mast_survey_2021"
+    assert row_2021.mast_source_report_year_prior_year == 2021
+    assert row_2021.mast_feature_quality_flags_prior_year == (
+        "western_maryland_only,study_plot_not_countywide"
+    )
+    assert "western_maryland_only" in row_2021.model_feature_quality_flags
+    assert "study_plot_not_countywide" in row_2021.model_feature_quality_flags
+
+    row_2022 = next(row for row in rows if row.year == 2022)
+    assert row_2022.mast_index_prior_year == 1.92
+
+
 def test_build_model_feature_matrix_flags_missing_tick_status_only_when_opted_in(
     tmp_path: Path,
 ) -> None:
@@ -503,6 +607,75 @@ def _minimal_required_inputs(
     return lyme, population, weather
 
 
+def _lyme_row(county_fips: str, year: int, total_cases: int) -> dict[str, str]:
+    return {
+        "county_fips": county_fips,
+        "year": str(year),
+        "confirmed_cases": str(total_cases),
+        "probable_cases": "0",
+        "total_cases": str(total_cases),
+        "canonical_source_id": f"cdc_{year}",
+        "source_values_summary": "",
+        "reconciliation_status": "matched",
+        "data_quality_flags": "",
+    }
+
+
+def _population_row(
+    county_fips: str,
+    county_name: str,
+    year: int,
+) -> dict[str, str]:
+    return {
+        "county_fips": county_fips,
+        "county_name": county_name,
+        "year": str(year),
+        "population": "100000",
+    }
+
+
+def _mast_row(
+    *,
+    county_fips: str,
+    county_name: str,
+    year: int,
+    source_report_year: int,
+    mast_index: str,
+    black_oak: str,
+    source_id: str,
+) -> dict[str, str]:
+    return {
+        "county_fips": county_fips,
+        "county_name": county_name,
+        "year": str(year),
+        "region": "Western Maryland",
+        "mast_category": "oak_acorn_abundance",
+        "mast_index": mast_index,
+        "mast_rating": "poor_and_spotty",
+        "acorn_index": mast_index,
+        "hard_mast_index": mast_index,
+        "soft_mast_index": "",
+        "plots_observed": "",
+        "expected_plots": "",
+        "coverage_complete": "",
+        "source_id": source_id,
+        "source_url_hash": "hash",
+        "source_report_year": str(source_report_year),
+        "parser_method": "pypdfium_table_text",
+        "extraction_confidence": "high",
+        "black_oak_acorns_per_branch": black_oak,
+        "white_oak_acorns_per_branch": "14.77",
+        "unit_average_acorns_per_branch": mast_index,
+        "black_oak_mast_rating": "I",
+        "white_oak_mast_rating": "III",
+        "unit_average_mast_rating": "II",
+        "white_oak_subjective_crown_pct": "1.75",
+        "black_oak_subjective_crown_pct": "34.00",
+        "feature_quality_flags": "western_maryland_only,study_plot_not_countywide",
+        "extracted_text_excerpt": "excerpt",
+    }
+
+
 def _model_row(
     *,
     county_fips: str,
@@ -554,6 +727,21 @@ def _model_row(
         deer_total_harvest_prior_season=None,
         deer_harvest_per_sqmi_prior_season=None,
         deer_is_derived_total=None,
+        mast_index_prior_year=None,
+        acorn_index_prior_year=None,
+        hard_mast_index_prior_year=None,
+        soft_mast_index_prior_year=None,
+        black_oak_acorns_per_branch_prior_year=None,
+        white_oak_acorns_per_branch_prior_year=None,
+        unit_average_acorns_per_branch_prior_year=None,
+        white_oak_subjective_crown_pct_prior_year=None,
+        black_oak_subjective_crown_pct_prior_year=None,
+        mast_coverage_complete_prior_year=None,
+        mast_source_ids_prior_year=None,
+        mast_source_report_year_prior_year=None,
+        mast_parser_method_prior_year=None,
+        mast_extraction_confidence_prior_year=None,
+        mast_feature_quality_flags_prior_year=None,
         ixodes_scapularis_status=None,
         ixodes_pacificus_status=None,
         borrelia_burgdorferi_status=None,

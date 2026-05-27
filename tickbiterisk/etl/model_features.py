@@ -55,6 +55,21 @@ class ModelCountyYearFeature:
     deer_total_harvest_prior_season: int | None
     deer_harvest_per_sqmi_prior_season: float | None
     deer_is_derived_total: bool | None
+    mast_index_prior_year: float | None
+    acorn_index_prior_year: float | None
+    hard_mast_index_prior_year: float | None
+    soft_mast_index_prior_year: float | None
+    black_oak_acorns_per_branch_prior_year: float | None
+    white_oak_acorns_per_branch_prior_year: float | None
+    unit_average_acorns_per_branch_prior_year: float | None
+    white_oak_subjective_crown_pct_prior_year: float | None
+    black_oak_subjective_crown_pct_prior_year: float | None
+    mast_coverage_complete_prior_year: bool | None
+    mast_source_ids_prior_year: str | None
+    mast_source_report_year_prior_year: int | None
+    mast_parser_method_prior_year: str | None
+    mast_extraction_confidence_prior_year: str | None
+    mast_feature_quality_flags_prior_year: str | None
     ixodes_scapularis_status: str | None
     ixodes_pacificus_status: str | None
     borrelia_burgdorferi_status: str | None
@@ -75,14 +90,17 @@ def build_model_feature_matrix(
     weather_weekly_path: Path,
     contact_pressure_path: Path | None = None,
     deer_harvest_path: Path | None = None,
+    mast_acorn_path: Path | None = None,
     tick_status_path: Path | None = None,
 ) -> list[ModelCountyYearFeature]:
     population = _read_population(population_path)
     weather = _aggregate_weather_weekly(weather_weekly_path)
     contact = _read_contact_pressure(contact_pressure_path)
     deer = _read_deer_harvest(deer_harvest_path)
+    mast = _read_mast_acorn(mast_acorn_path)
     tick_status = _read_tick_status(tick_status_path)
     tick_status_enabled = tick_status_path is not None
+    mast_enabled = mast_acorn_path is not None
 
     rows = []
     for lyme in _read_csv(lyme_outcomes_path):
@@ -98,6 +116,7 @@ def build_model_feature_matrix(
 
         contact_row = contact.get((county_fips, year))
         deer_row = deer.get((county_fips, year))
+        mast_row = mast.get((county_fips, year))
         tick_status_row = tick_status.get(county_fips)
         total_cases = _parse_int(lyme["total_cases"])
         weather_ratio = weather_row["weather_observation_ratio"]
@@ -110,6 +129,8 @@ def build_model_feature_matrix(
             deer_is_derived_total=(
                 None if deer_row is None else deer_row["deer_is_derived_total"]
             ),
+            mast_missing=mast_enabled and mast_row is None,
+            mast_flags=_mast_quality_flags(mast_row),
             tick_status_missing=tick_status_enabled and tick_status_row is None,
             tick_status_flags=_tick_status_quality_flags(tick_status_row),
         )
@@ -156,6 +177,37 @@ def build_model_feature_matrix(
                 deer_is_derived_total=(
                     None if deer_row is None else deer_row["deer_is_derived_total"]
                 ),
+                mast_index_prior_year=_mast_float(mast_row, "mast_index"),
+                acorn_index_prior_year=_mast_float(mast_row, "acorn_index"),
+                hard_mast_index_prior_year=_mast_float(mast_row, "hard_mast_index"),
+                soft_mast_index_prior_year=_mast_float(mast_row, "soft_mast_index"),
+                black_oak_acorns_per_branch_prior_year=_mast_float(
+                    mast_row, "black_oak_acorns_per_branch"
+                ),
+                white_oak_acorns_per_branch_prior_year=_mast_float(
+                    mast_row, "white_oak_acorns_per_branch"
+                ),
+                unit_average_acorns_per_branch_prior_year=_mast_float(
+                    mast_row, "unit_average_acorns_per_branch"
+                ),
+                white_oak_subjective_crown_pct_prior_year=_mast_float(
+                    mast_row, "white_oak_subjective_crown_pct"
+                ),
+                black_oak_subjective_crown_pct_prior_year=_mast_float(
+                    mast_row, "black_oak_subjective_crown_pct"
+                ),
+                mast_coverage_complete_prior_year=_mast_bool(
+                    mast_row, "coverage_complete"
+                ),
+                mast_source_ids_prior_year=_mast_text(mast_row, "source_id"),
+                mast_source_report_year_prior_year=_mast_int(
+                    mast_row, "source_report_year"
+                ),
+                mast_parser_method_prior_year=_mast_text(mast_row, "parser_method"),
+                mast_extraction_confidence_prior_year=_mast_text(
+                    mast_row, "extraction_confidence"
+                ),
+                mast_feature_quality_flags_prior_year=_mast_quality_flags(mast_row),
                 ixodes_scapularis_status=_tick_status_text(
                     tick_status_row, "ixodes_scapularis_status"
                 ),
@@ -330,6 +382,36 @@ def _read_deer_harvest(path: Path | None) -> dict[tuple[str, int], dict[str, Any
     return rows
 
 
+def _read_mast_acorn(path: Path | None) -> dict[tuple[str, int], dict[str, str]]:
+    if path is None:
+        return {}
+    rows: dict[tuple[str, int], dict[str, str]] = {}
+    for row in _read_csv(path):
+        if str(row.get("mast_category", "")).strip() not in {
+            "",
+            "overall",
+            "oak_acorn_abundance",
+        }:
+            continue
+        county_fips = str(row["county_fips"]).zfill(5)
+        observation_year = int(row["year"])
+        model_year = observation_year + 1
+        key = (county_fips, model_year)
+        existing = rows.get(key)
+        if existing is None or _mast_preferred_sort_key(row) > _mast_preferred_sort_key(
+            existing
+        ):
+            rows[key] = row
+    return rows
+
+
+def _mast_preferred_sort_key(row: dict[str, str]) -> tuple[int, str]:
+    return (
+        _parse_int_or_none(row.get("source_report_year", "")) or _parse_int(row["year"]),
+        str(row.get("source_id", "")),
+    )
+
+
 def _read_tick_status(path: Path | None) -> dict[str, dict[str, str]]:
     if path is None:
         return {}
@@ -347,6 +429,8 @@ def _model_quality_flags(
     contact_missing: bool,
     deer_missing: bool,
     deer_is_derived_total: bool | None,
+    mast_missing: bool,
+    mast_flags: str,
     tick_status_missing: bool,
     tick_status_flags: str,
 ) -> list[str]:
@@ -361,6 +445,9 @@ def _model_quality_flags(
         flags.append("missing_deer_harvest_prior_season")
     if deer_is_derived_total:
         flags.append("deer_prior_season_derived_total")
+    if mast_missing:
+        flags.append("missing_mast_acorn_prior_year")
+    flags.extend(_split_flags(mast_flags))
     if tick_status_missing:
         flags.append("missing_tick_status")
     flags.extend(_split_flags(tick_status_flags))
@@ -384,6 +471,37 @@ def _tick_status_text(row: dict[str, str] | None, column: str) -> str | None:
         return None
     text = str(row.get(column, "")).strip()
     return text or None
+
+
+def _mast_text(row: dict[str, str] | None, column: str) -> str | None:
+    if row is None:
+        return None
+    text = str(row.get(column, "")).strip()
+    return text or None
+
+
+def _mast_int(row: dict[str, str] | None, column: str) -> int | None:
+    if row is None:
+        return None
+    return _parse_int_or_none(row.get(column, ""))
+
+
+def _mast_float(row: dict[str, str] | None, column: str) -> float | None:
+    if row is None:
+        return None
+    return _parse_float_or_none(row.get(column, ""))
+
+
+def _mast_bool(row: dict[str, str] | None, column: str) -> bool | None:
+    if row is None or not str(row.get(column, "")).strip():
+        return None
+    return _parse_bool(row.get(column))
+
+
+def _mast_quality_flags(row: dict[str, str] | None) -> str:
+    if row is None:
+        return ""
+    return ",".join(_dedupe_preserve_order(_split_flags(row.get("feature_quality_flags", ""))))
 
 
 def _tick_status_quality_flags(row: dict[str, str] | None) -> str:

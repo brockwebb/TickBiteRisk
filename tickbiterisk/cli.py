@@ -776,6 +776,10 @@ def model_features(
         Path("build/etl/deer-harvest/maryland_dnr_deer_harvest.csv"),
         help="Optional Maryland deer harvest CSV.",
     ),
+    mast_acorn_path: Path = typer.Option(
+        Path("build/etl/mast/maryland_dnr_mast_acorn_county_year.csv"),
+        help="Optional Maryland DNR mast/acorn county-year feature CSV.",
+    ),
     tick_status_path: Path | None = typer.Option(
         None,
         help=(
@@ -807,6 +811,7 @@ def model_features(
             contact_pressure_path if contact_pressure_path.exists() else None
         ),
         deer_harvest_path=deer_harvest_path if deer_harvest_path.exists() else None,
+        mast_acorn_path=mast_acorn_path if mast_acorn_path.exists() else None,
         tick_status_path=tick_status_path,
     )
     output = write_model_feature_matrix_output(rows, output_dir)
