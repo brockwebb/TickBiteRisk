@@ -110,9 +110,9 @@ tickbiterisk risk export-static \
   --output-dir public/data
 ```
 
-The static dashboard reads only the committed `public/data` bundle and
-`public/md_counties.geojson`. It does not need raw data, Postgres credentials,
-NOAA tokens, Census tokens, or private ETL extracts.
+The static dashboard reads only the committed `public/data` bundle, including
+`public/data/md_counties.geojson`. It does not need raw data, Postgres
+credentials, NOAA tokens, Census tokens, or private ETL extracts.
 
 Run the static dashboard locally:
 

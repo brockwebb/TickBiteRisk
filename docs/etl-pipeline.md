@@ -62,12 +62,13 @@ candidates until backtesting shows they improve the public score.
 11. `tickbiterisk etl model-features`
     - Joins Lyme outcomes, population, weather, deer, contact-pressure, and
       optional surveillance features into the county-year feature matrix.
-    - Writes `model_feature_matrix.csv`.
+    - Writes `model_features_county_year.csv`.
 
 12. `tickbiterisk etl model-design-matrix`
     - Converts the feature panel into numeric model inputs with missingness
       indicators and a schema sidecar.
-    - Writes `model_design_matrix.csv` and `model_design_matrix_schema.json`.
+    - Writes `model_design_matrix_county_year.csv` and
+      `model_design_matrix_schema.json`.
 
 13. `tickbiterisk etl model-compare`
     - Runs rolling-origin comparisons across transparent baseline and ridge

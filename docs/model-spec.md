@@ -10,11 +10,12 @@ CDC Lyme onset seasonality to make a week-level public score.
 
 Primary artifacts:
 
-- `build/etl/model-features/model_feature_matrix.csv`
-- `build/etl/design-matrix/model_design_matrix.csv`
+- `build/etl/model/model_features_county_year.csv`
+- `build/etl/model/model_design_matrix_county_year.csv`
+- `build/etl/model/model_design_matrix_schema.json`
 - `build/etl/model-comparison/model_comparison_predictions.csv`
 - `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv`
-- `public/data/risk_baseline.json`
+- `public/data/md_county_risk_weekly.json`
 
 The current public score is not weather-adjusted. Weather features are present
 in the feature matrix for model comparison and future branches, but the shipped

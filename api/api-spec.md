@@ -129,10 +129,6 @@ tickbiterisk risk lookup \
   selectors.
 - Errors are raised as CLI parameter errors with no traceback in normal use.
 
----
-
-## 3. Current Static Runtime: `tickbiterisk risk export-static`
-
 ## 3. Current Single-Bite Runtime: `tickbiterisk risk single-bite`
 
 ### 3.1. Command

@@ -33,12 +33,14 @@ boundary clearly allow redistribution.
 | `county_population_year.csv` | `tickbiterisk etl census-population` | County-year population denominators |
 | `county_reference.csv` | `tickbiterisk etl county-reference` | County FIPS, names, land area, and internal points |
 | `weather_features_weekly.csv` | `tickbiterisk etl noaa-weather-features` | Weekly weather predictors and quality flags |
-| `model_feature_matrix.csv` | `tickbiterisk etl model-features` | Model-ready joined county-year panel |
-| `model_design_matrix.csv` | `tickbiterisk etl model-design-matrix` | Numeric feature matrix and schema sidecar |
+| `model_features_county_year.csv` | `tickbiterisk etl model-features` | Model-ready joined county-year panel |
+| `model_design_matrix_county_year.csv` | `tickbiterisk etl model-design-matrix` | Numeric feature matrix |
+| `model_design_matrix_schema.json` | `tickbiterisk etl model-design-matrix` | Design-matrix schema sidecar |
 | `model_comparison_predictions.csv` | `tickbiterisk etl model-compare` | Rolling-origin predictions from candidate model branches |
 | `seasonality_baseline.csv` | `tickbiterisk etl seasonality-baseline` | CDC weekly/monthly Lyme onset share baseline |
 | `county_week_seasonal_risk_baseline.csv` | `tickbiterisk etl county-week-risk` | Product-shaped county-week relative risk rows |
-| `risk_baseline.json` | `tickbiterisk risk export-static` | Public dashboard score payload |
+| `md_county_risk_weekly.json` | `tickbiterisk risk export-static` | Public dashboard score payload |
+| `md_county_metadata.json` | `tickbiterisk risk export-static` | Public county metadata payload |
 | `model_card.json` | `tickbiterisk risk export-static` | Public model, caveat, and provenance summary |
 | `source_catalog.json` | `tickbiterisk risk export-static` | Public source and artifact metadata |
 

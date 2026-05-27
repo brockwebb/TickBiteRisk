@@ -72,6 +72,24 @@ def test_api_spec_documents_current_cli_json_contract_before_roadmap_http_api() 
         assert token in spec
 
 
+def test_api_spec_has_ordered_unique_current_runtime_sections() -> None:
+    spec = API_SPEC.read_text(encoding="utf-8")
+
+    assert spec.count("Current Static Runtime") == 1
+    assert spec.count("Current Single-Bite Runtime") == 1
+    _assert_in_order = [
+        "## 2. Current Local Runtime",
+        "## 3. Current Single-Bite Runtime",
+        "## 4. Current Static Runtime",
+        "## 5. Roadmap HTTP API",
+    ]
+    position = -1
+    for token in _assert_in_order:
+        next_position = spec.find(token, position + 1)
+        assert next_position > position, token
+        position = next_position
+
+
 def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() -> None:
     readme = README.read_text(encoding="utf-8")
     quick_start = readme.split("## data sources", maxsplit=1)[0]
@@ -237,6 +255,9 @@ def test_model_spec_leads_with_implemented_comparison_model_before_research_mode
         "Current implemented model",
         "Single-bite decision-support overlay",
         "model_comparison_predictions.csv",
+        "model_features_county_year.csv",
+        "model_design_matrix_county_year.csv",
+        "md_county_risk_weekly.json",
         "linear_blend_baseline",
         "ridge_forecast_safe",
         "not weather-adjusted",
@@ -250,6 +271,9 @@ def test_model_spec_leads_with_implemented_comparison_model_before_research_mode
         "NUTS",
         "p(τ)",
         "posterior probability",
+        "risk_baseline.json",
+        "model_feature_matrix.csv",
+        "model_design_matrix.csv",
     ]:
         assert token not in current_section
 
@@ -274,10 +298,11 @@ def test_data_sources_catalog_matches_current_v0_artifacts() -> None:
         "Current source catalog",
         "Current v0 derived artifacts",
         "Status",
-        "model_feature_matrix",
+        "model_features_county_year.csv",
         "model_comparison_predictions",
         "county_week_seasonal_risk_baseline",
-        "risk_baseline.json",
+        "md_county_risk_weekly.json",
+        "md_county_metadata.json",
     ]:
         assert token in catalog
 
@@ -286,6 +311,9 @@ def test_data_sources_catalog_matches_current_v0_artifacts() -> None:
         "lambda_weekly.parquet",
         "Posterior draws per season",
         "pipelines/fetch_ed.sh",
+        "risk_baseline.json",
+        "model_feature_matrix.csv",
+        "model_design_matrix.csv",
     ]:
         assert token not in catalog
 
@@ -322,6 +350,8 @@ def test_etl_pipeline_doc_has_current_cli_flow_without_unimplemented_lambda_stac
         "tickbiterisk etl model-features",
         "tickbiterisk etl model-compare",
         "tickbiterisk etl county-week-risk",
+        "model_features_county_year.csv",
+        "model_design_matrix_county_year.csv",
         "tickbiterisk risk export-static",
         "No live weekly ED scaler is wired into the current product",
     ]:
@@ -333,6 +363,8 @@ def test_etl_pipeline_doc_has_current_cli_flow_without_unimplemented_lambda_stac
         "PyMC incremental ADVI",
         "triggers full PyMC MCMC",
         "cron/annual.sh",
+        "model_feature_matrix.csv",
+        "model_design_matrix.csv",
     ]:
         assert token not in etl
 
