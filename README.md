@@ -1,9 +1,4 @@
-# ** THIS IS A NEW PROJECT AND BEING BUILT OUT** June 8, 2025
-# tickbiterisk
-
-> **Root file** – this README lives at repo root, not in `/docs`.  All lowercase filename per project convention.
-
----
+# TickBiteRisk
 
 ## mission
 
@@ -13,27 +8,25 @@ This project ships as self-hosted code; we do not currently provide a public API
 
 ## current build status
 
-The active implementation is a Maryland-first ETL and modeling prototype. The current code focuses on source manifest parsing, Maryland Lyme county-year reconciliation, CDC seasonality baselines, tick/vector status normalization, model feature assembly, baseline backtesting, model comparison, county-week seasonal risk baselines, runtime lookup over derived risk files, static public JSON export, and a Postgres-ready warehouse schema. The HTTP API endpoint described below is roadmap behavior; the implemented product-facing bridges today are `tickbiterisk risk lookup`, which reads the derived county-week baseline and returns a plain JSON response, and `tickbiterisk risk export-static`, which writes public-safe derived JSON files for a static web product.
+The active implementation is a Maryland-first ETL, modeling, and static
+dashboard prototype. The current code handles source cataloging, Maryland Lyme
+county-year reconciliation, CDC seasonality baselines, tick/vector status
+normalization, weather and ecological feature assembly, model comparison,
+county-week seasonal risk baselines, runtime lookup over derived risk files,
+static public JSON export, and a Postgres-ready warehouse schema.
 
-## quick start (docker)
+The implemented product-facing bridges today are:
 
-```bash
-# clone repository
-git clone https://github.com/yourhandle/tickbiterisk.git
-cd tickbiterisk
+- `tickbiterisk risk lookup`, which reads the derived county-week baseline and
+  returns plain JSON.
+- `tickbiterisk risk export-static`, which writes public-safe derived JSON files
+  for the static web product.
+- `public/`, which can be served directly or published through GitHub Pages.
 
-# future target: spin up database, model fit, and HTTP API
-docker compose up -d            # roadmap until compose/API wiring lands
-```
-
-The HTTP API and Docker deployment are roadmap behavior. Use the Python CLI
-commands below for the implemented v0 path.
-
-## quick start (python)
+## quick start (current cli)
 
 The current local Python path is the Maryland ETL plus runtime lookup against
-derived CSV artifacts. Package/server commands such as `init-data` and
-`runserver` are roadmap behavior.
+derived CSV artifacts.
 
 ```bash
 python -m pip install -e ".[dev]"
@@ -53,17 +46,34 @@ The lookup output is a relative Maryland county-week seasonal Lyme baseline on a
 1-10 scale. It is not a per-bite infection probability, diagnosis, treatment
 recommendation, or weather-adjusted forecast.
 
+## quick start (static dashboard)
+
+The committed `public/data` files are derived, public-safe artifacts. Serve the
+dashboard locally with:
+
+```bash
+python -m http.server 8000 --directory public
+```
+
+Then open `http://localhost:8000`.
+
+GitHub Pages deployment uses the committed `public/` directory and requires no
+runtime secrets or raw data access.
+
 ## data sources
 
-| feed                                             | cadence | licence          |
-| ------------------------------------------------ | ------- | ---------------- |
-| CDC Tick Surveillance CSV                        | annual  | US public domain |
-| FARS deer collisions                             | annual  | US public domain |
-| NSSP ED tick‑bite index                          | weekly  | US public domain |
-| NLCD land‑cover                                  | static  | US public domain |
-| Census PEP/intercensal population               | annual  | US public domain |
-| CAPC dog serology\*                              | monthly | CC‑BY‑NC 4.0     |
-| \*CAPC not redistributed; fetch script provided. |         |                  |
+| feed | current role |
+| --- | --- |
+| CDC Lyme public-use geography | County-year outcome spine |
+| CDC Lyme dashboard/geodata exports | Reconciliation and validation context |
+| CDC Lyme seasonality | Weekly/monthly disease-onset allocation |
+| NOAA GHCND daily observations | Historical weather feature candidates |
+| Census population and geography | Incidence denominators, county names, and land area |
+| Maryland DNR deer harvest | County-season host-pressure proxy |
+| CDC tick vector/pathogen status | Static surveillance status feature candidates |
+| Census building permits | Contact/land-use pressure proxy |
+| NLCD/MRLC land cover | Habitat source acquired for deeper feature extraction |
+| Maryland DNR mast/acorn reports | Low-confidence ecological source; cataloged, not model-default |
 
 Full details: [`/docs/data-sources.md`](docs/data-sources.md)
 
@@ -153,26 +163,18 @@ Good first issues are labelled **`help wanted`**.
 
 ## cite
 
-```
-@software{tickbiterisk,
-  title = {TickBiteRisk: Maryland-first tickborne disease risk data toolkit},
-  author = {Webb, Brock and Contributors},
-  year   = 2025,
-  url    = {https://github.com/yourhandle/tickbiterisk},
-  doi    = {10.5281/zenodo.xxxxxxx}
-}
-```
-
-(Manuscript: *arXiv:2506.xxxxx*).
+Formal citation metadata is not published yet. Until then, cite the repository
+name, commit, and data/model artifact version used for your analysis.
 
 ## ai-generated assistance
 
-Large‑language‑model tools (OpenAI GPT‑4o, June 2025) were used to accelerate code scaffolding, literature search, and first‑draft text suggestions. All AI outputs were reviewed and revised by the human authors, who take full responsibility for the final content.
+Large-language-model tools were used to accelerate code scaffolding, literature
+search, and first-draft text suggestions. All AI outputs were reviewed and
+revised by the human authors, who take full responsibility for the final
+content.
 
 ## disclaimer
 
-This project offers **informational estimates only** and is **not medical advice**.  Users should consult a healthcare professional for diagnosis or treatment decisions.
-
----
-
-*Logo & badge graphics forthcoming.*
+This project offers **informational estimates only** and is **not medical
+advice**. Users should follow CDC guidance and consult a healthcare professional
+for diagnosis or treatment decisions.

@@ -69,10 +69,37 @@ def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() ->
     readme = README.read_text(encoding="utf-8")
     quick_start = readme.split("## data sources", maxsplit=1)[0]
 
+    assert "## quick start (current cli)" in quick_start
+    assert "## quick start (static dashboard)" in quick_start
     assert "tickbiterisk risk lookup" in quick_start
     assert "tickbiterisk risk export-static" in quick_start
-    assert "roadmap behavior" in quick_start
+    assert "python -m http.server 8000 --directory public" in quick_start
+    assert "quick start (docker)" not in quick_start
+    assert "docker compose up -d" not in quick_start
     assert "curl 'http://localhost:8000/risk" not in quick_start
+
+
+def test_readme_data_sources_match_current_catalog_not_old_source_wishlist() -> None:
+    readme = README.read_text(encoding="utf-8")
+    data_sources = readme.split("## data sources", maxsplit=1)[1].split(
+        "## maryland ETL", maxsplit=1
+    )[0]
+
+    for token in [
+        "CDC Lyme public-use geography",
+        "CDC Lyme seasonality",
+        "NOAA GHCND daily observations",
+        "Maryland DNR deer harvest",
+        "Census population and geography",
+    ]:
+        assert token in data_sources
+
+    for token in [
+        "FARS deer collisions",
+        "NSSP ED tick",
+        "CAPC dog serology",
+    ]:
+        assert token not in data_sources
 
 
 def test_operational_runbook_documents_static_pages_v0_not_live_api_stack() -> None:
