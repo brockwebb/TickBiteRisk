@@ -180,7 +180,8 @@ def test_build_contact_pressure_features_calculates_denominator_rates(tmp_path) 
     assert anne_2023.population == 590000
     assert anne_2023.land_area_sqmi == 414.806
     assert anne_2023.feature_quality_flags == (
-        "construction_proxy_only,historical_partial_jurisdiction_coverage"
+        "construction_proxy_only,historical_partial_jurisdiction_coverage,"
+        "missing_construction_lag"
     )
 
 
@@ -280,6 +281,295 @@ def test_build_contact_pressure_features_flags_zero_population(tmp_path) -> None
     assert anne_2023.population == 0
     assert anne_2023.units_authorized_per_100k is None
     assert "missing_population" in anne_2023.feature_quality_flags
+
+
+def test_build_contact_pressure_features_adds_construction_lag_features(tmp_path) -> None:
+    bps = tmp_path / "building_permits.csv"
+    county_reference = tmp_path / "county_reference.csv"
+    population = tmp_path / "county_population_year.csv"
+    _write(
+        bps,
+        [
+            "county_fips",
+            "county_name",
+            "year",
+            "month",
+            "one_unit_units",
+            "two_unit_units",
+            "three_four_unit_units",
+            "five_plus_unit_units",
+            "total_units_authorized",
+            "total_value_dollars",
+            "source_id",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "Anne Arundel County",
+                "2020",
+                "12",
+                "80",
+                "0",
+                "0",
+                "0",
+                "80",
+                "40000000",
+                "census_bps_county_2020",
+                "hash2020",
+            ],
+            [
+                "24003",
+                "Anne Arundel County",
+                "2021",
+                "12",
+                "120",
+                "0",
+                "0",
+                "0",
+                "120",
+                "41000000",
+                "census_bps_county_2021",
+                "hash2021",
+            ],
+            [
+                "24003",
+                "Anne Arundel County",
+                "2023",
+                "12",
+                "180",
+                "0",
+                "0",
+                "0",
+                "180",
+                "43000000",
+                "census_bps_county_2023",
+                "hash2023",
+            ],
+        ],
+    )
+    _write(
+        county_reference,
+        [
+            "county_fips",
+            "state_fips",
+            "state",
+            "county_name",
+            "aland_sqmi",
+            "awater_sqmi",
+            "intptlat",
+            "intptlon",
+            "geography_source",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "24",
+                "MD",
+                "Anne Arundel County",
+                "100",
+                "0",
+                "38.99",
+                "-76.56",
+                "Census Gazetteer",
+                "geo",
+            ],
+        ],
+    )
+    _write(
+        population,
+        [
+            "county_fips",
+            "county_name",
+            "year",
+            "population",
+            "source_id",
+            "census_dataset",
+            "vintage",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "Anne Arundel County",
+                "2020",
+                "100000",
+                "census_population_2020",
+                "pep",
+                "2020",
+                "pop",
+            ],
+            [
+                "24003",
+                "Anne Arundel County",
+                "2021",
+                "200000",
+                "census_population_2021",
+                "pep",
+                "2021",
+                "pop",
+            ],
+            [
+                "24003",
+                "Anne Arundel County",
+                "2023",
+                "300000",
+                "census_population_2023",
+                "pep",
+                "2023",
+                "pop",
+            ],
+        ],
+    )
+
+    rows = build_contact_pressure_features(
+        building_permits_path=bps,
+        county_reference_path=county_reference,
+        population_path=population,
+    )
+
+    anne_2020 = next(row for row in rows if row.year == 2020)
+    anne_2021 = next(row for row in rows if row.year == 2021)
+    anne_2023 = next(row for row in rows if row.year == 2023)
+    assert anne_2020.units_authorized_per_sqmi_prior_year is None
+    assert anne_2020.units_authorized_per_100k_prior_year is None
+    assert anne_2020.units_authorized_per_sqmi_trailing_3yr_mean is None
+    assert anne_2020.units_authorized_per_100k_trailing_3yr_mean is None
+    assert anne_2020.units_authorized_per_sqmi_yoy_change is None
+    assert "missing_construction_lag" in anne_2020.feature_quality_flags
+    assert anne_2021.units_authorized_per_sqmi_prior_year == 0.8
+    assert anne_2021.units_authorized_per_100k_prior_year == 80.0
+    assert anne_2021.units_authorized_per_sqmi_trailing_3yr_mean == 0.8
+    assert anne_2021.units_authorized_per_100k_trailing_3yr_mean == 80.0
+    assert anne_2021.units_authorized_per_sqmi_yoy_change == 0.4
+    assert "missing_construction_lag" not in anne_2021.feature_quality_flags
+    assert anne_2023.units_authorized_per_sqmi_prior_year is None
+    assert anne_2023.units_authorized_per_100k_prior_year is None
+    assert anne_2023.units_authorized_per_sqmi_trailing_3yr_mean == 1.0
+    assert anne_2023.units_authorized_per_100k_trailing_3yr_mean == 70.0
+    assert anne_2023.units_authorized_per_sqmi_yoy_change is None
+    assert "missing_construction_lag" in anne_2023.feature_quality_flags
+
+
+def test_build_contact_pressure_features_flags_missing_prior_population_lag(
+    tmp_path,
+) -> None:
+    bps = tmp_path / "building_permits.csv"
+    county_reference = tmp_path / "county_reference.csv"
+    population = tmp_path / "county_population_year.csv"
+    _write(
+        bps,
+        [
+            "county_fips",
+            "county_name",
+            "year",
+            "month",
+            "one_unit_units",
+            "two_unit_units",
+            "three_four_unit_units",
+            "five_plus_unit_units",
+            "total_units_authorized",
+            "total_value_dollars",
+            "source_id",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "Anne Arundel County",
+                "2020",
+                "12",
+                "80",
+                "0",
+                "0",
+                "0",
+                "80",
+                "40000000",
+                "census_bps_county_2020",
+                "hash2020",
+            ],
+            [
+                "24003",
+                "Anne Arundel County",
+                "2021",
+                "12",
+                "120",
+                "0",
+                "0",
+                "0",
+                "120",
+                "41000000",
+                "census_bps_county_2021",
+                "hash2021",
+            ],
+        ],
+    )
+    _write(
+        county_reference,
+        [
+            "county_fips",
+            "state_fips",
+            "state",
+            "county_name",
+            "aland_sqmi",
+            "awater_sqmi",
+            "intptlat",
+            "intptlon",
+            "geography_source",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "24",
+                "MD",
+                "Anne Arundel County",
+                "100",
+                "0",
+                "38.99",
+                "-76.56",
+                "Census Gazetteer",
+                "geo",
+            ],
+        ],
+    )
+    _write(
+        population,
+        [
+            "county_fips",
+            "county_name",
+            "year",
+            "population",
+            "source_id",
+            "census_dataset",
+            "vintage",
+            "source_url_hash",
+        ],
+        [
+            [
+                "24003",
+                "Anne Arundel County",
+                "2021",
+                "200000",
+                "census_population_2021",
+                "pep",
+                "2021",
+                "pop",
+            ],
+        ],
+    )
+
+    rows = build_contact_pressure_features(
+        building_permits_path=bps,
+        county_reference_path=county_reference,
+        population_path=population,
+    )
+
+    anne_2021 = next(row for row in rows if row.year == 2021)
+    assert anne_2021.units_authorized_per_sqmi_prior_year == 0.8
+    assert anne_2021.units_authorized_per_100k_prior_year is None
+    assert "missing_construction_lag" in anne_2021.feature_quality_flags
 
 
 def test_build_contact_pressure_features_flags_blank_land_area(tmp_path) -> None:
