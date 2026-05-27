@@ -50,7 +50,7 @@ Current model-ready feature groups include:
 - Maryland DNR Western Maryland mast/acorn study-plot observations, joined only
   as prior-year ecology features.
 - U.S. Drought Monitor county-year summaries, labeled as same-year
-  retrospective observed drought context.
+  retrospective observed drought context plus prior-year ecology candidates.
 - EPA EnviroAtlas static county habitat fields.
 - Census BPS construction/contact pressure, including prior-year and trailing
   construction lags.
@@ -81,9 +81,10 @@ baseline, and should be read as localized ecological context rather than
 countywide or statewide mast production.
 
 The 2026-05-27 expanded feature comparison added USDM drought, EnviroAtlas
-habitat, and construction-lag features. Held-out MAE still ranked
-`linear_blend_baseline` first, with `ridge_forecast_ecology` and
-`ridge_lag_weather_ecology` worse than the simple blend. These features remain
+habitat, and construction-lag features, then added prior-year USDM drought to
+the timing-safe ecology lane. Held-out MAE still ranked
+`linear_blend_baseline` first; `ridge_forecast_ecology` worsened to 21.782782
+MAE per 100k after the prior-year drought addition. These features remain
 available for research lanes but are not promoted into the public score.
 
 ## Public score transform

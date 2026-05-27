@@ -125,7 +125,8 @@ probability or a treatment recommendation.
 - Mast/acorn values are Western Maryland study-plot observations, not statewide
   countywide mast production; model joins use only prior-year values.
 - USDM drought values are same-year retrospective observed conditions in the
-  current comparison, not a forecast-time drought forecast.
+  retrospective comparison, not a forecast-time drought forecast. Prior-year
+  USDM drought summaries are also joined as timing-safe ecology candidates.
 - EnviroAtlas habitat fields are static county context, not annual land-cover
   change.
 - Same-year weather branches are retrospective comparisons unless replaced by a
