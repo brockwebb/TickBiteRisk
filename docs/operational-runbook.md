@@ -1,5 +1,7 @@
 # TickBiteRisk – Operational Runbook
 
+**The following deployment instructions assume you (or a third-party sponsor) want to host TickBiteRisk for others. Skip this file if you’re using the toolkit solely on your own machine.**
+
 > **File location:** `/docs/operational-runbook.md`
 
 ---
