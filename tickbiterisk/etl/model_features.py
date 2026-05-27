@@ -97,6 +97,17 @@ class ModelCountyYearFeature:
     usdm_tick_season_weeks_d1_or_worse: int | None = None
     usdm_source_ids: str | None = None
     usdm_feature_quality_flags: str | None = None
+    usdm_prior_year_week_count: int | None = None
+    usdm_prior_year_dsci_mean: float | None = None
+    usdm_prior_year_dsci_max: float | None = None
+    usdm_prior_year_weeks_d0_or_worse: int | None = None
+    usdm_prior_year_weeks_d1_or_worse: int | None = None
+    usdm_prior_year_weeks_d2_or_worse: int | None = None
+    usdm_prior_year_tick_season_week_count: int | None = None
+    usdm_prior_year_tick_season_dsci_mean: float | None = None
+    usdm_prior_year_tick_season_weeks_d1_or_worse: int | None = None
+    usdm_prior_year_source_ids: str | None = None
+    usdm_prior_year_feature_quality_flags: str | None = None
     forest_pct: float | None = None
     forest_woody_wetland_pct: float | None = None
     wetland_pct: float | None = None
@@ -155,6 +166,7 @@ def build_model_feature_matrix(
         deer_row = deer.get((county_fips, year))
         mast_row = mast.get((county_fips, year))
         drought_row = drought.get((county_fips, year))
+        drought_prior_year_row = drought.get((county_fips, year - 1))
         habitat_row = habitat.get(county_fips)
         tick_status_row = tick_status.get(county_fips)
         total_cases = _parse_int(lyme["total_cases"])
@@ -173,6 +185,10 @@ def build_model_feature_matrix(
             mast_flags=_mast_quality_flags(mast_row),
             drought_missing=drought_enabled and drought_row is None,
             drought_flags=_drought_quality_flags(drought_row),
+            drought_prior_year_missing=(
+                drought_enabled and drought_prior_year_row is None
+            ),
+            drought_prior_year_flags=_drought_quality_flags(drought_prior_year_row),
             habitat_missing=habitat_enabled and habitat_row is None,
             habitat_flags=_habitat_quality_flags(habitat_row),
             tick_status_missing=tick_status_enabled and tick_status_row is None,
@@ -321,6 +337,40 @@ def build_model_feature_matrix(
                 ),
                 usdm_source_ids=_drought_text(drought_row, "source_ids"),
                 usdm_feature_quality_flags=_drought_quality_flags(drought_row),
+                usdm_prior_year_week_count=_drought_int(
+                    drought_prior_year_row, "usdm_week_count"
+                ),
+                usdm_prior_year_dsci_mean=_drought_float(
+                    drought_prior_year_row, "usdm_dsci_mean"
+                ),
+                usdm_prior_year_dsci_max=_drought_float(
+                    drought_prior_year_row, "usdm_dsci_max"
+                ),
+                usdm_prior_year_weeks_d0_or_worse=_drought_int(
+                    drought_prior_year_row, "usdm_weeks_d0_or_worse"
+                ),
+                usdm_prior_year_weeks_d1_or_worse=_drought_int(
+                    drought_prior_year_row, "usdm_weeks_d1_or_worse"
+                ),
+                usdm_prior_year_weeks_d2_or_worse=_drought_int(
+                    drought_prior_year_row, "usdm_weeks_d2_or_worse"
+                ),
+                usdm_prior_year_tick_season_week_count=_drought_int(
+                    drought_prior_year_row, "usdm_tick_season_week_count"
+                ),
+                usdm_prior_year_tick_season_dsci_mean=_drought_float(
+                    drought_prior_year_row, "usdm_tick_season_dsci_mean"
+                ),
+                usdm_prior_year_tick_season_weeks_d1_or_worse=_drought_int(
+                    drought_prior_year_row,
+                    "usdm_tick_season_weeks_d1_or_worse",
+                ),
+                usdm_prior_year_source_ids=_drought_text(
+                    drought_prior_year_row, "source_ids"
+                ),
+                usdm_prior_year_feature_quality_flags=_drought_quality_flags(
+                    drought_prior_year_row
+                ),
                 forest_pct=_habitat_float(habitat_row, "forest_pct"),
                 forest_woody_wetland_pct=_habitat_float(
                     habitat_row, "forest_woody_wetland_pct"
@@ -569,6 +619,8 @@ def _model_quality_flags(
     mast_flags: str,
     drought_missing: bool,
     drought_flags: str,
+    drought_prior_year_missing: bool,
+    drought_prior_year_flags: str,
     habitat_missing: bool,
     habitat_flags: str,
     tick_status_missing: bool,
@@ -592,6 +644,9 @@ def _model_quality_flags(
     if drought_missing:
         flags.append("missing_usdm_drought")
     flags.extend(_split_flags(drought_flags))
+    if drought_prior_year_missing:
+        flags.append("missing_usdm_drought_prior_year")
+    flags.extend(_split_flags(drought_prior_year_flags))
     if habitat_missing:
         flags.append("missing_enviroatlas_habitat")
     flags.extend(_split_flags(habitat_flags))

@@ -73,6 +73,8 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_missing_mast_index_prior_year"] == "0"
     assert mast_row["feature_usdm_dsci_mean"] == "85.5"
     assert mast_row["feature_usdm_tick_season_dsci_mean"] == "92.25"
+    assert mast_row["feature_usdm_prior_year_dsci_mean"] == "41.5"
+    assert mast_row["feature_usdm_prior_year_tick_season_dsci_mean"] == "44.25"
     assert mast_row["feature_forest_pct"] == "36.1"
     assert mast_row["feature_impervious_pct"] == "9.7"
     assert mast_row["feature_units_authorized_per_sqmi_prior_year"] == "1.5"
@@ -81,6 +83,7 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_missing_forest_pct"] == "0"
     assert mast_row["feature_missing_units_authorized_per_sqmi_prior_year"] == "0"
     assert "feature_usdm_dsci_mean" in result.schema.feature_columns
+    assert "feature_usdm_prior_year_dsci_mean" in result.schema.feature_columns
     assert "feature_forest_pct" in result.schema.feature_columns
     assert (
         "feature_units_authorized_per_sqmi_prior_year"
@@ -94,6 +97,8 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     )
     assert missing_new_row["feature_usdm_dsci_mean"] == "0.0"
     assert missing_new_row["feature_missing_usdm_dsci_mean"] == "1"
+    assert missing_new_row["feature_usdm_prior_year_dsci_mean"] == "0.0"
+    assert missing_new_row["feature_missing_usdm_prior_year_dsci_mean"] == "1"
     assert missing_new_row["feature_forest_pct"] == "0.0"
     assert missing_new_row["feature_missing_forest_pct"] == "1"
 
@@ -263,6 +268,39 @@ def _write_feature_matrix(path: Path) -> Path:
                         "usdm_county_statistics" if has_new_features else ""
                     ),
                     "usdm_feature_quality_flags": (
+                        "drought_monitor_retro_observed"
+                        if has_new_features
+                        else ""
+                    ),
+                    "usdm_prior_year_week_count": (
+                        "52" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_dsci_mean": (
+                        "41.5" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_dsci_max": "120" if has_new_features else "",
+                    "usdm_prior_year_weeks_d0_or_worse": (
+                        "10" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_weeks_d1_or_worse": (
+                        "3" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_weeks_d2_or_worse": (
+                        "1" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_tick_season_week_count": (
+                        "26" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_tick_season_dsci_mean": (
+                        "44.25" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_tick_season_weeks_d1_or_worse": (
+                        "2" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_source_ids": (
+                        "usdm_county_statistics" if has_new_features else ""
+                    ),
+                    "usdm_prior_year_feature_quality_flags": (
                         "drought_monitor_retro_observed"
                         if has_new_features
                         else ""

@@ -160,6 +160,18 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
         "feature_usdm_dsci_mean"
     )
     assert model_compare._is_forecast_ecology_feature_column(
+        "feature_usdm_prior_year_dsci_mean"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_usdm_prior_year_tick_season_dsci_mean"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_missing_usdm_prior_year_dsci_mean"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_usdm_prior_year_dsci_mean"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
         "feature_deer_harvest_per_sqmi_prior_season"
     )
     assert model_compare._is_forecast_ecology_feature_column(

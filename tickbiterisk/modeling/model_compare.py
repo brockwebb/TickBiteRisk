@@ -99,6 +99,20 @@ FORECAST_ECOLOGY_EXACT_FEATURES = {
     "feature_missing_riparian_forest_45m_pct",
     "feature_missing_riparian_forest_woody_wetland_45m_pct",
     "feature_missing_natural_land_cover_index",
+    "feature_usdm_prior_year_dsci_mean",
+    "feature_usdm_prior_year_dsci_max",
+    "feature_usdm_prior_year_weeks_d0_or_worse",
+    "feature_usdm_prior_year_weeks_d1_or_worse",
+    "feature_usdm_prior_year_weeks_d2_or_worse",
+    "feature_usdm_prior_year_tick_season_dsci_mean",
+    "feature_usdm_prior_year_tick_season_weeks_d1_or_worse",
+    "feature_missing_usdm_prior_year_dsci_mean",
+    "feature_missing_usdm_prior_year_dsci_max",
+    "feature_missing_usdm_prior_year_weeks_d0_or_worse",
+    "feature_missing_usdm_prior_year_weeks_d1_or_worse",
+    "feature_missing_usdm_prior_year_weeks_d2_or_worse",
+    "feature_missing_usdm_prior_year_tick_season_dsci_mean",
+    "feature_missing_usdm_prior_year_tick_season_weeks_d1_or_worse",
 }
 
 

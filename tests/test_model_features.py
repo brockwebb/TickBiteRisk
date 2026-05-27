@@ -404,6 +404,22 @@ def test_build_model_feature_matrix_joins_drought_habitat_and_construction_lags(
             {
                 "county_fips": "24003",
                 "county_name": "Anne Arundel County",
+                "year": "2021",
+                "usdm_week_count": "52",
+                "usdm_dsci_mean": "41.5",
+                "usdm_dsci_max": "120",
+                "usdm_weeks_d0_or_worse": "10",
+                "usdm_weeks_d1_or_worse": "3",
+                "usdm_weeks_d2_or_worse": "1",
+                "usdm_tick_season_week_count": "26",
+                "usdm_tick_season_dsci_mean": "44.25",
+                "usdm_tick_season_weeks_d1_or_worse": "2",
+                "source_ids": "usdm_county_statistics",
+                "feature_quality_flags": "drought_monitor_retro_observed",
+            },
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
                 "year": "2022",
                 "usdm_week_count": "52",
                 "usdm_dsci_mean": "85.5",
@@ -463,6 +479,11 @@ def test_build_model_feature_matrix_joins_drought_habitat_and_construction_lags(
     assert row.usdm_dsci_mean == 85.5
     assert row.usdm_dsci_max == 250
     assert row.usdm_tick_season_dsci_mean == 92.25
+    assert row.usdm_prior_year_dsci_mean == 41.5
+    assert row.usdm_prior_year_dsci_max == 120
+    assert row.usdm_prior_year_weeks_d1_or_worse == 3
+    assert row.usdm_prior_year_tick_season_dsci_mean == 44.25
+    assert row.usdm_prior_year_tick_season_weeks_d1_or_worse == 2
     assert row.forest_pct == 35.6
     assert row.impervious_pct == 11.8
     assert row.riparian_natural_45m_pct == 75.0
@@ -533,9 +554,11 @@ def test_build_model_feature_matrix_flags_missing_drought_and_habitat_when_enabl
     )
 
     assert rows[0].usdm_dsci_mean is None
+    assert rows[0].usdm_prior_year_dsci_mean is None
     assert rows[0].forest_pct is None
     flags = rows[0].model_feature_quality_flags.split(",")
     assert "missing_usdm_drought" in flags
+    assert "missing_usdm_drought_prior_year" in flags
     assert "missing_enviroatlas_habitat" in flags
 
 
