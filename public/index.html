@@ -52,6 +52,56 @@
         <div id="panel-content">
           <p>Select a county to see its relative seasonal Lyme baseline.</p>
         </div>
+        <section class="bite-calculator" aria-labelledby="bite-title">
+          <h3 id="bite-title">Attached tick check</h3>
+          <form id="bite-form">
+            <div class="bite-form-grid">
+              <label for="bite-tick-species">Tick</label>
+              <select id="bite-tick-species">
+                <option value="ixodes_scapularis">Blacklegged / deer tick</option>
+                <option value="possible_ixodes">Possibly blacklegged</option>
+                <option value="unknown">Unknown</option>
+                <option value="not_ixodes">Definitely not blacklegged</option>
+              </select>
+
+              <label for="bite-tick-stage">Stage</label>
+              <select id="bite-tick-stage">
+                <option value="nymph">Nymph</option>
+                <option value="adult">Adult</option>
+                <option value="unknown">Unknown</option>
+                <option value="larva">Larva</option>
+              </select>
+
+              <label for="bite-attachment-hours">Attached hours</label>
+              <input id="bite-attachment-hours" type="number" min="0" max="240" step="1" />
+
+              <label for="bite-engorgement">Engorgement</label>
+              <select id="bite-engorgement">
+                <option value="unknown">Unknown</option>
+                <option value="flat">Flat</option>
+                <option value="slightly_engorged">Slightly engorged</option>
+                <option value="engorged">Engorged</option>
+              </select>
+
+              <label for="bite-hours-since-removal">Hours since removal</label>
+              <input id="bite-hours-since-removal" type="number" min="0" max="720" step="1" />
+
+              <label for="bite-doxycycline-safe">Doxycycline safety</label>
+              <select id="bite-doxycycline-safe">
+                <option value="unknown">Unknown</option>
+                <option value="true">Known safe</option>
+                <option value="false">Known unsafe</option>
+              </select>
+
+              <label for="bite-tick-count">Attached ticks</label>
+              <input id="bite-tick-count" type="number" min="1" max="20" step="1" value="1" />
+            </div>
+            <button type="submit">Calculate bite score</button>
+          </form>
+          <div id="bite-result" class="bite-result" aria-live="polite">
+            <p class="muted">Use this after selecting a county and date.</p>
+          </div>
+        </section>
       </aside>
 
       <section class="county-list-section" aria-labelledby="county-list-title">

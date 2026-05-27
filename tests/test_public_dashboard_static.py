@@ -13,8 +13,27 @@ def test_dashboard_html_has_accessible_landmarks_and_data_hooks() -> None:
     assert 'id="county-list"' in html
     assert 'id="county-panel"' in html
     assert 'id="date-input"' in html
+    assert 'id="bite-form"' in html
+    assert 'id="bite-result"' in html
     assert "Informational only. Not medical advice." in html
     assert "app.js" in html
+
+
+def test_dashboard_html_has_single_bite_calculator_controls() -> None:
+    html = (PUBLIC_DIR / "index.html").read_text(encoding="utf-8")
+
+    for token in [
+        "Attached tick check",
+        'id="bite-tick-species"',
+        'id="bite-tick-stage"',
+        'id="bite-attachment-hours"',
+        'id="bite-engorgement"',
+        'id="bite-hours-since-removal"',
+        'id="bite-doxycycline-safe"',
+        'id="bite-tick-count"',
+        "Calculate bite score",
+    ]:
+        assert token in html
 
 
 def test_dashboard_css_defines_risk_classes_and_focus_styles() -> None:
@@ -48,7 +67,28 @@ def test_dashboard_javascript_has_expected_runtime_functions() -> None:
         "function renderSources",
         "function renderLoadError",
         "function safeUrl",
+        "function handleBiteSubmit",
+        "function estimateSingleBiteRisk",
+        "function renderBiteResult",
         "fetchJson",
+    ]:
+        assert token in js
+
+
+def test_dashboard_javascript_has_single_bite_scoring_logic() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "single_bite_risk_score",
+        "pep_consideration",
+        "meets_cdc_consideration_criteria",
+        "does_not_meet_cdc_consideration_criteria",
+        "partially_meets_cdc_consideration_criteria",
+        "maryland_high_incidence_geography_floor",
+        "not an absolute infection probability",
+        "function locationSeasonModifier",
+        "function pepCriteria",
+        "function pepConsideration",
     ]:
         assert token in js
 
@@ -189,5 +229,18 @@ def test_dashboard_css_styles_model_lineage_strip_compactly() -> None:
         ".lineage-grid",
         ".lineage-grid dt",
         ".lineage-grid dd",
+    ]:
+        assert token in css
+
+
+def test_dashboard_css_styles_single_bite_calculator() -> None:
+    css = (PUBLIC_DIR / "styles.css").read_text(encoding="utf-8")
+
+    for token in [
+        ".bite-calculator",
+        ".bite-form-grid",
+        ".bite-result",
+        ".criteria-list",
+        ".criteria-status",
     ]:
         assert token in css

@@ -31,6 +31,7 @@ a {
 
 button,
 input,
+select,
 summary {
   font: inherit;
 }
@@ -266,6 +267,86 @@ h1 {
 
 .flag-list li {
   margin: 0.25rem 0;
+}
+
+.bite-calculator {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.bite-calculator h3 {
+  margin-top: 0;
+}
+
+.bite-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.45rem;
+}
+
+.bite-form-grid label {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.bite-form-grid input,
+.bite-form-grid select {
+  width: 100%;
+  min-height: 2.4rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 0.45rem 0.55rem;
+}
+
+.bite-calculator button {
+  width: 100%;
+  margin-top: 0.75rem;
+  border: 1px solid #15351f;
+  border-radius: 6px;
+  background: #15351f;
+  color: #fff;
+  padding: 0.65rem 0.75rem;
+  font-weight: 700;
+}
+
+.bite-result {
+  margin-top: 1rem;
+}
+
+.bite-result h4 {
+  margin: 0 0 0.5rem;
+}
+
+.criteria-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.75rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.criteria-list li {
+  display: grid;
+  gap: 0.15rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.55rem;
+}
+
+.criteria-list small {
+  color: var(--muted);
+}
+
+.criteria-status {
+  width: max-content;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4f7f5;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .risk-unavailable {

@@ -6,6 +6,7 @@ const state = {
   selectedCounty: "24003",
   selectedWeek: 1,
   byCountyWeek: new Map(),
+  biteEstimateRequested: false,
 };
 
 const dataPaths = {
@@ -56,6 +57,7 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   setDefaultDate();
   document.getElementById("date-input").addEventListener("change", handleDateChange);
+  document.getElementById("bite-form").addEventListener("submit", handleBiteSubmit);
 
   try {
     const [weekly, counties, modelCard, sourceCatalog] = await Promise.all([
@@ -104,6 +106,13 @@ function handleDateChange(event) {
   renderMap();
   renderCountyList();
   selectCounty(state.selectedCounty);
+  if (state.biteEstimateRequested) renderBiteResult();
+}
+
+function handleBiteSubmit(event) {
+  event.preventDefault();
+  state.biteEstimateRequested = true;
+  renderBiteResult();
 }
 
 function mmwrYearWeek(dateString) {
@@ -261,6 +270,221 @@ function selectCounty(countyFips) {
     <p class="disclaimer">This is not a per-bite infection probability, diagnosis, or medical advice.</p>
   </div>`;
   updateSelectedControls();
+  if (state.biteEstimateRequested) renderBiteResult();
+}
+
+function renderBiteResult() {
+  const target = document.getElementById("bite-result");
+  const record = getRecord(state.selectedCounty);
+  if (!record) {
+    target.innerHTML = "<p>Select a county/date with an available baseline first.</p>";
+    return;
+  }
+  const result = estimateSingleBiteRisk(record, readBiteInputs());
+  const criteriaItems = result.pep_criteria
+    .map(
+      (criterion) => `<li>
+        <span class="criteria-status">${escapeHtml(criterion.status)}</span>
+        <span>${escapeHtml(readableModelName(criterion.criterion))}</span>
+        <small>${escapeHtml(criterion.explanation)}</small>
+      </li>`
+    )
+    .join("");
+
+  target.innerHTML = `<section aria-labelledby="bite-result-title">
+    <h4 id="bite-result-title">Single-bite Lyme score</h4>
+    <p><span class="score-badge ${riskClass(result.single_bite_risk_score)}">${escapeHtml(result.single_bite_risk_score)}/10</span> ${escapeHtml(result.single_bite_risk_band)}</p>
+    <p>${escapeHtml(result.risk_interpretation)}</p>
+    <p><b>CDC criteria:</b> ${escapeHtml(readableModelName(result.pep_consideration))}</p>
+    <ul class="criteria-list">${criteriaItems}</ul>
+    <p class="disclaimer">This is not an absolute infection probability, diagnosis, or treatment recommendation.</p>
+  </section>`;
+}
+
+function readBiteInputs() {
+  return {
+    tick_species: document.getElementById("bite-tick-species").value,
+    tick_stage: document.getElementById("bite-tick-stage").value,
+    attachment_hours: optionalNumber("bite-attachment-hours"),
+    engorgement: document.getElementById("bite-engorgement").value,
+    hours_since_removal: optionalNumber("bite-hours-since-removal"),
+    doxycycline_safe: optionalBoolean("bite-doxycycline-safe"),
+    tick_count: optionalNumber("bite-tick-count") || 1,
+  };
+}
+
+function estimateSingleBiteRisk(record, input) {
+  const modifiers = {
+    location_season: locationSeasonModifier(record),
+    tick_species: speciesModifier(input.tick_species),
+    tick_stage: stageModifier(input.tick_stage),
+    attachment: attachmentModifier(input.attachment_hours, input.engorgement),
+  };
+  const rawSingle = Math.min(
+    1,
+    Math.max(
+      0,
+      modifiers.location_season *
+        modifiers.tick_species *
+        modifiers.tick_stage *
+        modifiers.attachment
+    )
+  );
+  const tickCount = Math.min(20, Math.max(1, Number(input.tick_count || 1)));
+  const combined = 1 - (1 - rawSingle) ** tickCount;
+  const scoreRaw = Number((combined * 10).toFixed(6));
+  const score = Math.max(1, Math.min(10, Math.ceil(scoreRaw)));
+  const criteria = pepCriteria(record, input);
+  return {
+    single_bite_risk_score: score,
+    single_bite_risk_band: biteRiskBand(score),
+    single_bite_risk_score_raw: scoreRaw,
+    pep_consideration: pepConsideration(criteria),
+    pep_criteria: criteria,
+    evidence_modifiers: modifiers,
+    caveats: biteCaveats(record, input),
+    risk_interpretation:
+      "This score combines the selected county-week baseline with tick identity, stage, attachment, engorgement, and tick count. It is not an absolute infection probability.",
+  };
+}
+
+function locationSeasonModifier(record) {
+  const baseline = Number(record.risk_score || 1) / 10;
+  if (String(record.county_fips || "").startsWith("24")) {
+    return Math.max(baseline, 0.45);
+  }
+  return baseline;
+}
+
+function speciesModifier(species) {
+  if (species === "ixodes_scapularis") return 1;
+  if (species === "possible_ixodes") return 0.75;
+  if (species === "unknown") return 0.5;
+  return 0.05;
+}
+
+function stageModifier(stage) {
+  if (stage === "nymph") return 1;
+  if (stage === "adult") return 0.85;
+  if (stage === "larva") return 0.1;
+  return 0.7;
+}
+
+function attachmentModifier(hours, engorgement) {
+  let base = 0.7;
+  if (hours !== null && hours < 24) base = 0.15;
+  if (hours !== null && hours >= 24 && hours < 36) base = 0.45;
+  if (hours !== null && hours >= 36 && hours < 48) base = 1;
+  if (hours !== null && hours >= 48 && hours < 72) base = 1.25;
+  if (hours !== null && hours >= 72) base = 1.4;
+  if (engorgement === "flat") return Math.min(base, 0.2);
+  if (engorgement === "slightly_engorged") return Math.max(base, 0.75);
+  if (engorgement === "engorged") return Math.max(base, 1.15);
+  return base;
+}
+
+function pepCriteria(record, input) {
+  return [
+    {
+      criterion: "lyme_common_area",
+      status: String(record.county_fips || "").startsWith("24") ? "meets" : "uncertain",
+      explanation: "Maryland is treated as Lyme-common geography in this Maryland-only product.",
+    },
+    tickIdentityCriterion(input),
+    attachmentCriterion(input),
+    {
+      criterion: "removal_window",
+      status:
+        input.hours_since_removal === null
+          ? "uncertain"
+          : input.hours_since_removal <= 72
+            ? "meets"
+            : "not_met",
+      explanation: "CDC consideration is most relevant within 72 hours after removal.",
+    },
+    {
+      criterion: "doxycycline_safety",
+      status:
+        input.doxycycline_safe === null
+          ? "uncertain"
+          : input.doxycycline_safe
+            ? "meets"
+            : "not_met",
+      explanation: "A healthcare professional must decide whether doxycycline is safe.",
+    },
+  ];
+}
+
+function tickIdentityCriterion(input) {
+  let status = "uncertain";
+  if (
+    input.tick_species === "ixodes_scapularis" &&
+    (input.tick_stage === "nymph" || input.tick_stage === "adult")
+  ) {
+    status = "meets";
+  }
+  if (input.tick_species === "not_ixodes" || input.tick_stage === "larva") {
+    status = "not_met";
+  }
+  return {
+    criterion: "tick_identity",
+    status,
+    explanation: "CDC Lyme prophylaxis guidance focuses on adult or nymphal blacklegged ticks.",
+  };
+}
+
+function attachmentCriterion(input) {
+  let status = "uncertain";
+  if (
+    input.engorgement === "engorged" ||
+    (input.attachment_hours !== null && input.attachment_hours >= 36)
+  ) {
+    status = "meets";
+  }
+  if (
+    input.engorgement === "flat" ||
+    (input.attachment_hours !== null && input.attachment_hours < 24)
+  ) {
+    status = "not_met";
+  }
+  return {
+    criterion: "attachment_duration",
+    status,
+    explanation: "CDC guidance treats 36+ hours or engorgement as a key consideration.",
+  };
+}
+
+function pepConsideration(criteria) {
+  const statuses = new Set(criteria.map((criterion) => criterion.status));
+  if (statuses.size === 1 && statuses.has("meets")) {
+    return "meets_cdc_consideration_criteria";
+  }
+  if (statuses.has("not_met")) {
+    return "does_not_meet_cdc_consideration_criteria";
+  }
+  return "partially_meets_cdc_consideration_criteria";
+}
+
+function biteRiskBand(score) {
+  if (score >= 9) return "high";
+  if (score >= 7) return "elevated";
+  if (score >= 5) return "moderate";
+  if (score >= 3) return "low";
+  return "very low";
+}
+
+function biteCaveats(record, input) {
+  const caveats = [
+    "not_calibrated_absolute_probability",
+    "not_diagnosis_or_treatment_recommendation",
+  ];
+  if (String(record.county_fips || "").startsWith("24") && Number(record.risk_score) < 5) {
+    caveats.push("maryland_high_incidence_geography_floor");
+  }
+  if (input.tick_species === "not_ixodes") {
+    caveats.push("non_ixodes_lyme_vector_unlikely");
+  }
+  return caveats;
 }
 
 function renderModelLineage(record) {
@@ -442,6 +666,20 @@ function categoryLabel(value) {
 
 function formatNumber(value) {
   return Number(value).toFixed(2);
+}
+
+function optionalNumber(id) {
+  const value = document.getElementById(id).value;
+  if (value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function optionalBoolean(id) {
+  const value = document.getElementById(id).value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
 }
 
 function escapeAttribute(value) {
