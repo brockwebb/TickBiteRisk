@@ -135,6 +135,39 @@ def test_model_card_matches_weekly_export_metadata() -> None:
         "static_seasonality_prior",
         "not_weather_adjusted",
     ]
+    assert model_card["annual_prediction_source"]["artifact_type"] == (
+        "annual_prediction_branch"
+    )
+    assert model_card["annual_prediction_source"]["run_id"].startswith(
+        "model_compare_"
+    )
+    assert model_card["annual_prediction_source"]["sha256"] == (
+        weekly["selected_score_config"]["source_prediction_sha256"]
+    )
+    assert "model-comparison" in model_card["method_summary"]
+
+
+def test_source_catalog_exposes_selected_annual_prediction_branch() -> None:
+    weekly = load_public_json("md_county_risk_weekly.json")
+    source_catalog = load_public_json("source_catalog.json")
+
+    annual_prediction = next(
+        source
+        for source in source_catalog["sources"]
+        if source["source_id"] == "annual_prediction_branch"
+    )
+
+    assert annual_prediction["artifact_type"] == "annual prediction branch"
+    assert annual_prediction["model_name"] == weekly["model_name"]
+    assert annual_prediction["run_id"] == (
+        weekly["selected_score_config"]["source_prediction_run_id"]
+    )
+    assert annual_prediction["sha256"] == (
+        weekly["selected_score_config"]["source_prediction_sha256"]
+    )
+    assert annual_prediction["notes"].startswith(
+        "Selected annual prediction rows from model-comparison output"
+    )
 
 
 def test_public_guidance_links_use_http_urls() -> None:

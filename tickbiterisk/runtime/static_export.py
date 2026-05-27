@@ -362,9 +362,10 @@ def _model_card_payload(
         ],
         "clinical_disclaimer": CLINICAL_DISCLAIMER,
         "method_summary": (
-            "Annual baseline predictions apportioned by CDC national MMWR-week "
-            "Lyme onset seasonality."
+            "Selected annual model-comparison prediction rows apportioned by "
+            "CDC national MMWR-week Lyme onset seasonality."
         ),
+        "annual_prediction_source": _annual_prediction_source(first),
         "quality_flags": [
             "relative_seasonal_baseline",
             "static_seasonality_prior",
@@ -397,7 +398,24 @@ def _source_catalog_payload(
                 "redistribution": "public derived data",
                 "sha256": input_sha256,
                 "notes": (
-                    "Do not publish raw restricted or terms-unclear source extracts."
+                    "Derived from selected model-comparison annual predictions "
+                    "and CDC seasonality; do not publish raw restricted or "
+                    "terms-unclear source extracts."
+                ),
+            },
+            {
+                "source_id": "annual_prediction_branch",
+                "artifact_type": "annual prediction branch",
+                "redistribution": "public derived data",
+                "sha256": first.source_prediction_sha256,
+                "run_id": first.source_prediction_run_id,
+                "model_name": first.model_name,
+                "model_family": first.model_family,
+                "evaluation_mode": first.evaluation_mode,
+                "weather_mode": first.weather_mode,
+                "notes": (
+                    "Selected annual prediction rows from model-comparison output; "
+                    "not raw surveillance data."
                 ),
             },
             {
@@ -408,6 +426,18 @@ def _source_catalog_payload(
                 "notes": "CDC national onset seasonality; not county-specific.",
             },
         ],
+    }
+
+
+def _annual_prediction_source(record: CountyWeekRiskRecord) -> dict[str, object]:
+    return {
+        "artifact_type": "annual_prediction_branch",
+        "run_id": record.source_prediction_run_id,
+        "sha256": record.source_prediction_sha256,
+        "model_name": record.model_name,
+        "model_family": record.model_family,
+        "evaluation_mode": record.evaluation_mode,
+        "weather_mode": record.weather_mode,
     }
 
 

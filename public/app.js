@@ -256,10 +256,59 @@ function selectCounty(countyFips) {
     <p>${escapeHtml(sentenceCase(record.risk_category))} relative seasonal baseline for Lyme reports in Maryland counties like this one during this week.</p>
     <p>Predicted weekly incidence: ${formatNumber(record.predicted_weekly_incidence_per_100k)} per 100k.</p>
     <p>95% empirical interval: ${formatNumber(interval95[0])} to ${formatNumber(interval95[1])} per 100k.</p>
+    ${renderModelLineage(record)}
     ${renderFlagCaveats(record)}
     <p class="disclaimer">This is not a per-bite infection probability, diagnosis, or medical advice.</p>
   </div>`;
   updateSelectedControls();
+}
+
+function renderModelLineage(record) {
+  const annualSource =
+    (state.modelCard && state.modelCard.annual_prediction_source) || {};
+  const sourceCatalog = state.sourceCatalog || {};
+  const modelName =
+    annualSource.model_name || record.model_name || (state.weekly && state.weekly.model_name) || "unknown model";
+  const modelFamily = annualSource.model_family || record.model_family || "model";
+  const evaluationMode = annualSource.evaluation_mode || record.evaluation_mode || "";
+  const weatherMode = annualSource.weather_mode || record.weather_mode || "";
+  const sourceLabel =
+    annualSource.run_id || sourceCatalog.source_prediction_run_id
+      ? "model-comparison run"
+      : "model-comparison output";
+
+  return `<section class="lineage-strip" aria-labelledby="lineage-heading">
+    <h4 id="lineage-heading">Model source</h4>
+    <dl class="lineage-grid">
+      <div>
+        <dt>Annual model</dt>
+        <dd>${escapeHtml(readableModelName(modelName))} (${escapeHtml(readableModelName(modelFamily))})</dd>
+      </div>
+      <div>
+        <dt>Validation</dt>
+        <dd>${escapeHtml(readableModelName(evaluationMode || "rolling origin prior years"))}</dd>
+      </div>
+      <div>
+        <dt>Weather</dt>
+        <dd>${escapeHtml(readableWeatherMode(weatherMode))}</dd>
+      </div>
+      <div>
+        <dt>Source</dt>
+        <dd>${escapeHtml(sourceLabel)}</dd>
+      </div>
+    </dl>
+  </section>`;
+}
+
+function readableModelName(value) {
+  return String(value || "unknown").replaceAll("_", " ");
+}
+
+function readableWeatherMode(value) {
+  if (value === "not_used_by_lagged_model" || !value) {
+    return "not weather-adjusted";
+  }
+  return readableModelName(value);
 }
 
 function renderFlagCaveats(record) {

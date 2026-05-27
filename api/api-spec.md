@@ -1,145 +1,186 @@
-# TickBiteRisk – API Specification
+# TickBiteRisk API And Runtime Specification
 
-> **File location:** `/api/API_SPEC.md`
-
----
-
-## 1  Overview
-
-Roadmap target: a single REST endpoint returns the posterior probability that a tick bite acquired in a given U.S. county, with specified attachment duration(s), will result in Lyme disease infection.  Results include 95 % credible intervals and metadata flags indicating data freshness.
-
-Current implemented bridge: `tickbiterisk risk lookup` reads the derived Maryland county-week seasonal baseline CSV and returns local JSON for county/date lookup. That response is a relative 1-10 Lyme seasonality baseline, not the posterior per-bite probability described by this HTTP API draft.
-
-Base URL (Docker default)
-
-```
-http://localhost:8000
-```
-
-Production deployments SHOULD serve the API behind HTTPS.
+> **File location:** `/api/api-spec.md`
 
 ---
 
-## 2  Endpoint: `GET /risk`
+## 1. Overview
 
-### 2.1  Query parameters
+Current implemented local contract: `tickbiterisk risk lookup` reads the derived
+Maryland county-week seasonal risk baseline CSV and returns local JSON for a
+county/date query.
 
-| Name     | Type                           | Required                  | Example                   | Description                                                                                             |
-| -------- | ------------------------------ | ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `fips`   | string (5‑digit)               | ✅                         | `24003`                   | County FIPS code. Leading zeros allowed.                                                                |
-| `tau`    | number **or** array of numbers | ✅                         | `24`  or  `tau=12&tau=36` | Attachment duration(s) in hours. Each must be ≥0 & ≤168.                                                |
-| `k`      | integer                        | optional, default `1`     | `2`                       | Number of attached nymphs (identical τ assumed for each).                                               |
-| `date`   | `YYYY‑MM‑DD`                   | optional, default *today* | `2025‑07‑15`              | Returns risk based on priors valid for CDC MMWR week of this date. Useful for querying historical baselines. |
-| `pretty` | boolean                        | optional                  | `true`                    | If `true`, JSON is indented for human reading (no effect on content).                                   |
+That response is a relative 1-10 Lyme seasonality baseline for Maryland
+counties. It is not a per-bite infection probability, diagnosis, treatment
+recommendation, or weather-adjusted forecast.
 
-### 2.2  Successful response (`200 OK`)
+The future HTTP API described later in this document is roadmap behavior. The
+repository does not currently ship a FastAPI app, Docker API service, or
+`openapi.yaml`.
 
-```jsonc
+---
+
+## 2. Current Local Runtime: `tickbiterisk risk lookup`
+
+### 2.1. Command
+
+```bash
+tickbiterisk risk lookup \
+  --county-fips 24003 \
+  --date 2026-05-26 \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --pretty
+```
+
+### 2.2. Parameters
+
+| Name | Required | Example | Description |
+| --- | --- | --- | --- |
+| `--county-fips` | yes | `24003` | Five-digit Maryland county FIPS code. |
+| `--date` | no | `2026-05-26` | Calendar date converted to CDC MMWR year/week. Defaults to today. |
+| `--scores-path` | no | `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv` | Derived county-week score CSV. |
+| `--model-name` | no | `linear_blend_baseline` | Annual prediction model branch. |
+| `--seasonality-source-id` | no | `cdc_seasonality_week_2023` | Weekly seasonality branch. |
+| `--benchmark-quantile` | no | `0.95` | Optional score-scale selector when multiple scale branches coexist. |
+| `--headroom-multiplier` | no | `1.2` | Optional score-scale selector when multiple scale branches coexist. |
+| `--score-denominator` | no | `3.659725` | Optional exact score-scale denominator selector. |
+| `--source-prediction-run-id` | no | `model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0` | Optional annual prediction source selector. |
+| `--source-prediction-sha256` | no | SHA-256 string | Optional annual prediction artifact selector. |
+| `--source-seasonality-sha256` | no | SHA-256 string | Optional seasonality artifact selector. |
+| `--pretty` | no | `--pretty` | Pretty-print JSON output. |
+
+### 2.3. Successful Response Shape
+
+```json
 {
-  "fips": "24003",
-  "tau": [24],
-  "k": 1,
-  "date": "2025-07-15",
-  "risk": [0.022],
-  "ci95": [[0.011, 0.041]],
-  "theta_source": "observed",      // 'observed' | 'forecast' | 'static'
-  "lambda_source": "forecast",     // same enum
-  "last_theta_update": "2024-11-20",
-  "last_lambda_update": "2025-07-07",
-  "version": "v1.0.0"
+  "county_fips": "24003",
+  "county_name": "Anne Arundel County",
+  "query_date": "2026-05-26",
+  "mmwr_year": 2026,
+  "mmwr_week": 21,
+  "data_year": 2023,
+  "model_name": "linear_blend_baseline",
+  "model_family": "ensemble",
+  "target_definition": "lyme_incidence_per_100k",
+  "feature_set": "historical_outcome_baselines",
+  "evaluation_mode": "rolling_origin_prior_years",
+  "weather_mode": "not_used_by_lagged_model",
+  "seasonality_source_id": "cdc_seasonality_week_2023",
+  "period_label": "MMWR Week 21",
+  "risk_score": 1,
+  "risk_category": "very_low",
+  "risk_score_raw": 1.23,
+  "predicted_weekly_incidence_per_100k": 0.45,
+  "predicted_weekly_incidence_80_interval": [0.33, 0.51],
+  "predicted_weekly_incidence_95_interval": [0.28, 0.55],
+  "predicted_weekly_cases": 2.67,
+  "predicted_annual_incidence_per_100k": 78.0,
+  "score_scale": {
+    "benchmark_quantile": 0.95,
+    "headroom_multiplier": 1.2,
+    "score_denominator": 3.659725
+  },
+  "source_metadata": {
+    "source_prediction_run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0",
+    "source_prediction_sha256": "0f4cfc8ba65722e09da63dbc7eecd61d010b3cf8a298515451ba6b31d6787250",
+    "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74"
+  },
+  "feature_quality_flags": [
+    "relative_seasonal_baseline",
+    "static_seasonality_prior",
+    "not_weather_adjusted"
+  ],
+  "backtest_assumption_flags": [
+    "observational_not_causal",
+    "intervention_history_unmodeled",
+    "surveillance_reporting_sensitive"
+  ],
+  "data_quality_flags": [
+    "relative_seasonal_baseline",
+    "requested_year_unavailable",
+    "using_latest_available_year"
+  ],
+  "score_interpretation": "Relative seasonal Lyme baseline on a 1-10 scale. This is not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.",
+  "clinical_disclaimer": "TickBiteRisk is for informational and educational purposes only...",
+  "guidance_links": [
+    {
+      "title": "CDC: What to do after a tick bite",
+      "url": "https://www.cdc.gov/ticks/after-a-tick-bite/index.html"
+    }
+  ]
 }
 ```
 
-*Elements `risk` and `ci95` are arrays aligned with `tau` order.*
+### 2.4. Runtime Behavior
 
-### 2.3  Error responses
-
-| Status                    | JSON payload                               | Typical cause                   |
-| ------------------------- | ------------------------------------------ | ------------------------------- |
-| `400 Bad Request`         | `{ "detail": "tau must be 0–168 hours" }`  | Validation failed               |
-| `404 Not Found`           | `{ "detail": "Unknown FIPS code" }`        | Non‑existent county             |
-| `503 Service Unavailable` | `{ "detail": "Model priors unavailable" }` | Postgres down or priors missing |
-
-All errors follow FastAPI’s Problem Details format (`detail`, optional `type`).
+- Dates use CDC MMWR week boundaries.
+- If the query MMWR year exists in the selected derived artifact, the response
+  uses that year and includes `exact_baseline_year`.
+- If the query MMWR year is unavailable, the response uses the latest available
+  baseline for the same county/week and includes `requested_year_unavailable`
+  and `using_latest_available_year`.
+- If multiple score-scale branches overlap, callers must provide score-scale
+  selectors.
+- If multiple source branches overlap, callers must provide source run/hash
+  selectors.
+- Errors are raised as CLI parameter errors with no traceback in normal use.
 
 ---
 
-## 3  OpenAPI schema (excerpt)
+## 3. Current Static Runtime: `tickbiterisk risk export-static`
 
-```yaml
-openapi: 3.1.0
-info:
-  title: TickBiteRisk API
-  version: 1.0.0
-paths:
-  /risk:
-    get:
-      summary: Per‑bite Lyme probability
-      parameters:
-        - in: query
-          name: fips
-          schema: {type: string, pattern: "^\d{5}$"}
-          required: true
-        - in: query
-          name: tau
-          schema: {type: array, items: {type: number}}
-          style: form
-          explode: true
-          required: true
-        - in: query
-          name: k
-          schema: {type: integer, minimum: 1}
-          required: false
-        - in: query
-          name: date
-          schema: {type: string, format: date}
-          required: false
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RiskResponse'
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '404': { $ref: '#/components/responses/NotFound' }
-components:
-  schemas:
-    RiskResponse:
-      type: object
-      properties:
-        fips: {type: string}
-        tau: {type: array, items: {type: number}}
-        k: {type: integer}
-        date: {type: string, format: date}
-        risk: {type: array, items: {type: number}}
-        ci95:
-          type: array
-          items:
-            type: array
-            items: {type: number}
-            minItems: 2
-            maxItems: 2
-        theta_source: {type: string}
-        lambda_source: {type: string}
-        last_theta_update: {type: string, format: date}
-        last_lambda_update: {type: string, format: date}
-        version: {type: string}
-  responses:
-    BadRequest:
-      description: Bad Request
-      content:
-        application/json:
-          schema: {type: object, properties: {detail: {type: string}}}
-    NotFound:
-      description: Not Found
-      content:
-        application/json:
-          schema: {type: object, properties: {detail: {type: string}}}
+```bash
+tickbiterisk risk export-static \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --output-dir public/data
 ```
 
-Full YAML lives at `/api/openapi.yaml`; FastAPI auto‑serves interactive docs at `/docs`.
+The static export writes:
+
+- `md_county_risk_weekly.json`
+- `md_county_metadata.json`
+- `model_card.json`
+- `source_catalog.json`
+- `static_export_manifest.json`
+
+The static bundle publishes one selected model/source/scale branch, one latest
+available row per county/MMWR week, CDC guidance links, model/source metadata,
+and plain-language caveats. It does not publish raw data, private warehouse
+tables, credentials, or ambiguous branches.
 
 ---
 
-*Last updated: 2025‑06‑08 (draft v0.1)*
+## 4. Roadmap HTTP API
+
+The roadmap HTTP API may eventually expose per-bite Lyme probability estimates
+using location, attachment duration, tick species/stage, and calibrated
+ecological features. This is not implemented in v0.
+
+Possible future endpoint:
+
+```text
+GET /risk?fips=24003&tau=24
+```
+
+Possible future parameters:
+
+| Name | Type | Required | Description |
+| --- | --- | --- | --- |
+| `fips` | string | yes | County FIPS code. |
+| `tau` | number or repeated number | yes | Attachment duration in hours. |
+| `k` | integer | no | Number of attached ticks. |
+| `date` | `YYYY-MM-DD` | no | Calendar date for MMWR week and seasonal context. |
+| `pretty` | boolean | no | Pretty-print JSON output. |
+
+Possible future response concepts:
+
+- per-bite infection probability,
+- uncertainty or credible interval,
+- model/source metadata,
+- explicit clinical caveats and CDC guidance links.
+
+Before this HTTP API is built, it needs separate implementation, validation,
+security review, dependency wiring, OpenAPI generation, and product wording
+review.
+
+*Last updated: 2026-05-27*

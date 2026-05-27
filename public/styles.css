@@ -211,6 +211,40 @@ h1 {
   margin-bottom: 0.5rem;
 }
 
+.lineage-strip {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border-left: 4px solid #4f6f52;
+  background: #f3f8f5;
+}
+
+.lineage-strip h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.lineage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.lineage-grid div {
+  min-width: 0;
+}
+
+.lineage-grid dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.lineage-grid dd {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+}
+
 .flag-caveats {
   margin: 1rem 0;
   padding: 0.75rem;

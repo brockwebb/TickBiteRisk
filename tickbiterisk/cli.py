@@ -128,6 +128,16 @@ from tickbiterisk.etl.weather_features import (
 from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
 from tickbiterisk.modeling.backtest import BacktestInputError, run_baseline_backtests
 from tickbiterisk.modeling.backtest_build import write_model_backtest_outputs
+from tickbiterisk.modeling.design_matrix import (
+    ModelDesignMatrixInputError,
+    build_model_design_matrix,
+)
+from tickbiterisk.modeling.design_matrix_build import write_model_design_matrix_outputs
+from tickbiterisk.modeling.model_compare import (
+    ModelComparisonInputError,
+    run_model_comparison,
+)
+from tickbiterisk.modeling.model_compare_build import write_model_comparison_outputs
 from tickbiterisk.modeling.risk_score import (
     RiskScoreInputError,
     build_seasonal_risk_scores,
@@ -761,11 +771,126 @@ def model_backtest(
     )
 
 
+@etl_app.command("model-design-matrix")
+def model_design_matrix(
+    model_features_path: Path = typer.Option(
+        Path("build/etl/model/model_features_county_year.csv"),
+        help="Input rich model feature matrix CSV.",
+    ),
+    lookback_years: int = typer.Option(
+        5,
+        help="Maximum prior county years used for lagged outcome features.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/model"),
+        help="Output directory for numeric model design matrix artifacts.",
+    ),
+) -> None:
+    if not model_features_path.exists():
+        raise typer.BadParameter(
+            f"Model features file not found: {model_features_path}"
+        )
+    if lookback_years < 1:
+        raise typer.BadParameter("lookback-years must be at least 1")
+
+    try:
+        result = build_model_design_matrix(
+            model_features_path=model_features_path,
+            lookback_years=lookback_years,
+        )
+    except ModelDesignMatrixInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_model_design_matrix_outputs(result, output_dir)
+    typer.echo(f"Wrote {len(result.rows)} model design matrix row(s) to {outputs.matrix_path}")
+    typer.echo(f"Wrote model design matrix schema to {outputs.schema_path}")
+
+
+@etl_app.command("model-compare")
+def model_compare(
+    design_matrix_path: Path = typer.Option(
+        Path("build/etl/model/model_design_matrix_county_year.csv"),
+        help="Input numeric model design matrix CSV.",
+    ),
+    start_year: int = typer.Option(
+        2007,
+        help="First held-out test year to evaluate.",
+    ),
+    end_year: int | None = typer.Option(
+        None,
+        help="Last held-out test year to evaluate. Defaults to max year in input.",
+    ),
+    min_train_years: int = typer.Option(
+        5,
+        help="Minimum prior county years required for model comparison.",
+    ),
+    ridge_alpha: float = typer.Option(
+        1.0,
+        help="Ridge penalty for the regularized linear comparison model.",
+    ),
+    shrinkage_strength: float = typer.Option(
+        5.0,
+        help="Pseudo-count strength for empirical Bayes county shrinkage.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/model-comparison"),
+        help="Output directory for model comparison artifacts.",
+    ),
+    append: bool = typer.Option(
+        False,
+        "--append/--replace",
+        help="Append to existing comparison artifacts with key-based dedupe, or replace.",
+    ),
+) -> None:
+    if not design_matrix_path.exists():
+        raise typer.BadParameter(
+            f"Model design matrix file not found: {design_matrix_path}"
+        )
+    if min_train_years < 1:
+        raise typer.BadParameter("min-train-years must be at least 1")
+    if ridge_alpha <= 0:
+        raise typer.BadParameter("ridge-alpha must be greater than 0")
+    if shrinkage_strength < 0:
+        raise typer.BadParameter("shrinkage-strength must be non-negative")
+    if end_year is not None and start_year > end_year:
+        raise typer.BadParameter("start-year must be less than or equal to end-year")
+
+    try:
+        result = run_model_comparison(
+            design_matrix_path=design_matrix_path,
+            start_year=start_year,
+            end_year=end_year,
+            min_train_years=min_train_years,
+            ridge_alpha=ridge_alpha,
+            shrinkage_strength=shrinkage_strength,
+        )
+    except ModelComparisonInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_model_comparison_outputs(result, output_dir, append=append)
+    typer.echo(f"Wrote 1 model comparison run row(s) to {outputs.runs_path}")
+    typer.echo(
+        f"Wrote {len(result.predictions)} model comparison prediction row(s) to "
+        f"{outputs.predictions_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.metrics)} model comparison metric row(s) to "
+        f"{outputs.metrics_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.summary)} model comparison summary row(s) to "
+        f"{outputs.summary_path}"
+    )
+
+
 @etl_app.command("county-week-risk")
 def county_week_risk(
-    backtest_predictions_path: Path = typer.Option(
-        Path("build/etl/backtest/model_backtest_predictions.csv"),
-        help="Input backtest prediction CSV with annual county predictions.",
+    predictions_path: Path = typer.Option(
+        Path("build/etl/model-comparison/model_comparison_predictions.csv"),
+        "--predictions-path",
+        "--backtest-predictions-path",
+        help=(
+            "Input annual county prediction CSV from model comparison or "
+            "legacy backtest outputs."
+        ),
     ),
     seasonality_baseline_path: Path = typer.Option(
         Path("build/etl/seasonality/seasonality_baseline.csv"),
@@ -773,7 +898,7 @@ def county_week_risk(
     ),
     model_name: str = typer.Option(
         "linear_blend_baseline",
-        help="Annual backtest model branch to convert into weekly risk scores.",
+        help="Annual prediction model branch to convert into weekly risk scores.",
     ),
     seasonality_source_id: str = typer.Option(
         "cdc_seasonality_week_2023",
@@ -800,9 +925,9 @@ def county_week_risk(
         ),
     ),
 ) -> None:
-    if not backtest_predictions_path.exists():
+    if not predictions_path.exists():
         raise typer.BadParameter(
-            f"Backtest predictions file not found: {backtest_predictions_path}"
+            f"Annual predictions file not found: {predictions_path}"
         )
     if not seasonality_baseline_path.exists():
         raise typer.BadParameter(
@@ -811,7 +936,7 @@ def county_week_risk(
 
     try:
         result = build_seasonal_risk_scores(
-            predictions_path=backtest_predictions_path,
+            predictions_path=predictions_path,
             seasonality_baseline_path=seasonality_baseline_path,
             model_name=model_name,
             seasonality_source_id=seasonality_source_id,

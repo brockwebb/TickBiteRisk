@@ -1,0 +1,138 @@
+from pathlib import Path
+
+
+README = Path("README.md")
+API_SPEC = Path("api/api-spec.md")
+ARCHITECTURE = Path("docs/architecture.md")
+RUNBOOK = Path("docs/operational-runbook.md")
+USER_GUIDE = Path("docs/user-guide.md")
+
+
+def test_user_guide_matches_implemented_maryland_baseline_product() -> None:
+    guide = USER_GUIDE.read_text(encoding="utf-8")
+
+    for token in [
+        "relative county-week seasonal Lyme baseline",
+        "not a per-bite infection probability",
+        "CDC MMWR week",
+        "tickbiterisk risk lookup",
+        "tickbiterisk risk export-static",
+        "Informational and educational only",
+        "Follow CDC guidance",
+    ]:
+        assert token in guide
+
+
+def test_user_guide_does_not_present_roadmap_api_as_live_medical_guidance() -> None:
+    guide = USER_GUIDE.read_text(encoding="utf-8")
+
+    forbidden_tokens = [
+        "Posterior mean probability the bite transmits Lyme disease",
+        "most physicians consider single-dose doxycycline prophylaxis reasonable",
+        "Dashboard users simply pick county and drag the",
+        "https://api.tickbiterisk.org/risk",
+    ]
+    for token in forbidden_tokens:
+        assert token not in guide
+
+
+def test_api_spec_documents_current_cli_json_contract_before_roadmap_http_api() -> None:
+    spec = API_SPEC.read_text(encoding="utf-8")
+
+    for token in [
+        "Current implemented local contract",
+        "tickbiterisk risk lookup",
+        "county_fips",
+        "query_date",
+        "mmwr_year",
+        "mmwr_week",
+        "risk_score",
+        "model_family",
+        "feature_set",
+        "evaluation_mode",
+        "weather_mode",
+        "source_metadata",
+        "not a per-bite infection probability",
+        "Roadmap HTTP API",
+    ]:
+        assert token in spec
+
+
+def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() -> None:
+    readme = README.read_text(encoding="utf-8")
+    quick_start = readme.split("## data sources", maxsplit=1)[0]
+
+    assert "tickbiterisk risk lookup" in quick_start
+    assert "tickbiterisk risk export-static" in quick_start
+    assert "roadmap behavior" in quick_start
+    assert "curl 'http://localhost:8000/risk" not in quick_start
+
+
+def test_operational_runbook_documents_static_pages_v0_not_live_api_stack() -> None:
+    runbook = RUNBOOK.read_text(encoding="utf-8")
+
+    for token in [
+        "V0 static dashboard",
+        "GitHub Pages",
+        "public/data",
+        ".github/workflows/pages.yml",
+        "no runtime secrets",
+        "tickbiterisk risk export-static",
+        "python -m http.server",
+    ]:
+        assert token in runbook
+
+    forbidden_tokens = [
+        "FastAPI",
+        "PagerDuty",
+        "Prometheus",
+        "pg_restore",
+        "posterior NetCDF",
+        "GET /risk?fips=24003&tau=24",
+    ]
+    for token in forbidden_tokens:
+        assert token not in runbook
+
+
+def test_architecture_doc_leads_with_static_first_v0_pipeline() -> None:
+    architecture = ARCHITECTURE.read_text(encoding="utf-8")
+
+    for token in [
+        "Static-first v0 architecture",
+        "model_comparison_predictions.csv",
+        "county_week_seasonal_risk_baseline.csv",
+        "public/data",
+        "public/app.js",
+        "GitHub Pages",
+        "no raw data",
+        "Future service architecture",
+    ]:
+        assert token in architecture
+
+    first_section = architecture.split("## Future service architecture", maxsplit=1)[0]
+    for token in ["FastAPI", "PostGIS", "PyMC"]:
+        assert token not in first_section
+
+
+def test_public_modeling_docs_do_not_overclaim_unimplemented_model_lanes() -> None:
+    docs_text = "\n".join(
+        [
+            README.read_text(encoding="utf-8"),
+            Path("docs/data-manifest.md").read_text(encoding="utf-8"),
+            Path("docs/etl-pipeline.md").read_text(encoding="utf-8"),
+        ]
+    )
+
+    forbidden_tokens = [
+        "consumed by the Bayesian model",
+        "for Bayesian, linear, random forest, and ensemble lanes",
+        "for Bayesian, linear, random-forest, or ensemble modeling",
+    ]
+    for token in forbidden_tokens:
+        assert token not in docs_text
+
+    for token in [
+        "stdlib baselines, ridge profiles, empirical-Bayes shrinkage, and future model lanes",
+        "current v0 model comparison",
+    ]:
+        assert token in docs_text

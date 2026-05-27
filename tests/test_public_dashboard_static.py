@@ -42,6 +42,9 @@ def test_dashboard_javascript_has_expected_runtime_functions() -> None:
         "function renderCountyList",
         "function renderMap",
         "function selectCounty",
+        "function renderModelLineage",
+        "function readableModelName",
+        "function readableWeatherMode",
         "function renderSources",
         "function renderLoadError",
         "function safeUrl",
@@ -128,6 +131,24 @@ def test_dashboard_javascript_renders_deduplicated_flag_caveats_in_county_panel(
         assert token in js
 
 
+def test_dashboard_javascript_renders_model_lineage_in_county_panel() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "function renderModelLineage",
+        "annual_prediction_source",
+        "Model source",
+        "model-comparison run",
+        "model_family",
+        "evaluation_mode",
+        "weather_mode",
+        "not weather-adjusted",
+        "<dl class=\"lineage-grid\">",
+        "${renderModelLineage(record)}",
+    ]:
+        assert token in js
+
+
 def test_dashboard_javascript_escapes_panel_values_and_sanitizes_links() -> None:
     js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
 
@@ -155,5 +176,18 @@ def test_dashboard_css_styles_flag_caveats_without_visual_noise() -> None:
         ".flag-caveats h4",
         ".flag-list",
         ".flag-list li",
+    ]:
+        assert token in css
+
+
+def test_dashboard_css_styles_model_lineage_strip_compactly() -> None:
+    css = (PUBLIC_DIR / "styles.css").read_text(encoding="utf-8")
+
+    for token in [
+        ".lineage-strip",
+        ".lineage-strip h4",
+        ".lineage-grid",
+        ".lineage-grid dt",
+        ".lineage-grid dd",
     ]:
         assert token in css

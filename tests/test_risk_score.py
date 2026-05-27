@@ -85,6 +85,33 @@ def test_build_seasonal_risk_scores_filters_to_requested_model(
     assert len(result.rows) == 4
 
 
+def test_build_seasonal_risk_scores_reads_model_comparison_predictions(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_model_comparison_predictions(
+        tmp_path / "model_comparison_predictions.csv"
+    )
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+
+    result = build_seasonal_risk_scores(
+        predictions_path=predictions_path,
+        seasonality_baseline_path=seasonality_path,
+        model_name="ridge_forecast_safe",
+    )
+
+    assert result.scale.model_name == "ridge_forecast_safe"
+    assert result.scale.scale_quality_flags == "relative_to_maryland_prediction_distribution"
+    assert len(result.rows) == 4
+    first = result.rows[0]
+    assert first.source_prediction_run_id == "compare-run"
+    assert first.model_family == "regularized_linear"
+    assert first.feature_set == "safe_numeric_design_matrix"
+    assert first.evaluation_mode == "rolling_origin_prior_years"
+    assert first.weather_mode == "not_used_by_forecast_safe_model"
+    assert first.predicted_annual_cases == 11.25
+    assert "surveillance_reporting_sensitive" in first.backtest_assumption_flags
+
+
 def test_build_seasonal_risk_scores_filters_to_requested_seasonality_source(
     tmp_path: Path,
 ) -> None:
@@ -130,7 +157,7 @@ def test_build_seasonal_risk_scores_fails_when_model_missing(
             model_name="missing_model",
         )
     except RiskScoreInputError as exc:
-        assert "No backtest predictions found for model_name=missing_model" in str(exc)
+        assert "No annual predictions found for model_name=missing_model" in str(exc)
     else:
         raise AssertionError("Expected missing model to fail")
 
@@ -372,6 +399,16 @@ def _write_predictions(
     return _write_csv(path, rows)
 
 
+def _write_model_comparison_predictions(path: Path) -> Path:
+    return _write_csv(
+        path,
+        [
+            _model_comparison_prediction_row("24001", "County 24001", "45.0", "11.25"),
+            _model_comparison_prediction_row("24003", "County 24003", "30.0", "7.5"),
+        ],
+    )
+
+
 def _prediction_row(
     county_fips: str,
     county_name: str,
@@ -393,6 +430,45 @@ def _prediction_row(
         "model_feature_quality_flags": "missing_deer_harvest_prior_season",
         "backtest_assumption_flags": (
             "observational_not_causal,intervention_history_unmodeled"
+        ),
+    }
+
+
+def _model_comparison_prediction_row(
+    county_fips: str,
+    county_name: str,
+    predicted_incidence: str,
+    predicted_cases: str,
+) -> dict[str, str]:
+    return {
+        "run_id": "compare-run",
+        "model_name": "ridge_forecast_safe",
+        "model_family": "regularized_linear",
+        "target_definition": "lyme_incidence_per_100k",
+        "feature_set": "safe_numeric_design_matrix",
+        "feature_profile": "forecast_safe_lagged",
+        "evaluation_mode": "rolling_origin_prior_years",
+        "weather_mode": "not_used_by_forecast_safe_model",
+        "source_file_sha256": "b" * 64,
+        "county_fips": county_fips,
+        "county_name": county_name,
+        "test_year": "2020",
+        "train_start_year": "1993",
+        "train_end_year": "2019",
+        "train_row_count": "100",
+        "train_county_count": "24",
+        "actual_cases": "10",
+        "actual_population": "25000",
+        "actual_incidence_per_100k": "40.0",
+        "predicted_cases": predicted_cases,
+        "predicted_incidence_per_100k": predicted_incidence,
+        "residual_incidence_per_100k": "-5.0",
+        "absolute_error_incidence_per_100k": "5.0",
+        "residual_cases": "-1.25",
+        "absolute_error_cases": "1.25",
+        "model_feature_quality_flags": "current_status_retrospective_proxy",
+        "comparison_assumption_flags": (
+            "observational_not_causal,surveillance_reporting_sensitive"
         ),
     }
 

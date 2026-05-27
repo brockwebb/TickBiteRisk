@@ -160,7 +160,7 @@ The baseline is a national disease-onset prior, not a county-specific predictor.
 
 The system must convert annual held-out Lyme prediction rows into a product-shaped county-week risk baseline by combining:
 
-- one selected annual model branch from `model_backtest_predictions.csv`.
+- one selected annual model branch from `model_comparison_predictions.csv` or a legacy `model_backtest_predictions.csv` artifact.
 - one selected weekly seasonality branch from `seasonality_baseline.csv`.
 - an explicit relative score scale defined by benchmark quantile and headroom multiplier.
 
@@ -306,7 +306,7 @@ Display categories:
 - `7-8`: high
 - `9-10`: very high
 
-The first product-shaped risk artifact is a relative county-week seasonal baseline. It combines annual baseline backtest predictions with the CDC national MMWR-week disease-onset curve and maps the resulting weekly incidence estimate to the 1-10 scale. It must be labeled as `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted` until weather, habitat, host, and intervention modifiers are explicitly added.
+The first product-shaped risk artifact is a relative county-week seasonal baseline. It combines a selected annual prediction branch, currently from the model-comparison artifact by default, with the CDC national MMWR-week disease-onset curve and maps the resulting weekly incidence estimate to the 1-10 scale. It must be labeled as `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted` until weather, habitat, host, and intervention modifiers are explicitly added.
 
 The first runtime surfaces for this score are the local `tickbiterisk risk lookup` command and the `tickbiterisk risk export-static` public JSON bundle. Both preserve the non-medical, relative-baseline framing.
 
@@ -426,7 +426,7 @@ The next build slice is accepted when:
 - Weather acquisition has a runnable small-range fixture path.
 - CDC Lyme seasonality baselines can be materialized for monthly and MMWR-week disease-onset curves.
 - At least one baseline backtest can run on a Maryland county-year panel.
-- A county-week seasonal risk baseline can be materialized from baseline backtest predictions and CDC MMWR-week seasonality.
+- A county-week seasonal risk baseline can be materialized from model-comparison predictions and CDC MMWR-week seasonality.
 
 ## 10. Open Questions
 

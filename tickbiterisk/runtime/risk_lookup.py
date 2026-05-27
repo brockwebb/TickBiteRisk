@@ -33,6 +33,11 @@ REQUIRED_SCORE_COLUMNS = [
     "source_prediction_sha256",
     "source_seasonality_sha256",
     "model_name",
+    "model_family",
+    "target_definition",
+    "feature_set",
+    "evaluation_mode",
+    "weather_mode",
     "county_fips",
     "county_name",
     "year",
@@ -73,6 +78,11 @@ class CountyWeekRiskRecord:
     source_prediction_sha256: str
     source_seasonality_sha256: str
     model_name: str
+    model_family: str
+    target_definition: str
+    feature_set: str
+    evaluation_mode: str
+    weather_mode: str
     county_fips: str
     county_name: str
     year: int
@@ -111,6 +121,11 @@ class CountyWeekRiskResponse:
     mmwr_week: int
     data_year: int
     model_name: str
+    model_family: str
+    target_definition: str
+    feature_set: str
+    evaluation_mode: str
+    weather_mode: str
     seasonality_source_id: str
     period_label: str
     risk_score: int
@@ -277,6 +292,11 @@ class RiskLookupStore:
             mmwr_week=week,
             data_year=record.year,
             model_name=record.model_name,
+            model_family=record.model_family,
+            target_definition=record.target_definition,
+            feature_set=record.feature_set,
+            evaluation_mode=record.evaluation_mode,
+            weather_mode=record.weather_mode,
             seasonality_source_id=record.seasonality_source_id,
             period_label=record.period_label,
             risk_score=record.risk_score,
@@ -356,6 +376,11 @@ def _score_record_from_row(row: dict[str, str]) -> CountyWeekRiskRecord:
         source_prediction_sha256=row["source_prediction_sha256"],
         source_seasonality_sha256=row["source_seasonality_sha256"],
         model_name=row["model_name"],
+        model_family=row["model_family"],
+        target_definition=row["target_definition"],
+        feature_set=row["feature_set"],
+        evaluation_mode=row["evaluation_mode"],
+        weather_mode=row["weather_mode"],
         county_fips=_normalize_fips(row["county_fips"]),
         county_name=row["county_name"],
         year=_parse_int(row["year"], "year"),

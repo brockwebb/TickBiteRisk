@@ -33,6 +33,11 @@ def test_lookup_returns_county_date_response_with_disclaimer_and_guidance(
     assert response.mmwr_year == 2023
     assert response.mmwr_week == 1
     assert response.data_year == 2023
+    assert response.model_family == "ensemble"
+    assert response.target_definition == "lyme_incidence_per_100k"
+    assert response.feature_set == "historical_outcome_baselines"
+    assert response.evaluation_mode == "forecast_prior_year"
+    assert response.weather_mode == "not_used_by_baseline"
     assert response.risk_score == 7
     assert response.risk_category == "high"
     assert response.predicted_weekly_incidence_per_100k == 2.5
@@ -220,7 +225,7 @@ def _score_row(
         "source_prediction_sha256": "a" * 64,
         "source_seasonality_sha256": "b" * 64,
         "model_name": "linear_blend_baseline",
-        "model_family": "baseline",
+        "model_family": "ensemble",
         "target_definition": "lyme_incidence_per_100k",
         "feature_set": "historical_outcome_baselines",
         "evaluation_mode": "forecast_prior_year",

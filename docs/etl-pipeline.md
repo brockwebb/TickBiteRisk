@@ -2,7 +2,10 @@
 
 > **File location:** `docs/etl-pipeline.md`
 
-The ETL layer converts raw public datasets into tidy county tables and covariates consumed by the Bayesian model.  Each feed is 100 % reproducible from public URLs—no credentials required except where noted.
+The ETL layer converts raw public datasets into tidy county tables and covariates
+consumed by the current v0 model comparison: stdlib baselines, ridge profiles,
+empirical-Bayes shrinkage, and future model lanes. Each feed is reproducible
+from public URLs with no credentials required except where noted.
 
 ---
 
@@ -48,7 +51,28 @@ All scripts are POSIX‑shell or Python 3.11; run inside the Docker image so de
 * Aggregates weekly NOAA weather to calendar-year features by apportioning boundary weeks across calendar years using `week_start_date` and `week_end_date`.
 * Keeps contact pressure and deer harvest optional; missing optional rows are surfaced in `model_feature_quality_flags` instead of dropping the county-year.
 * Maps deer harvest into the next model year as prior completed season evidence (`season_start_year + 1`) to avoid same-year leakage.
-* The 2026-05-25 live smoke wrote 676 model feature rows for 24 Maryland jurisdictions from 1992-2023: 385 with contact pressure, 92 with prior-season deer harvest, and 36 flagged `partial_weather_year`.
+* The refreshed 2026-05-26 model panel wrote 676 model feature rows for 24 Maryland jurisdictions from 1992-2023: 385 with contact pressure, 276 with prior-season deer harvest after including annual-report PDFs, and 36 flagged `partial_weather_year`.
+
+### 2.2.1  Model Design Matrix (`tickbiterisk etl model-design-matrix`)
+
+* Reads the auditable joined panel from `model_features_county_year.csv`.
+* Writes `model_design_matrix_county_year.csv` and `model_design_matrix_schema.json`.
+* Converts the mixed raw feature panel into a model-consumable county-year matrix with stable id columns, target columns, numeric feature columns, passthrough quality flags, and a schema sidecar.
+* Adds lagged Lyme incidence features from prior county history and excludes rows with no prior county history.
+* Encodes current tick/vector/pathogen status strings as one-hot feature columns and expands `model_feature_quality_flags` into boolean `feature_flag_*` columns.
+* Imputes optional numeric feature blanks to `0.0` with paired missingness indicators such as `feature_missing_deer_harvest_prior_season`; this keeps sparse acquired sources consumable without hiding missingness.
+* The 2026-05-26 live run with a 5-year lookback wrote 652 design-matrix rows from the 676-row feature panel.
+
+### 2.2.2  Model Comparison (`tickbiterisk etl model-compare`)
+
+* Reads `model_design_matrix_county_year.csv`.
+* Uses rolling-origin annual validation: each held-out `test_year` is predicted using only rows where `year < test_year`.
+* Compares seven stdlib model profiles: prior-year incidence, trailing mean incidence, linear-blend baseline, empirical-Bayes county shrinkage, forecast-safe ridge over lag/history features, forecast-safe ridge with prior-season deer ecology, and retrospective ridge with same-year weather/ecology.
+* Excludes current cumulative tick-status one-hot features and surveillance/reporting regime flags from the ridge feature sets.
+* Keeps forecast-safe profiles free of same-year observed weather and same-year construction/contact pressure; prior-season deer harvest is the only ecology proxy included in `ridge_forecast_ecology`.
+* Labels same-year observed weather/ecology features as retrospective reconstruction rather than true prospective weather forecast.
+* Writes `model_comparison_runs.csv`, `model_comparison_predictions.csv`, `model_comparison_metrics.csv`, and `model_comparison_summary.csv`.
+* The 2026-05-26 live run for held-out years 2007-2023 wrote 2,856 prediction rows and ranked `linear_blend_baseline` first by MAE (18.240783 cases per 100k), followed by `prior_year_incidence` (18.32327), `ridge_forecast_safe` (19.094881), `ridge_forecast_ecology` (19.239029), and `ridge_lag_weather_ecology` (19.846399).
 
 ### 2.3  CDC Lyme Seasonality Baseline (`tickbiterisk etl seasonality-baseline`)
 
@@ -62,7 +86,7 @@ All scripts are POSIX‑shell or Python 3.11; run inside the Docker image so de
 
 ### 2.4  County-Week Seasonal Risk Baseline (`tickbiterisk etl county-week-risk`)
 
-* Reads annual county prediction rows from `model_backtest_predictions.csv`.
+* Reads annual county prediction rows from `model_comparison_predictions.csv` by default; the legacy `--backtest-predictions-path` alias remains supported for older `model_backtest_predictions.csv` inputs.
 * Reads CDC Lyme MMWR-week rows from `seasonality_baseline.csv`.
 * Filters to one annual model branch with `--model-name`, defaulting to `linear_blend_baseline`.
 * Filters to one weekly seasonality branch with `--seasonality-source-id`, defaulting to `cdc_seasonality_week_2023`.
@@ -73,7 +97,7 @@ All scripts are POSIX‑shell or Python 3.11; run inside the Docker image so de
 * Carries `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted`, because this is a product-shaped baseline, not a weather-adjusted disease forecast.
 * Runtime lookup is available with `tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26`; it converts the calendar date to CDC MMWR week and returns JSON from the derived baseline artifact.
 * Static public export is available with `tickbiterisk risk export-static`; it selects one unambiguous model/source/scale branch and writes `md_county_risk_weekly.json`, `md_county_metadata.json`, `model_card.json`, `source_catalog.json`, and `static_export_manifest.json` from derived rows only.
-* The 2026-05-25 live smoke with `linear_blend_baseline` wrote 21,571 county-week score rows for 24 Maryland jurisdictions across prediction years 2007-2023, plus 1 scale row.
+* The 2026-05-27 live run with `linear_blend_baseline` from `model_comparison_predictions.csv` wrote 21,624 county-week score rows for 24 Maryland jurisdictions across prediction years 2007-2023, plus 1 scale row. Comparison assumption flags are preserved in the existing `backtest_assumption_flags` output column for runtime compatibility.
 
 ### 2.5  CDC Tick Surveillance (`fetch_cdc_ticks.sh`)
 

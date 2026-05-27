@@ -33,6 +33,10 @@ def test_risk_lookup_command_returns_json_response(tmp_path: Path) -> None:
     assert payload["risk_score"] == 7
     assert payload["risk_category"] == "high"
     assert payload["query_date"] == "2023-01-01"
+    assert payload["model_family"] == "ensemble"
+    assert payload["feature_set"] == "historical_outcome_baselines"
+    assert payload["evaluation_mode"] == "forecast_prior_year"
+    assert payload["weather_mode"] == "not_used_by_baseline"
     assert "clinical_disclaimer" in payload
 
 

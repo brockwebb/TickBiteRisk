@@ -45,6 +45,43 @@ def test_county_week_risk_command_writes_scores_and_scale(tmp_path: Path) -> Non
     assert rows[-1]["risk_category"] == "high"
 
 
+def test_county_week_risk_command_accepts_generic_predictions_path(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_model_comparison_predictions(
+        tmp_path / "model_comparison_predictions.csv"
+    )
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "county-week-risk",
+            "--predictions-path",
+            str(predictions_path),
+            "--seasonality-baseline-path",
+            str(seasonality_path),
+            "--model-name",
+            "ridge_forecast_safe",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 4 county-week risk score row(s)" in result.stdout
+    with (output_dir / "county_week_seasonal_risk_baseline.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert {row["model_name"] for row in rows} == {"ridge_forecast_safe"}
+    assert rows[0]["weather_mode"] == "not_used_by_forecast_safe_model"
+    assert "surveillance_reporting_sensitive" in rows[0]["backtest_assumption_flags"]
+
+
 def test_county_week_risk_command_selects_seasonality_source(
     tmp_path: Path,
 ) -> None:
@@ -171,7 +208,7 @@ def test_county_week_risk_command_fails_cleanly_when_inputs_missing(
     )
 
     assert result.exit_code != 0
-    assert "Backtest predictions file not found" in result.output
+    assert "Annual predictions file not found" in result.output
     assert "Traceback" not in result.output
     assert not (tmp_path / "out" / "county_week_seasonal_risk_baseline.csv").exists()
 
@@ -182,6 +219,16 @@ def _write_predictions(path: Path) -> Path:
         [
             _prediction_row("24001", "County 24001", "20.0"),
             _prediction_row("24003", "County 24003", "100.0"),
+        ],
+    )
+
+
+def _write_model_comparison_predictions(path: Path) -> Path:
+    return _write_csv(
+        path,
+        [
+            _model_comparison_prediction_row("24001", "County 24001", "20.0"),
+            _model_comparison_prediction_row("24003", "County 24003", "100.0"),
         ],
     )
 
@@ -206,6 +253,44 @@ def _prediction_row(
         "predicted_incidence_per_100k": predicted_incidence,
         "model_feature_quality_flags": "",
         "backtest_assumption_flags": "observational_not_causal",
+    }
+
+
+def _model_comparison_prediction_row(
+    county_fips: str,
+    county_name: str,
+    predicted_incidence: str,
+) -> dict[str, str]:
+    return {
+        "run_id": "compare-run",
+        "model_name": "ridge_forecast_safe",
+        "model_family": "regularized_linear",
+        "target_definition": "lyme_incidence_per_100k",
+        "feature_set": "safe_numeric_design_matrix",
+        "feature_profile": "forecast_safe_lagged",
+        "evaluation_mode": "rolling_origin_prior_years",
+        "weather_mode": "not_used_by_forecast_safe_model",
+        "source_file_sha256": "b" * 64,
+        "county_fips": county_fips,
+        "county_name": county_name,
+        "test_year": "2020",
+        "train_start_year": "2019",
+        "train_end_year": "2019",
+        "train_row_count": "24",
+        "train_county_count": "24",
+        "actual_cases": "5",
+        "actual_population": "100000",
+        "actual_incidence_per_100k": "5.0",
+        "predicted_cases": predicted_incidence,
+        "predicted_incidence_per_100k": predicted_incidence,
+        "residual_incidence_per_100k": "0.0",
+        "absolute_error_incidence_per_100k": "0.0",
+        "residual_cases": "0.0",
+        "absolute_error_cases": "0.0",
+        "model_feature_quality_flags": "",
+        "comparison_assumption_flags": (
+            "observational_not_causal,surveillance_reporting_sensitive"
+        ),
     }
 
 

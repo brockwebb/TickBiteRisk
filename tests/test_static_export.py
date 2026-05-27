@@ -70,7 +70,22 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         "static_seasonality_prior",
         "not_weather_adjusted",
     ]
+    assert model_card["annual_prediction_source"]["artifact_type"] == (
+        "annual_prediction_branch"
+    )
+    assert model_card["annual_prediction_source"]["run_id"] == "run1"
+    assert model_card["annual_prediction_source"]["sha256"] == "a" * 64
+    assert model_card["annual_prediction_source"]["model_family"] == "ensemble"
+    assert model_card["annual_prediction_source"]["weather_mode"] == (
+        "not_used_by_baseline"
+    )
+    assert "model-comparison" in model_card["method_summary"]
     assert source_catalog["sources"][0]["artifact_type"] == "derived"
+    assert "model-comparison annual predictions" in source_catalog["sources"][0]["notes"]
+    assert source_catalog["sources"][1]["source_id"] == "annual_prediction_branch"
+    assert source_catalog["sources"][1]["run_id"] == "run1"
+    assert source_catalog["sources"][1]["sha256"] == "a" * 64
+    assert source_catalog["sources"][1]["model_name"] == "linear_blend_baseline"
     assert any("CDC" in link["title"] for link in source_catalog["guidance_links"])
     assert manifest["files"] == [
         "md_county_risk_weekly.json",

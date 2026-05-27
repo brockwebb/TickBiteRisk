@@ -138,7 +138,7 @@ def build_seasonal_risk_scores(
     ]
     if not predictions:
         raise RiskScoreInputError(
-            f"No backtest predictions found for model_name={model_name}"
+            f"No annual predictions found for model_name={model_name}"
         )
     seasonality_rows = _read_weekly_lyme_seasonality(
         seasonality_baseline_path,
@@ -188,7 +188,7 @@ def build_seasonal_risk_scores(
         n_score_rows=len(rows),
         source_prediction_sha256=prediction_sha256,
         source_seasonality_sha256=seasonality_sha256,
-        scale_quality_flags="relative_to_maryland_backtest_distribution",
+        scale_quality_flags="relative_to_maryland_prediction_distribution",
     )
     return SeasonalRiskScoreResult(
         rows=rows,
@@ -307,7 +307,10 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
                 model_feature_quality_flags=row.get(
                     "model_feature_quality_flags", ""
                 ),
-                backtest_assumption_flags=row.get("backtest_assumption_flags", ""),
+                backtest_assumption_flags=(
+                    row.get("backtest_assumption_flags", "")
+                    or row.get("comparison_assumption_flags", "")
+                ),
             )
             for row in rows
     ]
