@@ -12,6 +12,7 @@ def test_usdm_drought_command_writes_weekly_and_county_year_outputs(
 ) -> None:
     dsci_csv = """State,County,FIPS,MapDate,DSCI
 MD,Allegany County,24001,2020-04-07,100
+MD,Allegany County,24001,2020-04-07,100
 """
     severity_csv = """MapDate,FIPS,County,State,None,D0,D1,D2,D3,D4
 2020-04-07,24001,Allegany County,MD,0,100,0,0,0,0

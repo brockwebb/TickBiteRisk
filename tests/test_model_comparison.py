@@ -192,6 +192,25 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     assert not model_compare._is_safe_feature_column(
         "feature_flag_missing_construction_lag"
     )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_missing_population"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_missing_land_area"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_partial_weather_year"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_missing_deer_harvest_prior_season"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_missing_mast_acorn_prior_year"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_missing_tick_status"
+    )
+    assert model_compare._is_safe_feature_column("feature_missing_usdm_dsci_mean")
 
 
 def test_write_model_comparison_outputs_orders_and_dedupes(

@@ -680,7 +680,10 @@ def usdm_drought(
     weekly_output = write_usdm_weekly_output(rows, output_dir)
     county_year_rows = build_usdm_county_year_features(rows)
     county_year_output = write_usdm_county_year_output(county_year_rows, output_dir)
-    typer.echo(f"Wrote {len(rows)} USDM weekly drought row(s) to {weekly_output}")
+    weekly_row_count = len({(row.county_fips, row.map_date) for row in rows})
+    typer.echo(
+        f"Wrote {weekly_row_count} USDM weekly drought row(s) to {weekly_output}"
+    )
     typer.echo(
         f"Wrote {len(county_year_rows)} USDM county-year drought feature row(s) "
         f"to {county_year_output}"

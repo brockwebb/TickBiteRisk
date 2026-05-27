@@ -75,6 +75,21 @@ def test_build_usdm_county_year_features_aggregates_drought_weeks() -> None:
     assert allegany.feature_quality_flags == "drought_monitor_retro_observed"
 
 
+def test_build_usdm_county_year_features_dedupes_overlapping_api_weeks() -> None:
+    weekly_rows = parse_usdm_dsci_csv(
+        DSCI_CSV,
+        severity_csv=SEVERITY_CSV,
+        source_url="https://example.test/usdm",
+    )
+
+    features = build_usdm_county_year_features([*weekly_rows, weekly_rows[1]])
+
+    allegany = next(row for row in features if row.county_fips == "24001")
+    assert allegany.usdm_week_count == 3
+    assert allegany.usdm_dsci_mean == round((0 + 100 + 250) / 3, 6)
+    assert allegany.usdm_weeks_d0_or_worse == 2
+
+
 def test_build_usdm_drought_urls_use_county_statistics_api() -> None:
     urls = build_usdm_drought_urls(aoi="MD", year=2020)
 

@@ -140,7 +140,7 @@ def build_usdm_county_year_features(
     rows: list[UsdmDroughtWeekly],
 ) -> list[UsdmDroughtCountyYear]:
     grouped: dict[tuple[str, int], list[UsdmDroughtWeekly]] = {}
-    for row in rows:
+    for row in _dedupe_weekly_rows(rows):
         grouped.setdefault((row.county_fips, row.map_date.year), []).append(row)
     features = []
     for (county_fips, year), county_rows in grouped.items():
@@ -173,6 +173,11 @@ def build_usdm_county_year_features(
             )
         )
     return sorted(features, key=lambda item: (item.county_fips, item.year))
+
+
+def _dedupe_weekly_rows(rows: list[UsdmDroughtWeekly]) -> list[UsdmDroughtWeekly]:
+    keyed = {(row.county_fips, row.map_date): row for row in rows}
+    return sorted(keyed.values(), key=lambda item: (item.county_fips, item.map_date))
 
 
 def _read_csv_text(text: str) -> list[dict[str, str]]:

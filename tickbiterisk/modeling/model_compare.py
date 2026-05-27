@@ -21,23 +21,6 @@ RUN_WEATHER_MODE = "mixed_model_specific"
 FORECAST_SAFE_WEATHER_MODE = "not_used_by_forecast_safe_model"
 LAGGED_WEATHER_MODE = "not_used_by_lagged_model"
 EXCLUDED_FEATURE_PREFIXES = ("feature_tick_",)
-EXCLUDED_FEATURES = {
-    "feature_flag_current_status_retrospective_proxy",
-    "feature_flag_no_records_not_absence",
-    "feature_flag_status_only_not_prevalence",
-    "feature_flag_lyme_source_conflict",
-    "feature_flag_lyme_case_definition_change",
-    "feature_flag_covid_reporting_disruption",
-    "feature_flag_western_maryland_only",
-    "feature_flag_study_plot_not_countywide",
-    "feature_flag_drought_monitor_retro_observed",
-    "feature_flag_static_enviroatlas_2011",
-    "feature_flag_missing_usdm_drought",
-    "feature_flag_missing_enviroatlas_habitat",
-    "feature_flag_missing_construction_lag",
-    "feature_flag_construction_proxy_only",
-    "feature_flag_historical_partial_jurisdiction_coverage",
-}
 REQUIRED_MODEL_COMPARISON_COLUMNS = [
     "county_fips",
     "year",
@@ -385,7 +368,7 @@ def _is_safe_feature_column(column: str) -> bool:
     return (
         column.startswith("feature_")
         and not column.startswith(EXCLUDED_FEATURE_PREFIXES)
-        and column not in EXCLUDED_FEATURES
+        and not column.startswith("feature_flag_")
     )
 
 
