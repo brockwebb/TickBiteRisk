@@ -121,6 +121,8 @@ def test_operational_runbook_documents_static_pages_v0_not_live_api_stack() -> N
         "no runtime secrets",
         "tickbiterisk risk export-static",
         "python -m http.server",
+        "attached tick calculator",
+        "CDC criteria breakdown",
     ]:
         assert token in runbook
 
@@ -187,6 +189,7 @@ def test_roadmap_starts_from_shipped_static_maryland_v0() -> None:
         "Current v0 baseline",
         "Maryland static dashboard",
         "county-week seasonal Lyme baseline",
+        "single-bite Lyme decision-support overlay",
         "GitHub Pages",
         "model comparison",
         "Roadmap",
@@ -198,6 +201,7 @@ def test_roadmap_starts_from_shipped_static_maryland_v0() -> None:
         "docker compose up downloads sample DB",
         "Full CONUS priors 2025 season",
         "/risk API; React+D3 dashboard",
+        "Per-bite research model that combines geography",
     ]:
         assert token not in current_section
 

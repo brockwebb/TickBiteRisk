@@ -4,7 +4,8 @@
 
 TickBiteRisk now ships a Maryland static dashboard and local CLI runtime built
 from derived, public-safe artifacts. The current product is a county-week
-seasonal Lyme baseline, not a live clinical decision system.
+seasonal Lyme baseline plus a single-bite Lyme decision-support overlay, not a
+live clinical decision system.
 
 The implemented flow is:
 
@@ -16,7 +17,10 @@ The implemented flow is:
    across CDC Lyme onset seasonality.
 5. Export a 1-10 Maryland-relative county-week seasonal Lyme baseline to
    `public/data`.
-6. Serve the static dashboard through GitHub Pages without runtime secrets or
+6. Combine the county-week baseline with tick identity, life stage, attachment,
+   engorgement, removal timing, and CDC criteria for a transparent single-bite
+   Lyme decision-support overlay.
+7. Serve the static dashboard through GitHub Pages without runtime secrets or
    raw data redistribution.
 
 The current v0 branch favors inspectability over cleverness. It is designed to
@@ -27,7 +31,7 @@ complexity.
 
 | Version | Theme | Scope | Exit check |
 | --- | --- | --- | --- |
-| v0.1 | Public static baseline | Maryland dashboard, county-week risk JSON, CLI lookup/export, source metadata, plain-language caveats | Static site can be hosted from the repo and every public score carries provenance |
+| v0.1 | Public static baseline | Maryland dashboard, county-week risk JSON, single-bite Lyme decision-support overlay, CLI lookup/export, source metadata, plain-language caveats | Static site can be hosted from the repo and every public score carries provenance |
 | v0.2 | Dashboard polish | 508-focused color/contrast pass, keyboard map interaction, browser smoke tests, improved source panel | County click and table lookup work on desktop and mobile without overlap |
 | v0.3 | Validation report | Backtest writeup, model comparison summary, residual review by county/year, known intervention/data drift caveats | Public docs can explain when the score works, when it misses, and why |
 | v0.4 | Ecological feature depth | Stronger NLCD/land-cover summaries, deer harvest normalization, acorn/mast notes where usable, optional park/activity proxy manifest | Each feature has source, grain, date span, license note, and missingness flags |
@@ -43,8 +47,9 @@ against the same data and validation harness:
 - Random forest or gradient boosted model for feature interaction discovery.
 - Linear or ridge ensemble combining transparent branches when it improves
   held-out calibration.
-- Per-bite research model that combines geography, tick species/stage,
-  attachment duration, and CDC/IDSA guidance language.
+- Calibrated per-bite probability research model that validates absolute risk
+  against suitable evidence before any probability language appears in public
+  output.
 - Database-backed HTTP service if there is a clear need beyond static files.
 
 ## Product principles

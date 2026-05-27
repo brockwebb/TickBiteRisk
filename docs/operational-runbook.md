@@ -79,6 +79,8 @@ Open `http://localhost:8000` and confirm:
 - county list buttons render,
 - selecting a county updates the detail panel,
 - the model source strip appears,
+- the attached tick calculator returns a single-bite score,
+- the CDC criteria breakdown appears for the attached tick calculator,
 - sources and CDC guidance links appear,
 - public caveats say informational only and not medical advice.
 
