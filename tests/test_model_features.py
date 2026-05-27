@@ -203,8 +203,9 @@ def test_build_model_feature_matrix_aggregates_required_and_optional_inputs(
     )
     assert row.model_feature_quality_flags == (
         "reviewed,legacy_source,partial_weather_year,"
-        "deer_prior_season_derived_total,current_status_retrospective_proxy,"
-        "no_records_not_absence,status_only_not_prevalence"
+        "construction_proxy_only,deer_prior_season_derived_total,"
+        "current_status_retrospective_proxy,no_records_not_absence,"
+        "status_only_not_prevalence"
     )
 
 
@@ -369,6 +370,173 @@ def test_build_model_feature_matrix_joins_mast_acorn_as_prior_year_feature(
 
     row_2022 = next(row for row in rows if row.year == 2022)
     assert row_2022.mast_index_prior_year == 1.92
+
+
+def test_build_model_feature_matrix_joins_drought_habitat_and_construction_lags(
+    tmp_path: Path,
+) -> None:
+    lyme, population, weather = _minimal_required_inputs(tmp_path, county_fips="24003")
+    contact = _write_csv(
+        tmp_path / "contact.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2022",
+                "residential_units_authorized": "1200",
+                "units_authorized_per_sqmi": "2.5",
+                "units_authorized_per_100k": "200",
+                "units_authorized_per_sqmi_prior_year": "1.75",
+                "units_authorized_per_100k_prior_year": "150",
+                "units_authorized_per_sqmi_trailing_3yr_mean": "1.25",
+                "units_authorized_per_100k_trailing_3yr_mean": "125",
+                "units_authorized_per_sqmi_yoy_change": "0.75",
+                "total_value_dollars": "450000000",
+                "feature_quality_flags": (
+                    "construction_proxy_only,missing_construction_lag"
+                ),
+            }
+        ],
+    )
+    drought = _write_csv(
+        tmp_path / "drought.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2022",
+                "usdm_week_count": "52",
+                "usdm_dsci_mean": "85.5",
+                "usdm_dsci_max": "250",
+                "usdm_weeks_d0_or_worse": "20",
+                "usdm_weeks_d1_or_worse": "8",
+                "usdm_weeks_d2_or_worse": "2",
+                "usdm_tick_season_week_count": "26",
+                "usdm_tick_season_dsci_mean": "92.25",
+                "usdm_tick_season_weeks_d1_or_worse": "5",
+                "source_ids": "usdm_county_statistics",
+                "feature_quality_flags": "drought_monitor_retro_observed",
+            }
+        ],
+    )
+    habitat = _write_csv(
+        tmp_path / "habitat.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "forest_pct": "35.6",
+                "forest_woody_wetland_pct": "45.3",
+                "wetland_pct": "10.8",
+                "emergent_wetland_pct": "1.2",
+                "developed_pct": "39.7",
+                "impervious_pct": "11.8",
+                "agriculture_pct": "11.8",
+                "pasture_hay_pct": "3.4",
+                "cultivated_crop_pct": "8.4",
+                "riparian_natural_45m_pct": "75.0",
+                "riparian_forest_45m_pct": "34.5",
+                "riparian_forest_woody_wetland_45m_pct": "68.8",
+                "natural_land_cover_index": "48.4",
+                "source_url_hash": "hash",
+                "feature_quality_flags": "static_enviroatlas_2011",
+            }
+        ],
+    )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme,
+        population_path=population,
+        weather_weekly_path=weather,
+        contact_pressure_path=contact,
+        usdm_drought_path=drought,
+        enviroatlas_habitat_path=habitat,
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.units_authorized_per_sqmi_prior_year == 1.75
+    assert row.units_authorized_per_100k_prior_year == 150
+    assert row.units_authorized_per_sqmi_trailing_3yr_mean == 1.25
+    assert row.units_authorized_per_100k_trailing_3yr_mean == 125
+    assert row.units_authorized_per_sqmi_yoy_change == 0.75
+    assert row.usdm_dsci_mean == 85.5
+    assert row.usdm_dsci_max == 250
+    assert row.usdm_tick_season_dsci_mean == 92.25
+    assert row.forest_pct == 35.6
+    assert row.impervious_pct == 11.8
+    assert row.riparian_natural_45m_pct == 75.0
+    assert row.natural_land_cover_index == 48.4
+    flags = row.model_feature_quality_flags.split(",")
+    assert "construction_proxy_only" in flags
+    assert "missing_construction_lag" in flags
+    assert "drought_monitor_retro_observed" in flags
+    assert "static_enviroatlas_2011" in flags
+
+
+def test_build_model_feature_matrix_flags_missing_drought_and_habitat_when_enabled(
+    tmp_path: Path,
+) -> None:
+    lyme, population, weather = _minimal_required_inputs(tmp_path, county_fips="24003")
+    drought = _write_csv(
+        tmp_path / "drought.csv",
+        [
+            {
+                "county_fips": "24005",
+                "county_name": "Baltimore County",
+                "year": "2022",
+                "usdm_week_count": "52",
+                "usdm_dsci_mean": "0",
+                "usdm_dsci_max": "0",
+                "usdm_weeks_d0_or_worse": "0",
+                "usdm_weeks_d1_or_worse": "0",
+                "usdm_weeks_d2_or_worse": "0",
+                "usdm_tick_season_week_count": "26",
+                "usdm_tick_season_dsci_mean": "0",
+                "usdm_tick_season_weeks_d1_or_worse": "0",
+                "source_ids": "usdm_county_statistics",
+                "feature_quality_flags": "drought_monitor_retro_observed",
+            }
+        ],
+    )
+    habitat = _write_csv(
+        tmp_path / "habitat.csv",
+        [
+            {
+                "county_fips": "24005",
+                "county_name": "Baltimore County",
+                "forest_pct": "36.1",
+                "forest_woody_wetland_pct": "37.9",
+                "wetland_pct": "2.6",
+                "emergent_wetland_pct": "0.8",
+                "developed_pct": "35.6",
+                "impervious_pct": "9.7",
+                "agriculture_pct": "23.2",
+                "pasture_hay_pct": "10.8",
+                "cultivated_crop_pct": "12.4",
+                "riparian_natural_45m_pct": "66.4",
+                "riparian_forest_45m_pct": "53.2",
+                "riparian_forest_woody_wetland_45m_pct": "61.6",
+                "natural_land_cover_index": "41.1",
+                "source_url_hash": "hash",
+                "feature_quality_flags": "static_enviroatlas_2011",
+            }
+        ],
+    )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme,
+        population_path=population,
+        weather_weekly_path=weather,
+        usdm_drought_path=drought,
+        enviroatlas_habitat_path=habitat,
+    )
+
+    assert rows[0].usdm_dsci_mean is None
+    assert rows[0].forest_pct is None
+    flags = rows[0].model_feature_quality_flags.split(",")
+    assert "missing_usdm_drought" in flags
+    assert "missing_enviroatlas_habitat" in flags
 
 
 def test_build_model_feature_matrix_flags_missing_tick_status_only_when_opted_in(
@@ -722,6 +890,11 @@ def _model_row(
         residential_units_authorized=None,
         units_authorized_per_sqmi=None,
         units_authorized_per_100k=None,
+        units_authorized_per_sqmi_prior_year=None,
+        units_authorized_per_100k_prior_year=None,
+        units_authorized_per_sqmi_trailing_3yr_mean=None,
+        units_authorized_per_100k_trailing_3yr_mean=None,
+        units_authorized_per_sqmi_yoy_change=None,
         contact_pressure_total_value_dollars=None,
         contact_pressure_feature_quality_flags=None,
         deer_total_harvest_prior_season=None,

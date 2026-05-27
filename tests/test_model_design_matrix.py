@@ -71,6 +71,31 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_black_oak_acorns_per_branch_prior_year"] == "17.02"
     assert mast_row["feature_white_oak_subjective_crown_pct_prior_year"] == "22.87"
     assert mast_row["feature_missing_mast_index_prior_year"] == "0"
+    assert mast_row["feature_usdm_dsci_mean"] == "85.5"
+    assert mast_row["feature_usdm_tick_season_dsci_mean"] == "92.25"
+    assert mast_row["feature_forest_pct"] == "36.1"
+    assert mast_row["feature_impervious_pct"] == "9.7"
+    assert mast_row["feature_units_authorized_per_sqmi_prior_year"] == "1.5"
+    assert mast_row["feature_units_authorized_per_100k_trailing_3yr_mean"] == "30.0"
+    assert mast_row["feature_missing_usdm_dsci_mean"] == "0"
+    assert mast_row["feature_missing_forest_pct"] == "0"
+    assert mast_row["feature_missing_units_authorized_per_sqmi_prior_year"] == "0"
+    assert "feature_usdm_dsci_mean" in result.schema.feature_columns
+    assert "feature_forest_pct" in result.schema.feature_columns
+    assert (
+        "feature_units_authorized_per_sqmi_prior_year"
+        in result.schema.feature_columns
+    )
+
+    missing_new_row = next(
+        item
+        for item in result.rows
+        if item["county_fips"] == "24003" and item["year"] == "2020"
+    )
+    assert missing_new_row["feature_usdm_dsci_mean"] == "0.0"
+    assert missing_new_row["feature_missing_usdm_dsci_mean"] == "1"
+    assert missing_new_row["feature_forest_pct"] == "0.0"
+    assert missing_new_row["feature_missing_forest_pct"] == "1"
 
 
 def test_write_model_design_matrix_outputs_writes_csv_and_schema_json(
@@ -112,6 +137,7 @@ def _write_feature_matrix(path: Path) -> Path:
             year = 2018 + offset
             has_deer = county_fips == "24005" and year == 2020
             has_mast = county_fips == "24005" and year == 2020
+            has_new_features = county_fips == "24005" and year == 2020
             rows.append(
                 {
                     "county_fips": county_fips,
@@ -153,6 +179,21 @@ def _write_feature_matrix(path: Path) -> Path:
                     "residential_units_authorized": str(100 + offset),
                     "units_authorized_per_sqmi": str(1.5 + offset),
                     "units_authorized_per_100k": str(30 + offset),
+                    "units_authorized_per_sqmi_prior_year": (
+                        "1.5" if has_new_features else ""
+                    ),
+                    "units_authorized_per_100k_prior_year": (
+                        "30.0" if has_new_features else ""
+                    ),
+                    "units_authorized_per_sqmi_trailing_3yr_mean": (
+                        "1.25" if has_new_features else ""
+                    ),
+                    "units_authorized_per_100k_trailing_3yr_mean": (
+                        "30.0" if has_new_features else ""
+                    ),
+                    "units_authorized_per_sqmi_yoy_change": (
+                        "0.25" if has_new_features else ""
+                    ),
                     "contact_pressure_total_value_dollars": str(1000000 + offset),
                     "contact_pressure_feature_quality_flags": "construction_proxy_only",
                     "deer_total_harvest_prior_season": "1200" if has_deer else "",
@@ -202,6 +243,50 @@ def _write_feature_matrix(path: Path) -> Path:
                     "tick_status_source_ids": "cdc_ixodes_county_status_2025",
                     "tick_status_feature_quality_flags": (
                         "current_status_retrospective_proxy,no_records_not_absence"
+                    ),
+                    "usdm_week_count": "52" if has_new_features else "",
+                    "usdm_dsci_mean": "85.5" if has_new_features else "",
+                    "usdm_dsci_max": "250" if has_new_features else "",
+                    "usdm_weeks_d0_or_worse": "20" if has_new_features else "",
+                    "usdm_weeks_d1_or_worse": "8" if has_new_features else "",
+                    "usdm_weeks_d2_or_worse": "2" if has_new_features else "",
+                    "usdm_tick_season_week_count": (
+                        "26" if has_new_features else ""
+                    ),
+                    "usdm_tick_season_dsci_mean": (
+                        "92.25" if has_new_features else ""
+                    ),
+                    "usdm_tick_season_weeks_d1_or_worse": (
+                        "5" if has_new_features else ""
+                    ),
+                    "usdm_source_ids": (
+                        "usdm_county_statistics" if has_new_features else ""
+                    ),
+                    "usdm_feature_quality_flags": (
+                        "drought_monitor_retro_observed"
+                        if has_new_features
+                        else ""
+                    ),
+                    "forest_pct": "36.1" if has_new_features else "",
+                    "forest_woody_wetland_pct": "37.9" if has_new_features else "",
+                    "wetland_pct": "2.6" if has_new_features else "",
+                    "emergent_wetland_pct": "0.8" if has_new_features else "",
+                    "developed_pct": "35.6" if has_new_features else "",
+                    "impervious_pct": "9.7" if has_new_features else "",
+                    "agriculture_pct": "23.2" if has_new_features else "",
+                    "pasture_hay_pct": "10.8" if has_new_features else "",
+                    "cultivated_crop_pct": "12.4" if has_new_features else "",
+                    "riparian_natural_45m_pct": "66.4" if has_new_features else "",
+                    "riparian_forest_45m_pct": "53.2" if has_new_features else "",
+                    "riparian_forest_woody_wetland_45m_pct": (
+                        "61.6" if has_new_features else ""
+                    ),
+                    "natural_land_cover_index": "41.1" if has_new_features else "",
+                    "enviroatlas_source_url_hash": (
+                        "hash" if has_new_features else ""
+                    ),
+                    "enviroatlas_feature_quality_flags": (
+                        "static_enviroatlas_2011" if has_new_features else ""
                     ),
                     "model_feature_quality_flags": (
                         "current_status_retrospective_proxy,no_records_not_absence"

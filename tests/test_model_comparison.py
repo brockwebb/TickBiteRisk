@@ -138,6 +138,28 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
         "feature_contact_pressure_total_value_dollars"
     )
     assert model_compare._is_forecast_ecology_feature_column(
+        "feature_units_authorized_per_sqmi_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_units_authorized_per_100k_trailing_3yr_mean"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_missing_units_authorized_per_sqmi_prior_year"
+    )
+    assert not model_compare._is_forecast_ecology_feature_column(
+        "feature_units_authorized_per_sqmi_yoy_change"
+    )
+    assert model_compare._is_forecast_ecology_feature_column("feature_forest_pct")
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_natural_land_cover_index"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_missing_forest_pct"
+    )
+    assert not model_compare._is_forecast_ecology_feature_column(
+        "feature_usdm_dsci_mean"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
         "feature_deer_harvest_per_sqmi_prior_season"
     )
     assert model_compare._is_forecast_ecology_feature_column(
@@ -160,6 +182,15 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     )
     assert not model_compare._is_safe_feature_column(
         "feature_flag_study_plot_not_countywide"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_drought_monitor_retro_observed"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_static_enviroatlas_2011"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_missing_construction_lag"
     )
 
 

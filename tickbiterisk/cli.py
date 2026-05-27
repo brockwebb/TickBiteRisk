@@ -840,6 +840,14 @@ def model_features(
         Path("build/etl/mast/maryland_dnr_mast_acorn_county_year.csv"),
         help="Optional Maryland DNR mast/acorn county-year feature CSV.",
     ),
+    usdm_drought_path: Path = typer.Option(
+        Path("build/etl/usdm-drought/usdm_drought_county_year.csv"),
+        help="Optional USDM county-year drought feature CSV.",
+    ),
+    enviroatlas_habitat_path: Path = typer.Option(
+        Path("build/etl/enviroatlas/enviroatlas_county_habitat.csv"),
+        help="Optional EPA EnviroAtlas static county habitat feature CSV.",
+    ),
     tick_status_path: Path | None = typer.Option(
         None,
         help=(
@@ -872,6 +880,14 @@ def model_features(
         ),
         deer_harvest_path=deer_harvest_path if deer_harvest_path.exists() else None,
         mast_acorn_path=mast_acorn_path if mast_acorn_path.exists() else None,
+        usdm_drought_path=(
+            usdm_drought_path if usdm_drought_path.exists() else None
+        ),
+        enviroatlas_habitat_path=(
+            enviroatlas_habitat_path
+            if enviroatlas_habitat_path.exists()
+            else None
+        ),
         tick_status_path=tick_status_path,
     )
     output = write_model_feature_matrix_output(rows, output_dir)

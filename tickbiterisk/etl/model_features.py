@@ -50,6 +50,11 @@ class ModelCountyYearFeature:
     residential_units_authorized: int | None
     units_authorized_per_sqmi: float | None
     units_authorized_per_100k: float | None
+    units_authorized_per_sqmi_prior_year: float | None
+    units_authorized_per_100k_prior_year: float | None
+    units_authorized_per_sqmi_trailing_3yr_mean: float | None
+    units_authorized_per_100k_trailing_3yr_mean: float | None
+    units_authorized_per_sqmi_yoy_change: float | None
     contact_pressure_total_value_dollars: int | None
     contact_pressure_feature_quality_flags: str | None
     deer_total_harvest_prior_season: int | None
@@ -81,6 +86,32 @@ class ModelCountyYearFeature:
     tick_status_source_ids: str | None
     tick_status_feature_quality_flags: str | None
     model_feature_quality_flags: str
+    usdm_week_count: int | None = None
+    usdm_dsci_mean: float | None = None
+    usdm_dsci_max: float | None = None
+    usdm_weeks_d0_or_worse: int | None = None
+    usdm_weeks_d1_or_worse: int | None = None
+    usdm_weeks_d2_or_worse: int | None = None
+    usdm_tick_season_week_count: int | None = None
+    usdm_tick_season_dsci_mean: float | None = None
+    usdm_tick_season_weeks_d1_or_worse: int | None = None
+    usdm_source_ids: str | None = None
+    usdm_feature_quality_flags: str | None = None
+    forest_pct: float | None = None
+    forest_woody_wetland_pct: float | None = None
+    wetland_pct: float | None = None
+    emergent_wetland_pct: float | None = None
+    developed_pct: float | None = None
+    impervious_pct: float | None = None
+    agriculture_pct: float | None = None
+    pasture_hay_pct: float | None = None
+    cultivated_crop_pct: float | None = None
+    riparian_natural_45m_pct: float | None = None
+    riparian_forest_45m_pct: float | None = None
+    riparian_forest_woody_wetland_45m_pct: float | None = None
+    natural_land_cover_index: float | None = None
+    enviroatlas_source_url_hash: str | None = None
+    enviroatlas_feature_quality_flags: str | None = None
 
 
 def build_model_feature_matrix(
@@ -91,6 +122,8 @@ def build_model_feature_matrix(
     contact_pressure_path: Path | None = None,
     deer_harvest_path: Path | None = None,
     mast_acorn_path: Path | None = None,
+    usdm_drought_path: Path | None = None,
+    enviroatlas_habitat_path: Path | None = None,
     tick_status_path: Path | None = None,
 ) -> list[ModelCountyYearFeature]:
     population = _read_population(population_path)
@@ -98,9 +131,13 @@ def build_model_feature_matrix(
     contact = _read_contact_pressure(contact_pressure_path)
     deer = _read_deer_harvest(deer_harvest_path)
     mast = _read_mast_acorn(mast_acorn_path)
+    drought = _read_usdm_drought(usdm_drought_path)
+    habitat = _read_enviroatlas_habitat(enviroatlas_habitat_path)
     tick_status = _read_tick_status(tick_status_path)
     tick_status_enabled = tick_status_path is not None
     mast_enabled = mast_acorn_path is not None
+    drought_enabled = usdm_drought_path is not None
+    habitat_enabled = enviroatlas_habitat_path is not None
 
     rows = []
     for lyme in _read_csv(lyme_outcomes_path):
@@ -117,6 +154,8 @@ def build_model_feature_matrix(
         contact_row = contact.get((county_fips, year))
         deer_row = deer.get((county_fips, year))
         mast_row = mast.get((county_fips, year))
+        drought_row = drought.get((county_fips, year))
+        habitat_row = habitat.get(county_fips)
         tick_status_row = tick_status.get(county_fips)
         total_cases = _parse_int(lyme["total_cases"])
         weather_ratio = weather_row["weather_observation_ratio"]
@@ -125,12 +164,17 @@ def build_model_feature_matrix(
             reconciliation_status=str(lyme.get("reconciliation_status", "")),
             weather_observation_ratio=weather_ratio,
             contact_missing=contact_row is None,
+            contact_flags=_contact_quality_flags(contact_row),
             deer_missing=deer_row is None,
             deer_is_derived_total=(
                 None if deer_row is None else deer_row["deer_is_derived_total"]
             ),
             mast_missing=mast_enabled and mast_row is None,
             mast_flags=_mast_quality_flags(mast_row),
+            drought_missing=drought_enabled and drought_row is None,
+            drought_flags=_drought_quality_flags(drought_row),
+            habitat_missing=habitat_enabled and habitat_row is None,
+            habitat_flags=_habitat_quality_flags(habitat_row),
             tick_status_missing=tick_status_enabled and tick_status_row is None,
             tick_status_flags=_tick_status_quality_flags(tick_status_row),
         )
@@ -159,6 +203,21 @@ def build_model_feature_matrix(
                 ),
                 units_authorized_per_100k=_contact_float(
                     contact_row, "units_authorized_per_100k"
+                ),
+                units_authorized_per_sqmi_prior_year=_contact_float(
+                    contact_row, "units_authorized_per_sqmi_prior_year"
+                ),
+                units_authorized_per_100k_prior_year=_contact_float(
+                    contact_row, "units_authorized_per_100k_prior_year"
+                ),
+                units_authorized_per_sqmi_trailing_3yr_mean=_contact_float(
+                    contact_row, "units_authorized_per_sqmi_trailing_3yr_mean"
+                ),
+                units_authorized_per_100k_trailing_3yr_mean=_contact_float(
+                    contact_row, "units_authorized_per_100k_trailing_3yr_mean"
+                ),
+                units_authorized_per_sqmi_yoy_change=_contact_float(
+                    contact_row, "units_authorized_per_sqmi_yoy_change"
                 ),
                 contact_pressure_total_value_dollars=_contact_int(
                     contact_row, "total_value_dollars"
@@ -239,6 +298,62 @@ def build_model_feature_matrix(
                     tick_status_row, "tick_status_feature_quality_flags"
                 ),
                 model_feature_quality_flags=",".join(flags),
+                usdm_week_count=_drought_int(drought_row, "usdm_week_count"),
+                usdm_dsci_mean=_drought_float(drought_row, "usdm_dsci_mean"),
+                usdm_dsci_max=_drought_float(drought_row, "usdm_dsci_max"),
+                usdm_weeks_d0_or_worse=_drought_int(
+                    drought_row, "usdm_weeks_d0_or_worse"
+                ),
+                usdm_weeks_d1_or_worse=_drought_int(
+                    drought_row, "usdm_weeks_d1_or_worse"
+                ),
+                usdm_weeks_d2_or_worse=_drought_int(
+                    drought_row, "usdm_weeks_d2_or_worse"
+                ),
+                usdm_tick_season_week_count=_drought_int(
+                    drought_row, "usdm_tick_season_week_count"
+                ),
+                usdm_tick_season_dsci_mean=_drought_float(
+                    drought_row, "usdm_tick_season_dsci_mean"
+                ),
+                usdm_tick_season_weeks_d1_or_worse=_drought_int(
+                    drought_row, "usdm_tick_season_weeks_d1_or_worse"
+                ),
+                usdm_source_ids=_drought_text(drought_row, "source_ids"),
+                usdm_feature_quality_flags=_drought_quality_flags(drought_row),
+                forest_pct=_habitat_float(habitat_row, "forest_pct"),
+                forest_woody_wetland_pct=_habitat_float(
+                    habitat_row, "forest_woody_wetland_pct"
+                ),
+                wetland_pct=_habitat_float(habitat_row, "wetland_pct"),
+                emergent_wetland_pct=_habitat_float(
+                    habitat_row, "emergent_wetland_pct"
+                ),
+                developed_pct=_habitat_float(habitat_row, "developed_pct"),
+                impervious_pct=_habitat_float(habitat_row, "impervious_pct"),
+                agriculture_pct=_habitat_float(habitat_row, "agriculture_pct"),
+                pasture_hay_pct=_habitat_float(habitat_row, "pasture_hay_pct"),
+                cultivated_crop_pct=_habitat_float(
+                    habitat_row, "cultivated_crop_pct"
+                ),
+                riparian_natural_45m_pct=_habitat_float(
+                    habitat_row, "riparian_natural_45m_pct"
+                ),
+                riparian_forest_45m_pct=_habitat_float(
+                    habitat_row, "riparian_forest_45m_pct"
+                ),
+                riparian_forest_woody_wetland_45m_pct=_habitat_float(
+                    habitat_row, "riparian_forest_woody_wetland_45m_pct"
+                ),
+                natural_land_cover_index=_habitat_float(
+                    habitat_row, "natural_land_cover_index"
+                ),
+                enviroatlas_source_url_hash=_habitat_text(
+                    habitat_row, "source_url_hash"
+                ),
+                enviroatlas_feature_quality_flags=_habitat_quality_flags(
+                    habitat_row
+                ),
             )
         )
     return sorted(rows, key=lambda row: (row.county_fips, row.year))
@@ -405,6 +520,26 @@ def _read_mast_acorn(path: Path | None) -> dict[tuple[str, int], dict[str, str]]
     return rows
 
 
+def _read_usdm_drought(
+    path: Path | None,
+) -> dict[tuple[str, int], dict[str, str]]:
+    if path is None:
+        return {}
+    return {
+        (str(row["county_fips"]).zfill(5), int(row["year"])): row
+        for row in _read_csv(path)
+    }
+
+
+def _read_enviroatlas_habitat(path: Path | None) -> dict[str, dict[str, str]]:
+    if path is None:
+        return {}
+    return {
+        str(row["county_fips"]).zfill(5): row
+        for row in _read_csv(path)
+    }
+
+
 def _mast_preferred_sort_key(row: dict[str, str]) -> tuple[int, str]:
     return (
         _parse_int_or_none(row.get("source_report_year", "")) or _parse_int(row["year"]),
@@ -427,10 +562,15 @@ def _model_quality_flags(
     reconciliation_status: str,
     weather_observation_ratio: float | None,
     contact_missing: bool,
+    contact_flags: str,
     deer_missing: bool,
     deer_is_derived_total: bool | None,
     mast_missing: bool,
     mast_flags: str,
+    drought_missing: bool,
+    drought_flags: str,
+    habitat_missing: bool,
+    habitat_flags: str,
     tick_status_missing: bool,
     tick_status_flags: str,
 ) -> list[str]:
@@ -441,6 +581,7 @@ def _model_quality_flags(
         flags.append("partial_weather_year")
     if contact_missing:
         flags.append("missing_contact_pressure")
+    flags.extend(_split_flags(contact_flags))
     if deer_missing:
         flags.append("missing_deer_harvest_prior_season")
     if deer_is_derived_total:
@@ -448,6 +589,12 @@ def _model_quality_flags(
     if mast_missing:
         flags.append("missing_mast_acorn_prior_year")
     flags.extend(_split_flags(mast_flags))
+    if drought_missing:
+        flags.append("missing_usdm_drought")
+    flags.extend(_split_flags(drought_flags))
+    if habitat_missing:
+        flags.append("missing_enviroatlas_habitat")
+    flags.extend(_split_flags(habitat_flags))
     if tick_status_missing:
         flags.append("missing_tick_status")
     flags.extend(_split_flags(tick_status_flags))
@@ -464,6 +611,12 @@ def _contact_float(row: dict[str, str] | None, column: str) -> float | None:
     if row is None:
         return None
     return _parse_float_or_none(row.get(column, ""))
+
+
+def _contact_quality_flags(row: dict[str, str] | None) -> str:
+    if row is None:
+        return ""
+    return ",".join(_dedupe_preserve_order(_split_flags(row.get("feature_quality_flags", ""))))
 
 
 def _tick_status_text(row: dict[str, str] | None, column: str) -> str | None:
@@ -499,6 +652,50 @@ def _mast_bool(row: dict[str, str] | None, column: str) -> bool | None:
 
 
 def _mast_quality_flags(row: dict[str, str] | None) -> str:
+    if row is None:
+        return ""
+    return ",".join(_dedupe_preserve_order(_split_flags(row.get("feature_quality_flags", ""))))
+
+
+def _drought_text(row: dict[str, str] | None, column: str) -> str | None:
+    if row is None:
+        return None
+    text = str(row.get(column, "")).strip()
+    return text or None
+
+
+def _drought_int(row: dict[str, str] | None, column: str) -> int | None:
+    if row is None:
+        return None
+    return _parse_int_or_none(row.get(column, ""))
+
+
+def _drought_float(row: dict[str, str] | None, column: str) -> float | None:
+    if row is None:
+        return None
+    return _parse_float_or_none(row.get(column, ""))
+
+
+def _drought_quality_flags(row: dict[str, str] | None) -> str:
+    if row is None:
+        return ""
+    return ",".join(_dedupe_preserve_order(_split_flags(row.get("feature_quality_flags", ""))))
+
+
+def _habitat_text(row: dict[str, str] | None, column: str) -> str | None:
+    if row is None:
+        return None
+    text = str(row.get(column, "")).strip()
+    return text or None
+
+
+def _habitat_float(row: dict[str, str] | None, column: str) -> float | None:
+    if row is None:
+        return None
+    return _parse_float_or_none(row.get(column, ""))
+
+
+def _habitat_quality_flags(row: dict[str, str] | None) -> str:
     if row is None:
         return ""
     return ",".join(_dedupe_preserve_order(_split_flags(row.get("feature_quality_flags", ""))))

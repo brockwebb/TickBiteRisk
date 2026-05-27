@@ -78,6 +78,10 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
             str(tmp_path / "missing-deer.csv"),
             "--mast-acorn-path",
             str(tmp_path / "missing-mast.csv"),
+            "--usdm-drought-path",
+            str(tmp_path / "missing-drought.csv"),
+            "--enviroatlas-habitat-path",
+            str(tmp_path / "missing-habitat.csv"),
             "--tick-status-path",
             str(tick_status),
             "--output-dir",
@@ -285,6 +289,10 @@ def test_model_features_command_accepts_mast_acorn_path(tmp_path: Path) -> None:
             str(tmp_path / "missing-deer.csv"),
             "--mast-acorn-path",
             str(mast),
+            "--usdm-drought-path",
+            str(tmp_path / "missing-drought.csv"),
+            "--enviroatlas-habitat-path",
+            str(tmp_path / "missing-habitat.csv"),
             "--output-dir",
             str(output_dir),
         ],
@@ -299,6 +307,120 @@ def test_model_features_command_accepts_mast_acorn_path(tmp_path: Path) -> None:
     assert rows[0]["mast_index_prior_year"] == "1.92"
     assert rows[0]["black_oak_acorns_per_branch_prior_year"] == "1.97"
     assert "western_maryland_only" in rows[0]["model_feature_quality_flags"]
+
+
+def test_model_features_command_accepts_drought_and_habitat_paths(
+    tmp_path: Path,
+) -> None:
+    lyme = _write_csv(
+        tmp_path / "lyme.csv",
+        [
+            {
+                "county_fips": "24003",
+                "year": "2022",
+                "confirmed_cases": "10",
+                "probable_cases": "0",
+                "total_cases": "10",
+                "canonical_source_id": "cdc_2022",
+                "source_values_summary": "",
+                "reconciliation_status": "matched",
+                "data_quality_flags": "",
+            }
+        ],
+    )
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2022",
+                "population": "100000",
+            }
+        ],
+    )
+    weather = _write_csv(tmp_path / "weather.csv", [_weather_row()])
+    drought = _write_csv(
+        tmp_path / "drought.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2022",
+                "usdm_week_count": "52",
+                "usdm_dsci_mean": "85.5",
+                "usdm_dsci_max": "250",
+                "usdm_weeks_d0_or_worse": "20",
+                "usdm_weeks_d1_or_worse": "8",
+                "usdm_weeks_d2_or_worse": "2",
+                "usdm_tick_season_week_count": "26",
+                "usdm_tick_season_dsci_mean": "92.25",
+                "usdm_tick_season_weeks_d1_or_worse": "5",
+                "source_ids": "usdm_county_statistics",
+                "feature_quality_flags": "drought_monitor_retro_observed",
+            }
+        ],
+    )
+    habitat = _write_csv(
+        tmp_path / "habitat.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "forest_pct": "35.6",
+                "forest_woody_wetland_pct": "45.3",
+                "wetland_pct": "10.8",
+                "emergent_wetland_pct": "1.2",
+                "developed_pct": "39.7",
+                "impervious_pct": "11.8",
+                "agriculture_pct": "11.8",
+                "pasture_hay_pct": "3.4",
+                "cultivated_crop_pct": "8.4",
+                "riparian_natural_45m_pct": "75.0",
+                "riparian_forest_45m_pct": "34.5",
+                "riparian_forest_woody_wetland_45m_pct": "68.8",
+                "natural_land_cover_index": "48.4",
+                "source_url_hash": "hash",
+                "feature_quality_flags": "static_enviroatlas_2011",
+            }
+        ],
+    )
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-features",
+            "--lyme-outcomes-path",
+            str(lyme),
+            "--population-path",
+            str(population),
+            "--weather-weekly-path",
+            str(weather),
+            "--contact-pressure-path",
+            str(tmp_path / "missing-contact.csv"),
+            "--deer-harvest-path",
+            str(tmp_path / "missing-deer.csv"),
+            "--usdm-drought-path",
+            str(drought),
+            "--enviroatlas-habitat-path",
+            str(habitat),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    with (output_dir / "model_features_county_year.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["usdm_dsci_mean"] == "85.5"
+    assert rows[0]["forest_pct"] == "35.6"
+    assert "drought_monitor_retro_observed" in rows[0]["model_feature_quality_flags"]
+    assert "static_enviroatlas_2011" in rows[0]["model_feature_quality_flags"]
 
 
 def _write_csv(path: Path, rows: list[dict[str, str]]) -> Path:
