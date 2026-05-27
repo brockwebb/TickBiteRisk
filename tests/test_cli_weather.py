@@ -11,6 +11,10 @@ from tickbiterisk.etl.noaa_backfill import (
     NoaaMarylandBackfillResult,
     NoaaStationCoverageAuditResult,
 )
+from tickbiterisk.etl.open_meteo_backfill import (
+    OpenMeteoCountyBackfillResult,
+    OpenMeteoMarylandBackfillResult,
+)
 from tickbiterisk.etl.open_meteo import WeatherDailyObservation
 
 
@@ -84,6 +88,98 @@ def test_weather_backfill_writes_weekly_and_monthly_features(
     assert (tmp_path / "weather_features_monthly.csv").exists()
     assert "weather_features_weekly.csv" in result.stdout
     assert "weather_features_monthly.csv" in result.stdout
+
+
+def test_weather_backfill_open_meteo_maryland_dry_run_prints_chunk_plan(
+    tmp_path,
+) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "weather-backfill-open-meteo-maryland",
+            "--start-date",
+            "2020-01-01",
+            "--end-date",
+            "2020-01-03",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+            "--county-fips",
+            "24005",
+            "--max-chunk-days",
+            "2",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Planned 4 Open-Meteo archive request(s)" in result.stdout
+    assert "24003" in result.stdout
+    assert "24005" in result.stdout
+    assert "archive-api.open-meteo.com" in result.stdout
+    assert not (tmp_path / "weather_daily.csv").exists()
+
+
+def test_weather_backfill_open_meteo_maryland_command_reports_summary(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_backfill(**kwargs) -> OpenMeteoMarylandBackfillResult:
+        assert kwargs["county_fips_values"] == ["24003"]
+        assert kwargs["output_dir"] == tmp_path
+        assert kwargs["max_chunk_days"] == 2
+        assert kwargs["max_attempts"] == 5
+        assert kwargs["sleep_seconds"] == 3.0
+        assert kwargs["inter_chunk_sleep_seconds"] == 0.25
+        assert kwargs["inter_county_sleep_seconds"] == 0.5
+        return OpenMeteoMarylandBackfillResult(
+            county_results=[
+                OpenMeteoCountyBackfillResult(
+                    county_fips="24003",
+                    chunk_count=2,
+                    daily_observation_count=3,
+                    daily_output_path=tmp_path / "weather_daily.csv",
+                    weekly_output_path=tmp_path / "weather_features_weekly.csv",
+                    monthly_output_path=tmp_path / "weather_features_monthly.csv",
+                )
+            ],
+            failures=[],
+        )
+
+    monkeypatch.setattr(
+        "tickbiterisk.cli.run_open_meteo_maryland_backfill", fake_backfill
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "weather-backfill-open-meteo-maryland",
+            "--start-date",
+            "2020-01-01",
+            "--end-date",
+            "2020-01-03",
+            "--output-dir",
+            str(tmp_path),
+            "--county-fips",
+            "24003",
+            "--max-chunk-days",
+            "2",
+            "--max-attempts",
+            "5",
+            "--retry-sleep-seconds",
+            "3",
+            "--inter-chunk-sleep-seconds",
+            "0.25",
+            "--inter-county-sleep-seconds",
+            "0.5",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Completed 1/1 Maryland Open-Meteo county backfill(s)" in result.stdout
+    assert "Wrote 3 daily observation row(s)" in result.stdout
 
 
 def test_noaa_stations_dry_run_prints_noaa_url(tmp_path) -> None:
@@ -172,6 +268,42 @@ def test_noaa_weather_features_command_reads_raw_noaa_csv(tmp_path) -> None:
     assert df.loc[0, "source"] == "noaa_cdo_ghcnd_daily"
     assert df.loc[0, "weather_model"] == "ghcnd_station_daily"
     assert pd.isna(df.loc[0, "humidity_mean_pct"])
+
+
+def test_open_meteo_weather_features_command_recomputes_existing_daily_csv(
+    tmp_path,
+) -> None:
+    input_path = tmp_path / "weather_daily.csv"
+    input_path.write_text(
+        "\n".join(
+            [
+                "county_fips,date,source,weather_model,temp_mean_f,temp_max_f,temp_min_f,humidity_mean_pct,humidity_max_pct,humidity_min_pct,dew_point_mean_f,precipitation_mm,rain_mm,snowfall_mm,precipitation_hours,soil_temp_0_7cm_f,soil_moisture_0_7cm,evapotranspiration_mm,wind_mean_mph,wind_max_mph,source_url_hash",
+                "24003,2021-01-01,open_meteo_archive,open_meteo_archive,60,65,55,82,95,65,48,0,0,0,0,48,0.30,1.0,5,10,aaaaaaaa",
+                "24003,2020-01-01,open_meteo_archive,open_meteo_archive,50,55,45,72,85,55,40,0,0,0,0,45,0.25,1.0,5,10,bbbbbbbb",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "open-meteo-weather-features",
+            "--input-path",
+            str(input_path),
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 2 Open-Meteo monthly feature row(s)" in result.stdout
+    monthly = pd.read_csv(
+        tmp_path / "weather_features_monthly.csv", dtype={"county_fips": str}
+    )
+    jan_2021 = monthly[(monthly["county_fips"] == "24003") & (monthly["year"] == 2021)]
+    assert jan_2021.iloc[0]["temp_anomaly_vs_10yr"] == 10.0
 
 
 def test_noaa_backfill_county_dry_run_prints_station_discovery_url(tmp_path) -> None:

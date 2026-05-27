@@ -98,6 +98,14 @@ from tickbiterisk.etl.open_meteo import (
     build_open_meteo_archive_url,
     fetch_open_meteo_archive,
 )
+from tickbiterisk.etl.open_meteo_backfill import (
+    OpenMeteoBackfillError,
+    plan_open_meteo_archive_requests,
+    read_open_meteo_weather_daily_rows,
+    resolve_maryland_open_meteo_county_fips,
+    run_open_meteo_maryland_backfill,
+    validate_open_meteo_backfill_args,
+)
 from tickbiterisk.etl.population_build import write_county_population_output
 from tickbiterisk.etl.raw_download import download_source_files
 from tickbiterisk.etl.seasonality import (
@@ -1388,6 +1396,99 @@ def weather_backfill_open_meteo(
     typer.echo(f"Wrote {monthly_output}")
 
 
+@etl_app.command("weather-backfill-open-meteo-maryland")
+def weather_backfill_open_meteo_maryland(
+    start_date: str = typer.Option(..., help="Daily weather start date."),
+    end_date: str = typer.Option(..., help="Daily weather end date."),
+    output_dir: Path = typer.Option(
+        Path("build/etl"), help="Output directory for ETL artifacts."
+    ),
+    county_fips: list[str] | None = typer.Option(
+        None,
+        "--county-fips",
+        help="Optional Maryland county FIPS subset. Repeat for multiple counties.",
+    ),
+    max_chunk_days: int = typer.Option(
+        366, help="Maximum inclusive days per Open-Meteo archive request."
+    ),
+    weather_model: str = typer.Option(
+        "open_meteo_archive", help="Optional Open-Meteo archive model selector."
+    ),
+    max_attempts: int = typer.Option(3, help="Maximum attempts per archive request."),
+    retry_sleep_seconds: float = typer.Option(
+        1.0, help="Base sleep seconds between Open-Meteo request retries."
+    ),
+    inter_chunk_sleep_seconds: float = typer.Option(
+        0.0, help="Sleep seconds between chunks for the same county."
+    ),
+    inter_county_sleep_seconds: float = typer.Option(
+        0.0, help="Sleep seconds between county backfills."
+    ),
+    fail_fast: bool = typer.Option(False, help="Stop at the first county failure."),
+    allow_partial: bool = typer.Option(
+        False, help="Exit successfully even when one or more counties fail."
+    ),
+    dry_run: bool = typer.Option(False, help="Print planned queries without fetching data."),
+) -> None:
+    parsed_start_date = _parse_iso_date(start_date, "start-date")
+    parsed_end_date = _parse_iso_date(end_date, "end-date")
+    try:
+        county_fips_values = resolve_maryland_open_meteo_county_fips(county_fips)
+        validate_open_meteo_backfill_args(
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            max_chunk_days=max_chunk_days,
+        )
+    except OpenMeteoBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    if dry_run:
+        plans = plan_open_meteo_archive_requests(
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            county_fips_values=county_fips_values,
+            max_chunk_days=max_chunk_days,
+            weather_model=weather_model,
+        )
+        typer.echo(f"Planned {len(plans)} Open-Meteo archive request(s)")
+        for plan in plans:
+            typer.echo(
+                f"{plan.county_fips} {plan.chunk_start_date.isoformat()} "
+                f"to {plan.chunk_end_date.isoformat()}: {plan.url}"
+            )
+        return
+
+    try:
+        result = run_open_meteo_maryland_backfill(
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            output_dir=output_dir,
+            county_fips_values=county_fips_values,
+            max_chunk_days=max_chunk_days,
+            weather_model=weather_model,
+            continue_on_error=not fail_fast,
+            max_attempts=max_attempts,
+            sleep_seconds=retry_sleep_seconds,
+            inter_chunk_sleep_seconds=inter_chunk_sleep_seconds,
+            inter_county_sleep_seconds=inter_county_sleep_seconds,
+        )
+    except OpenMeteoBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    typer.echo(
+        f"Completed {result.success_count}/{result.county_count} "
+        "Maryland Open-Meteo county backfill(s)"
+    )
+    typer.echo(f"Fetched {result.chunk_count} archive request chunk(s)")
+    typer.echo(f"Wrote {result.daily_observation_count} daily observation row(s)")
+    if result.failure_count:
+        typer.echo(f"Failures: {result.failure_count}")
+        for failure in result.failures:
+            typer.echo(f"{failure.county_fips}: {failure.error}")
+        if not allow_partial:
+            raise typer.Exit(1)
+
+
 @etl_app.command("noaa-stations")
 def noaa_stations(
     county_fips: str = typer.Option(..., help="Maryland county FIPS code."),
@@ -1483,6 +1584,39 @@ def noaa_weather_features(
     typer.echo(f"Wrote {len(weekly_features)} NOAA weekly feature row(s) to {weekly_output}")
     typer.echo(
         f"Wrote {len(monthly_features)} NOAA monthly feature row(s) to {monthly_output}"
+    )
+
+
+@etl_app.command("open-meteo-weather-features")
+def open_meteo_weather_features(
+    input_path: Path = typer.Option(
+        Path("build/etl/open-meteo/weather_daily.csv"),
+        help="Input Open-Meteo weather_daily.csv path.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/open-meteo"), help="Output directory for ETL artifacts."
+    ),
+) -> None:
+    rows = read_open_meteo_weather_daily_rows(input_path)
+    weekly_features = add_trailing_weekly_anomalies(
+        compute_weekly_weather_features(rows)
+    )
+    weekly_output = write_weather_features_weekly_output(
+        weekly_features, output_dir, append=False
+    )
+    monthly_features = add_trailing_monthly_anomalies(
+        compute_monthly_weather_features(rows)
+    )
+    monthly_output = write_weather_features_monthly_output(
+        monthly_features, output_dir, append=False
+    )
+    typer.echo(
+        f"Wrote {len(weekly_features)} Open-Meteo weekly feature row(s) to "
+        f"{weekly_output}"
+    )
+    typer.echo(
+        f"Wrote {len(monthly_features)} Open-Meteo monthly feature row(s) to "
+        f"{monthly_output}"
     )
 
 

@@ -347,6 +347,7 @@ def test_data_sources_catalog_tracks_remaining_candidate_sources() -> None:
     for token in [
         "Potential source and feature candidates",
         "`open_meteo_archive_md_county_daily`",
+        "2020-2023 Maryland-wide enriched weather layer",
         "`usda_fia_fiadb`",
         "`maryland_dnr_archery_hunter_survey`",
         "`usda_nass_maryland_cdl`",

@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 from tickbiterisk.etl.weather_locations import WeatherLocation
 
 OPEN_METEO_ARCHIVE_ENDPOINT = "https://archive-api.open-meteo.com/v1/archive"
+OPEN_METEO_SNOWFALL_CM_TO_MM = 10.0
 OPEN_METEO_DAILY_VARIABLES = [
     "temperature_2m_mean",
     "temperature_2m_max",
@@ -124,28 +125,45 @@ def parse_open_meteo_archive_response(
                 date=date.fromisoformat(raw_date),
                 source="open_meteo_archive",
                 weather_model=weather_model,
-                temp_mean_f=float(daily["temperature_2m_mean"][index]),
-                temp_max_f=float(daily["temperature_2m_max"][index]),
-                temp_min_f=float(daily["temperature_2m_min"][index]),
-                humidity_mean_pct=float(daily["relative_humidity_2m_mean"][index]),
-                humidity_max_pct=float(daily["relative_humidity_2m_max"][index]),
-                humidity_min_pct=float(daily["relative_humidity_2m_min"][index]),
-                dew_point_mean_f=float(daily["dew_point_2m_mean"][index]),
-                precipitation_mm=float(daily["precipitation_sum"][index]),
-                rain_mm=float(daily["rain_sum"][index]),
-                snowfall_mm=float(daily["snowfall_sum"][index]),
-                precipitation_hours=float(daily["precipitation_hours"][index]),
-                soil_temp_0_7cm_f=float(
-                    daily["soil_temperature_0_to_7cm_mean"][index]
+                temp_mean_f=_required_float(daily, "temperature_2m_mean", index, raw_date),
+                temp_max_f=_required_float(daily, "temperature_2m_max", index, raw_date),
+                temp_min_f=_required_float(daily, "temperature_2m_min", index, raw_date),
+                humidity_mean_pct=_required_float(
+                    daily, "relative_humidity_2m_mean", index, raw_date
+                ),
+                humidity_max_pct=_required_float(
+                    daily, "relative_humidity_2m_max", index, raw_date
+                ),
+                humidity_min_pct=_required_float(
+                    daily, "relative_humidity_2m_min", index, raw_date
+                ),
+                dew_point_mean_f=_required_float(
+                    daily, "dew_point_2m_mean", index, raw_date
+                ),
+                precipitation_mm=_required_float(
+                    daily, "precipitation_sum", index, raw_date
+                ),
+                rain_mm=_required_float(daily, "rain_sum", index, raw_date),
+                snowfall_mm=_required_float(daily, "snowfall_sum", index, raw_date)
+                * OPEN_METEO_SNOWFALL_CM_TO_MM,
+                precipitation_hours=_required_float(
+                    daily, "precipitation_hours", index, raw_date
+                ),
+                soil_temp_0_7cm_f=_required_float(
+                    daily, "soil_temperature_0_to_7cm_mean", index, raw_date
                 ),
                 soil_moisture_0_7cm=_nullable_float(
                     daily["soil_moisture_0_to_7cm_mean"][index]
                 ),
-                evapotranspiration_mm=float(
-                    daily["et0_fao_evapotranspiration"][index]
+                evapotranspiration_mm=_required_float(
+                    daily, "et0_fao_evapotranspiration", index, raw_date
                 ),
-                wind_mean_mph=float(daily["wind_speed_10m_mean"][index]),
-                wind_max_mph=float(daily["wind_speed_10m_max"][index]),
+                wind_mean_mph=_required_float(
+                    daily, "wind_speed_10m_mean", index, raw_date
+                ),
+                wind_max_mph=_required_float(
+                    daily, "wind_speed_10m_max", index, raw_date
+                ),
                 source_url_hash=source_url_hash,
             )
         )
@@ -195,4 +213,18 @@ def fetch_open_meteo_archive(
 def _nullable_float(value: Any) -> float | None:
     if value is None:
         return None
+    return float(value)
+
+
+def _required_float(
+    daily: dict[str, Any],
+    variable: str,
+    index: int,
+    raw_date: str,
+) -> float:
+    value = daily[variable][index]
+    if value is None:
+        raise OpenMeteoArchiveError(
+            f"Open-Meteo daily variable {variable} has null value for {raw_date}"
+        )
     return float(value)

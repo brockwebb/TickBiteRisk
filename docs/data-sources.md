@@ -32,7 +32,7 @@ feature ideas to test in time-aware backtests before any public model claim.
 
 | Source ID | Candidate | Grain | Why try it | Status |
 | --- | --- | --- | --- | --- |
-| `open_meteo_archive_md_county_daily` | Open-Meteo historical/reanalysis weather | County-day | Humidity, dew point, soil moisture, soil temperature, evapotranspiration, and wind fields that NOAA GHCND does not currently populate | candidate_etl_supported_backfill_pending |
+| `open_meteo_archive_md_county_daily` | Open-Meteo historical/reanalysis weather | County-day | 2020-2023 Maryland-wide enriched weather layer with humidity, dew point, soil moisture, soil temperature, evapotranspiration, and wind fields that NOAA GHCND does not currently populate | candidate_etl_supported_recent_backfill_materialized |
 | `usda_fia_fiadb` | USDA Forest Service FIA / FIADB / EVALIDator | Forest inventory estimate | Oak-hickory and forest-composition context that may be more biologically meaningful than generic forest percent | source_manifested_needs_feature_extraction |
 | `maryland_dnr_archery_hunter_survey` | Maryland DNR Archery Hunter / Bowhunter Survey | Hunter report / county-season if extractable | Host and wildlife observation proxy, potentially lighter than raster GIS if report tables are defensible | source_manifested_needs_review |
 | `usda_nass_maryland_cdl` | USDA NASS Cropland Data Layer / CropScape | Raster/county summary candidate | Annual crop, pasture, hay, and open-land change context around land-use and edge habitat | source_manifested_needs_feature_extraction |
@@ -85,5 +85,8 @@ feature ideas to test in time-aware backtests before any public model claim.
 - ENSO and composite ecological-pressure features are not implemented yet. If
   tested, they should use timing-safe lags and preserve component values rather
   than hiding source uncertainty inside a single score.
+- Open-Meteo recent backfill is local under ignored `build/etl/open-meteo`.
+  It currently covers 2020-2023 for all 24 Maryland jurisdictions and is a
+  model-feature candidate, not the selected public weather source.
 
 Last updated: 2026-05-27.

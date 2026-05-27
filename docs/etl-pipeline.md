@@ -30,6 +30,15 @@ candidates until backtesting shows they improve the public score.
    - Converts NOAA daily observations into weekly and monthly weather features.
    - Writes `weather_features_weekly.csv` and `weather_features_monthly.csv`.
 
+4a. `tickbiterisk etl weather-backfill-open-meteo-maryland`
+   - Pulls chunked Open-Meteo archive weather at Maryland county internal
+     points as a secondary reanalysis/gap-fill source.
+   - Writes `weather_daily.csv`, `weather_features_weekly.csv`, and
+     `weather_features_monthly.csv` under the chosen Open-Meteo output
+     directory.
+   - `tickbiterisk etl open-meteo-weather-features` can rebuild weekly/monthly
+     features from an existing Open-Meteo daily CSV without another API call.
+
 5. `tickbiterisk etl deer-harvest`
    - Normalizes Maryland DNR deer harvest tables and text-extractable annual
      reports.
