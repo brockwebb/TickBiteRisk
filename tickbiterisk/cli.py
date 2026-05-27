@@ -56,6 +56,12 @@ from tickbiterisk.etl.ecology_sources import (
     ECOLOGY_SOURCE_FILES,
     MARYLAND_DNR_MAST_REPORT_URLS,
 )
+from tickbiterisk.etl.enviroatlas import (
+    build_enviroatlas_maryland_habitat_query_url,
+    fetch_enviroatlas_json,
+    parse_enviroatlas_county_habitat,
+)
+from tickbiterisk.etl.enviroatlas_build import write_enviroatlas_county_habitat_output
 from tickbiterisk.etl.lyme import (
     parse_cdc_county_dashboard,
     parse_cdc_lyme_geodata,
@@ -679,6 +685,20 @@ def usdm_drought(
         f"Wrote {len(county_year_rows)} USDM county-year drought feature row(s) "
         f"to {county_year_output}"
     )
+
+
+@etl_app.command("enviroatlas-habitat")
+def enviroatlas_habitat(
+    output_dir: Path = typer.Option(
+        Path("build/etl/enviroatlas"),
+        help="Output directory for EnviroAtlas habitat ETL artifacts.",
+    ),
+) -> None:
+    source_url = build_enviroatlas_maryland_habitat_query_url()
+    response_json = fetch_enviroatlas_json(source_url)
+    rows = parse_enviroatlas_county_habitat(response_json, source_url=source_url)
+    output = write_enviroatlas_county_habitat_output(rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} EnviroAtlas county habitat row(s) to {output}")
 
 
 @etl_app.command("tick-status")
