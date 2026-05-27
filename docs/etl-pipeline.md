@@ -1,102 +1,120 @@
-# TickBiteRisk – ETL Pipeline Specification
+# TickBiteRisk ETL Pipeline
 
-> **File location:** `/docs/ETL_PIPELINE.md`
+## Current v0 ETL pipeline
 
-The ETL layer converts raw public datasets into tidy county tables and covariates consumed by the Bayesian model.  Each feed is 100 % reproducible from public URLs—no credentials required except where noted.
+The ETL layer turns acquired source files into reproducible Maryland county-year
+and county-week artifacts. The current pipeline supports model comparison and a
+static public dashboard. It does not run a live disease forecast service.
 
----
+No live weekly ED scaler is wired into the current product. Weather, ecology,
+deer, construction, and tick surveillance fields are model features or research
+candidates until backtesting shows they improve the public score.
 
-## 1  Directory layout
+## Main flow
 
+1. `tickbiterisk etl lyme-outcomes`
+   - Reads ignored raw CDC Lyme source files.
+   - Reconciles Maryland county-year Lyme counts across CDC public-use,
+     dashboard, and geodata sources.
+   - Writes `lyme_county_year_reconciled.csv`.
+
+2. `tickbiterisk etl county-reference`
+   - Builds Maryland county FIPS, names, area, and internal point reference.
+   - Writes `county_reference.csv`.
+
+3. `tickbiterisk etl census-population`
+   - Fetches or refreshes county-year population denominators.
+   - Writes `county_population_year.csv`.
+
+4. `tickbiterisk etl noaa-weather-features`
+   - Converts NOAA daily observations into weekly and monthly weather features.
+   - Writes `weather_features_weekly.csv` and `weather_features_monthly.csv`.
+
+5. `tickbiterisk etl deer-harvest`
+   - Normalizes Maryland DNR deer harvest tables and text-extractable annual
+     reports.
+   - Writes `maryland_dnr_deer_harvest.csv`.
+
+6. `tickbiterisk etl ecology-sources`
+   - Catalogs NLCD/MRLC, Census BPS, mast/acorn, and related ecological source
+     files.
+   - Writes `source_manifest.csv`.
+
+7. `tickbiterisk etl building-permits`
+   - Normalizes Census county building permit data as a contact/land-use
+     pressure proxy.
+   - Writes `maryland_building_permits_county_year.csv`.
+
+8. `tickbiterisk etl contact-pressure`
+   - Combines building permits, population, and county area into per-capita and
+     per-square-mile features.
+   - Writes `contact_pressure_features_county_year.csv`.
+
+9. `tickbiterisk etl mast-acorn`
+   - Attempts structured extraction from Maryland mast/acorn reports.
+   - Writes extraction summaries even when OCR or text extraction is not model
+     ready.
+
+10. `tickbiterisk etl seasonality-baseline`
+    - Normalizes CDC Lyme onset exports by month and MMWR week.
+    - Writes `seasonality_observations.csv` and `seasonality_baseline.csv`.
+
+11. `tickbiterisk etl model-features`
+    - Joins Lyme outcomes, population, weather, deer, contact-pressure, and
+      optional surveillance features into the county-year feature matrix.
+    - Writes `model_features_county_year.csv`.
+
+12. `tickbiterisk etl model-design-matrix`
+    - Converts the feature panel into numeric model inputs with missingness
+      indicators and a schema sidecar.
+    - Writes `model_design_matrix_county_year.csv` and
+      `model_design_matrix_schema.json`.
+
+13. `tickbiterisk etl model-compare`
+    - Runs rolling-origin comparisons across transparent baseline and ridge
+      branches.
+    - Writes `model_comparison_runs.csv`,
+      `model_comparison_predictions.csv`, `model_comparison_metrics.csv`, and
+      `model_comparison_summary.csv`.
+
+14. `tickbiterisk etl county-week-risk`
+    - Applies CDC weekly Lyme seasonality to the selected annual model branch.
+    - Writes `county_week_seasonal_risk_baseline.csv` and
+      `risk_score_scale.csv`.
+
+15. `tickbiterisk risk export-static`
+    - Selects one unambiguous model/source/scale branch for public use.
+    - Writes dashboard JSON files under `public/data`.
+
+## Runtime lookup
+
+The local lookup command reads the derived county-week baseline:
+
+```bash
+tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26 --pretty
 ```
-/data-pipelines/
-    ├── fetch_cdc_ticks.sh
-    ├── fetch_fars.sh
-    ├── fetch_ed.sh
-    ├── fetch_nlcd.sh
-    ├── fetch_acs.sh
-    ├── fetch_capc.sh        # requires CC‑BY‑NC click‑through
-    ├── transform_nlcd_edge.py
-    ├── derive_theta_inputs.py
-    └── derive_lambda_inputs.py
-```
 
-All scripts are POSIX‑shell or Python 3.11; run inside the Docker image so dependency versions are pinned.
+It converts the date to CDC MMWR week and returns the relative Maryland Lyme
+baseline for that county-week. The value is not a personal infection
+probability or a treatment recommendation.
 
----
+## Idempotency and lineage
 
-## 2  Per‑feed details
+- Writers use stable keys and append/dedupe behavior or explicit replacement.
+- Each derived artifact keeps source IDs, source SHA-256 values, branch labels,
+  quality flags, or sidecar metadata where practical.
+- Raw files live under ignored data paths.
+- Public exports include model and source metadata so a static site can explain
+  what produced each score.
 
-### 2.1  CDC Tick Surveillance (`fetch_cdc_ticks.sh`)
+## Source limitations kept visible
 
-| Step     | Command                                                        | Notes                                                          |
-| -------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
-| Download | `curl -L $CDC_URL -o cdc_ticks.csv`                            | \$CDC\_URL is version‑stamped; script aborts if MD5 unchanged. |
-| Cleanup  | `csvcut -c state,county,fips,n_nymphs,n_pos > ticks_trim.csv`  | Remove adult tick rows.                                        |
-| Load     | `psql -c "\copy raw_cdc_ticks FROM ticks_trim.csv CSV HEADER"` | Raw table partitioned by year.                                 |
+- Deer harvest is a host-pressure proxy, not direct deer population.
+- Building permits are a contact/land-use pressure proxy, not proof of
+  migration or exposure.
+- Mast/acorn extraction is currently low-confidence and excluded from default
+  model behavior unless manually reviewed.
+- Same-year weather branches are retrospective comparisons unless replaced by a
+  true forecast-time feature set.
 
-### 2.2  FARS Deer Collisions (`fetch_fars.sh`)
-
-1. `wget https://static.nhtsa.gov/.../NationalCSV.zip` – unzip.
-2. Filter `ACCIDENT.CSV` where `ANIMALS=5` (deer).
-3. Aggregate: `group by fips, year count(*) as deer_crashes`.
-4. Upsert into `raw_fars_deer`.
-
-### 2.3  NSSP ED Tick‑Bite Visits (`fetch_ed.sh`)
-
-* Pull weekly CSV via CDC GitHub raw link.
-* Convert HHS region → county join using fixed mapping table (`hhs_to_county.csv`).
-* Store in `raw_ed_visits (fips, epiweek, visits)`.
-
-### 2.4  NLCD Land‑Cover & Edge Metrics
-
-```
-fetch_nlcd.sh  # downloads GeoTIFF once
-transform_nlcd_edge.py  # rasterio windowed read
-```
-
-* Calculates `%forest`, `%pasture`, and **edge density** (m of forest‑nonforest boundary / km²) for each county.
-* Writes to `cov_nlcd_edge`.
-
-### 2.5  ACS Population (`fetch_acs.sh`)
-
-* Uses Census API: `https://api.census.gov/data/2023/acs/acs5?get=B01003_001E&for=county:*`.
-* Loads into `cov_pop_density`.
-
-### 2.6  CAPC Dog Serology (`fetch_capc.sh` – optional)
-
-* Scrapes county JSON; user must set `CAPC_OK=1` env var acknowledging CC‑BY‑NC.
-* Writes to `cov_dog_lyme`; not redistributed.
-
----
-
-## 3  Transform stage
-
-### 3.1  `derive_theta_inputs.py`
-
-* Joins `raw_cdc_ticks`, `cov_deer`, `cov_dog_lyme`, `cov_nlcd_edge` on `fips`.
-* Creates `theta_input.parquet` (columns: fips, y, n, deer\_km2, dog\_pct, edge\_km\_km2).
-
-### 3.2  `derive_lambda_inputs.py`
-
-* Joins `raw_ed_visits`, seasonal Fourier template, snow‑cover covariate.
-* Outputs weekly `lambda_input.parquet` ready for PyMC incremental ADVI.
-
----
-
-## 4  Orchestration
-
-* **Annual job** (`cron/annual.sh`): runs `fetch_cdc_ticks.sh`, `fetch_fars.sh`, `fetch_nlcd.sh`, `fetch_acs.sh`, then transformation scripts, then triggers full PyMC MCMC.
-* **Weekly job** (`cron/weekly.sh`): runs `fetch_ed.sh`, `derive_lambda_inputs.py`, incremental ADVI fit.
-
-All cron scripts exit non‑zero on failure, surfacing errors in GitHub Actions logs.
-
----
-
-## 5  Data lineage checksum
-
-Every script appends SHA‑256 of raw file to `etl_log` table (`fips='00000'`) so model fits are traceable to exact input snapshots.
-
----
-
-*Last updated: 2025‑06‑08 (draft v0.1)*
+Last updated: 2026-05-27.

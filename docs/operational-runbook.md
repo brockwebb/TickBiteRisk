@@ -1,4 +1,4 @@
-# TickBiteRisk – Operational Runbook
+# TickBiteRisk Operational Runbook
 
 **The following deployment instructions assume you (or a third-party sponsor) want to host TickBiteRisk for others. Skip this file if you’re using the toolkit solely on your own machine.**
 
@@ -6,82 +6,128 @@
 
 ---
 
-## 1 Service inventory
+## 1. V0 static dashboard
 
-| Component        | Docker service | Port            | Responsibilities                                                  |
-| ---------------- | -------------- | --------------- | ----------------------------------------------------------------- |
-| PostGIS          | `postgres`     | 5432 (internal) | Stores raw/processed data, posterior tables, audit logs.          |
-| PyMC Fit         | `pymc_fit`     | —               | Runs annual MCMC & weekly ADVI; mounts `/data` and writes NetCDF. |
-| FastAPI          | `fastapi_app`  | 8000            | Serves `/risk` endpoint and OpenAPI docs.                         |
-| Nginx (optional) | `nginx`        | 443             | TLS termination, rate‑limiting, static dashboard.                 |
+The implemented public product is a static dashboard deployed from the committed
+`public/` directory to GitHub Pages. It serves derived JSON artifacts from
+`public/data` plus static HTML, CSS, JavaScript, and county geometry.
 
-## 2 Environments & secrets
+V0 has no runtime secrets, database connection, server process, API container,
+or scheduled production job. Raw data and private ETL outputs stay outside the
+public runtime.
 
-| Variable            | Service                           | Default           | Description                             |
-| ------------------- | --------------------------------- | ----------------- | --------------------------------------- |
-| `POSTGRES_PASSWORD` | postgres, pymc\_fit, fastapi\_app | **set in `.env`** | DB auth.                                |
-| `FASTAPI_WORKERS`   | fastapi\_app                      | 2                 | Gunicorn worker count.                  |
-| `CAPC_OK`           | pymc\_fit                         | *unset*           | Must be `1` to fetch CC‑BY‑NC dog data. |
-| `TZ`                | all                               | `UTC`             | Ensure cron jobs run on UTC.            |
+The Python package is tooling for ETL, model comparison, export, and local
+lookup. The public/ directory is the deployable site artifact for GitHub
+Pages; the static dashboard is not packaged into the Python wheel.
 
-Secrets live **only** in `.env` (git‑ignored).  GitHub Actions test pipeline uses throw‑away passwords.
+## 2. Public files
 
-## 3 Cron schedules (UTC)
+The deployed site should contain:
 
-| Script           | Schedule       | Action                                                               |
-| ---------------- | -------------- | -------------------------------------------------------------------- |
-| `cron/weekly.sh` | `0 6 * * MON`  | Pull NSSP ED CSV → ADVI update → reload FastAPI in‑place (`SIGHUP`). |
-| `cron/annual.sh` | `30 5 15 11 *` | Fetch CDC tick, FARS deer, ACS pop, run full MCMC, tag release.      |
+```text
+public/index.html
+public/app.js
+public/styles.css
+public/data/md_counties.geojson
+public/data/md_county_metadata.json
+public/data/md_county_risk_weekly.json
+public/data/model_card.json
+public/data/source_catalog.json
+public/data/static_export_manifest.json
+```
 
-Cron runs inside the **pymc\_fit** container via supervisord.  All logs pipe to stdout → Docker log driver.
+The `public/data` JSON bundle is a public-safe derived data product. It should
+not include raw surveillance extracts, API keys, database dumps, or private
+warehouse tables.
 
-## 4 Deployment commands
+## 3. Regenerate public data
 
-### Local dev
+When the derived county-week risk CSV changes, rebuild the static data bundle:
 
 ```bash
-docker compose up --build           # first‑time setup
-docker compose exec postgres psql -U postgres -c '\dt'
+tickbiterisk risk export-static \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --model-summary-path build/etl/model-comparison/model_comparison_summary.csv \
+  --output-dir public/data
+
+tickbiterisk dashboard build-assets \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --model-summary-path build/etl/model-comparison/model_comparison_summary.csv \
+  --output-dir public/data
 ```
 
-### Production (systemd unit)
+Use selectors such as `--source-prediction-sha256`, `--source-prediction-run-id`,
+`--benchmark-quantile`, or `--score-denominator` if multiple model/source/scale
+branches coexist.
 
-```ini
-[Service]
-Restart=always
-ExecStart=/usr/local/bin/docker-compose -f /opt/tickbiterisk/docker-compose.yml up
-WorkingDirectory=/opt/tickbiterisk
-EnvironmentFile=/opt/tickbiterisk/.env
+## 4. Local validation
+
+Run the same checks used by the Pages workflow:
+
+```bash
+ruff check .
+pytest -q
+node --check public/app.js
+python -m json.tool public/data/md_county_risk_weekly.json >/dev/null
+python -m json.tool public/data/md_county_metadata.json >/dev/null
+python -m json.tool public/data/model_card.json >/dev/null
+python -m json.tool public/data/source_catalog.json >/dev/null
+python -m json.tool public/data/static_export_manifest.json >/dev/null
 ```
 
-`systemctl enable tickbiterisk && systemctl start tickbiterisk`
+Run the dashboard locally:
 
-## 5 Backup & restore
+```bash
+python -m http.server 8000 --directory public
+```
 
-* **Database:** nightly `pg_dump -Fc tickrisk > backups/db_$(date +%F).dump.zst` (
-  15 MB for 10‑year archive).  Retention: 30 days.
-* **Posterior NetCDF:** stored in `/data/posteriors/`; backed up via same script.
+Open `http://localhost:8000` and confirm:
 
-## 6 Monitoring & alerts
+- the Maryland map renders,
+- county list buttons render,
+- selecting a county updates the detail panel,
+- the model source strip appears,
+- the attached tick calculator returns a single-bite score,
+- the CDC criteria breakdown appears for the attached tick calculator,
+- sources and CDC guidance links appear,
+- public caveats say informational only and not medical advice.
 
-| Metric              | Threshold                          | Action          |
-| ------------------- | ---------------------------------- | --------------- |
-| API 5xx rate        | >1% over 5 min                     | PagerDuty ‑ LOW |
-| Cron weekly job lag | >2 days since `last_lambda_update` | PagerDuty ‑ MED |
-| DB size growth      | >100 MB/day                        | Slack alert     |
+## 5. Deployment
 
-Prometheus sidecar scrapes FastAPI `/metrics` and Postgres exporter; Grafana dashboard JSON lives in `/ops/grafana/`.
+GitHub Pages deployment is handled by `.github/workflows/pages.yml`.
 
-## 7 Disaster recovery drill
+The workflow:
 
-1. Provision fresh host; install Docker/Docker‑compose.
-2. `scp` latest DB dump + `posterior_*.nc` to `/restore`.
-3. `docker compose up --build` (runs empty).
-4. `pg_restore -d tickrisk /restore/db_latest.dump.zst`.
-5. Copy NetCDF into `/data/posteriors/`; restart `fastapi_app`.
-6. `GET /risk?fips=24003&tau=24` should return HTTP 200 within CI95 bounds.
+- validates on pull requests,
+- validates and deploys on pushes to `main` and manual dispatch,
+- installs Python and Node,
+- runs lint, tests, JavaScript syntax checks, and public-data JSON validation,
+- uploads the committed `public/` directory,
+- deploys that artifact to GitHub Pages.
 
----
+Repository Settings > Pages should use GitHub Actions as the source. No GitHub
+Actions secrets are required for deployment because the site uses committed
+derived data.
 
-*Last updated: 2025-06-08 (draft v0.1)*
+## 6. Failure response
 
+If GitHub Pages deployment fails:
+
+1. Open the failed workflow run.
+2. Check whether failure happened in validation or deployment.
+3. For validation failures, reproduce locally with the commands in section 4.
+4. For missing JSON files, regenerate `public/data` from the selected derived
+   score branch.
+5. For dashboard JavaScript errors, run `node --check public/app.js` and a local
+   browser smoke test.
+6. For deployment-only failures, retry the workflow after confirming GitHub
+   Pages is enabled for the repository.
+
+## 7. Future service runbook
+
+A database-backed HTTP API may be added later. That would require a separate
+runbook covering service inventory, secrets, backups, monitoring, incident
+response, and disaster recovery. Those service operations are not part of the
+implemented v0 static dashboard.
+
+*Last updated: 2026-05-27*

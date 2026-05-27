@@ -1,100 +1,118 @@
-# TickBiteRisk – Statistical Model Specification
+# TickBiteRisk Model Specification
 
-> **File location:** `/docs/MODEL_SPEC.md`
+## Current implemented model
 
-## 1 Modelling goals
+The implemented v0 model is a Maryland county-year Lyme incidence comparison
+framework that produces a county-week seasonal baseline for the static
+dashboard. It predicts annual Lyme incidence per 100,000 residents, compares
+several transparent branches, then distributes the selected annual branch across
+CDC Lyme onset seasonality to make a week-level public score.
 
-* Estimate, for any U.S. county *i* and attachment duration τ, the posterior probability that a single *Ixodes* nymph bite will transmit *Borrelia burgdorferi*.
-* Propagate uncertainty from sparse tick‑testing samples, ecological covariates, and missing weekly exposure signals.
-* Allow seamless updating when new surveillance data arrive without retraining from scratch.
+Primary artifacts:
 
-## 2 Notation
+- `build/etl/model/model_features_county_year.csv`
+- `build/etl/model/model_design_matrix_county_year.csv`
+- `build/etl/model/model_design_matrix_schema.json`
+- `build/etl/model-comparison/model_comparison_predictions.csv`
+- `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv`
+- `public/data/md_county_risk_weekly.json`
 
-| Symbol | Meaning                                                                        |
-| ------ | ------------------------------------------------------------------------------ |
-| θᵢ     | Prevalence of *B. burgdorferi* in host‑seeking nymphs in county *i*            |
-| λᵢ,t   | Human–nymph encounter intensity (exposure rate) for county *i* during week *t* |
-| p(τ)   | Probability an **infected** nymph transmits after feeding τ hours              |
-| k      | Number of attached nymphs on a person (default = 1)                            |
-| yᵢ     | Number of PCR‑positive nymphs in CDC sample from county *i*                    |
-| nᵢ     | Total nymphs tested in county *i*                                              |
+The current public score is not weather-adjusted. Weather features are present
+in the feature matrix for model comparison and future branches, but the shipped
+public baseline intentionally uses the selected annual prediction plus static
+seasonality until validation supports a more dynamic forecast.
 
-## 3 Model hierarchy
+## Model branches
 
-### 3.1 Prevalence layer (annual fit)
+The comparison harness supports these current branches:
 
-```math
-\begin{aligned}
-y_i &\sim \text{Binom}(n_i,\,\theta_i)\\
-\text{logit}(\theta_i) &= \alpha_0 + \alpha_1\,\text{Deer}_{i} + \alpha_2\,\text{Dogs}_{i} + \alpha_3\,\text{ForestEdge}_{i} + u_i\\
-\mathbf u &\sim \text{CAR}(\rho,\sigma^2)\quad\text{(queen adjacency on counties)}
-\end{aligned}
-```
+| Branch | Purpose |
+| --- | --- |
+| `prior_year_incidence` | Simple persistence baseline using the prior observed year |
+| `trailing_mean_incidence` | Smooth historical baseline over recent years |
+| `linear_blend_baseline` | Selected v0 branch combining persistence and trailing mean behavior |
+| `empirical_bayes_shrinkage` | County estimates shrunk toward broader Maryland behavior when data are sparse |
+| `ridge_forecast_safe` | Regularized annual model using conservative non-leaky features |
+| `ridge_forecast_ecology` | Regularized model including ecological feature candidates |
+| `ridge_lag_weather_ecology` | Experimental lagged weather/ecology branch for comparison |
 
-\* **Priors** – weakly informative: `α • ∼ Normal(0, 2)`, `ρ ∼ Uniform(0, 1)`, `σ ∼ HalfNormal(1)`.
+The selected dashboard branch is currently `linear_blend_baseline` because it
+is transparent, stable, and defensible for a first public baseline.
 
-* When `nᵢ = 0`, posterior for θᵢ is driven by covariates + CAR smoothing.
+## Feature families
 
-### 3.2 Exposure layer (weekly update)
+Current model-ready feature groups include:
 
-```math
-\lambda_{i,t} = f_{\text{season}}(t)\;\exp\big(\beta_1\,\text{EDScaler}_{i,t}\big)
-```
+- Historical Lyme incidence and population-normalized rates.
+- NOAA weekly weather aggregates rolled to county-year predictors.
+- CDC Lyme seasonality shares by week and month of onset.
+- Maryland deer harvest density proxy.
+- Land-cover and habitat proxy fields where acquired data support them.
+- CDC tick vector and pathogen surveillance status fields.
+- Data quality and assumption flags for missingness, source vintage, and
+  non-comparable years.
 
-\* `f_season(t)` – county‑specific mean seasonal curve, modelled as a 2‑harmonic Fourier basis fitted to the previous five years of λ draws.
-\* `EDScaler_{i,t}` – `\log\big(\text{ED visits this week} / \text{baseline}\big)`. If the ED feed is >14 days old, scaler is set = 0 and uncertainty of `β₁` inflated via `σ_{miss}`.
+## Validation approach
 
-**Priors**: `β₁ ∼ Normal(0, 0.5)`; Fourier coefficients `∼ Normal(0, 0.5)`.
+Backtests use time-aware validation: a branch can only train on information
+available before the held-out year. The current comparison table reports
+standard forecast diagnostics such as mean absolute error, root mean squared
+error, and rank/correlation behavior across held-out county-years.
 
-### 3.3 Attachment‑time dose–response
+The practical questions for v0 are:
 
-The logistic curve comes from pooled rodent + human data (Piesman 1988, Eisen 2018):
+- Does the branch rank Maryland counties better than a naive statewide average?
+- Does it avoid false precision when a county has sparse or unstable history?
+- Are errors explainable from source limitations, reporting changes, or
+  missing ecological features?
+- Does adding weather or ecology improve held-out performance enough to justify
+  the extra explanation burden?
 
-```math
-p(\tau) = \frac{1}{1 + \exp\{-(\gamma_0 + \gamma_1\,\tau)\}}
-```
+## Public score transform
 
-with priors `γ₀ ∼ Normal(−7, 1)`, `γ₁ ∼ Normal(0.10, 0.02)`.
+The selected annual predicted incidence is multiplied by the selected CDC
+weekly seasonality share. The resulting county-week predicted incidence is then
+mapped to a 1-10 Maryland-relative score using a benchmark with headroom above
+the high historical range. This keeps the scale stable while still allowing
+unusually high county-weeks to register near the top.
 
-### 3.4 Per‑bite probability
+The scale is relative to the current Maryland data product. It should not be
+read as an absolute probability of infection.
 
-For an individual bitten in county *i*, week *t*, with attachment τ and *k* nymphs:
+## Single-bite decision-support overlay
 
-```math
-P_{\text{Lyme}} = 1 - \prod_{j=1}^{k}\bigl(1 - \theta_{i}\,p(\tau_j)\bigr)
-```
+The implemented `tickbiterisk risk single-bite` runtime uses the county-week
+seasonal baseline as the local/seasonal prior and applies transparent
+bite-evidence modifiers:
 
-## 4 Missing‑data handling
+- tick species identity, with blacklegged/Ixodes ticks treated as the Lyme
+  vector of concern,
+- tick life stage,
+- estimated attachment duration,
+- engorgement,
+- number of attached ticks,
+- time since removal, and
+- whether doxycycline safety is known or unknown.
 
-\* `yᵢ = nᵢ = 0` → θᵢ posterior shrinks to covariate mean + CAR.
-\* ED scaler missing >14 d → treat as latent, integrate over `β₁ σ_{miss}`; increases CI not point estimate.
+The output is a single-bite Lyme decision-support score plus a
+criterion-by-criterion CDC prophylaxis consideration summary. It is deliberately
+not an absolute infection probability, diagnosis, or treatment recommendation.
 
-## 5 Implementation details
+## Research roadmap model
 
-\* **Engine** – PyMC 5 (NUTS, 2 chains × 1 000 post‑warmup), running in a lightweight Docker container.
-\* Convergence criterion: `\hat R < 1.03` and ESS >400 for all α, β, γ.
-\* Posterior draws persisted in compressed NetCDF4 (zstd) per season (\~25 MB).
+A later research branch may calibrate absolute bite-specific disease
+probabilities by combining county context, tick species or life stage,
+attachment duration, pathogen prevalence, and uncertainty from sparse
+surveillance. That branch may use Bayesian hierarchical modeling, posterior
+draws, or ensemble combinations if the data and validation justify it.
 
-## 6 Validation plan
+That future work must remain separate from the v0 public score until it has:
 
-| Level               | Data                               | Metric                                                                      |
-| ------------------- | ---------------------------------- | --------------------------------------------------------------------------- |
-| County annual       | CDC human Lyme incidence (2023)    | Spearman ρ between predicted per‑person risk × pop and cases (target > 0.6) |
-| Temporal weekly     | withheld ED tick‑bite counts       | Continuous Ranked Prob. Score (CRPS)                                        |
-| Bite‑level clinical | Nadelman prophylaxis RCT (n = 482) | Brier score & calibration plot                                              |
+- validation against held-out surveillance and documented clinical evidence,
+- clinician/public-health review of wording,
+- uncertainty intervals that are meaningful for the modeled quantity,
+- source and license review for all required inputs,
+- plain-language warnings that users should follow CDC guidance and consult
+  healthcare professionals about personal medical situations.
 
-## 7 Rationale for Bayesian choice
-
-1. **Sparse yᵢ** – 60 % of counties have zero tick samples; CAR + covariate pooling gives usable θᵢ while propagating larger uncertainty.
-2. **Missing weekly feeds** – state‑space formulation widens credible intervals rather than dropping rows.
-3. **Transparency** – credible intervals and prior sensitivities visible to educators and reviewers; avoids opaque ML black‑box in v1.
-
-## 8 Update cadence
-
-* **Annual fit**: November 15 after CDC tick CSV release.
-* **Weekly update**: Mondays 02:00 ET, `update_lambda.sh` ingests NSSP CSV, refits only `β₁` posterior via incremental ADVI.
-
----
-
-*Last updated: 2025‑06‑08 (draft v0.1)*
-
+Last updated: 2026-05-27.

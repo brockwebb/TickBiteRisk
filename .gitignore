@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
 
 # C extensions
 *.so
@@ -49,6 +50,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+playwright-report/
+test-results/
 cover/
 
 # Translations
@@ -129,12 +132,17 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Node / browser smoke dependencies
+node_modules/
 
 # Spyder project settings
 .spyderproject
@@ -182,6 +190,40 @@ cython_debug/
 
 # Ruff stuff:
 .ruff_cache/
+
+# TickBiteRisk local/raw data and private warehouse outputs
+data/raw/
+data/private/
+data/warehouse/
+data/postgres/
+raw/
+private/
+exports/private/
+*.duckdb
+*.duckdb.wal
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+
+# Large/raw data formats should live under ignored data directories.
+data/**/*.parquet
+data/**/*.feather
+data/**/*.gpkg
+data/**/*.geojson
+data/**/*.tif
+data/**/*.tiff
+data/**/*.nc
+data/**/*.grib
+data/**/*.grb
+raw/**/*.csv
+raw/**/*.xlsx
+raw/**/*.xls
+raw/**/*.pdf
+raw/**/*.parquet
+raw/**/*.geojson
+raw/**/*.tif
+raw/**/*.tiff
 
 # PyPI configuration file
 .pypirc

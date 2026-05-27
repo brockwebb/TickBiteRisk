@@ -1,0 +1,277 @@
+import json
+from pathlib import Path
+
+from tests.test_runtime_risk_lookup import _score_row, _write_csv, _write_scores
+from tickbiterisk.runtime.static_export import (
+    StaticExportInputError,
+    export_static_risk_data,
+)
+
+
+def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    model_summary_path = _write_model_summary(tmp_path / "model_summary.csv")
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "public-data",
+        model_summary_path=model_summary_path,
+    )
+
+    assert outputs.weekly_risk_path.name == "md_county_risk_weekly.json"
+    assert outputs.county_metadata_path.name == "md_county_metadata.json"
+    assert outputs.model_card_path.name == "model_card.json"
+    assert outputs.source_catalog_path.name == "source_catalog.json"
+    assert outputs.export_manifest_path.name == "static_export_manifest.json"
+
+    weekly = _read_json(outputs.weekly_risk_path)
+    counties = _read_json(outputs.county_metadata_path)
+    model_card = _read_json(outputs.model_card_path)
+    source_catalog = _read_json(outputs.source_catalog_path)
+    manifest = _read_json(outputs.export_manifest_path)
+
+    assert weekly["schema_version"] == "county-week-risk-static-v1"
+    assert weekly["export_type"] == "md_county_risk_weekly"
+    assert weekly["scope"] == "maryland_county_week"
+    assert weekly["date_system"]["name"] == "CDC MMWR"
+    assert weekly["record_count"] == 2
+    assert weekly["model_name"] == "linear_blend_baseline"
+    assert weekly["seasonality_source_id"] == "cdc_seasonality_week_2023"
+    assert weekly["score_scale"]["range"] == [1, 10]
+    assert weekly["selected_score_config"]["source_prediction_sha256"] == "a" * 64
+    assert (
+        "Relative Maryland county-week Lyme baseline, not a per-bite infection probability."
+        in weekly["caveats"]
+    )
+    assert "Not a personal infection probability." in weekly["caveats"]
+    assert weekly["records"][0]["county_fips"] == "24003"
+    assert weekly["records"][0]["year"] == 2023
+    assert weekly["records"][0]["risk_score"] == 7
+    assert weekly["records"][0]["predicted_weekly_incidence_95_interval"] == [
+        1.5,
+        3.5,
+    ]
+
+    assert counties["county_count"] == 2
+    anne_arundel = next(
+        county
+        for county in counties["counties"]
+        if county["county_fips"] == "24003"
+    )
+    assert anne_arundel["available_years"] == [2023]
+    assert anne_arundel["source_available_years"] == [2022, 2023]
+    assert anne_arundel["max_risk_score"] == 7
+
+    assert model_card["score_interpretation"].startswith(
+        "Relative seasonal Lyme baseline"
+    )
+    assert "not medical advice" in model_card["clinical_disclaimer"].lower()
+    assert "Not a personal infection probability." in model_card["caveats"]
+    assert model_card["quality_flags"] == [
+        "relative_seasonal_baseline",
+        "static_seasonality_prior",
+        "not_weather_adjusted",
+    ]
+    assert model_card["annual_prediction_source"]["artifact_type"] == (
+        "annual_prediction_branch"
+    )
+    assert model_card["annual_prediction_source"]["run_id"] == "run1"
+    assert model_card["annual_prediction_source"]["sha256"] == "a" * 64
+    assert model_card["annual_prediction_source"]["model_family"] == "ensemble"
+    assert model_card["annual_prediction_source"]["weather_mode"] == (
+        "not_used_by_baseline"
+    )
+    assert model_card["validation_summary"] == {
+        "run_id": "run1",
+        "model_name": "linear_blend_baseline",
+        "rank_by_mae": 1,
+        "n_predictions": 408,
+        "mae_incidence_per_100k": 18.24,
+        "rmse_incidence_per_100k": 29.54,
+        "pearson_correlation": 0.76,
+        "comparison_assumption_flags": [
+            "observational_not_causal",
+            "intervention_history_unmodeled",
+        ],
+    }
+    assert "model-comparison" in model_card["method_summary"]
+    assert source_catalog["sources"][0]["artifact_type"] == "derived"
+    assert "model-comparison annual predictions" in source_catalog["sources"][0]["notes"]
+    assert source_catalog["sources"][1]["source_id"] == "annual_prediction_branch"
+    assert source_catalog["sources"][1]["run_id"] == "run1"
+    assert source_catalog["sources"][1]["sha256"] == "a" * 64
+    assert source_catalog["sources"][1]["model_name"] == "linear_blend_baseline"
+    assert any("CDC" in link["title"] for link in source_catalog["guidance_links"])
+    assert manifest["files"] == [
+        "md_county_risk_weekly.json",
+        "md_county_metadata.json",
+        "model_card.json",
+        "source_catalog.json",
+        "static_export_manifest.json",
+    ]
+    assert manifest["record_counts"]["weekly_risk"] == 2
+
+
+def test_export_static_risk_data_requires_unambiguous_score_branch(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_ambiguous_scores(tmp_path / "scores.csv")
+
+    try:
+        export_static_risk_data(
+            scores_path=scores_path,
+            output_dir=tmp_path / "public-data",
+        )
+    except StaticExportInputError as exc:
+        assert "Multiple static export score branches found" in str(exc)
+    else:
+        raise AssertionError("Expected ambiguous static export to fail")
+
+
+def test_export_static_risk_data_can_select_score_branch(tmp_path: Path) -> None:
+    scores_path = _write_ambiguous_scores(tmp_path / "scores.csv")
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "public-data",
+        source_prediction_sha256="c" * 64,
+    )
+
+    weekly = _read_json(outputs.weekly_risk_path)
+
+    assert weekly["record_count"] == 1
+    assert weekly["selected_score_config"]["source_prediction_sha256"] == "c" * 64
+    assert weekly["records"][0]["risk_score"] == 8
+
+
+def test_export_static_risk_data_rejects_ambiguous_score_denominator(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_csv(
+        tmp_path / "scores.csv",
+        [
+            _score_row("24003", "Anne Arundel County", "2023", "1", "7"),
+            {
+                **_score_row("24003", "Anne Arundel County", "2023", "1", "8"),
+                "score_denominator": "4.5",
+            },
+        ],
+    )
+
+    try:
+        export_static_risk_data(
+            scores_path=scores_path,
+            output_dir=tmp_path / "public-data",
+        )
+    except StaticExportInputError as exc:
+        assert "Multiple static export score branches found" in str(exc)
+    else:
+        raise AssertionError("Expected ambiguous denominator export to fail")
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "public-data",
+        score_denominator=4.5,
+    )
+    weekly = _read_json(outputs.weekly_risk_path)
+
+    assert weekly["selected_score_config"]["score_denominator"] == 4.5
+    assert weekly["records"][0]["risk_score"] == 8
+
+
+def test_export_static_risk_data_rejects_missing_model_summary_match(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    model_summary_path = _write_model_summary(
+        tmp_path / "model_summary.csv",
+        model_name="prior_year_incidence",
+    )
+
+    try:
+        export_static_risk_data(
+            scores_path=scores_path,
+            output_dir=tmp_path / "public-data",
+            model_summary_path=model_summary_path,
+        )
+    except StaticExportInputError as exc:
+        assert "No model comparison summary row matched" in str(exc)
+    else:
+        raise AssertionError("Expected missing summary match export to fail")
+
+
+def test_export_static_risk_data_keeps_blank_optional_validation_metrics_null(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    model_summary_path = _write_model_summary(
+        tmp_path / "model_summary.csv",
+        n_predictions="",
+        mae_incidence_per_100k="",
+        rmse_incidence_per_100k="",
+        pearson_correlation="",
+    )
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "public-data",
+        model_summary_path=model_summary_path,
+    )
+
+    model_card = _read_json(outputs.model_card_path)
+    validation = model_card["validation_summary"]
+
+    assert validation["n_predictions"] is None
+    assert validation["mae_incidence_per_100k"] is None
+    assert validation["rmse_incidence_per_100k"] is None
+    assert validation["pearson_correlation"] is None
+
+
+def _write_ambiguous_scores(path: Path) -> Path:
+    return _write_csv(
+        path,
+        [
+            _score_row("24003", "Anne Arundel County", "2023", "1", "7"),
+            {
+                **_score_row("24003", "Anne Arundel County", "2023", "1", "8"),
+                "source_prediction_run_id": "run2",
+                "source_prediction_sha256": "c" * 64,
+            },
+        ],
+    )
+
+
+def _write_model_summary(
+    path: Path,
+    *,
+    model_name: str = "linear_blend_baseline",
+    n_predictions: str = "408",
+    mae_incidence_per_100k: str = "18.24",
+    rmse_incidence_per_100k: str = "29.54",
+    pearson_correlation: str = "0.76",
+) -> Path:
+    path.write_text(
+        "\n".join(
+            [
+                (
+                    "run_id,rank_by_mae,model_name,model_family,feature_profile,"
+                    "n_predictions,mae_incidence_per_100k,rmse_incidence_per_100k,"
+                    "pearson_correlation,comparison_assumption_flags"
+                ),
+                (
+                    f"run1,1,{model_name},ensemble,lagged_outcome_blend,"
+                    f"{n_predictions},"
+                    f"{mae_incidence_per_100k},{rmse_incidence_per_100k},"
+                    f"{pearson_correlation},"
+                    "\"observational_not_causal,intervention_history_unmodeled\""
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _read_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))

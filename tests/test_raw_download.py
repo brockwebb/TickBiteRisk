@@ -1,0 +1,105 @@
+from tickbiterisk.etl.ecology_sources import EcologySourceFile
+from tickbiterisk.etl import raw_download
+from tickbiterisk.etl.raw_download import download_source_files, fetch_url_bytes
+
+
+class FakeBytesResponse:
+    def __init__(self, content: bytes) -> None:
+        self.content = content
+
+    def __enter__(self) -> "FakeBytesResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.content
+
+
+def test_fetch_url_bytes_retries_transient_oserror_then_returns_bytes(
+    monkeypatch,
+) -> None:
+    calls = []
+
+    def flaky_urlopen(request, *, timeout: int):
+        calls.append((request, timeout))
+        if len(calls) == 1:
+            raise TimeoutError("timed out before first byte")
+        return FakeBytesResponse(b"ok")
+
+    monkeypatch.setattr(raw_download, "urlopen", flaky_urlopen)
+
+    content = fetch_url_bytes(
+        "https://example.test/file",
+        retry_delay_seconds=0,
+    )
+
+    assert content == b"ok"
+    assert len(calls) == 2
+    assert calls[0][0].headers["User-agent"] == "tickbiterisk-etl/0.1"
+    assert calls[0][1] == 60
+
+
+def test_download_source_files_writes_files_and_manifest(tmp_path) -> None:
+    source = EcologySourceFile(
+        source_id="example_html",
+        family="example",
+        url="https://example.test/page",
+        raw_relative_path="example/page.html",
+        description="Example HTML page",
+        expected_format="html",
+    )
+
+    def fake_fetch(url: str) -> bytes:
+        assert url == "https://example.test/page"
+        return b"<html>ok</html>"
+
+    result = download_source_files(
+        [source],
+        raw_dir=tmp_path / "raw",
+        manifest_path=tmp_path / "manifest.csv",
+        fetcher=fake_fetch,
+    )
+
+    output_path = tmp_path / "raw" / "example" / "page.html"
+    assert output_path.read_bytes() == b"<html>ok</html>"
+    assert result.row_count == 1
+    assert result.manifest_path == tmp_path / "manifest.csv"
+    manifest_text = result.manifest_path.read_text(encoding="utf-8")
+    assert "example_html" in manifest_text
+    assert "sha256" in manifest_text
+    assert "bytes" in manifest_text
+
+
+def test_download_source_files_overwrites_idempotently(tmp_path) -> None:
+    source = EcologySourceFile(
+        source_id="example_pdf",
+        family="example",
+        url="https://example.test/file.pdf",
+        raw_relative_path="example/file.pdf",
+        description="Example PDF",
+        expected_format="pdf",
+    )
+    calls = []
+    payloads = iter([b"OLD", b"NEW"])
+
+    def fake_fetch(url: str) -> bytes:
+        calls.append(url)
+        return next(payloads)
+
+    download_source_files(
+        [source],
+        raw_dir=tmp_path / "raw",
+        manifest_path=tmp_path / "manifest.csv",
+        fetcher=fake_fetch,
+    )
+    download_source_files(
+        [source],
+        raw_dir=tmp_path / "raw",
+        manifest_path=tmp_path / "manifest.csv",
+        fetcher=fake_fetch,
+    )
+
+    assert calls == ["https://example.test/file.pdf", "https://example.test/file.pdf"]
+    assert (tmp_path / "raw" / "example" / "file.pdf").read_bytes() == b"NEW"

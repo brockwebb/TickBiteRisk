@@ -1,0 +1,5 @@
+STATEFP,COUNTYFP,GEOID,NAME,STUSPS,STATE_NAME,fips,year,Lyme_Confirmed_Cases,Lyme_Probable_Cases,Lyme_Confirmed_Probable_Cases
+24,003,24003,Anne Arundel,MD,Maryland,24003,2020,53,18,71
+24,003,24003,Anne Arundel,MD,Maryland,24003,2021,60,21,81
+24,005,24005,Baltimore,MD,Maryland,24005,2020,120,58,178
+51,059,51059,Fairfax,VA,Virginia,51059,2020,1,0,1

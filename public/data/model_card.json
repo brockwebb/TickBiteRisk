@@ -1,0 +1,57 @@
+{
+  "annual_prediction_source": {
+    "artifact_type": "annual_prediction_branch",
+    "evaluation_mode": "rolling_origin_prior_years",
+    "model_family": "ensemble",
+    "model_name": "linear_blend_baseline",
+    "run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0",
+    "sha256": "0f4cfc8ba65722e09da63dbc7eecd61d010b3cf8a298515451ba6b31d6787250",
+    "weather_mode": "not_used_by_lagged_model"
+  },
+  "caveats": [
+    "Informational and educational only; not medical advice.",
+    "Does not diagnose disease or determine whether a person is infected.",
+    "Not a treatment recommendation or substitute for a healthcare professional.",
+    "Relative Maryland county-week Lyme baseline, not a per-bite infection probability.",
+    "Not a personal infection probability.",
+    "Static seasonal prior; not a weather-adjusted forecast.",
+    "CDC national onset seasonality is not county-specific.",
+    "Surveillance/reporting changes and interventions are unmodeled.",
+    "Empirical intervals describe baseline uncertainty, not clinical confidence for an individual bite."
+  ],
+  "clinical_disclaimer": "TickBiteRisk is for informational and educational purposes only. It is not medical advice, does not diagnose disease, and does not determine whether you are infected. Follow CDC guidance and contact a qualified healthcare professional about your situation.",
+  "export_type": "model_card",
+  "generated_at": "2026-05-27T14:01:32+00:00",
+  "method_summary": "Selected annual model-comparison prediction rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
+  "model_name": "linear_blend_baseline",
+  "not_for": [
+    "per-bite infection probability",
+    "diagnosis",
+    "treatment recommendation",
+    "weather-adjusted forecast"
+  ],
+  "product_framing": "relative county-week seasonal Lyme baseline",
+  "quality_flags": [
+    "relative_seasonal_baseline",
+    "static_seasonality_prior",
+    "not_weather_adjusted"
+  ],
+  "schema_version": "county-week-risk-static-v1",
+  "score_interpretation": "Relative seasonal Lyme baseline on a 1-10 Maryland scale; not a per-bite infection probability.",
+  "target_definition": "lyme_incidence_per_100k",
+  "validation_summary": {
+    "comparison_assumption_flags": [
+      "observational_not_causal",
+      "retrospective_weather_reconstruction",
+      "intervention_history_unmodeled",
+      "surveillance_reporting_sensitive"
+    ],
+    "mae_incidence_per_100k": 18.240783,
+    "model_name": "linear_blend_baseline",
+    "n_predictions": 408,
+    "pearson_correlation": 0.755185,
+    "rank_by_mae": 1,
+    "rmse_incidence_per_100k": 29.536604,
+    "run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0"
+  }
+}
