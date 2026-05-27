@@ -14,6 +14,10 @@ V0 has no runtime secrets, database connection, server process, API container,
 or scheduled production job. Raw data and private ETL outputs stay outside the
 public runtime.
 
+The Python package is tooling for ETL, model comparison, export, and local
+lookup. The public/ directory is the deployable site artifact for GitHub
+Pages; the static dashboard is not packaged into the Python wheel.
+
 ## 2. Public files
 
 The deployed site should contain:
@@ -92,7 +96,8 @@ GitHub Pages deployment is handled by `.github/workflows/pages.yml`.
 
 The workflow:
 
-- runs on pushes to `main` and manual dispatch,
+- validates on pull requests,
+- validates and deploys on pushes to `main` and manual dispatch,
 - installs Python and Node,
 - runs lint, tests, JavaScript syntax checks, and public-data JSON validation,
 - uploads the committed `public/` directory,

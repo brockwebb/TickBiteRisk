@@ -244,7 +244,7 @@ def extract_docling_markdown(
         except ImportError as exc:
             raise RuntimeError(
                 "Docling is required for PDF deer harvest extraction. "
-                "Install the development dependencies with docling enabled."
+                'Install with the "ocr" extra: pip install -e ".[ocr]".'
             ) from exc
         converter_factory = DocumentConverter
     converter = converter_factory()

@@ -44,6 +44,7 @@ def test_github_pages_workflow_has_expected_triggers_and_permissions() -> None:
             "on:",
             "push:",
             "branches: [main]",
+            "pull_request:",
             "workflow_dispatch:",
             "permissions:",
             "contents: read",
@@ -55,6 +56,7 @@ def test_github_pages_workflow_has_expected_triggers_and_permissions() -> None:
     deploy = _job_block(workflow, "deploy")
     for token in [
         "needs: validate",
+        "if: github.event_name != 'pull_request'",
         "pages: write",
         "id-token: write",
         "environment:",
@@ -76,9 +78,12 @@ def test_github_pages_workflow_validates_static_dashboard_before_deploy() -> Non
             "actions/setup-node@v6",
             'node-version: "24"',
             'python -m pip install -e ".[dev]"',
+            "npm ci",
+            "npx playwright install --with-deps chromium",
             "ruff check .",
             "pytest -q",
             "node --check public/app.js",
+            "npm run test:dashboard",
             "Validate committed dashboard data",
             'data_dir = Path("public/data")',
             '"md_counties.geojson"',

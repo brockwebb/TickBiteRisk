@@ -107,6 +107,24 @@ def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() ->
     assert "curl 'http://localhost:8000/risk" not in quick_start
 
 
+def test_readme_contribution_checks_match_configured_tooling() -> None:
+    readme = README.read_text(encoding="utf-8")
+    contribute = readme.split("## contribute", maxsplit=1)[1].split(
+        "## licence", maxsplit=1
+    )[0]
+
+    for token in [
+        "ruff check .",
+        "pytest -q",
+        "node --check public/app.js",
+        "npm ci",
+        "npm run test:dashboard",
+    ]:
+        assert token in contribute
+
+    assert "pre-commit" not in contribute
+
+
 def test_readme_data_sources_match_current_catalog_not_old_source_wishlist() -> None:
     readme = README.read_text(encoding="utf-8")
     data_sources = readme.split("## data sources", maxsplit=1)[1].split(
@@ -144,6 +162,8 @@ def test_operational_runbook_documents_static_pages_v0_not_live_api_stack() -> N
         "python -m http.server",
         "attached tick calculator",
         "CDC criteria breakdown",
+        "Python package is tooling",
+        "public/ directory is the deployable site artifact",
     ]:
         assert token in runbook
 

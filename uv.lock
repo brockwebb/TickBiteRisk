@@ -2122,14 +2122,16 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "docling" },
     { name = "pytest" },
     { name = "ruff" },
+]
+ocr = [
+    { name = "docling" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "docling", marker = "extra == 'dev'", specifier = ">=2.0" },
+    { name = "docling", marker = "extra == 'ocr'", specifier = ">=2.0" },
     { name = "openpyxl", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "pydantic", specifier = ">=2.7" },
@@ -2138,7 +2140,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "typer", specifier = ">=0.12" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["dev", "ocr"]
 
 [[package]]
 name = "tokenizers"

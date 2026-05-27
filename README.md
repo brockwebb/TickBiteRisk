@@ -61,6 +61,10 @@ tickbiterisk risk export-static \
   --output-dir build/public-risk
 ```
 
+The `dev` extra is intentionally light for CI. Install
+`python -m pip install -e ".[ocr]"` when you want the optional Docling parser
+for PDF/OCR review.
+
 The lookup output is a relative Maryland county-week seasonal Lyme baseline.
 The single-bite output is a decision-support score and CDC criteria explainer.
 Neither output is an absolute infection probability, diagnosis, treatment
@@ -174,8 +178,9 @@ Roadmap HTTP API:
 ## contribute
 
 1. Fork → create feature branch → commit tests.
-2. Run `pre-commit run --all-files`.
-3. Open PR; CI must pass lint, unit, and mini‑model tests.
+2. Run `ruff check .`, `pytest -q`, `node --check public/app.js`, `npm ci`,
+   and `npm run test:dashboard`.
+3. Open PR; CI must pass lint, unit, public-data, and dashboard smoke tests.
 
 Good first issues are labelled **`help wanted`**.
 

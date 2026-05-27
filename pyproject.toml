@@ -18,9 +18,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "docling>=2.0",
   "pytest>=8.2",
   "ruff>=0.5",
+]
+ocr = [
+  "docling>=2.0",
 ]
 
 [project.scripts]

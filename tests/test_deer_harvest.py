@@ -347,6 +347,24 @@ def test_extract_docling_markdown_uses_injected_converter() -> None:
     assert "Maryland Reported Antlered and Antlerless Harvest" in markdown
 
 
+def test_extract_docling_markdown_error_mentions_ocr_extra(monkeypatch) -> None:
+    original_import = __import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "docling.document_converter":
+            raise ImportError("no docling")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    try:
+        extract_docling_markdown("report.pdf")
+    except RuntimeError as exc:
+        assert 'Install with the "ocr" extra' in str(exc)
+    else:
+        raise AssertionError("Expected missing Docling runtime error")
+
+
 def test_attach_deer_harvest_density_uses_census_land_area() -> None:
     rows = parse_maryland_dnr_deer_harvest_html(
         DEER_HARVEST_HTML,
