@@ -341,6 +341,26 @@ def test_data_sources_catalog_matches_current_v0_artifacts() -> None:
         assert token not in catalog
 
 
+def test_data_sources_catalog_tracks_remaining_candidate_sources() -> None:
+    catalog = DATA_SOURCES.read_text(encoding="utf-8")
+
+    for token in [
+        "Potential source and feature candidates",
+        "`open_meteo_archive_md_county_daily`",
+        "`usda_fia_fiadb`",
+        "`maryland_dnr_archery_hunter_survey`",
+        "`usda_nass_maryland_cdl`",
+        "`noaa_cpc_enso_index`",
+        "`noaa_psl_mei_v2`",
+        "`inaturalist_tick_observations`",
+        "`gbif_tick_occurrences`",
+        "`park_attendance_county_year`",
+        "`ecological_pressure_index`",
+        "derived feature candidate, not a raw feed",
+    ]:
+        assert token in catalog
+
+
 def test_testing_ci_plan_documents_current_static_pipeline_not_future_model_service() -> None:
     ci_plan = TESTING_CI_PLAN.read_text(encoding="utf-8")
 

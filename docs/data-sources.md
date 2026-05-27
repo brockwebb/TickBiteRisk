@@ -25,6 +25,25 @@ boundary clearly allow redistribution.
 | `nssp_coverage` | NSSP coverage map table | County/status | Feasibility check for future ED tick-bite feed | acquired_not_model_input |
 | `capc_dog_serology` | CAPC canine Lyme data | County/month | Possible veterinary sentinel source | not_redistributed_license_sensitive |
 
+## Potential source and feature candidates
+
+These are not current public-runtime inputs. They are candidate feeds or derived
+feature ideas to test in time-aware backtests before any public model claim.
+
+| Source ID | Candidate | Grain | Why try it | Status |
+| --- | --- | --- | --- | --- |
+| `open_meteo_archive_md_county_daily` | Open-Meteo historical/reanalysis weather | County-day | Humidity, dew point, soil moisture, soil temperature, evapotranspiration, and wind fields that NOAA GHCND does not currently populate | candidate_etl_supported_backfill_pending |
+| `usda_fia_fiadb` | USDA Forest Service FIA / FIADB / EVALIDator | Forest inventory estimate | Oak-hickory and forest-composition context that may be more biologically meaningful than generic forest percent | source_manifested_needs_feature_extraction |
+| `maryland_dnr_archery_hunter_survey` | Maryland DNR Archery Hunter / Bowhunter Survey | Hunter report / county-season if extractable | Host and wildlife observation proxy, potentially lighter than raster GIS if report tables are defensible | source_manifested_needs_review |
+| `usda_nass_maryland_cdl` | USDA NASS Cropland Data Layer / CropScape | Raster/county summary candidate | Annual crop, pasture, hay, and open-land change context around land-use and edge habitat | source_manifested_needs_feature_extraction |
+| `noaa_cpc_enso_index` | NOAA CPC ENSO index, ONI/RONI | Global seasonal climate index | El Nino / La Nina phase as a lagged climate-regime overtone, likely prior winter/spring only | candidate_needs_etl |
+| `noaa_psl_mei_v2` | NOAA PSL Multivariate ENSO Index v2 | Global bimonthly climate index | Ocean-atmosphere ENSO strength companion to ONI/RONI, useful only as lagged broad climate context | candidate_needs_etl |
+| `cdc_tick_bite_tracker` | CDC Tick Bite Data Tracker | HHS region/week dashboard | Activity overlay if backing data becomes available; current public dashboard grain is not county-year | candidate_missing_bulk_data |
+| `inaturalist_tick_observations` | iNaturalist tick observations | Point observation | Experimental tick-observation activity proxy if normalized by observer effort and license terms | candidate_bias_sensitive |
+| `gbif_tick_occurrences` | GBIF tick occurrence records | Point occurrence | Comparator for public tick observations and museum/citizen-science records, with per-record license review | candidate_bias_sensitive |
+| `park_attendance_county_year` | Park attendance or trail-use records | Park/county/agency-year | Outdoor exposure denominator proxy if a reliable Maryland source can be found | candidate_needs_source_selection |
+| `ecological_pressure_index` | Composite ecological pressure index | County-year derived feature | derived feature candidate, not a raw feed; would combine lagged host, habitat, climate stress, contact pressure, spatial disease pressure, and optional ENSO/Open-Meteo/FIA inputs | candidate_needs_design_and_backtest |
+
 ## Current v0 derived artifacts
 
 | Artifact | Producer | Use |
@@ -63,5 +82,8 @@ boundary clearly allow redistribution.
   review exists.
 - Land-cover features need deeper county summarization before they should drive
   public model claims.
+- ENSO and composite ecological-pressure features are not implemented yet. If
+  tested, they should use timing-safe lags and preserve component values rather
+  than hiding source uncertainty inside a single score.
 
 Last updated: 2026-05-27.
