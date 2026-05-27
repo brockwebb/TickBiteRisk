@@ -56,6 +56,15 @@ NUMERIC_SOURCE_COLUMNS = [
     "contact_pressure_total_value_dollars",
     "deer_total_harvest_prior_season",
     "deer_harvest_per_sqmi_prior_season",
+    "mast_index_prior_year",
+    "acorn_index_prior_year",
+    "hard_mast_index_prior_year",
+    "soft_mast_index_prior_year",
+    "black_oak_acorns_per_branch_prior_year",
+    "white_oak_acorns_per_branch_prior_year",
+    "unit_average_acorns_per_branch_prior_year",
+    "white_oak_subjective_crown_pct_prior_year",
+    "black_oak_subjective_crown_pct_prior_year",
 ]
 OPTIONAL_NUMERIC_COLUMNS = [
     "residential_units_authorized",
@@ -64,6 +73,15 @@ OPTIONAL_NUMERIC_COLUMNS = [
     "contact_pressure_total_value_dollars",
     "deer_total_harvest_prior_season",
     "deer_harvest_per_sqmi_prior_season",
+    "mast_index_prior_year",
+    "acorn_index_prior_year",
+    "hard_mast_index_prior_year",
+    "soft_mast_index_prior_year",
+    "black_oak_acorns_per_branch_prior_year",
+    "white_oak_acorns_per_branch_prior_year",
+    "unit_average_acorns_per_branch_prior_year",
+    "white_oak_subjective_crown_pct_prior_year",
+    "black_oak_subjective_crown_pct_prior_year",
 ]
 REQUIRED_MODEL_FEATURE_COLUMNS = [
     "county_fips",

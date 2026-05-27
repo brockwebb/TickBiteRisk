@@ -33,6 +33,8 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert row["feature_weather_temp_mean_f"] == "52.0"
     assert row["feature_missing_deer_harvest_prior_season"] == "1"
     assert row["feature_deer_harvest_per_sqmi_prior_season"] == "0.0"
+    assert row["feature_missing_mast_index_prior_year"] == "1"
+    assert row["feature_mast_index_prior_year"] == "0.0"
     assert row["feature_tick_ixodes_scapularis_established"] == "1"
     assert row["feature_tick_borrelia_burgdorferi_present"] == "1"
     assert row["feature_flag_missing_deer_harvest_prior_season"] == "1"
@@ -49,6 +51,8 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
         "target_population",
     ]
     assert "feature_weather_temp_mean_f" in result.schema.feature_columns
+    assert "feature_mast_index_prior_year" in result.schema.feature_columns
+    assert "feature_missing_mast_index_prior_year" in result.schema.feature_columns
     assert "feature_tick_ixodes_scapularis_established" in result.schema.feature_columns
     assert "feature_flag_missing_deer_harvest_prior_season" in result.schema.feature_columns
     assert result.schema.missing_value_strategy["numeric"] == (
@@ -56,6 +60,17 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
         "feature_missing_* indicators"
     )
     assert len(result.schema.input_sha256) == 64
+
+    mast_row = next(
+        item
+        for item in result.rows
+        if item["county_fips"] == "24005" and item["year"] == "2020"
+    )
+    assert mast_row["feature_mast_index_prior_year"] == "11.91"
+    assert mast_row["feature_acorn_index_prior_year"] == "11.91"
+    assert mast_row["feature_black_oak_acorns_per_branch_prior_year"] == "17.02"
+    assert mast_row["feature_white_oak_subjective_crown_pct_prior_year"] == "22.87"
+    assert mast_row["feature_missing_mast_index_prior_year"] == "0"
 
 
 def test_write_model_design_matrix_outputs_writes_csv_and_schema_json(
@@ -96,6 +111,7 @@ def _write_feature_matrix(path: Path) -> Path:
         for offset, cases in enumerate(yearly_cases):
             year = 2018 + offset
             has_deer = county_fips == "24005" and year == 2020
+            has_mast = county_fips == "24005" and year == 2020
             rows.append(
                 {
                     "county_fips": county_fips,
@@ -142,6 +158,39 @@ def _write_feature_matrix(path: Path) -> Path:
                     "deer_total_harvest_prior_season": "1200" if has_deer else "",
                     "deer_harvest_per_sqmi_prior_season": "3.5" if has_deer else "",
                     "deer_is_derived_total": "False" if has_deer else "",
+                    "mast_index_prior_year": "11.91" if has_mast else "",
+                    "acorn_index_prior_year": "11.91" if has_mast else "",
+                    "hard_mast_index_prior_year": "11.91" if has_mast else "",
+                    "soft_mast_index_prior_year": "",
+                    "black_oak_acorns_per_branch_prior_year": (
+                        "17.02" if has_mast else ""
+                    ),
+                    "white_oak_acorns_per_branch_prior_year": (
+                        "6.80" if has_mast else ""
+                    ),
+                    "unit_average_acorns_per_branch_prior_year": (
+                        "11.91" if has_mast else ""
+                    ),
+                    "white_oak_subjective_crown_pct_prior_year": (
+                        "22.87" if has_mast else ""
+                    ),
+                    "black_oak_subjective_crown_pct_prior_year": (
+                        "34.87" if has_mast else ""
+                    ),
+                    "mast_coverage_complete_prior_year": "",
+                    "mast_source_ids_prior_year": (
+                        "maryland_dnr_wmd_mast_survey_2021" if has_mast else ""
+                    ),
+                    "mast_source_report_year_prior_year": "2021" if has_mast else "",
+                    "mast_parser_method_prior_year": (
+                        "pypdfium_table_text" if has_mast else ""
+                    ),
+                    "mast_extraction_confidence_prior_year": "high" if has_mast else "",
+                    "mast_feature_quality_flags_prior_year": (
+                        "western_maryland_only,study_plot_not_countywide"
+                        if has_mast
+                        else ""
+                    ),
                     "ixodes_scapularis_status": "established",
                     "ixodes_pacificus_status": "no_records",
                     "borrelia_burgdorferi_status": "present",

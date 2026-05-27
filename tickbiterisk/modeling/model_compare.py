@@ -28,6 +28,8 @@ EXCLUDED_FEATURES = {
     "feature_flag_lyme_source_conflict",
     "feature_flag_lyme_case_definition_change",
     "feature_flag_covid_reporting_disruption",
+    "feature_flag_western_maryland_only",
+    "feature_flag_study_plot_not_countywide",
 }
 REQUIRED_MODEL_COMPARISON_COLUMNS = [
     "county_fips",
@@ -55,6 +57,24 @@ FORECAST_ECOLOGY_EXACT_FEATURES = {
     "feature_missing_deer_harvest_per_sqmi_prior_season",
     "feature_deer_is_derived_total",
     "feature_missing_deer_is_derived_total",
+    "feature_mast_index_prior_year",
+    "feature_acorn_index_prior_year",
+    "feature_hard_mast_index_prior_year",
+    "feature_soft_mast_index_prior_year",
+    "feature_black_oak_acorns_per_branch_prior_year",
+    "feature_white_oak_acorns_per_branch_prior_year",
+    "feature_unit_average_acorns_per_branch_prior_year",
+    "feature_white_oak_subjective_crown_pct_prior_year",
+    "feature_black_oak_subjective_crown_pct_prior_year",
+    "feature_missing_mast_index_prior_year",
+    "feature_missing_acorn_index_prior_year",
+    "feature_missing_hard_mast_index_prior_year",
+    "feature_missing_soft_mast_index_prior_year",
+    "feature_missing_black_oak_acorns_per_branch_prior_year",
+    "feature_missing_white_oak_acorns_per_branch_prior_year",
+    "feature_missing_unit_average_acorns_per_branch_prior_year",
+    "feature_missing_white_oak_subjective_crown_pct_prior_year",
+    "feature_missing_black_oak_subjective_crown_pct_prior_year",
 }
 
 

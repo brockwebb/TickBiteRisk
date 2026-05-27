@@ -143,6 +143,24 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     assert model_compare._is_forecast_ecology_feature_column(
         "feature_missing_deer_harvest_prior_season"
     )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_mast_index_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_mast_index_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_black_oak_acorns_per_branch_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_missing_mast_index_prior_year"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_western_maryland_only"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_flag_study_plot_not_countywide"
+    )
 
 
 def test_write_model_comparison_outputs_orders_and_dedupes(
