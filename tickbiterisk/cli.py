@@ -147,6 +147,10 @@ from tickbiterisk.runtime.risk_lookup import (
     RiskLookupInputError,
     RiskLookupStore,
 )
+from tickbiterisk.runtime.single_bite import (
+    SingleBiteRiskInputError,
+    estimate_single_bite_risk,
+)
 from tickbiterisk.runtime.static_export import (
     StaticExportInputError,
     export_static_risk_data,
@@ -240,6 +244,88 @@ def risk_lookup(
             source_seasonality_sha256=source_seasonality_sha256,
         )
     except RiskLookupInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(json.dumps(asdict(response), indent=2 if pretty else None))
+
+
+@risk_app.command("single-bite")
+def risk_single_bite(
+    county_fips: str = typer.Option(
+        ...,
+        help="Five-digit Maryland county FIPS code.",
+    ),
+    lookup_date: str = typer.Option(
+        date.today().isoformat(),
+        "--date",
+        help="Calendar date to convert to MMWR week.",
+    ),
+    scores_path: Path = typer.Option(
+        Path("build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv"),
+        help="County-week seasonal risk baseline CSV.",
+    ),
+    tick_species: str = typer.Option(
+        ...,
+        help="Tick identity, such as blacklegged, ixodes_scapularis, unknown, or not_ixodes.",
+    ),
+    tick_stage: str = typer.Option(
+        "unknown",
+        help="Tick life stage: nymph, adult, larva, or unknown.",
+    ),
+    attachment_hours: float | None = typer.Option(
+        None,
+        help="Estimated attachment duration in hours.",
+    ),
+    engorgement: str = typer.Option(
+        "unknown",
+        help="Observed engorgement: flat, slightly_engorged, engorged, or unknown.",
+    ),
+    hours_since_removal: float | None = typer.Option(
+        None,
+        help="Hours since the tick was removed.",
+    ),
+    doxycycline_safe: bool | None = typer.Option(
+        None,
+        "--doxycycline-safe/--doxycycline-unsafe",
+        help="Whether doxycycline is known to be safe for the person; omit if unknown.",
+    ),
+    tick_count: int = typer.Option(
+        1,
+        help="Number of attached ticks represented by this estimate.",
+    ),
+    model_name: str = typer.Option(
+        "linear_blend_baseline",
+        help="Risk score model branch to query for the county-week prior.",
+    ),
+    seasonality_source_id: str = typer.Option(
+        "cdc_seasonality_week_2023",
+        help="Weekly seasonality source_id to query.",
+    ),
+    pretty: bool = typer.Option(
+        False,
+        help="Pretty-print JSON output.",
+    ),
+) -> None:
+    if not scores_path.exists():
+        raise typer.BadParameter(f"Risk score file not found: {scores_path}")
+    try:
+        store = RiskLookupStore.from_csv(scores_path)
+        baseline = store.lookup(
+            county_fips=county_fips,
+            query_date=lookup_date,
+            model_name=model_name,
+            seasonality_source_id=seasonality_source_id,
+        )
+        response = estimate_single_bite_risk(
+            baseline=baseline,
+            tick_species=tick_species,
+            tick_stage=tick_stage,
+            attachment_hours=attachment_hours,
+            engorgement=engorgement,
+            hours_since_removal=hours_since_removal,
+            doxycycline_safe=doxycycline_safe,
+            tick_count=tick_count,
+        )
+    except (RiskLookupInputError, SingleBiteRiskInputError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(json.dumps(asdict(response), indent=2 if pretty else None))
 

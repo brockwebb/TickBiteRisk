@@ -184,7 +184,34 @@ The lookup must:
 
 The lookup output must not be presented as per-bite infection probability, diagnosis, treatment guidance, or weather-adjusted forecast.
 
-### FR4D: Static Public Risk Export
+### FR4D: Single-Bite Runtime
+
+The system must expose a local single-bite runtime over the derived county-week
+risk baseline before a full HTTP API is implemented.
+
+The single-bite runtime must:
+
+- be callable as `tickbiterisk risk single-bite`.
+- read `county_week_seasonal_risk_baseline.csv` without requiring raw source
+  files, Postgres credentials, or live network access.
+- accept `county_fips`, calendar date, tick species, tick stage, attachment
+  hours, engorgement, optional hours since removal, optional doxycycline safety,
+  and tick count.
+- use the county/date lookup result as the local and seasonal context.
+- return a single-bite Lyme decision-support score on a 1-10 scale.
+- return CDC prophylaxis consideration criteria as separate `meets`, `not_met`,
+  or `uncertain` statuses.
+- include CDC guidance links, a clinical disclaimer, caveats, normalized inputs,
+  evidence modifiers, and baseline context.
+
+The single-bite runtime must not be presented as an absolute infection
+probability, diagnosis, treatment recommendation, or substitute for a healthcare
+professional. Symptoms must remain outside the model and should prompt medical
+care regardless of score.
+
+Plain-language public wording should say: this is not an absolute infection probability.
+
+### FR4E: Static Public Risk Export
 
 The system must expose a static export command over the derived county-week risk baseline for a public web/runtime bundle.
 
@@ -199,7 +226,7 @@ The export must:
 
 The static export must be framed as a relative Maryland county-week Lyme baseline, not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.
 
-### FR4E: Static Dashboard Prototype
+### FR4F: Static Dashboard Prototype
 
 The system must expose a static dashboard under `public/` that reads only
 `public/data` assets, requires no backend credentials, and presents the

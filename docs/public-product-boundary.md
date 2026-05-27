@@ -66,6 +66,14 @@ The first implemented runtime bridge reads the derived
 county/date lookups. It must keep the score framed as a relative seasonal Lyme
 baseline, not a per-bite infection probability or treatment recommendation.
 
+The second implemented runtime bridge, `tickbiterisk risk single-bite`, reads
+that same county-week baseline and combines it with user-supplied bite evidence:
+tick species, life stage, attachment time, engorgement, removal timing, optional
+doxycycline safety, and tick count. It may return a single-bite Lyme
+decision-support score and a CDC prophylaxis consideration criteria summary. It
+must stay framed as a transparent decision-support estimate, not an absolute
+infection probability, diagnosis, or treatment recommendation.
+
 The static export bridge, `tickbiterisk risk export-static`, reads that same
 derived artifact and writes public-safe JSON files. It selects one explicit
 model/source/scale branch, publishes the latest available baseline row per

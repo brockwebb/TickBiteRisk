@@ -5,9 +5,10 @@
 TickBiteRisk turns messy tickborne disease and ecology data into a transparent
 Maryland-first risk context product. The current system helps people compare
 relative county-week seasonal Lyme risk and understand the evidence behind the
-score.
+score. It also provides a single-bite Lyme decision-support score for organizing
+post-bite evidence against CDC prophylaxis consideration criteria.
 
-This is not a per-bite infection probability, diagnosis, treatment
+This is not an absolute infection probability, diagnosis, treatment
 recommendation, or weather-adjusted forecast.
 
 ## Current v0 scope
@@ -16,6 +17,8 @@ The current v0 scope is deliberately narrower than the long-term idea:
 
 - Maryland county-level public dashboard.
 - A relative county-week seasonal Lyme baseline on a 1-10 scale.
+- A single-bite Lyme decision-support score that uses tick species/stage,
+  attachment time, engorgement, removal timing, and doxycycline safety fields.
 - Local CLI lookup and static JSON export from derived artifacts.
 - Normalized ETL for CDC Lyme, Maryland surveillance, NOAA weather, Census
   population, deer harvest, land-cover/habitat proxies, tick vector/pathogen
@@ -29,14 +32,16 @@ The current v0 scope is deliberately narrower than the long-term idea:
 The v0 dashboard answers: "Compared with other Maryland county-weeks in the
 data product, how elevated is the seasonal Lyme baseline here?"
 
-It does not answer: "Did this specific tick bite infect me?"
+The v0 single-bite CLI answers: "Given what I know about this attached tick,
+how elevated is my Lyme concern score, and which CDC consideration criteria are
+met, not met, or uncertain?"
 
 ## Out of current scope
 
 - Personal medical advice, diagnosis, prophylaxis decisions, or treatment
   recommendations.
-- Bite-specific calculations using tick attachment duration, tick testing, or
-  individual symptoms.
+- Determining whether a specific bite infected someone.
+- Using tick testing or individual symptoms as model inputs.
 - National county coverage.
 - Live API service, user accounts, or server-side runtime.
 - Claims that prevention campaigns or clinical behavior caused observed
@@ -60,8 +65,8 @@ defensible estimate of disease risk after a tick encounter?
 Future work may test:
 
 - Bayesian hierarchical disease incidence models.
-- Per-bite infection probability models using tick species, stage, attachment
-  duration, and pathogen prevalence.
+- Calibrated absolute infection probability models using tick species, stage,
+  attachment duration, and pathogen prevalence.
 - Live API or conversational interfaces that ask only medically relevant,
   plain-language questions.
 - Multi-pathogen extensions for anaplasmosis, babesiosis, ehrlichiosis,

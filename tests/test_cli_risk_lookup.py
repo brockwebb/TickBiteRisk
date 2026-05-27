@@ -60,3 +60,67 @@ def test_risk_lookup_command_fails_cleanly_when_scores_missing(
     assert result.exit_code != 0
     assert "Risk score file not found" in result.output
     assert "Traceback" not in result.output
+
+
+def test_risk_single_bite_command_returns_decision_support_json(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+
+    result = runner.invoke(
+        app,
+        [
+            "risk",
+            "single-bite",
+            "--county-fips",
+            "24003",
+            "--date",
+            "2023-01-01",
+            "--scores-path",
+            str(scores_path),
+            "--tick-species",
+            "blacklegged",
+            "--tick-stage",
+            "nymph",
+            "--attachment-hours",
+            "40",
+            "--engorgement",
+            "engorged",
+            "--hours-since-removal",
+            "24",
+            "--doxycycline-safe",
+            "--pretty",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["county_fips"] == "24003"
+    assert payload["single_bite_risk_score"] >= payload["baseline_context"][
+        "county_week_risk_score"
+    ]
+    assert payload["pep_consideration"] == "meets_cdc_consideration_criteria"
+    assert payload["input_summary"]["tick_species"] == "ixodes_scapularis"
+    assert "clinical_disclaimer" in payload
+
+
+def test_risk_single_bite_command_fails_cleanly_when_scores_missing(
+    tmp_path: Path,
+) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "risk",
+            "single-bite",
+            "--county-fips",
+            "24003",
+            "--scores-path",
+            str(tmp_path / "missing.csv"),
+            "--tick-species",
+            "blacklegged",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Risk score file not found" in result.output
+    assert "Traceback" not in result.output

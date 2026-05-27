@@ -78,13 +78,32 @@ unusually high county-weeks to register near the top.
 The scale is relative to the current Maryland data product. It should not be
 read as an absolute probability of infection.
 
+## Single-bite decision-support overlay
+
+The implemented `tickbiterisk risk single-bite` runtime uses the county-week
+seasonal baseline as the local/seasonal prior and applies transparent
+bite-evidence modifiers:
+
+- tick species identity, with blacklegged/Ixodes ticks treated as the Lyme
+  vector of concern,
+- tick life stage,
+- estimated attachment duration,
+- engorgement,
+- number of attached ticks,
+- time since removal, and
+- whether doxycycline safety is known or unknown.
+
+The output is a single-bite Lyme decision-support score plus a
+criterion-by-criterion CDC prophylaxis consideration summary. It is deliberately
+not an absolute infection probability, diagnosis, or treatment recommendation.
+
 ## Research roadmap model
 
-A later research branch may estimate bite-specific disease risk by combining
-county context, tick species or life stage, attachment duration, pathogen
-prevalence, and uncertainty from sparse surveillance. That branch may use
-Bayesian hierarchical modeling, posterior draws, or ensemble combinations if
-the data and validation justify it.
+A later research branch may calibrate absolute bite-specific disease
+probabilities by combining county context, tick species or life stage,
+attachment duration, pathogen prevalence, and uncertainty from sparse
+surveillance. That branch may use Bayesian hierarchical modeling, posterior
+draws, or ensemble combinations if the data and validation justify it.
 
 That future work must remain separate from the v0 public score until it has:
 

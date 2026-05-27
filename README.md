@@ -2,7 +2,10 @@
 
 ## mission
 
-Build a transparent, Maryland-first tickborne disease risk data product from open public data. The current implementation communicates relative county-week Lyme risk baselines; per-bite Lyme probability for any U.S. county is a roadmap goal.
+Build a transparent, Maryland-first tickborne disease risk data product from
+open public data. The current implementation communicates relative county-week
+Lyme risk baselines and a single-bite Lyme decision-support score. Calibrated
+absolute infection probabilities for any U.S. county remain a research goal.
 
 This project ships as self-hosted code; we do not currently provide a public API.
 
@@ -19,6 +22,9 @@ The implemented product-facing bridges today are:
 
 - `tickbiterisk risk lookup`, which reads the derived county-week baseline and
   returns plain JSON.
+- `tickbiterisk risk single-bite`, which combines that baseline with tick
+  identity, stage, attachment time, engorgement, removal timing, and CDC
+  prophylaxis consideration criteria.
 - `tickbiterisk risk export-static`, which writes public-safe derived JSON files
   for the static web product.
 - `public/`, which can be served directly or published through GitHub Pages.
@@ -37,13 +43,26 @@ tickbiterisk risk lookup \
   --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
   --pretty
 
+tickbiterisk risk single-bite \
+  --county-fips 24003 \
+  --date 2026-05-26 \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --tick-species blacklegged \
+  --tick-stage nymph \
+  --attachment-hours 40 \
+  --engorgement engorged \
+  --hours-since-removal 24 \
+  --doxycycline-safe \
+  --pretty
+
 tickbiterisk risk export-static \
   --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
   --output-dir build/public-risk
 ```
 
-The lookup output is a relative Maryland county-week seasonal Lyme baseline on a
-1-10 scale. It is not a per-bite infection probability, diagnosis, treatment
+The lookup output is a relative Maryland county-week seasonal Lyme baseline.
+The single-bite output is a decision-support score and CDC criteria explainer.
+Neither output is an absolute infection probability, diagnosis, treatment
 recommendation, or weather-adjusted forecast.
 
 ## quick start (static dashboard)
@@ -139,6 +158,7 @@ committed data product used by the static dashboard.
 Implemented local lookup:
 
 * `tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26 --pretty` – relative county-week seasonal Lyme baseline JSON, not per-bite probability.
+* `tickbiterisk risk single-bite --county-fips 24003 --date 2026-05-26 --tick-species blacklegged --tick-stage nymph --attachment-hours 40 --engorgement engorged --hours-since-removal 24 --doxycycline-safe --pretty` – single-bite Lyme decision-support score and CDC prophylaxis criteria summary, not an absolute infection probability.
 * `tickbiterisk risk export-static --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv --output-dir build/public-risk` – public-safe derived JSON bundle for static web/runtime use.
 
 Roadmap HTTP API:

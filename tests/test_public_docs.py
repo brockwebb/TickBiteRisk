@@ -13,6 +13,7 @@ DATA_SOURCES = Path("docs/data-sources.md")
 TESTING_CI_PLAN = Path("docs/testing-ci-plan.md")
 ETL_PIPELINE = Path("docs/etl-pipeline.md")
 MODEL_BACKGROUND = Path("docs/model-background.md")
+SRS = Path("docs/software-requirements-spec.md")
 
 
 def test_user_guide_matches_implemented_maryland_baseline_product() -> None:
@@ -20,9 +21,11 @@ def test_user_guide_matches_implemented_maryland_baseline_product() -> None:
 
     for token in [
         "relative county-week seasonal Lyme baseline",
-        "not a per-bite infection probability",
+        "single-bite Lyme decision-support score",
+        "not an absolute infection probability",
         "CDC MMWR week",
         "tickbiterisk risk lookup",
+        "tickbiterisk risk single-bite",
         "tickbiterisk risk export-static",
         "Informational and educational only",
         "Follow CDC guidance",
@@ -49,6 +52,10 @@ def test_api_spec_documents_current_cli_json_contract_before_roadmap_http_api() 
     for token in [
         "Current implemented local contract",
         "tickbiterisk risk lookup",
+        "Current Single-Bite Runtime",
+        "tickbiterisk risk single-bite",
+        "single_bite_risk_score",
+        "pep_consideration",
         "county_fips",
         "query_date",
         "mmwr_year",
@@ -59,7 +66,7 @@ def test_api_spec_documents_current_cli_json_contract_before_roadmap_http_api() 
         "evaluation_mode",
         "weather_mode",
         "source_metadata",
-        "not a per-bite infection probability",
+        "not an absolute infection probability",
         "Roadmap HTTP API",
     ]:
         assert token in spec
@@ -72,6 +79,7 @@ def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() ->
     assert "## quick start (current cli)" in quick_start
     assert "## quick start (static dashboard)" in quick_start
     assert "tickbiterisk risk lookup" in quick_start
+    assert "tickbiterisk risk single-bite" in quick_start
     assert "tickbiterisk risk export-static" in quick_start
     assert "python -m http.server 8000 --directory public" in quick_start
     assert "quick start (docker)" not in quick_start
@@ -194,13 +202,14 @@ def test_roadmap_starts_from_shipped_static_maryland_v0() -> None:
         assert token not in current_section
 
 
-def test_vision_scope_separates_current_relative_baseline_from_future_per_bite_work() -> None:
+def test_vision_scope_includes_single_bite_score_without_absolute_probability_claim() -> None:
     vision = VISION_SCOPE.read_text(encoding="utf-8")
 
     for token in [
         "Current v0 scope",
         "relative county-week seasonal Lyme baseline",
-        "not a per-bite infection probability",
+        "single-bite Lyme decision-support score",
+        "not an absolute infection probability",
         "Future research scope",
     ]:
         assert token in vision
@@ -212,6 +221,7 @@ def test_vision_scope_separates_current_relative_baseline_from_future_per_bite_w
         "posterior",
         "tau_hours",
         "probability + CI",
+        "Bite-specific calculations using tick attachment duration",
     ]:
         assert token not in current_section
 
@@ -221,6 +231,7 @@ def test_model_spec_leads_with_implemented_comparison_model_before_research_mode
 
     for token in [
         "Current implemented model",
+        "Single-bite decision-support overlay",
         "model_comparison_predictions.csv",
         "linear_blend_baseline",
         "ridge_forecast_safe",
@@ -237,6 +248,19 @@ def test_model_spec_leads_with_implemented_comparison_model_before_research_mode
         "posterior probability",
     ]:
         assert token not in current_section
+
+
+def test_srs_documents_single_bite_runtime_as_current_nonmedical_feature() -> None:
+    srs = SRS.read_text(encoding="utf-8")
+
+    for token in [
+        "Single-Bite Runtime",
+        "tickbiterisk risk single-bite",
+        "single-bite Lyme decision-support score",
+        "CDC prophylaxis consideration criteria",
+        "not an absolute infection probability",
+    ]:
+        assert token in srs
 
 
 def test_data_sources_catalog_matches_current_v0_artifacts() -> None:
