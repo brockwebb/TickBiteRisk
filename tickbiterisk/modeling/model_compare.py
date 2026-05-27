@@ -114,6 +114,12 @@ FORECAST_ECOLOGY_EXACT_FEATURES = {
     "feature_missing_usdm_prior_year_tick_season_dsci_mean",
     "feature_missing_usdm_prior_year_tick_season_weeks_d1_or_worse",
 }
+FORECAST_SPATIAL_EXACT_FEATURES = {
+    "feature_neighbor_prior_year_lyme_incidence_mean",
+    "feature_neighbor_prior_year_lyme_incidence_max",
+    "feature_neighbor_prior_year_count",
+    "feature_missing_neighbor_prior_year_lyme_incidence",
+}
 
 
 class ModelComparisonInputError(ValueError):
@@ -412,6 +418,13 @@ def _is_forecast_ecology_feature_column(column: str) -> bool:
     )
 
 
+def _is_forecast_spatial_feature_column(column: str) -> bool:
+    return (
+        _is_forecast_safe_feature_column(column)
+        or column in FORECAST_SPATIAL_EXACT_FEATURES
+    )
+
+
 def _has_training_depth(
     rows: list[_DesignRow],
     *,
@@ -476,6 +489,23 @@ def _predict_models(
             "regularized_linear",
             "forecast_safe_lagged",
             forecast_ridge_prediction,
+        )
+    )
+    spatial_columns = [
+        column for column in feature_columns if _is_forecast_spatial_feature_column(column)
+    ]
+    spatial_ridge_prediction = _ridge_prediction(
+        row=row,
+        train_rows=train_rows,
+        feature_columns=spatial_columns,
+        ridge_alpha=ridge_alpha,
+    )
+    predictions.append(
+        (
+            "ridge_forecast_spatial",
+            "regularized_linear",
+            "forecast_safe_lagged_spatial",
+            spatial_ridge_prediction,
         )
     )
     ecology_columns = [

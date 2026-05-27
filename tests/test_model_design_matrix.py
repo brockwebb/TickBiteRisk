@@ -132,6 +132,43 @@ def test_write_model_design_matrix_outputs_writes_csv_and_schema_json(
     assert schema["feature_columns"] == result.schema.feature_columns
 
 
+def test_build_model_design_matrix_adds_prior_year_neighbor_incidence_features(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+    adjacency = _write_adjacency(tmp_path / "adjacency.csv")
+
+    result = build_model_design_matrix(
+        model_features_path=feature_matrix,
+        lookback_years=2,
+        county_adjacency_path=adjacency,
+    )
+
+    anne_2020 = next(
+        row
+        for row in result.rows
+        if row["county_fips"] == "24003" and row["year"] == "2020"
+    )
+    assert anne_2020["feature_neighbor_prior_year_lyme_incidence_mean"] == "40.0"
+    assert anne_2020["feature_neighbor_prior_year_lyme_incidence_max"] == "40.0"
+    assert anne_2020["feature_neighbor_prior_year_count"] == "1"
+    assert anne_2020["feature_missing_neighbor_prior_year_lyme_incidence"] == "0"
+    assert "feature_neighbor_prior_year_lyme_incidence_mean" in (
+        result.schema.feature_columns
+    )
+    assert result.schema.spatial_neighbor_source_path == str(adjacency)
+    assert len(result.schema.spatial_neighbor_source_sha256 or "") == 64
+    assert "spatial_neighbor" in result.schema.missing_value_strategy
+
+    baltimore_2019 = next(
+        row
+        for row in result.rows
+        if row["county_fips"] == "24005" and row["year"] == "2019"
+    )
+    assert baltimore_2019["feature_neighbor_prior_year_lyme_incidence_mean"] == "10.0"
+    assert baltimore_2019["feature_neighbor_prior_year_count"] == "1"
+
+
 def _write_feature_matrix(path: Path) -> Path:
     rows = []
     for county_fips, county_name, yearly_cases in [
@@ -334,6 +371,34 @@ def _write_feature_matrix(path: Path) -> Path:
                     ),
                 }
             )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_adjacency(path: Path) -> Path:
+    rows = [
+        {
+            "county_fips": "24003",
+            "county_name": "Anne Arundel County",
+            "neighbor_county_fips": "24005",
+            "neighbor_county_name": "Baltimore County",
+            "shared_boundary_segment_count": "1",
+            "adjacency_method": "fixture",
+            "feature_quality_flags": "county_adjacency_from_fixture",
+        },
+        {
+            "county_fips": "24005",
+            "county_name": "Baltimore County",
+            "neighbor_county_fips": "24003",
+            "neighbor_county_name": "Anne Arundel County",
+            "shared_boundary_segment_count": "1",
+            "adjacency_method": "fixture",
+            "feature_quality_flags": "county_adjacency_from_fixture",
+        },
+    ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()

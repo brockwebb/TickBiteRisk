@@ -33,6 +33,7 @@ def test_run_model_comparison_uses_prior_year_training_windows(
         "prior_year_incidence",
         "ridge_forecast_ecology",
         "ridge_forecast_safe",
+        "ridge_forecast_spatial",
         "ridge_lag_weather_ecology",
         "trailing_mean_incidence",
     }
@@ -106,6 +107,12 @@ def test_run_model_comparison_includes_empirical_bayes_and_metrics(
     assert ecology_ridge.model_family == "regularized_linear"
     assert ecology_ridge.feature_profile == "forecast_safe_lagged_ecology"
     assert ecology_ridge.weather_mode == "not_used_by_forecast_safe_model"
+    spatial_ridge = next(
+        row for row in result.predictions if row.model_name == "ridge_forecast_spatial"
+    )
+    assert spatial_ridge.model_family == "regularized_linear"
+    assert spatial_ridge.feature_profile == "forecast_safe_lagged_spatial"
+    assert spatial_ridge.weather_mode == "not_used_by_forecast_safe_model"
 
     overall = next(
         row
@@ -170,6 +177,27 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     )
     assert not model_compare._is_forecast_safe_feature_column(
         "feature_usdm_prior_year_dsci_mean"
+    )
+    assert model_compare._is_forecast_spatial_feature_column(
+        "feature_neighbor_prior_year_lyme_incidence_mean"
+    )
+    assert model_compare._is_forecast_spatial_feature_column(
+        "feature_neighbor_prior_year_lyme_incidence_max"
+    )
+    assert model_compare._is_forecast_spatial_feature_column(
+        "feature_neighbor_prior_year_count"
+    )
+    assert model_compare._is_forecast_spatial_feature_column(
+        "feature_missing_neighbor_prior_year_lyme_incidence"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_neighbor_prior_year_lyme_incidence_mean"
+    )
+    assert not model_compare._is_forecast_ecology_feature_column(
+        "feature_neighbor_prior_year_lyme_incidence_mean"
+    )
+    assert not model_compare._is_forecast_spatial_feature_column(
+        "feature_neighbor_current_year_lyme_incidence_mean"
     )
     assert model_compare._is_forecast_ecology_feature_column(
         "feature_deer_harvest_per_sqmi_prior_season"

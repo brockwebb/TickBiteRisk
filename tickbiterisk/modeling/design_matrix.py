@@ -147,6 +147,12 @@ OPTIONAL_NUMERIC_COLUMNS = [
     "riparian_forest_woody_wetland_45m_pct",
     "natural_land_cover_index",
 ]
+SPATIAL_NEIGHBOR_FEATURE_COLUMNS = [
+    "feature_neighbor_prior_year_lyme_incidence_mean",
+    "feature_neighbor_prior_year_lyme_incidence_max",
+    "feature_neighbor_prior_year_count",
+    "feature_missing_neighbor_prior_year_lyme_incidence",
+]
 REQUIRED_MODEL_FEATURE_COLUMNS = [
     "county_fips",
     "year",
@@ -164,6 +170,8 @@ class ModelDesignMatrixInputError(ValueError):
 class ModelDesignMatrixSchema:
     source_path: str
     input_sha256: str
+    spatial_neighbor_source_path: str | None
+    spatial_neighbor_source_sha256: str | None
     row_count: int
     lookback_years: int
     id_columns: list[str]
@@ -184,6 +192,7 @@ def build_model_design_matrix(
     *,
     model_features_path: Path,
     lookback_years: int = 5,
+    county_adjacency_path: Path | None = None,
 ) -> ModelDesignMatrixResult:
     if lookback_years < 1:
         raise ModelDesignMatrixInputError("lookback_years must be at least 1")
@@ -191,12 +200,14 @@ def build_model_design_matrix(
     source_rows = _read_rows(model_features_path)
     rows_by_county = _rows_by_county(source_rows)
     rows_by_year = _rows_by_year(source_rows)
+    county_neighbors = _read_county_adjacency(county_adjacency_path)
     categorical_mappings = _categorical_mappings(source_rows)
     quality_flags = _quality_flags(source_rows)
     feature_columns = _feature_columns(
         lookback_years=lookback_years,
         categorical_mappings=categorical_mappings,
         quality_flags=quality_flags,
+        include_spatial_neighbors=county_adjacency_path is not None,
     )
 
     output_rows = []
@@ -215,6 +226,7 @@ def build_model_design_matrix(
                 row=row,
                 history=history,
                 rows_by_year=rows_by_year,
+                county_neighbors=county_neighbors,
                 lookback_years=lookback_years,
                 categorical_mappings=categorical_mappings,
                 quality_flags=quality_flags,
@@ -225,6 +237,12 @@ def build_model_design_matrix(
     schema = ModelDesignMatrixSchema(
         source_path=str(model_features_path),
         input_sha256=_sha256_file(model_features_path),
+        spatial_neighbor_source_path=(
+            None if county_adjacency_path is None else str(county_adjacency_path)
+        ),
+        spatial_neighbor_source_sha256=(
+            None if county_adjacency_path is None else _sha256_file(county_adjacency_path)
+        ),
         row_count=len(output_rows),
         lookback_years=lookback_years,
         id_columns=ID_COLUMNS,
@@ -239,6 +257,7 @@ def build_model_design_matrix(
             ),
             "categorical": "observed status values are one-hot encoded; empty statuses produce all-zero indicators",
             "lagged_outcome": "rows with no prior county history are excluded; missing exact prior-year incidence is imputed to 0.0 with feature_missing_prior_year_lyme_incidence",
+            "spatial_neighbor": "prior-year neighbor incidence features use only county-adjacent rows from year Y-1; unavailable neighbor priors are imputed to 0.0 with a missing indicator",
         },
     )
     return ModelDesignMatrixResult(rows=output_rows, schema=schema)
@@ -284,6 +303,34 @@ def _rows_by_year(rows: list[dict[str, str]]) -> dict[int, list[dict[str, str]]]
     return grouped
 
 
+def _read_county_adjacency(path: Path | None) -> dict[str, list[str]]:
+    if path is None:
+        return {}
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = set(reader.fieldnames or [])
+        missing_columns = {
+            "county_fips",
+            "neighbor_county_fips",
+        } - fieldnames
+        if missing_columns:
+            raise ModelDesignMatrixInputError(
+                "missing required county adjacency column(s): "
+                f"{', '.join(sorted(missing_columns))}"
+            )
+        neighbors: dict[str, set[str]] = {}
+        for row in reader:
+            county_fips = str(row["county_fips"]).zfill(5)
+            neighbor_county_fips = str(row["neighbor_county_fips"]).zfill(5)
+            if county_fips == neighbor_county_fips:
+                continue
+            neighbors.setdefault(county_fips, set()).add(neighbor_county_fips)
+    return {
+        county_fips: sorted(county_neighbors)
+        for county_fips, county_neighbors in neighbors.items()
+    }
+
+
 def _categorical_mappings(rows: list[dict[str, str]]) -> dict[str, list[str]]:
     mappings: dict[str, list[str]] = {}
     for column in STATUS_COLUMNS:
@@ -314,6 +361,7 @@ def _feature_columns(
     lookback_years: int,
     categorical_mappings: dict[str, list[str]],
     quality_flags: list[str],
+    include_spatial_neighbors: bool,
 ) -> list[str]:
     columns = [
         "feature_year",
@@ -332,6 +380,8 @@ def _feature_columns(
         ]
     )
     columns.extend(f"feature_missing_{column}" for column in OPTIONAL_NUMERIC_COLUMNS)
+    if include_spatial_neighbors:
+        columns.extend(SPATIAL_NEIGHBOR_FEATURE_COLUMNS)
     columns.append("feature_deer_is_derived_total")
     columns.append("feature_missing_deer_is_derived_total")
     for source_column, values in categorical_mappings.items():
@@ -346,6 +396,7 @@ def _design_row(
     row: dict[str, str],
     history: list[dict[str, str]],
     rows_by_year: dict[int, list[dict[str, str]]],
+    county_neighbors: dict[str, list[str]],
     lookback_years: int,
     categorical_mappings: dict[str, list[str]],
     quality_flags: list[str],
@@ -357,6 +408,11 @@ def _design_row(
         None,
     )
     state_prior_incidence = _state_incidence(rows_by_year.get(year - 1, []))
+    spatial_features = _spatial_neighbor_features(
+        row=row,
+        rows_by_year=rows_by_year,
+        county_neighbors=county_neighbors,
+    )
     record = {
         "county_fips": row["county_fips"],
         "county_name": row.get("county_name", ""),
@@ -391,6 +447,7 @@ def _design_row(
         feature_values[f"feature_missing_{column}"] = (
             "1" if _is_blank(row.get(column, "")) else "0"
         )
+    feature_values.update(spatial_features)
     feature_values["feature_missing_contact_pressure"] = (
         "1" if _is_blank(row.get("residential_units_authorized", "")) else "0"
     )
@@ -415,6 +472,44 @@ def _design_row(
     for column in feature_columns:
         record[column] = feature_values.get(column, "0")
     return record
+
+
+def _spatial_neighbor_features(
+    *,
+    row: dict[str, str],
+    rows_by_year: dict[int, list[dict[str, str]]],
+    county_neighbors: dict[str, list[str]],
+) -> dict[str, str]:
+    if not county_neighbors:
+        return {}
+    county_fips = row["county_fips"]
+    year = int(row["year"])
+    prior_rows_by_county = {
+        prior["county_fips"]: prior
+        for prior in rows_by_year.get(year - 1, [])
+    }
+    values = [
+        _parse_float(prior["lyme_incidence_per_100k"])
+        for neighbor_fips in county_neighbors.get(county_fips, [])
+        if (prior := prior_rows_by_county.get(neighbor_fips)) is not None
+    ]
+    if not values:
+        return {
+            "feature_neighbor_prior_year_lyme_incidence_mean": "0.0",
+            "feature_neighbor_prior_year_lyme_incidence_max": "0.0",
+            "feature_neighbor_prior_year_count": "0",
+            "feature_missing_neighbor_prior_year_lyme_incidence": "1",
+        }
+    return {
+        "feature_neighbor_prior_year_lyme_incidence_mean": _format_number(
+            mean(values)
+        ),
+        "feature_neighbor_prior_year_lyme_incidence_max": _format_number(
+            max(values)
+        ),
+        "feature_neighbor_prior_year_count": str(len(values)),
+        "feature_missing_neighbor_prior_year_lyme_incidence": "0",
+    }
 
 
 def _state_incidence(rows: list[dict[str, str]]) -> float | None:

@@ -45,6 +45,44 @@ def test_model_design_matrix_command_writes_matrix_and_schema(tmp_path: Path) ->
     assert "feature_prior_year_lyme_incidence_per_100k" in schema["feature_columns"]
 
 
+def test_model_design_matrix_command_accepts_county_adjacency_path(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_two_county_feature_matrix(tmp_path / "model_features.csv")
+    adjacency = _write_adjacency(tmp_path / "adjacency.csv")
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-design-matrix",
+            "--model-features-path",
+            str(feature_matrix),
+            "--county-adjacency-path",
+            str(adjacency),
+            "--lookback-years",
+            "1",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    with (output_dir / "model_design_matrix_county_year.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    anne_2020 = next(row for row in rows if row["county_fips"] == "24003")
+    assert anne_2020["feature_neighbor_prior_year_lyme_incidence_mean"] == "30.0"
+
+    schema = json.loads(
+        (output_dir / "model_design_matrix_schema.json").read_text(encoding="utf-8")
+    )
+    assert schema["spatial_neighbor_source_path"] == str(adjacency)
+
+
 def test_model_design_matrix_command_fails_cleanly_when_input_missing(
     tmp_path: Path,
 ) -> None:
@@ -116,6 +154,46 @@ def _write_feature_matrix(path: Path) -> Path:
                 "model_feature_quality_flags": "missing_deer_harvest_prior_season",
             }
         )
+    return _write_rows(path, rows)
+
+
+def _write_two_county_feature_matrix(path: Path) -> Path:
+    rows = []
+    for county_fips, county_name, cases_by_year in [
+        ("24003", "Anne Arundel County", {2019: 10, 2020: 20}),
+        ("24005", "Baltimore County", {2019: 30, 2020: 40}),
+    ]:
+        for year, cases in cases_by_year.items():
+            rows.append(
+                {
+                    "county_fips": county_fips,
+                    "county_name": county_name,
+                    "year": str(year),
+                    "total_cases": str(cases),
+                    "population": "100000",
+                    "lyme_incidence_per_100k": str(float(cases)),
+                    "weather_temp_mean_f": str(50 + (year - 2019)),
+                    "weather_precip_total_mm": "1000",
+                    "deer_harvest_per_sqmi_prior_season": "",
+                    "ixodes_scapularis_status": "established",
+                    "borrelia_burgdorferi_status": "present",
+                    "model_feature_quality_flags": "missing_deer_harvest_prior_season",
+                }
+            )
+    return _write_rows(path, rows)
+
+
+def _write_adjacency(path: Path) -> Path:
+    rows = [
+        {
+            "county_fips": "24003",
+            "neighbor_county_fips": "24005",
+        },
+        {
+            "county_fips": "24005",
+            "neighbor_county_fips": "24003",
+        },
+    ]
     return _write_rows(path, rows)
 
 

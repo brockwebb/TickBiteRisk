@@ -153,6 +153,10 @@ from tickbiterisk.modeling.model_compare import (
     run_model_comparison,
 )
 from tickbiterisk.modeling.model_compare_build import write_model_comparison_outputs
+from tickbiterisk.modeling.spatial_neighbors import (
+    build_county_adjacency_from_geojson,
+    write_county_adjacency_output,
+)
 from tickbiterisk.modeling.risk_score import (
     RiskScoreInputError,
     build_seasonal_risk_scores,
@@ -965,6 +969,10 @@ def model_design_matrix(
         Path("build/etl/model/model_features_county_year.csv"),
         help="Input rich model feature matrix CSV.",
     ),
+    county_adjacency_path: Path | None = typer.Option(
+        None,
+        help="Optional county adjacency CSV for spatial lag features.",
+    ),
     lookback_years: int = typer.Option(
         5,
         help="Maximum prior county years used for lagged outcome features.",
@@ -980,17 +988,42 @@ def model_design_matrix(
         )
     if lookback_years < 1:
         raise typer.BadParameter("lookback-years must be at least 1")
+    if county_adjacency_path is not None and not county_adjacency_path.exists():
+        raise typer.BadParameter(
+            f"County adjacency file not found: {county_adjacency_path}"
+        )
 
     try:
         result = build_model_design_matrix(
             model_features_path=model_features_path,
             lookback_years=lookback_years,
+            county_adjacency_path=county_adjacency_path,
         )
     except ModelDesignMatrixInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
     outputs = write_model_design_matrix_outputs(result, output_dir)
     typer.echo(f"Wrote {len(result.rows)} model design matrix row(s) to {outputs.matrix_path}")
     typer.echo(f"Wrote model design matrix schema to {outputs.schema_path}")
+
+
+@etl_app.command("county-adjacency")
+def county_adjacency(
+    county_geojson_path: Path = typer.Option(
+        Path("public/data/md_counties.geojson"),
+        help="Input Maryland county GeoJSON.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/county-adjacency"),
+        help="Output directory for county adjacency CSV.",
+    ),
+) -> None:
+    if not county_geojson_path.exists():
+        raise typer.BadParameter(
+            f"County GeoJSON file not found: {county_geojson_path}"
+        )
+    rows = build_county_adjacency_from_geojson(county_geojson_path)
+    output_path = write_county_adjacency_output(rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} county adjacency row(s) to {output_path}")
 
 
 @etl_app.command("model-compare")
