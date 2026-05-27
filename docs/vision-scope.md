@@ -1,74 +1,83 @@
-# TickBiteRisk – Vision & Scope
+# TickBiteRisk Vision And Scope
 
-## 1  Mission
+## Mission
 
-Provide an open‑source, evidence‑based engine that translates complex tick‑borne disease surveillance data into an intuitive **per‑bite risk estimate** for Lyme disease (and, eventually, other pathogens), helping individuals, educators, and public‑health practitioners make informed decisions.
+TickBiteRisk turns messy tickborne disease and ecology data into a transparent
+Maryland-first risk context product. The current system helps people compare
+relative county-week seasonal Lyme risk and understand the evidence behind the
+score.
 
-## 2  Problem Statement
+This is not a per-bite infection probability, diagnosis, treatment
+recommendation, or weather-adjusted forecast.
 
-*Existing tools either map regional Lyme incidence **or** offer qualitative bite advice; none combine live ecological data with bite‑specific factors to yield a quantified probability.*  This leaves clinicians guessing, outdoor enthusiasts confused, and educators without reproducible demos.
+## Current v0 scope
 
-## 3  Project Goals
+The current v0 scope is deliberately narrower than the long-term idea:
 
-| Goal                                                        | Success metric                                                                           |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Accurate** per‑bite probability within credible intervals |  Validated against CDC county case counts (ρ > 0.6) and published prophylaxis trial data |
-| **Live** weekly updates                                     |  Automated ETL refreshes 95 % of counties without manual intervention                    |
-| **Open & reproducible**                                     |  Build + fit + serve risk API with a single `docker compose up`                          |
-| **Educational**                                             |  High‑school notebook tutorial completes in < 15 min on free Colab                       |
-| **Extensible**                                              |  Modular design allows drop‑in of new pathogens or ML covariates                         |
+- Maryland county-level public dashboard.
+- A relative county-week seasonal Lyme baseline on a 1-10 scale.
+- Local CLI lookup and static JSON export from derived artifacts.
+- Normalized ETL for CDC Lyme, Maryland surveillance, NOAA weather, Census
+  population, deer harvest, land-cover/habitat proxies, tick vector/pathogen
+  status, and CDC seasonality data.
+- Model comparison across transparent baseline, empirical-Bayes shrinkage, and
+  ridge-style annual incidence branches.
+- Plain-language risk interpretation, source links, and CDC guidance links.
+- Public-safe GitHub Pages deployment with no runtime secrets and no raw data
+  redistribution.
 
-## 4  Scope
+The v0 dashboard answers: "Compared with other Maryland county-weeks in the
+data product, how elevated is the seasonal Lyme baseline here?"
 
-### In Scope
+It does not answer: "Did this specific tick bite infect me?"
 
-* Bayesian state‑space model for Lyme disease (U.S. counties)
-* Data feeds: CDC Tick Surveillance, FARS deer collisions, NSSP tick‑bite ED visits, NLCD land‑cover, population from ACS
-* FastAPI JSON API and minimal React/D3 demo site
-* Dockerised ETL + model pipeline; nightly/weekly cron scripts
-* Documentation, notebooks, and permissive licensing (MIT code, CC‑BY data)
+## Out of current scope
 
-### Out of Scope (v1)
+- Personal medical advice, diagnosis, prophylaxis decisions, or treatment
+  recommendations.
+- Bite-specific calculations using tick attachment duration, tick testing, or
+  individual symptoms.
+- National county coverage.
+- Live API service, user accounts, or server-side runtime.
+- Claims that prevention campaigns or clinical behavior caused observed
+  changes unless intervention data are explicitly modeled.
 
-* Pathogens other than *Borrelia burgdorferi*
-* Sub‑county (census‑tract) resolution
-* Advanced ML (GNN, boosted trees) – reserved for v2 paper
-* Smartphone apps or offline mobile bundles
+## Stakeholders
 
-## 5  Stakeholders & Personas
+| Stakeholder | Current need |
+| --- | --- |
+| Outdoor residents and visitors | Plain-language local seasonal context and links to official guidance |
+| County health educators | Evidence-backed timing and geography for prevention messaging |
+| Clinicians and public health staff | A transparent situational-awareness artifact, not a clinical rule |
+| Data collaborators | Reproducible ETL, source manifest, model comparison outputs, and caveats |
 
-| Persona                     | Key need                                                     |
-| --------------------------- | ------------------------------------------------------------ |
-| **Outdoor Adult**           | “Tick bit me yesterday—do I need doxycycline?”               |
-| **Scout Leader / Educator** | Hands‑on STEM activity analysing local tick risk             |
-| **County Health Officer**   | Weekly bulletin on rising tick activity to inform advisories |
-| **Data Scientist**          | Transparent code & data to extend or replicate findings      |
+## Future research scope
 
-## 6  Guiding Principles
+The broader research question remains valuable: can geography, ecology,
+weather, tick surveillance, and bite-specific evidence be combined into a
+defensible estimate of disease risk after a tick encounter?
 
-1. **Transparency over performance.** Readable Bayesian modelling choices trump marginal speed gains.
-2. **Public‑domain first.** Use U.S. federal datasets wherever possible; keep external sources clearly licensed.
-3. **Defensive uncertainty.** Always show credible intervals and flag forecast vs observed inputs.
-4. **Modularity.** Separate ETL, model fitting, and API layers so each can evolve independently.
-5. **Education usability.** Every component should run on a free cloud notebook within classroom time limits.
+Future work may test:
 
-## 7  MVP Definition
+- Bayesian hierarchical disease incidence models.
+- Per-bite infection probability models using tick species, stage, attachment
+  duration, and pathogen prevalence.
+- Live API or conversational interfaces that ask only medically relevant,
+  plain-language questions.
+- Multi-pathogen extensions for anaplasmosis, babesiosis, ehrlichiosis,
+  spotted fever rickettsiosis, Powassan, and tularemia where data support it.
+- Intervention-aware models for public health campaign planning.
 
-Deliver county‑level posterior θ & λ tables for the 2025 season, a `/risk` endpoint that accepts `fips`, `tau_hours`, and returns probability + CI, along with one HTML dashboard and one tutorial notebook.
+Those ideas stay labeled as research until validation, clinical wording, and
+public-health review support them.
 
-## 8  Roadmap Snapshot (v1 → v1.1)
+## Guiding principles
 
-1. **v1.0** – Core Bayesian model, Lyme only, weekly ED scaler.
-2. **v1.1** – Add ML deer/land‑use covariates, extend to Babesia.
+1. Transparency before sophistication.
+2. Conservative interpretation before scary precision.
+3. Source provenance on every derived public artifact.
+4. Accessibility and plain language in the first release, not as a later polish
+   pass.
+5. Clear separation between informational risk context and medical guidance.
 
-## 9  Risks & Mitigations
-
-| Risk                                | Mitigation                                                                   |
-| ----------------------------------- | ---------------------------------------------------------------------------- |
-| Data feed outages (NSSP)            | Seasonal GP fallback + uncertainty inflation                                 |
-| Misinterpretation as medical advice | Prominent disclaimers; encourage consultation with clinicians                |
-| Licensing conflicts (dog serology)  | Fetch but do **not** redistribute CC‑BY‑NC data; instruct users to self‑pull |
-
----
-
-*Last updated: 2025‑06‑08 (draft v0.1)*
+Last updated: 2026-05-27.

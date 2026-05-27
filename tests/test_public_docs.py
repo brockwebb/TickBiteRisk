@@ -6,6 +6,9 @@ API_SPEC = Path("api/api-spec.md")
 ARCHITECTURE = Path("docs/architecture.md")
 RUNBOOK = Path("docs/operational-runbook.md")
 USER_GUIDE = Path("docs/user-guide.md")
+ROADMAP = Path("docs/roadmap.md")
+VISION_SCOPE = Path("docs/vision-scope.md")
+MODEL_SPEC = Path("docs/model-spec.md")
 
 
 def test_user_guide_matches_implemented_maryland_baseline_product() -> None:
@@ -136,3 +139,70 @@ def test_public_modeling_docs_do_not_overclaim_unimplemented_model_lanes() -> No
         "current v0 model comparison",
     ]:
         assert token in docs_text
+
+
+def test_roadmap_starts_from_shipped_static_maryland_v0() -> None:
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+
+    for token in [
+        "Current v0 baseline",
+        "Maryland static dashboard",
+        "county-week seasonal Lyme baseline",
+        "GitHub Pages",
+        "model comparison",
+        "Roadmap",
+    ]:
+        assert token in roadmap
+
+    current_section = roadmap.split("## Roadmap", maxsplit=1)[0]
+    for token in [
+        "docker compose up downloads sample DB",
+        "Full CONUS priors 2025 season",
+        "/risk API; React+D3 dashboard",
+    ]:
+        assert token not in current_section
+
+
+def test_vision_scope_separates_current_relative_baseline_from_future_per_bite_work() -> None:
+    vision = VISION_SCOPE.read_text(encoding="utf-8")
+
+    for token in [
+        "Current v0 scope",
+        "relative county-week seasonal Lyme baseline",
+        "not a per-bite infection probability",
+        "Future research scope",
+    ]:
+        assert token in vision
+
+    current_section = vision.split("## Future research scope", maxsplit=1)[0]
+    for token in [
+        "FastAPI",
+        "Dockerised",
+        "posterior",
+        "tau_hours",
+        "probability + CI",
+    ]:
+        assert token not in current_section
+
+
+def test_model_spec_leads_with_implemented_comparison_model_before_research_model() -> None:
+    model_spec = MODEL_SPEC.read_text(encoding="utf-8")
+
+    for token in [
+        "Current implemented model",
+        "model_comparison_predictions.csv",
+        "linear_blend_baseline",
+        "ridge_forecast_safe",
+        "not weather-adjusted",
+        "Research roadmap model",
+    ]:
+        assert token in model_spec
+
+    current_section = model_spec.split("## Research roadmap model", maxsplit=1)[0]
+    for token in [
+        "PyMC",
+        "NUTS",
+        "p(τ)",
+        "posterior probability",
+    ]:
+        assert token not in current_section

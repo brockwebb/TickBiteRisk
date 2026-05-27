@@ -1,51 +1,61 @@
-# tickbiterisk – roadmap
+# TickBiteRisk Roadmap
 
-> **File location:** `/docs/roadmap.md`
+## Current v0 baseline
 
----
+TickBiteRisk now ships a Maryland static dashboard and local CLI runtime built
+from derived, public-safe artifacts. The current product is a county-week
+seasonal Lyme baseline, not a live clinical decision system.
 
-## milestone tracking
+The implemented flow is:
 
-We use [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
+1. Normalize acquired CDC, Maryland, NOAA, Census, deer, habitat, tick
+   surveillance, and seasonality inputs into reproducible ETL outputs.
+2. Build a county-year feature matrix for Maryland.
+3. Run model comparison across transparent baseline and ridge-style branches.
+4. Select the current model comparison branch and apportion annual predictions
+   across CDC Lyme onset seasonality.
+5. Export a 1-10 Maryland-relative county-week seasonal Lyme baseline to
+   `public/data`.
+6. Serve the static dashboard through GitHub Pages without runtime secrets or
+   raw data redistribution.
 
-* **MAJOR** – new disease modules or breaking API changes
-* **MINOR** – new features (ML covariates, dashboards) backward‑compatible with `/risk`
-* **PATCH** – bug fixes, doc tweaks, CI plumbing
+The current v0 branch favors inspectability over cleverness. It is designed to
+make the data lineage, assumptions, and limits legible before adding more model
+complexity.
 
----
+## Roadmap
 
-## release ladder
+| Version | Theme | Scope | Exit check |
+| --- | --- | --- | --- |
+| v0.1 | Public static baseline | Maryland dashboard, county-week risk JSON, CLI lookup/export, source metadata, plain-language caveats | Static site can be hosted from the repo and every public score carries provenance |
+| v0.2 | Dashboard polish | 508-focused color/contrast pass, keyboard map interaction, browser smoke tests, improved source panel | County click and table lookup work on desktop and mobile without overlap |
+| v0.3 | Validation report | Backtest writeup, model comparison summary, residual review by county/year, known intervention/data drift caveats | Public docs can explain when the score works, when it misses, and why |
+| v0.4 | Ecological feature depth | Stronger NLCD/land-cover summaries, deer harvest normalization, acorn/mast notes where usable, optional park/activity proxy manifest | Each feature has source, grain, date span, license note, and missingness flags |
+| v0.5 | Refresh automation | One-command data rebuild recipe, artifact checksums, CI validation of derived public JSON | A clean machine can reproduce public artifacts from acquired source files |
+| v1.0 | Evidence-backed release | Stable Maryland public product with documented validation, source catalog, accessibility review, and conservative risk language | Release notes identify model version, data vintage, and non-medical boundary |
 
-| Version                          | Target date | Scope                                                                           | Success metric                                          |
-| -------------------------------- | ----------- | ------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **v0.1.0** *(repo scaffold)*     | 2025‑06‑15  | Vision, docs, CI lint/unit pipeline, sample data; no full model yet             | CI green on push; docker compose up downloads sample DB |
-| **v0.2.0** *(etl prototype)*     | 2025‑07‑01  | All fetch scripts functional; PostGIS loads raw + processed tables              | `make etl-mini` completes on fresh clone                |
-| **v0.3.0** *(core Bayesian fit)* | 2025‑07‑15  | Annual MCMC for θ + p(τ) logistic; CLI risk calc on two counties                | Spearman ρ > 0.4 vs 2023 CDC cases (mini set)           |
-| **v1.0.0** *(MVP release)*       | 2025‑08‑31  | Full CONUS priors 2025 season; /risk API; React+D3 dashboard; nightly/weekly CI | Public Docker image; Zenodo DOI; arXiv paper posted     |
-| **v1.1.0** *(ML extension)*      | 2025‑Q4     | Gradient‑boosted λ covariates: trail density, night‑lights trend, WUI growth    | ΔRMSE ≥ 10 % over v1.0 baseline; SHAP report published  |
-| **v1.2.0** *(multi‑pathogen)*    | 2026‑Q1     | Extend model to *Anaplasma* & *Babesia*; multi‑label p(τ) curves                | Joint risk API `/risk?pathogen=bb,ap` returns array     |
-| **v2.0.0** *(mobile & offline)*  | 2026‑Q3     | React‑Native app using SQlite snapshot; offline per‑bite calc at campsites      | App beta in TestFlight/Play; <30 MB APK                 |
+## Future research lanes
 
----
+These are not current product promises. They are candidate branches to test
+against the same data and validation harness:
 
-## kanban columns (github projects)
+- Bayesian hierarchical incidence model with explicit uncertainty intervals.
+- Random forest or gradient boosted model for feature interaction discovery.
+- Linear or ridge ensemble combining transparent branches when it improves
+  held-out calibration.
+- Per-bite research model that combines geography, tick species/stage,
+  attachment duration, and CDC/IDSA guidance language.
+- Database-backed HTTP service if there is a clear need beyond static files.
 
-* **Backlog** – ideas w/o assignee
-* **Next up** – slated for next sprint
-* **In progress** – PR open
-* **Review** – awaiting maintainer review
-* **Done** – merged to `main`
+## Product principles
 
----
+- No raw acquired data in the public web product unless the source license and
+  privacy boundary clearly permit redistribution.
+- Every public score should carry source metadata, model version, and caveats.
+- The dashboard must stay plain-language: informational and educational only,
+  follow CDC guidance, and consult a healthcare professional for personal
+  medical decisions.
+- Model performance comes before model ambition. A simple branch that validates
+  well beats a complex branch that cannot be explained or backtested.
 
-## good‑first‑issue queue
-
-| Issue                                                                          | Label              | Est. effort |
-| ------------------------------------------------------------------------------ | ------------------ | ----------- |
-| Add unit test for `validate_fips` util                                         | `good first issue` | <½ hr       |
-| Write `fetch_snow.sh` to sum NOAA IMS snow‑days                                | `help wanted`      | 2 hrs       |
-| Add county lookup CLI (`tickbiterisk fips --state MD --county "Anne Arundel"`) | `good first issue` | 1 hr        |
-
----
-
-*Last updated: 2025‑06‑08 (draft v0.1)*
+Last updated: 2026-05-27.
