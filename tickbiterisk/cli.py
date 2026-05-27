@@ -108,6 +108,15 @@ from tickbiterisk.etl.tick_status import (
     parse_pathogen_status,
 )
 from tickbiterisk.etl.tick_status_build import write_tick_status_outputs
+from tickbiterisk.etl.usdm_drought import (
+    build_usdm_county_year_features,
+    fetch_usdm_drought_year,
+    fetch_usdm_text,
+)
+from tickbiterisk.etl.usdm_drought_build import (
+    write_usdm_county_year_output,
+    write_usdm_weekly_output,
+)
 from tickbiterisk.etl.weather_build import (
     read_noaa_daily_observations_input,
     write_noaa_daily_observations_output,
@@ -639,6 +648,37 @@ def contact_pressure(
     )
     output = write_contact_pressure_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} contact pressure feature row(s) to {output}")
+
+
+@etl_app.command("usdm-drought")
+def usdm_drought(
+    start_year: int = typer.Option(2000, help="First USDM calendar year."),
+    end_year: int = typer.Option(2025, help="Last USDM calendar year."),
+    aoi: str = typer.Option("MD", help="USDM area of interest, such as MD."),
+    output_dir: Path = typer.Option(
+        Path("build/etl/usdm-drought"),
+        help="Output directory for USDM drought ETL artifacts.",
+    ),
+) -> None:
+    if start_year > end_year:
+        raise typer.BadParameter("start-year must be less than or equal to end-year")
+    rows = []
+    for year in range(start_year, end_year + 1):
+        rows.extend(
+            fetch_usdm_drought_year(
+                aoi=aoi,
+                year=year,
+                fetcher=fetch_usdm_text,
+            )
+        )
+    weekly_output = write_usdm_weekly_output(rows, output_dir)
+    county_year_rows = build_usdm_county_year_features(rows)
+    county_year_output = write_usdm_county_year_output(county_year_rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} USDM weekly drought row(s) to {weekly_output}")
+    typer.echo(
+        f"Wrote {len(county_year_rows)} USDM county-year drought feature row(s) "
+        f"to {county_year_output}"
+    )
 
 
 @etl_app.command("tick-status")
