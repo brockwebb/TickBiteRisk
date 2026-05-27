@@ -49,6 +49,7 @@ def test_model_compare_command_writes_runs_predictions_metrics_and_summary(
         "prior_year_incidence",
         "ridge_forecast_ecology",
         "ridge_forecast_safe",
+        "ridge_forecast_spatial",
         "ridge_lag_weather_ecology",
         "trailing_mean_incidence",
     }
