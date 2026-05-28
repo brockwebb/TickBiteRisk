@@ -335,6 +335,17 @@ def test_dashboard_css_styles_validation_summary() -> None:
         assert token in css
 
 
+def test_dashboard_css_styles_forecast_explainer_panel() -> None:
+    css = (PUBLIC_DIR / "styles.css").read_text(encoding="utf-8")
+
+    for token in [
+        ".forecast-explainer",
+        ".forecast-explainer h3",
+        ".controls,\n  .forecast-explainer,",
+    ]:
+        assert token in css
+
+
 def test_dashboard_css_styles_visible_source_chain() -> None:
     css = (PUBLIC_DIR / "styles.css").read_text(encoding="utf-8")
 

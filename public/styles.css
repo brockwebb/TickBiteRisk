@@ -110,12 +110,17 @@ h1 {
 .map-section,
 .county-panel,
 .county-list-section,
+.forecast-explainer,
 .validation-summary,
 .sources {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
   padding: 1rem;
+}
+
+.forecast-explainer h3 {
+  margin-top: 1rem;
 }
 
 .risk-map {
@@ -456,6 +461,7 @@ h1 {
   }
 
   .controls,
+  .forecast-explainer,
   .county-list-section,
   .validation-summary,
   .sources {
