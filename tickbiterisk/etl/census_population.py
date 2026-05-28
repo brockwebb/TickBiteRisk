@@ -50,45 +50,47 @@ def get_census_api_key(env: Mapping[str, str] | None = None) -> str | None:
 
 
 def build_census_intercensal_1990_population_url(
-    *, api_key: str | None = None
+    *, state_fips: str = "24", api_key: str | None = None
 ) -> str:
     return _build_census_url(
         CENSUS_INTERCENSAL_1990_DATASET,
         get=["POP", "YEAR", "AGEGRP", "RACE_SEX", "HISP", "STATE", "COUNTY"],
-        predicates={"for": "county:*", "in": "state:24"},
+        predicates={"for": "county:*", "in": f"state:{state_fips.zfill(2)}"},
         api_key=api_key,
     )
 
 
 def build_census_intercensal_2000_population_url(
-    *, api_key: str | None = None
+    *, state_fips: str = "24", api_key: str | None = None
 ) -> str:
     return _build_census_url(
         CENSUS_INTERCENSAL_2000_DATASET,
         get=["GEONAME", "POP", "DATE_", "DATE_DESC"],
-        predicates={"for": "county:*", "in": "state:24"},
+        predicates={"for": "county:*", "in": f"state:{state_fips.zfill(2)}"},
         api_key=api_key,
     )
 
 
-def build_census_pep_2019_population_url(*, api_key: str | None = None) -> str:
+def build_census_pep_2019_population_url(
+    *, state_fips: str = "24", api_key: str | None = None
+) -> str:
     return _build_census_url(
         CENSUS_PEP_2019_DATASET,
         get=["NAME", "POP", "DATE_CODE"],
-        predicates={"for": "county:*", "in": "state:24"},
+        predicates={"for": "county:*", "in": f"state:{state_fips.zfill(2)}"},
         api_key=api_key,
     )
 
 
 def build_census_pep_2023_charv_population_url(
-    *, year: int, api_key: str | None = None
+    *, year: int, state_fips: str = "24", api_key: str | None = None
 ) -> str:
     return _build_census_url(
         CENSUS_PEP_2023_CHARV_DATASET,
         get=["NAME", "POP", "YEAR", "MONTH", "AGE", "SEX", "HISP", "POPGROUP"],
         predicates={
             "for": "county:*",
-            "in": "state:24",
+            "in": f"state:{state_fips.zfill(2)}",
             "YEAR": str(year),
             "MONTH": "7",
             "AGE": "0000",

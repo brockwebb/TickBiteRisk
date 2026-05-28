@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -56,7 +56,16 @@ request/run manifests as those sources graduate into the modeling lane.
    - These rows are aggregate validation and regional-capacity anchors only;
      they are not county outcomes or direct exposure observations.
 
-1c. `tickbiterisk etl regional-lyme-outcomes`
+1c. `tickbiterisk etl regional-population`
+   - Pulls keyless static Census county population CSVs for DE, DC, MD, PA,
+     VA, and WV.
+   - Writes `midatlantic_county_population_year.csv` and
+     `acquisition_provenance.csv`.
+   - These rows are denominator estimates for regional incidence/rate
+     diagnostics, not exposure evidence. Boundary changes can create gaps; the
+     first live run lacks Bedford city, VA denominators for 2010-2023.
+
+1d. `tickbiterisk etl regional-lyme-outcomes`
    - Reshapes the CDC county dashboard export into DE, DC, MD, PA, VA, and WV
      county/county-equivalent annual Lyme totals for 2001-2023.
    - Writes `midatlantic_lyme_county_year.csv` and
@@ -65,7 +74,7 @@ request/run manifests as those sources graduate into the modeling lane.
      spatial-neighbor, and capacity diagnostics; it does not replace the
      reconciled Maryland outcome target or the public Maryland default.
 
-1d. `tickbiterisk etl regional-signals`
+1e. `tickbiterisk etl regional-signals`
    - Derives Mid-Atlantic reported-case structure from
      `midatlantic_lyme_county_year.csv`.
    - Writes `midatlantic_regional_signals.csv`.
@@ -74,7 +83,7 @@ request/run manifests as those sources graduate into the modeling lane.
      prior-year or trailing regional history and are the only columns intended
      for forecast-time model experiments.
 
-1e. `tickbiterisk etl regional-hotspots`
+1f. `tickbiterisk etl regional-hotspots`
    - Summarizes same-year Mid-Atlantic reported-case rank, share, hotspot
      tier, prior-year movement, and top-quintile entry/exit diagnostics.
    - Writes `midatlantic_hotspot_county_year.csv` and
@@ -83,7 +92,7 @@ request/run manifests as those sources graduate into the modeling lane.
      movement review and surveillance-regime inspection, not forecast-time
      public scoring.
 
-1f. `tickbiterisk etl regional-outcome-stress`
+1g. `tickbiterisk etl regional-outcome-stress`
    - Runs rolling-origin, outcome-only stress tests against the Mid-Atlantic
      county panel.
    - Writes `regional_outcome_stress_runs.csv`,

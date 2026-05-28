@@ -111,6 +111,13 @@ from tickbiterisk.etl.regional_lyme import (
 from tickbiterisk.etl.regional_hotspots import build_midatlantic_hotspot_diagnostics
 from tickbiterisk.etl.regional_hotspots_build import write_regional_hotspot_outputs
 from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
+from tickbiterisk.etl.regional_population import (
+    build_midatlantic_population_urls,
+    fetch_midatlantic_county_population_estimates,
+)
+from tickbiterisk.etl.regional_population_build import (
+    write_regional_county_population_output,
+)
 from tickbiterisk.etl.regional_signals import build_midatlantic_regional_signals
 from tickbiterisk.etl.regional_signals_build import write_regional_signals_output
 from tickbiterisk.etl.mast_acorn import (
@@ -855,7 +862,7 @@ def county_reference(
     ),
     provenance_manifest_path: Path | None = typer.Option(
         None,
-        help="Output CSV manifest for API acquisition provenance.",
+        help="Output CSV manifest for static Census CSV acquisition provenance.",
     ),
 ) -> None:
     text = fetch_census_gazetteer_counties_text()
@@ -963,6 +970,55 @@ def census_population(
     typer.echo(
         f"Wrote {len(rows)} county-year population row(s) to {output} "
         f"(append={append})"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
+@etl_app.command("regional-population")
+def regional_population(
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-population"),
+        help="Output directory for Mid-Atlantic population artifacts.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        help="Print planned Census API queries without fetching data.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
+) -> None:
+    api_key = get_census_api_key()
+    urls = build_midatlantic_population_urls(api_key=api_key)
+    if dry_run:
+        typer.echo(f"Planned Mid-Atlantic Census population query(s): {len(urls)}")
+        for url in urls:
+            typer.echo(sanitize_census_url(url))
+        return
+
+    try:
+        rows = fetch_midatlantic_county_population_estimates(api_key=api_key)
+    except CensusApiResponseError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    output = write_regional_county_population_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _regional_population_provenance_records(
+            urls=urls,
+            rows=rows,
+            output_path=output,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+            api_key_present=api_key is not None,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(rows)} Mid-Atlantic county-year population row(s) to {output}"
     )
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
@@ -3988,6 +4044,129 @@ def _census_population_source_metadata(*, latest_only: bool = False) -> list[dic
     if latest_only:
         return [metadata[-1]]
     return metadata
+
+
+def _regional_population_provenance_records(
+    *,
+    urls: list[str],
+    rows: list[object],
+    output_path: Path,
+    output_dir: Path,
+    manifest_path: Path,
+    api_key_present: bool,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "regional-population",
+            "--output-dir",
+            str(output_dir),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+    row_counts = _regional_population_row_counts(rows)
+    return [
+        AcquisitionProvenanceRecord(
+            source_id=metadata["source_id"],
+            source_name="U.S. Census Bureau Mid-Atlantic county population estimates",
+            source_url=sanitize_census_url(url),
+            citation_url="https://www.census.gov/programs-surveys/popest.html",
+            acquisition_command=command,
+            acquisition_procedure=metadata["acquisition_procedure"],
+            request_method="GET",
+            request_description=metadata["request_description"],
+            derived_artifact_paths=[output_path],
+            row_count=row_counts.get(metadata["row_count_key"], 0),
+            parser_method=metadata["parser_method"],
+            extraction_quality="accepted",
+            access_notes="Public Census static CSV endpoint; no secret is required.",
+            modeling_caveats=(
+                "County population denominator estimate for regional rate "
+                "diagnostics; not exposure evidence and subject to Census "
+                "vintage/revision changes."
+            ),
+        )
+        for url, metadata in (
+            (url, _regional_population_url_metadata(url)) for url in urls
+        )
+    ]
+
+
+def _regional_population_row_counts(rows: list[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        state_fips = str(getattr(row, "state_fips", ""))
+        source_id = str(getattr(row, "source_id", ""))
+        if source_id == "census_pep_intercensal_2000_2010_static":
+            key = f"{state_fips}_intercensal_2000_2010_static"
+        elif source_id == "census_pep_2019_county_totals":
+            key = "pep_2019_county_totals"
+        elif source_id == "census_pep_2023_county_totals":
+            key = "pep_2023_county_totals"
+        else:
+            key = f"{state_fips}_{source_id}"
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _regional_population_url_metadata(url: str) -> dict[str, str]:
+    if "co-est00int-alldata-" in url:
+        state_fips = (
+            Path(urlsplit(url).path)
+            .name.removeprefix("co-est00int-alldata-")
+            .removesuffix(".csv")
+            .zfill(2)
+        )
+        return {
+            "source_id": (
+                "census_midatlantic_population_intercensal_2000_2010_static_"
+                f"{state_fips}"
+            ),
+            "row_count_key": f"{state_fips}_intercensal_2000_2010_static",
+            "acquisition_procedure": (
+                "Fetch Census intercensal county population static CSV rows and "
+                "normalize Mid-Atlantic county denominators for 2001-2009."
+            ),
+            "request_description": (
+                f"Census intercensal 2000 population CSV request for state {state_fips}."
+            ),
+            "parser_method": "parse_census_intercensal_2000_county_totals",
+        }
+    if "co-est2019-alldata.csv" in url:
+        return {
+            "source_id": "census_midatlantic_population_pep_2019_county_totals",
+            "row_count_key": "pep_2019_county_totals",
+            "acquisition_procedure": (
+                "Fetch Census PEP 2019 county totals CSV rows and "
+                "normalize Mid-Atlantic county denominators for 2010-2019."
+            ),
+            "request_description": "Census PEP 2019 county totals CSV request.",
+            "parser_method": "parse_census_pep_2019_county_totals",
+        }
+    return {
+        "source_id": "census_midatlantic_population_pep_2023_county_totals",
+        "row_count_key": "pep_2023_county_totals",
+        "acquisition_procedure": (
+            "Fetch Census PEP 2023 county totals CSV rows and normalize "
+            "Mid-Atlantic county denominators for 2020-2023."
+        ),
+        "request_description": "Census PEP 2023 county totals CSV request.",
+        "parser_method": "parse_census_pep_2023_county_totals",
+    }
+
+
+def _census_url_state_fips(url: str) -> str:
+    state_predicate = _census_url_query_value(url, "in")
+    if state_predicate.startswith("state:"):
+        return state_predicate.removeprefix("state:").zfill(2)
+    return "unknown"
+
+
+def _census_url_query_value(url: str, key: str) -> str:
+    query = dict(parse_qsl(urlsplit(url).query, keep_blank_values=True))
+    return query.get(key, "")
 
 
 def _building_permits_provenance_records(

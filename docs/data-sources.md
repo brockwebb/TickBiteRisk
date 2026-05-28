@@ -56,6 +56,7 @@ feature ideas to test in time-aware backtests before any public model claim.
 | --- | --- | --- |
 | `lyme_county_year_reconciled.csv` | `tickbiterisk etl lyme-outcomes` | Maryland Lyme outcome panel with source reconciliation flags |
 | `county_population_year.csv` | `tickbiterisk etl census-population` | County-year population denominators |
+| `midatlantic_county_population_year.csv` | `tickbiterisk etl regional-population` | DE/DC/MD/PA/VA/WV county-year population denominators for regional rate diagnostics |
 | `county_reference.csv` | `tickbiterisk etl county-reference` | County FIPS, names, land area, and internal points |
 | `weather_features_weekly.csv` | `tickbiterisk etl noaa-weather-features` | Weekly weather predictors and quality flags |
 | `model_features_county_year.csv` | `tickbiterisk etl model-features` | Model-ready joined county-year panel |

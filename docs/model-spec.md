@@ -13,6 +13,7 @@ Primary artifacts:
 - `build/etl/model/model_features_county_year.csv`
 - `build/etl/model/model_design_matrix_county_year.csv`
 - `build/etl/model/model_design_matrix_schema.json`
+- `build/etl/regional-population/midatlantic_county_population_year.csv`
 - `build/etl/regional-hotspots/midatlantic_hotspot_county_year.csv`
 - `build/etl/regional-hotspots/midatlantic_hotspot_summary.csv`
 - `build/etl/regional-outcome-stress/regional_outcome_stress_predictions.csv`
@@ -138,6 +139,9 @@ The Mid-Atlantic hotspot diagnostic uses only same-year reported case counts
 to classify county rank tiers and year-over-year movement. Its fields are
 intentionally named `diagnostic_*` because they can reveal regional movement or
 surveillance-regime disruptions, but they are not forecast-safe model features.
+Regional Census population denominators are now materialized so a later slice
+can convert those count-only diagnostics into incidence-rate diagnostics; the
+population table itself is denominator evidence, not exposure evidence.
 
 ## Forecast Update Contract
 
