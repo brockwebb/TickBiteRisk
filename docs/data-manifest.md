@@ -262,6 +262,8 @@ cases with a +0.902192 incidence/100k offset. These are research artifacts for
 forecasting validation, future Bayesian update design, and public wording
 review, not raw surveillance data or public score corrections.
 
+The forecast calibration backtest slice builds `forecast_calibration_backtest_runs.csv`, `forecast_calibration_backtest_predictions.csv`, and `forecast_calibration_backtest_metrics.csv` with `tickbiterisk etl forecast-calibration-backtest --predictions-path build/etl/model-comparison/model_comparison_predictions.csv --output-dir build/etl/forecast-calibration-backtest`. It learns shrunken observed-to-predicted case multipliers only from prior update rows for the same model branch, then compares original and calibrated held-out predictions. The 2026-05-28 live smoke wrote 4,320 calibrated prediction rows and 240 metrics. Default calibration worsened overall MAE for every branch: `prior_year_incidence` moved from 18.21318 to 22.045798 incidence/100k, `linear_blend_baseline` from 18.47245 to 22.19535, and `analog_year_forecast` from 21.382667 to 22.179582. Some surveillance-regime subsets improved, so the calibration artifact remains useful research evidence, but it is not an accepted public score correction.
+
 The first baseline backtest artifact now materializes:
 
 ```text

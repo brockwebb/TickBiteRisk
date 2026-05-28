@@ -77,6 +77,8 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `model_comparison_predictions.csv` | `tickbiterisk etl model-compare` | Rolling-origin predictions from candidate model branches |
 | `model_comparison_intervals.csv` | `tickbiterisk etl model-compare` | Bootstrap prediction intervals companion artifact for comparison branches |
 | `forecast_calibration_summary.csv` | `tickbiterisk etl model-diagnostics` | Empirical observed-to-predicted calibration factors by branch, surveillance regime, and year |
+| `forecast_calibration_backtest_predictions.csv` | `tickbiterisk etl forecast-calibration-backtest` | Forecast-safe shrunken calibration predictions using prior update evidence only |
+| `forecast_calibration_backtest_metrics.csv` | `tickbiterisk etl forecast-calibration-backtest` | Original-vs-calibrated MAE/RMSE metrics for empirical update multipliers |
 | `noaa_cpc_oni_seasons.csv` | `tickbiterisk etl enso-oni` | NOAA CPC ONI seasonal anomalies and El Nino / La Nina phase labels |
 | `noaa_cpc_oni_model_year_features.csv` | `tickbiterisk etl enso-oni` | Complete prior-year ONI model-year climate context features |
 | `seasonality_baseline.csv` | `tickbiterisk etl seasonality-baseline` | CDC weekly/monthly Lyme onset share baseline |

@@ -220,6 +220,13 @@ from tickbiterisk.modeling.design_matrix import (
     build_model_design_matrix,
 )
 from tickbiterisk.modeling.design_matrix_build import write_model_design_matrix_outputs
+from tickbiterisk.modeling.forecast_calibration_backtest import (
+    ForecastCalibrationBacktestInputError,
+    build_forecast_calibration_backtest,
+)
+from tickbiterisk.modeling.forecast_calibration_backtest_build import (
+    write_forecast_calibration_backtest_outputs,
+)
 from tickbiterisk.modeling.model_compare import (
     ModelComparisonInputError,
     run_model_comparison,
@@ -1848,6 +1855,70 @@ def model_diagnostics(
     typer.echo(
         f"Wrote {len(result.forecast_calibration_summary)} forecast calibration "
         f"summary row(s) to {outputs.forecast_calibration_summary_path}"
+    )
+
+
+@etl_app.command("forecast-calibration-backtest")
+def forecast_calibration_backtest(
+    predictions_path: Path = typer.Option(
+        Path("build/etl/model-comparison/model_comparison_predictions.csv"),
+        help="Input model comparison predictions CSV.",
+    ),
+    start_year: int = typer.Option(
+        2007,
+        help="First held-out year to calibrate.",
+    ),
+    end_year: int | None = typer.Option(
+        None,
+        help="Last held-out year to calibrate. Defaults to max year in input.",
+    ),
+    min_calibration_updates: int = typer.Option(
+        5,
+        help="Minimum prior update rows required before applying calibration.",
+    ),
+    calibration_prior_strength: float = typer.Option(
+        5.0,
+        help="Pseudo-update strength shrinking calibration multipliers toward 1.0.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/forecast-calibration-backtest"),
+        help="Output directory for forecast calibration backtest artifacts.",
+    ),
+) -> None:
+    if not predictions_path.exists():
+        raise typer.BadParameter(
+            f"Model comparison predictions file not found: {predictions_path}"
+        )
+    if min_calibration_updates < 1:
+        raise typer.BadParameter("min-calibration-updates must be at least 1")
+    if not math.isfinite(calibration_prior_strength) or calibration_prior_strength < 0:
+        raise typer.BadParameter(
+            "calibration-prior-strength must be finite and non-negative"
+        )
+    if end_year is not None and start_year > end_year:
+        raise typer.BadParameter("start-year must be less than or equal to end-year")
+
+    try:
+        result = build_forecast_calibration_backtest(
+            predictions_path=predictions_path,
+            start_year=start_year,
+            end_year=end_year,
+            min_calibration_updates=min_calibration_updates,
+            calibration_prior_strength=calibration_prior_strength,
+        )
+    except ForecastCalibrationBacktestInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_forecast_calibration_backtest_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote 1 forecast calibration backtest run row(s) to {outputs.runs_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.predictions)} forecast calibration backtest prediction "
+        f"row(s) to {outputs.predictions_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.metrics)} forecast calibration backtest metric row(s) to "
+        f"{outputs.metrics_path}"
     )
 
 

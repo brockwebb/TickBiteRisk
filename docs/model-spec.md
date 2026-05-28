@@ -187,6 +187,13 @@ incidence offsets by model branch, source vintage, surveillance regime, and
 forecast year. These factors are empirical calibration priors for research,
 not automatic public score corrections.
 
+`forecast-calibration-backtest` tests whether those priors would have improved
+held-out predictions when learned only from earlier update rows. The first
+materialized shrunken-ratio calibration worsened overall MAE for all current
+branches, even though it helped some surveillance-regime subsets. That argues
+for a cautious hierarchical/Bayesian update design with explicit regime
+reliability rather than a blanket multiplier.
+
 ## Public score transform
 
 The selected annual predicted incidence is multiplied by the selected CDC

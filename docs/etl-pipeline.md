@@ -276,6 +276,16 @@ request/run manifests as those sources graduate into the modeling lane.
       update research; it is not a public score correction.
     - Writes diagnostics under the chosen model-diagnostics output directory.
 
+17b. `tickbiterisk etl forecast-calibration-backtest`
+    - Applies forecast-safe shrunken calibration multipliers learned only from
+      prior update rows for the same model branch.
+    - Writes `forecast_calibration_backtest_runs.csv`,
+      `forecast_calibration_backtest_predictions.csv`, and
+      `forecast_calibration_backtest_metrics.csv`.
+    - This is a falsification harness for calibration/update ideas. A
+      calibration multiplier can remain useful as a research prior even when it
+      does not improve held-out MAE enough to become a public correction.
+
 18. `tickbiterisk etl county-week-risk`
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.
     - Writes `county_week_seasonal_risk_baseline.csv` and
