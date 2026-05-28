@@ -106,6 +106,11 @@ NUMERIC_SOURCE_COLUMNS = [
     "oni_prior_year_min_anomaly_c",
     "oni_prior_year_el_nino_season_count",
     "oni_prior_year_la_nina_season_count",
+    "mei_v2_prior_year_mean",
+    "mei_v2_prior_year_max",
+    "mei_v2_prior_year_min",
+    "mei_v2_prior_year_positive_month_count",
+    "mei_v2_prior_year_negative_month_count",
 ]
 OPTIONAL_NUMERIC_COLUMNS = [
     "population_prior_year",
@@ -164,6 +169,11 @@ OPTIONAL_NUMERIC_COLUMNS = [
     "oni_prior_year_min_anomaly_c",
     "oni_prior_year_el_nino_season_count",
     "oni_prior_year_la_nina_season_count",
+    "mei_v2_prior_year_mean",
+    "mei_v2_prior_year_max",
+    "mei_v2_prior_year_min",
+    "mei_v2_prior_year_positive_month_count",
+    "mei_v2_prior_year_negative_month_count",
 ]
 SPATIAL_NEIGHBOR_FEATURE_COLUMNS = [
     "feature_neighbor_prior_year_lyme_incidence_mean",

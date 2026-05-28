@@ -143,6 +143,16 @@ FORECAST_ECOLOGY_EXACT_FEATURES = {
     "feature_missing_oni_prior_year_min_anomaly_c",
     "feature_missing_oni_prior_year_el_nino_season_count",
     "feature_missing_oni_prior_year_la_nina_season_count",
+    "feature_mei_v2_prior_year_mean",
+    "feature_mei_v2_prior_year_max",
+    "feature_mei_v2_prior_year_min",
+    "feature_mei_v2_prior_year_positive_month_count",
+    "feature_mei_v2_prior_year_negative_month_count",
+    "feature_missing_mei_v2_prior_year_mean",
+    "feature_missing_mei_v2_prior_year_max",
+    "feature_missing_mei_v2_prior_year_min",
+    "feature_missing_mei_v2_prior_year_positive_month_count",
+    "feature_missing_mei_v2_prior_year_negative_month_count",
 }
 FORECAST_SPATIAL_EXACT_FEATURES = {
     "feature_neighbor_prior_year_lyme_incidence_mean",

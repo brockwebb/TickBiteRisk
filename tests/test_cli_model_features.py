@@ -56,6 +56,26 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
             }
         ],
     )
+    mei_v2 = _write_csv(
+        tmp_path / "mei_v2.csv",
+        [
+            {
+                "model_year": "2022",
+                "mei_v2_prior_year_month_count": "12",
+                "mei_v2_prior_year_mean": "-0.31",
+                "mei_v2_prior_year_max": "0.2",
+                "mei_v2_prior_year_min": "-1.0",
+                "mei_v2_prior_year_positive_month_count": "0",
+                "mei_v2_prior_year_negative_month_count": "4",
+                "source_ids": "noaa_psl_mei_v2",
+                "source_url_hashes": "mei_hash",
+                "feature_quality_flags": (
+                    "global_climate_index,not_maryland_specific,"
+                    "mei_v2_index,prior_year_signal"
+                ),
+            }
+        ],
+    )
     tick_status = _write_csv(
         tmp_path / "tick_status.csv",
         [
@@ -103,6 +123,8 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
             str(tmp_path / "missing-habitat.csv"),
             "--enso-oni-path",
             str(enso),
+            "--enso-mei-v2-path",
+            str(mei_v2),
             "--tick-status-path",
             str(tick_status),
             "--output-dir",
@@ -120,11 +142,14 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
     assert rows[0]["county_fips"] == "24003"
     assert rows[0]["lyme_incidence_per_100k"] == "2.5"
     assert rows[0]["oni_prior_year_mean_anomaly_c"] == "-0.42"
+    assert rows[0]["mei_v2_prior_year_mean"] == "-0.31"
+    assert rows[0]["mei_v2_source_ids"] == "noaa_psl_mei_v2"
     assert rows[0]["ixodes_scapularis_status"] == "established"
     assert rows[0]["borrelia_burgdorferi_status"] == "present"
     assert rows[0]["model_feature_quality_flags"] == (
         "missing_contact_pressure,missing_deer_harvest_prior_season,"
         "global_climate_index,not_maryland_specific,prior_year_signal,"
+        "mei_v2_index,"
         "current_status_retrospective_proxy,status_only_not_prevalence,"
         "no_records_not_absence"
     )

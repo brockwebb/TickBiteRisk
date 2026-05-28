@@ -131,6 +131,15 @@ MODEL_FEATURE_COLUMNS = [
     "enso_source_ids",
     "enso_source_url_hashes",
     "enso_feature_quality_flags",
+    "mei_v2_prior_year_month_count",
+    "mei_v2_prior_year_mean",
+    "mei_v2_prior_year_max",
+    "mei_v2_prior_year_min",
+    "mei_v2_prior_year_positive_month_count",
+    "mei_v2_prior_year_negative_month_count",
+    "mei_v2_source_ids",
+    "mei_v2_source_url_hashes",
+    "mei_v2_feature_quality_flags",
     "model_feature_quality_flags",
 ]
 

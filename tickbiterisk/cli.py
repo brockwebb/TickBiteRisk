@@ -1900,6 +1900,10 @@ def model_features(
         Path("build/etl/enso/noaa_cpc_oni_model_year_features.csv"),
         help="Optional NOAA CPC ONI prior-year global climate feature CSV.",
     ),
+    enso_mei_v2_path: Path = typer.Option(
+        Path("build/etl/enso/noaa_psl_mei_v2_model_year_features.csv"),
+        help="Optional NOAA PSL MEI.v2 prior-year global climate feature CSV.",
+    ),
     tick_status_path: Path | None = typer.Option(
         None,
         help=(
@@ -1941,6 +1945,9 @@ def model_features(
             else None
         ),
         enso_oni_path=enso_oni_path if enso_oni_path.exists() else None,
+        enso_mei_v2_path=(
+            enso_mei_v2_path if enso_mei_v2_path.exists() else None
+        ),
         tick_status_path=tick_status_path,
     )
     output = write_model_feature_matrix_output(rows, output_dir)

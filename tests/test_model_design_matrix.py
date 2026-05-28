@@ -91,14 +91,18 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_missing_ecological_pressure_prior_year_index"] == "0"
     assert mast_row["feature_oni_prior_year_mean_anomaly_c"] == "-0.42"
     assert mast_row["feature_oni_prior_year_la_nina_season_count"] == "5.0"
+    assert mast_row["feature_mei_v2_prior_year_mean"] == "-0.31"
+    assert mast_row["feature_mei_v2_prior_year_negative_month_count"] == "4.0"
     assert mast_row["feature_missing_usdm_dsci_mean"] == "0"
     assert mast_row["feature_missing_forest_pct"] == "0"
     assert mast_row["feature_missing_units_authorized_per_sqmi_prior_year"] == "0"
     assert mast_row["feature_missing_oni_prior_year_mean_anomaly_c"] == "0"
+    assert mast_row["feature_missing_mei_v2_prior_year_mean"] == "0"
     assert "feature_usdm_dsci_mean" in result.schema.feature_columns
     assert "feature_usdm_prior_year_dsci_mean" in result.schema.feature_columns
     assert "feature_forest_pct" in result.schema.feature_columns
     assert "feature_oni_prior_year_mean_anomaly_c" in result.schema.feature_columns
+    assert "feature_mei_v2_prior_year_mean" in result.schema.feature_columns
     assert (
         "feature_units_authorized_per_sqmi_prior_year"
         in result.schema.feature_columns
@@ -130,6 +134,8 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert missing_new_row["feature_missing_forest_pct"] == "1"
     assert missing_new_row["feature_oni_prior_year_mean_anomaly_c"] == "0.0"
     assert missing_new_row["feature_missing_oni_prior_year_mean_anomaly_c"] == "1"
+    assert missing_new_row["feature_mei_v2_prior_year_mean"] == "0.0"
+    assert missing_new_row["feature_missing_mei_v2_prior_year_mean"] == "1"
     assert missing_new_row["feature_ecological_pressure_prior_year_index"] == "0.0"
     assert missing_new_row["feature_ecological_pressure_component_count"] == "0"
     assert (
@@ -571,6 +577,32 @@ def _write_feature_matrix(path: Path) -> Path:
                     "enso_source_url_hashes": "hash" if has_new_features else "",
                     "enso_feature_quality_flags": (
                         "global_climate_index,not_maryland_specific,prior_year_signal"
+                        if has_new_features
+                        else ""
+                    ),
+                    "mei_v2_prior_year_month_count": (
+                        "12" if has_new_features else ""
+                    ),
+                    "mei_v2_prior_year_mean": (
+                        "-0.31" if has_new_features else ""
+                    ),
+                    "mei_v2_prior_year_max": "0.2" if has_new_features else "",
+                    "mei_v2_prior_year_min": "-1.0" if has_new_features else "",
+                    "mei_v2_prior_year_positive_month_count": (
+                        "0" if has_new_features else ""
+                    ),
+                    "mei_v2_prior_year_negative_month_count": (
+                        "4" if has_new_features else ""
+                    ),
+                    "mei_v2_source_ids": (
+                        "noaa_psl_mei_v2" if has_new_features else ""
+                    ),
+                    "mei_v2_source_url_hashes": (
+                        "mei_hash" if has_new_features else ""
+                    ),
+                    "mei_v2_feature_quality_flags": (
+                        "global_climate_index,not_maryland_specific,"
+                        "mei_v2_index,prior_year_signal"
                         if has_new_features
                         else ""
                     ),

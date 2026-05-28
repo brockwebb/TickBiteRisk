@@ -24,8 +24,8 @@ boundary clearly allow redistribution.
 | `nlcd_mrlc` | MRLC/NLCD land cover files | Raster/county summary candidate | Habitat and forest/edge proxy source | acquired_needs_feature_depth |
 | `census_bps` | Census Building Permits Survey county files | County-year | Contact/land-use pressure proxy | active_etl |
 | `maryland_mast_reports` | Maryland DNR mast/acorn reports | Region/report | Ecological food pulse candidate | acquired_low_confidence |
-| `noaa_cpc_oni` | NOAA CPC Oceanic Nino Index | Global seasonal climate index | Lagged ENSO phase overtone candidate; materialized as complete prior-year model features, not joined into public model yet | active_etl_candidate_feature |
-| `noaa_psl_mei_v2` | NOAA PSL Multivariate ENSO Index v2 | Global monthly climate index | Lagged ocean-atmosphere ENSO companion to ONI; materialized as complete prior-year feature artifact, not joined into public model yet | active_etl_candidate_feature_not_public_default |
+| `noaa_cpc_oni` | NOAA CPC Oceanic Nino Index | Global seasonal climate index | Lagged ENSO phase overtone candidate; materialized as complete prior-year model features, not promoted into the public model | active_etl_candidate_feature |
+| `noaa_psl_mei_v2` | NOAA PSL Multivariate ENSO Index v2 | Global monthly climate index | Lagged ocean-atmosphere ENSO companion to ONI; materialized as complete prior-year model features, not promoted into the public model | active_etl_candidate_feature_not_public_default |
 | `nssp_coverage` | NSSP coverage map table | County/status | Feasibility check for future ED tick-bite feed; materialized with county FIPS and caveats, but not tick-bite counts | active_etl_feasibility_only_not_model_input |
 | `capc_dog_serology` | CAPC canine Lyme data | County/month | Possible veterinary sentinel source | not_redistributed_license_sensitive |
 
@@ -41,7 +41,6 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `maryland_dnr_archery_hunter_survey` | Maryland DNR Archery Hunter / Bowhunter Survey | Hunter report / county-season if extractable | Host and wildlife observation proxy, potentially lighter than raster GIS if report tables are defensible | source_manifested_needs_review |
 | `usda_nass_maryland_cdl` | USDA NASS Cropland Data Layer / CropScape | Raster/county summary candidate | Annual crop, pasture, hay, and open-land change context around land-use and edge habitat | source_manifested_needs_feature_extraction |
 | `noaa_cpc_enso_index` | NOAA CPC ENSO index, ONI/RONI | Global seasonal climate index | ONI is now materialized; RONI remains a candidate companion index to test as a lagged climate-regime overtone | oni_active_roni_candidate_needs_etl |
-| `noaa_psl_mei_v2_model_join` | NOAA PSL Multivariate ENSO Index v2 model-feature join | Global monthly climate index to county-year feature | Backtest whether the materialized MEI.v2 prior-year artifact adds useful broad climate context beside ONI | candidate_needs_model_feature_join_and_backtest |
 | `acs_residential_exposure_history` | ACS 5-year B01001/B25024/B25003 detailed-table history | County-year ACS vintage | Historical backfill for the materialized 2024 exposure-context proxy if the rolling-survey caveats remain useful in backtests | candidate_historical_backfill_needs_static_summary_parser |
 | `cdc_tick_bite_tracker` | CDC Tick Bite Data Tracker | HHS region/week dashboard | Human tick-bite exposure pressure overlay if backing data becomes available; current public dashboard grain is not county-year and is not a disease truth label | candidate_missing_bulk_data |
 | `nssp_tick_bite_ed` | NSSP tick-bite emergency department visits | Facility/county/region-week likely | Privacy-sensitive human exposure pressure feed candidate; useful only after acquisition, suppression, coverage, and privacy review, and not a confirmed disease truth label | candidate_needs_acquisition_privacy_review_not_public_default |
@@ -122,10 +121,9 @@ feature ideas to test in time-aware backtests before any public model claim.
   review exists.
 - Land-cover features need deeper county summarization before they should drive
   public model claims.
-- ONI ETL and model joins are implemented as lagged global climate context
-  artifacts. MEI.v2 ETL is materialized as a sibling artifact, but not joined
-  into model features yet. The first ONI time-aware backtest did not improve
-  the selected public branch, so RONI, MEI.v2 joins, and composite
+- ONI and MEI.v2 ETL/model joins are implemented as separate lagged global
+  climate context artifacts. The first ONI time-aware backtest did not improve
+  the selected public branch, so RONI, MEI.v2, and composite
   ecological-pressure features still need separate evidence before any public
   model claim.
 - Open-Meteo recent backfill is local under ignored `build/etl/open-meteo`.

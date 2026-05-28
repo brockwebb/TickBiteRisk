@@ -106,10 +106,11 @@ countywide or statewide mast production.
 
 The 2026-05-28 expanded feature comparison now includes prior-year population
 growth, USDM drought, EnviroAtlas habitat, construction-lag features, prior-year
-USDM drought, complete prior-year ONI, and a transparent ecological pressure
-composite in the timing-safe ecology/exposure lane. MEI.v2 is now materialized
-as a separate complete prior-year ENSO companion artifact, but it is not joined
-into model features yet. Held-out MAE still ranks `prior_year_incidence` first;
+USDM drought, complete prior-year ONI, complete prior-year MEI.v2, and a
+transparent ecological pressure composite in the timing-safe ecology/exposure
+lane. ONI and MEI.v2 stay as separate global climate-context predictors because
+MEI.v2 is a dimensionless ocean-atmosphere index rather than a CPC seasonal
+temperature anomaly. Held-out MAE still ranks `prior_year_incidence` first;
 these features remain available for research lanes but are not promoted into
 the public score.
 
@@ -119,9 +120,10 @@ incidence. It ranked behind the simple blend and conservative safe ridge, with
 MAE 19.005867 per 100k in the current 2024-inclusive run, so it remains a
 diagnostic research lane. The regional and population-growth additions also
 remain research lanes unless a future validation slice shows stable improvement.
-The ecological pressure composite nudged `ridge_forecast_ecology` to 21.946949
-MAE per 100k in the same run, which is useful as a research signal but still
-behind simpler lagged baselines.
+After adding MEI.v2 to the ecology lane, `ridge_forecast_ecology` ranked at
+23.466694 MAE per 100k and `ridge_lag_weather_ecology` ranked at 25.233508
+MAE per 100k in the same run. That is useful negative evidence: MEI.v2 remains
+available for research, but it does not currently justify public promotion.
 
 ## Research lanes and diagnostics
 

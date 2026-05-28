@@ -281,8 +281,9 @@ artifacts.
 13. `tickbiterisk etl model-features`
     - Joins Lyme outcomes, population, timing-safe prior-year population
       growth, weather, deer, contact-pressure, construction lags, prior-year
-      mast/acorn, USDM drought, EnviroAtlas habitat, complete prior-year ONI,
-      and optional surveillance features into the county-year feature matrix.
+      mast/acorn, USDM drought, EnviroAtlas habitat, complete prior-year ONI
+      and MEI.v2, and optional surveillance features into the county-year
+      feature matrix.
     - Writes `model_features_county_year.csv`.
 
 14. `tickbiterisk etl county-adjacency`

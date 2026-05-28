@@ -133,6 +133,15 @@ class ModelCountyYearFeature:
     enso_source_ids: str | None = None
     enso_source_url_hashes: str | None = None
     enso_feature_quality_flags: str | None = None
+    mei_v2_prior_year_month_count: int | None = None
+    mei_v2_prior_year_mean: float | None = None
+    mei_v2_prior_year_max: float | None = None
+    mei_v2_prior_year_min: float | None = None
+    mei_v2_prior_year_positive_month_count: int | None = None
+    mei_v2_prior_year_negative_month_count: int | None = None
+    mei_v2_source_ids: str | None = None
+    mei_v2_source_url_hashes: str | None = None
+    mei_v2_feature_quality_flags: str | None = None
     population_prior_year: int | None = None
     population_change_prior_year: int | None = None
     population_pct_change_prior_year: float | None = None
@@ -150,6 +159,7 @@ def build_model_feature_matrix(
     usdm_drought_path: Path | None = None,
     enviroatlas_habitat_path: Path | None = None,
     enso_oni_path: Path | None = None,
+    enso_mei_v2_path: Path | None = None,
     tick_status_path: Path | None = None,
 ) -> list[ModelCountyYearFeature]:
     population = _read_population(population_path)
@@ -160,12 +170,14 @@ def build_model_feature_matrix(
     drought = _read_usdm_drought(usdm_drought_path)
     habitat = _read_enviroatlas_habitat(enviroatlas_habitat_path)
     enso = _read_enso_oni(enso_oni_path)
+    mei_v2 = _read_enso_mei_v2(enso_mei_v2_path)
     tick_status = _read_tick_status(tick_status_path)
     tick_status_enabled = tick_status_path is not None
     mast_enabled = mast_acorn_path is not None
     drought_enabled = usdm_drought_path is not None
     habitat_enabled = enviroatlas_habitat_path is not None
     enso_enabled = enso_oni_path is not None
+    mei_v2_enabled = enso_mei_v2_path is not None
 
     rows = []
     for lyme in _read_csv(lyme_outcomes_path):
@@ -191,6 +203,7 @@ def build_model_feature_matrix(
         drought_prior_year_row = drought.get((county_fips, year - 1))
         habitat_row = habitat.get(county_fips)
         enso_row = enso.get(year)
+        mei_v2_row = mei_v2.get(year)
         tick_status_row = tick_status.get(county_fips)
         total_cases = _parse_int(lyme["total_cases"])
         weather_ratio = weather_row["weather_observation_ratio"]
@@ -216,6 +229,8 @@ def build_model_feature_matrix(
             habitat_flags=_habitat_quality_flags(habitat_row),
             enso_missing=enso_enabled and enso_row is None,
             enso_flags=_enso_quality_flags(enso_row),
+            enso_mei_v2_missing=mei_v2_enabled and mei_v2_row is None,
+            enso_mei_v2_flags=_enso_quality_flags(mei_v2_row),
             tick_status_missing=tick_status_enabled and tick_status_row is None,
             tick_status_flags=_tick_status_quality_flags(tick_status_row),
         )
@@ -451,6 +466,29 @@ def build_model_feature_matrix(
                 enso_source_ids=_enso_text(enso_row, "source_ids"),
                 enso_source_url_hashes=_enso_text(enso_row, "source_url_hashes"),
                 enso_feature_quality_flags=_enso_quality_flags(enso_row),
+                mei_v2_prior_year_month_count=_enso_int(
+                    mei_v2_row, "mei_v2_prior_year_month_count"
+                ),
+                mei_v2_prior_year_mean=_enso_float(
+                    mei_v2_row, "mei_v2_prior_year_mean"
+                ),
+                mei_v2_prior_year_max=_enso_float(
+                    mei_v2_row, "mei_v2_prior_year_max"
+                ),
+                mei_v2_prior_year_min=_enso_float(
+                    mei_v2_row, "mei_v2_prior_year_min"
+                ),
+                mei_v2_prior_year_positive_month_count=_enso_int(
+                    mei_v2_row, "mei_v2_prior_year_positive_month_count"
+                ),
+                mei_v2_prior_year_negative_month_count=_enso_int(
+                    mei_v2_row, "mei_v2_prior_year_negative_month_count"
+                ),
+                mei_v2_source_ids=_enso_text(mei_v2_row, "source_ids"),
+                mei_v2_source_url_hashes=_enso_text(
+                    mei_v2_row, "source_url_hashes"
+                ),
+                mei_v2_feature_quality_flags=_enso_quality_flags(mei_v2_row),
             )
         )
     return sorted(rows, key=lambda row: (row.county_fips, row.year))
@@ -714,6 +752,15 @@ def _read_enso_oni(path: Path | None) -> dict[int, dict[str, str]]:
     }
 
 
+def _read_enso_mei_v2(path: Path | None) -> dict[int, dict[str, str]]:
+    if path is None:
+        return {}
+    return {
+        int(row["model_year"]): row
+        for row in _read_csv(path)
+    }
+
+
 def _mast_preferred_sort_key(row: dict[str, str]) -> tuple[int, str]:
     return (
         _parse_int_or_none(row.get("source_report_year", "")) or _parse_int(row["year"]),
@@ -749,6 +796,8 @@ def _model_quality_flags(
     habitat_flags: str,
     enso_missing: bool,
     enso_flags: str,
+    enso_mei_v2_missing: bool,
+    enso_mei_v2_flags: str,
     tick_status_missing: bool,
     tick_status_flags: str,
 ) -> list[str]:
@@ -779,6 +828,9 @@ def _model_quality_flags(
     if enso_missing:
         flags.append("missing_enso_oni_prior_year")
     flags.extend(_split_flags(enso_flags))
+    if enso_mei_v2_missing:
+        flags.append("missing_enso_mei_v2_prior_year")
+    flags.extend(_split_flags(enso_mei_v2_flags))
     if tick_status_missing:
         flags.append("missing_tick_status")
     flags.extend(_split_flags(tick_status_flags))
