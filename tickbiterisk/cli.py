@@ -1243,6 +1243,14 @@ def acs_exposure(
         None,
         help="Output CSV manifest for source acquisition provenance.",
     ),
+    append: bool = typer.Option(
+        False,
+        "--append/--replace",
+        help=(
+            "Append to existing ACS exposure artifacts with key-based dedupe, "
+            "or replace the output files."
+        ),
+    ),
 ) -> None:
     try:
         source_urls = build_acs_exposure_source_urls(year=year)
@@ -1267,7 +1275,7 @@ def acs_exposure(
     except AcsExposureInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    output = write_acs_exposure_output(rows, output_dir)
+    output = write_acs_exposure_output(rows, output_dir, append=append)
     resolved_manifest_path = (
         provenance_manifest_path or output_dir / "acquisition_provenance.csv"
     )
@@ -1280,10 +1288,12 @@ def acs_exposure(
             raw_dir=raw_dir,
             manifest_path=resolved_manifest_path,
             row_count=len(rows),
+            append=append,
         ),
         manifest_path=resolved_manifest_path,
+        append=append,
     )
-    typer.echo(f"Wrote {len(rows)} ACS exposure row(s) to {output}")
+    typer.echo(f"Wrote {len(rows)} ACS exposure row(s) to {output} (append={append})")
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
@@ -5016,6 +5026,7 @@ def _acs_exposure_provenance_records(
     raw_dir: Path,
     manifest_path: Path,
     row_count: int,
+    append: bool,
 ) -> list[AcquisitionProvenanceRecord]:
     command = _format_cli_command(
         [
@@ -5030,6 +5041,7 @@ def _acs_exposure_provenance_records(
             _public_provenance_path(output_dir),
             "--provenance-manifest-path",
             _public_provenance_path(manifest_path),
+            "--append" if append else "--replace",
         ]
     )
     source_items = [

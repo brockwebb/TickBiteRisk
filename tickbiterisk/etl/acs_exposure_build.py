@@ -46,6 +46,8 @@ ACS_EXPOSURE_COLUMNS = [
 def write_acs_exposure_output(
     rows: list[AcsExposureCountyYear],
     output_dir: Path,
+    *,
+    append: bool = False,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "midatlantic_acs_exposure_county_year.csv"
@@ -56,6 +58,14 @@ def write_acs_exposure_output(
         }
         for row in rows
     }
+    if append and output_path.exists():
+        keyed = {
+            **{
+                _record_key(record): record
+                for record in _read_existing_records(output_path)
+            },
+            **keyed,
+        }
     with output_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=ACS_EXPOSURE_COLUMNS)
         writer.writeheader()
@@ -69,3 +79,19 @@ def _format_value(value: object) -> object:
     if value is None:
         return ""
     return value
+
+
+def _read_existing_records(output_path: Path) -> list[dict[str, str]]:
+    with output_path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        return [
+            {
+                **record,
+                "county_fips": str(record["county_fips"]).zfill(5),
+            }
+            for record in reader
+        ]
+
+
+def _record_key(record: dict[str, object]) -> tuple[str, int]:
+    return (str(record["county_fips"]).zfill(5), int(record["year"]))

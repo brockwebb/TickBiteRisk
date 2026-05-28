@@ -85,6 +85,8 @@ artifacts.
      Gazetteer county land area.
    - Writes `midatlantic_acs_exposure_county_year.csv` and
      `acquisition_provenance.csv`.
+   - Supported vintages are 2023 and 2024. Use `--append` to accumulate both
+     vintages into one county-year panel with key-based replacement on rerun.
    - These rows are rolling-survey residential-form, tenure, age, and density
      exposure-context proxies only. They are not tick-bite counts, direct
      exposure observations, Lyme outcomes, or public-default model inputs.
@@ -372,7 +374,8 @@ probability or a treatment recommendation.
   from Census denominators, not proof of exposure or new construction.
 - ACS residential-form and density fields are rolling 5-year survey context,
   not annual observed exposure, tick-bite counts, Lyme outcomes, or disease
-  truth.
+  truth. Density fields use static 2024 Census Gazetteer county land area for
+  both currently materialized ACS vintages.
 - The ecological pressure composite is a transparent fixed-scale average of
   timing-safe component proxies; component columns stay visible and should be
   reviewed alongside the index.

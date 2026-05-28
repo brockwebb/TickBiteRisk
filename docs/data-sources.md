@@ -17,7 +17,7 @@ boundary clearly allow redistribution.
 | `census_county_reference` | Census Gazetteer county file | County | County names, FIPS, land/water area, internal points | active_etl |
 | `census_population` | Census PEP/intercensal population APIs and county totals CSV | County-year | Incidence denominators and per-capita feature normalization through 2025 | active_etl |
 | `census_regional_age_sex` | Census PEP county age/sex static CSVs | County-year | Mid-Atlantic age-structure context for exposure research; not tick-bite counts | active_etl_candidate_feature |
-| `acs_residential_exposure_context` | ACS 5-year table-based summary files B01001/B25024/B25003 | County-year ACS vintage | 2024 Mid-Atlantic residential form, tenure, age, and density exposure-context proxy; not tick-bite counts | active_etl_latest_2024_candidate_feature_not_public_default |
+| `acs_residential_exposure_context` | ACS 5-year table-based summary files B01001/B25024/B25003 | County-year ACS vintage | 2023-2024 Mid-Atlantic residential form, tenure, age, and density exposure-context proxy; not tick-bite counts | active_etl_2023_2024_candidate_feature_not_public_default |
 | `maryland_dnr_deer_harvest` | Maryland DNR deer harvest tables and annual reports | County-season | Host-pressure proxy; prior completed season maps into model year | active_etl |
 | `cdc_tick_vector_status` | CDC public tick vector county table through 2025 | County/species/status | Vector presence/status feature candidates | active_etl_latest_2025 |
 | `cdc_tick_pathogen_status` | CDC public Ixodes pathogen county table through 2025 | County/pathogen/status | Pathogen detection feature candidates | active_etl_latest_2025 |
@@ -41,7 +41,7 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `maryland_dnr_archery_hunter_survey` | Maryland DNR Archery Hunter / Bowhunter Survey | Hunter report / county-season if extractable | Host and wildlife observation proxy, potentially lighter than raster GIS if report tables are defensible | source_manifested_needs_review |
 | `usda_nass_maryland_cdl` | USDA NASS Cropland Data Layer / CropScape | Raster/county summary candidate | Annual crop, pasture, hay, and open-land change context around land-use and edge habitat | source_manifested_needs_feature_extraction |
 | `noaa_cpc_enso_index` | NOAA CPC ENSO index, ONI/RONI | Global seasonal climate index | ONI is now materialized; RONI remains a candidate companion index to test as a lagged climate-regime overtone | oni_active_roni_candidate_needs_etl |
-| `acs_residential_exposure_history` | ACS 5-year B01001/B25024/B25003 detailed-table history | County-year ACS vintage | Historical backfill for the materialized 2024 exposure-context proxy if the rolling-survey caveats remain useful in backtests | candidate_historical_backfill_needs_static_summary_parser |
+| `acs_residential_exposure_history` | ACS 5-year B01001/B25024/B25003 detailed-table history | County-year ACS vintage | Historical backfill before the materialized 2023-2024 exposure-context proxy if the rolling-survey caveats remain useful in backtests | candidate_historical_backfill_needs_static_summary_parser |
 | `cdc_tick_bite_tracker` | CDC Tick Bite Data Tracker | HHS region/week dashboard | Human tick-bite exposure pressure overlay if backing data becomes available; current public dashboard grain is not county-year and is not a disease truth label | candidate_missing_bulk_data |
 | `nssp_tick_bite_ed` | NSSP tick-bite emergency department visits | Facility/county/region-week likely | Privacy-sensitive human exposure pressure feed candidate; useful only after acquisition, suppression, coverage, and privacy review, and not a confirmed disease truth label | candidate_needs_acquisition_privacy_review_not_public_default |
 | `poison_center_tick_bite_inquiries` | Poison center tick-bite inquiries | Call center region/county-week likely | Privacy-sensitive exposure pressure feed candidate that could capture tick-bite concern or advice-seeking behavior, not confirmed Lyme disease outcomes | candidate_needs_acquisition_privacy_review_not_public_default |
@@ -61,7 +61,7 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `county_population_year.csv` | `tickbiterisk etl census-population` | County-year population denominators |
 | `midatlantic_county_population_year.csv` | `tickbiterisk etl regional-population` | DE/DC/MD/PA/VA/WV county-year population denominators for regional rate diagnostics |
 | `midatlantic_age_demographics_county_year.csv` | `tickbiterisk etl regional-demographics` | DE/DC/MD/PA/VA/WV county-year age-structure context through 2024 |
-| `midatlantic_acs_exposure_county_year.csv` | `tickbiterisk etl acs-exposure` | DE/DC/MD/PA/VA/WV 2024 ACS residential-form, tenure, age, and density exposure-context proxy |
+| `midatlantic_acs_exposure_county_year.csv` | `tickbiterisk etl acs-exposure` | DE/DC/MD/PA/VA/WV 2023-2024 ACS residential-form, tenure, age, and density exposure-context proxy |
 | `county_reference.csv` | `tickbiterisk etl county-reference` | County FIPS, names, land area, and internal points |
 | `weather_features_weekly.csv` | `tickbiterisk etl noaa-weather-features` | Weekly weather predictors and quality flags |
 | `model_features_county_year.csv` | `tickbiterisk etl model-features` | Model-ready joined county-year panel |
@@ -111,11 +111,12 @@ feature ideas to test in time-aware backtests before any public model claim.
 - NSSP tick-bite ED data is not wired into the current model. The materialized
   coverage table only tells us where future ED/syndromic data work may be
   feasible; it is not a tick-bite feed or a disease outcome.
-- ACS residential-form exposure context is materialized for the 2024 ACS 5-year
-  vintage from static table-based summary files. Historical ACS backfill remains
-  a candidate, and the raw files are large enough to keep cached under ignored
-  storage. These values remain exposure-context proxies, not tick-bite counts
-  or annual observed exposure.
+- ACS residential-form exposure context is materialized for the 2023 and 2024
+  ACS 5-year vintages from static table-based summary files. Earlier historical
+  ACS backfill remains a candidate, and the raw files are large enough to keep
+  cached under ignored storage. These values remain exposure-context proxies,
+  not tick-bite counts or annual observed exposure; density fields use static
+  2024 Census Gazetteer land area.
 - Mast/acorn reports are currently low-confidence for structured county-year
   extraction and should be treated as notes until better extraction or manual
   review exists.

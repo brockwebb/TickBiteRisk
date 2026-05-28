@@ -1,4 +1,5 @@
 import csv
+from dataclasses import replace
 from pathlib import Path
 
 from tickbiterisk.etl.acs_exposure import (
@@ -158,6 +159,49 @@ def test_write_acs_exposure_output_writes_stable_columns(tmp_path: Path) -> None
         assert next(reader) == ACS_EXPOSURE_COLUMNS
         first_row = next(reader)
     assert first_row[0:6] == ["24", "MD", "Maryland", "24011", "Caroline County", "2024"]
+
+
+def test_write_acs_exposure_output_appends_and_dedupes_by_county_year(
+    tmp_path: Path,
+) -> None:
+    row_2023 = build_midatlantic_acs_exposure(
+        geography_text=_geography_text(
+            [
+                {
+                    "STUSAB": "MD",
+                    "STATE": "24",
+                    "COUNTY": "011",
+                    "GEO_ID": "0500000US24011",
+                    "NAME": "Caroline County, Maryland",
+                    "TL_GEO_ID": "24011",
+                }
+            ]
+        ),
+        b01001_text=_b01001_text("0500000US24011", total=100),
+        b25024_text=_b25024_text("0500000US24011", total_housing=50),
+        b25003_text=_b25003_text("0500000US24011", occupied=40, owner=20),
+        gazetteer_text=_gazetteer_text(
+            [{"USPS": "MD", "GEOID": "24011", "NAME": "Caroline", "ALAND_SQMI": "5"}]
+        ),
+        source_urls=build_acs_exposure_source_urls(year=2023),
+    )[0]
+    row_2024 = replace(row_2023, year=2024, owner_occupied_share=0.7)
+    row_2024_replacement = replace(row_2024, owner_occupied_share=0.75)
+
+    write_acs_exposure_output([row_2023, row_2024], tmp_path / "out")
+    output = write_acs_exposure_output(
+        [row_2024_replacement],
+        tmp_path / "out",
+        append=True,
+    )
+
+    with output.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    assert [(row["county_fips"], row["year"]) for row in rows] == [
+        ("24011", "2023"),
+        ("24011", "2024"),
+    ]
+    assert rows[1]["owner_occupied_share"] == "0.75"
 
 
 def _geography_text(rows: list[dict[str, str]]) -> str:

@@ -65,7 +65,7 @@ Current model-ready feature groups include:
   timing-safe demographic/contact-pressure proxy.
 - Census PEP regional age-structure context through 2024, currently a
   research-only human exposure proxy and not a public default model input.
-- ACS 2024 residential form, tenure, age, and density context, currently a
+- ACS 2023-2024 residential form, tenure, age, and density context, currently a
   research-only human exposure proxy and not a public default model input.
 - NOAA weekly weather aggregates rolled to county-year predictors.
 - CDC Lyme seasonality shares by week and month of onset.
@@ -178,12 +178,14 @@ that join while preserving missing denominator rows, and the cluster diagnostic
 summarizes prior-history pressure bands. They remain diagnostic panels, not
 public Maryland forecast branches.
 
-Regional Census age/sex demographics and 2024 ACS residential-form summaries
+Regional Census age/sex demographics and 2023-2024 ACS residential-form summaries
 are also materialized as candidate human-exposure context layers. Age mix may
 help explain who is more likely to be diagnosed, exposed, or represented in
 reported incidence, and ACS single-family/owner-occupied/density fields may
 proxy residential edge contact. Neither source is a tick-encounter measure,
-annual observed exposure, or public-default model input.
+annual observed exposure, or public-default model input; ACS density fields use
+static 2024 Census Gazetteer county land area for both currently materialized
+vintages.
 
 ## Forecast Update Contract
 
