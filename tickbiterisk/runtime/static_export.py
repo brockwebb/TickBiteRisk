@@ -23,12 +23,12 @@ PUBLIC_CAVEATS = [
     "Informational and educational only; not medical advice.",
     "Does not diagnose disease or determine whether a person is infected.",
     "Not a treatment recommendation or substitute for a healthcare professional.",
-    "Relative Maryland county-week Lyme baseline, not a per-bite infection probability.",
+    "Relative Maryland county-week Lyme forecast, not a per-bite infection probability.",
     "Not a personal infection probability.",
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
     "Surveillance/reporting changes and interventions are unmodeled.",
-    "Empirical intervals describe baseline uncertainty, not clinical confidence for an individual bite.",
+    "Empirical intervals describe forecast uncertainty, not clinical confidence for an individual bite.",
 ]
 
 SCORE_CATEGORIES = {
@@ -356,9 +356,11 @@ def _model_card_payload(
         "generated_at": generated_at,
         "model_name": first.model_name,
         "target_definition": "lyme_incidence_per_100k",
-        "product_framing": "relative county-week seasonal Lyme baseline",
+        "product_framing": (
+            "Lyme risk forecasting tool for Maryland county-week conditions"
+        ),
         "score_interpretation": (
-            "Relative seasonal Lyme baseline on a 1-10 Maryland scale; not a "
+            "Relative seasonal Lyme forecast on a 1-10 Maryland scale; not a "
             "per-bite infection probability."
         ),
         "not_for": [
@@ -373,14 +375,15 @@ def _model_card_payload(
             "CDC national MMWR-week Lyme onset seasonality."
         ),
         "forecasting_status": {
-            "status": "forecasting_transition_research",
+            "status": "risk_forecasting_tool",
             "public_score_role": (
-                "relative county-week seasonal baseline with "
-                "forecast-transition diagnostics"
+                "relative county-week Lyme risk forecast with source-lag and "
+                "update diagnostics"
             ),
             "update_policy": (
-                "New surveillance and exposure signals are reconciled against prior "
-                "forecasts before they are considered for future reviewed estimates."
+                "New surveillance, ecology, exposure, and calibration evidence are "
+                "reconciled against prior forecasts and backtests before they are "
+                "considered for future reviewed estimates."
             ),
         },
         "annual_prediction_source": _annual_prediction_source(first),
@@ -458,6 +461,16 @@ def _source_catalog_payload(
                 "Official Lyme surveillance data lag real-world exposure conditions, "
                 "so TickBiteRisk treats forecasts as provisional informational "
                 "estimates that improve as new validated data arrive."
+            ),
+            "why_forecasting": (
+                "Forecasting gives timely prevention context while county-level "
+                "surveillance reports, population denominators, and reviewed source "
+                "updates catch up."
+            ),
+            "reconciliation_policy": (
+                "New observed reports are reconciled against prior forecasts using "
+                "surveillance-regime diagnostics, calibration backtests, and source "
+                "quality flags before they are promoted into future reviewed estimates."
             ),
             "forecast_boundary": (
                 "Forecast-safe branches use prior-year and trailing data; nowcast or "

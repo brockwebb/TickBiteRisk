@@ -62,6 +62,21 @@ def test_risk_lookup_command_fails_cleanly_when_scores_missing(
     assert "Traceback" not in result.output
 
 
+def test_risk_cli_help_uses_forecast_language() -> None:
+    for command in [
+        ["risk", "lookup", "--help"],
+        ["risk", "single-bite", "--help"],
+        ["risk", "export-static", "--help"],
+    ]:
+        result = runner.invoke(app, command)
+        normalized = " ".join(result.output.split())
+
+        assert result.exit_code == 0
+        assert "risk forecast" in normalized
+        assert "CSV" in normalized
+        assert "risk baseline CSV" not in normalized
+
+
 def test_risk_single_bite_command_returns_decision_support_json(
     tmp_path: Path,
 ) -> None:
@@ -96,9 +111,10 @@ def test_risk_single_bite_command_returns_decision_support_json(
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["county_fips"] == "24003"
-    assert payload["single_bite_risk_score"] >= payload["baseline_context"][
+    assert payload["single_bite_risk_score"] >= payload["forecast_context"][
         "county_week_risk_score"
     ]
+    assert "baseline_context" not in payload
     assert payload["pep_consideration"] == "meets_cdc_consideration_criteria"
     assert payload["input_summary"]["tick_species"] == "ixodes_scapularis"
     assert "clinical_disclaimer" in payload

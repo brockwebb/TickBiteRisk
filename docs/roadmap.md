@@ -1,10 +1,10 @@
 # TickBiteRisk Roadmap
 
-## Current v0 baseline
+## Current v0 forecast
 
 TickBiteRisk now ships a Maryland static dashboard and local CLI runtime built
 from derived, public-safe artifacts. The current product is a county-week
-seasonal Lyme baseline plus a single-bite Lyme decision-support overlay, not a
+seasonal Lyme forecast plus a single-bite Lyme decision-support overlay, not a
 live clinical decision system.
 
 The implemented flow is:
@@ -15,9 +15,9 @@ The implemented flow is:
 3. Run model comparison across transparent baseline and ridge-style branches.
 4. Select the current model comparison branch and apportion annual predictions
    across CDC Lyme onset seasonality.
-5. Export a 1-10 Maryland-relative county-week seasonal Lyme baseline to
+5. Export a 1-10 Maryland-relative county-week seasonal Lyme forecast to
    `public/data`.
-6. Combine the county-week baseline with tick identity, life stage, attachment,
+6. Combine the county-week forecast with tick identity, life stage, attachment,
    engorgement, removal timing, and CDC criteria for a transparent single-bite
    Lyme decision-support overlay.
 7. Serve the static dashboard through GitHub Pages without runtime secrets or
@@ -31,7 +31,7 @@ complexity.
 
 | Version | Theme | Scope | Exit check |
 | --- | --- | --- | --- |
-| v0.1 | Public static baseline | Maryland dashboard, county-week risk JSON, single-bite Lyme decision-support overlay, CLI lookup/export, source metadata, plain-language caveats | Static site can be hosted from the repo and every public score carries provenance |
+| v0.1 | Public static forecast | Maryland dashboard, county-week risk JSON, single-bite Lyme decision-support overlay, CLI lookup/export, source metadata, plain-language caveats | Static site can be hosted from the repo and every public score carries provenance |
 | v0.2 | Dashboard polish | 508-focused color/contrast pass, keyboard map interaction, browser smoke tests, improved source panel | County click and table lookup work on desktop and mobile without overlap |
 | v0.3 | Validation report | Backtest writeup, model comparison summary, residual review by county/year, known intervention/data drift caveats | Public docs can explain when the score works, when it misses, and why |
 | v0.4 | Ecological feature depth | Stronger NLCD/land-cover summaries, deer harvest normalization, acorn/mast notes where usable, optional park/activity proxy manifest | Each feature has source, grain, date span, license note, and missingness flags |

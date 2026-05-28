@@ -297,14 +297,14 @@ request/run manifests as those sources graduate into the modeling lane.
 
 ## Runtime lookup
 
-The local lookup command reads the derived county-week baseline:
+The local lookup command reads the derived county-week forecast:
 
 ```bash
 tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26 --pretty
 ```
 
 It converts the date to CDC MMWR week and returns the relative Maryland Lyme
-baseline for that county-week. The value is not a personal infection
+forecast for that county-week. The value is not a personal infection
 probability or a treatment recommendation.
 
 ## Idempotency and lineage

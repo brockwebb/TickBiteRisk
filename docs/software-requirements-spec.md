@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, county-week seasonal risk baselines, runtime lookup/static export, and Postgres-ready schema.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, Census county reference/area, Census population denominators, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, county-week seasonal risk forecasts, runtime lookup/static export, and Postgres-ready schema.
 
 ## 1. Purpose
 
@@ -162,9 +162,9 @@ The seasonality baseline output must include empirical period summaries and pred
 
 The baseline is a national disease-onset prior, not a county-specific predictor. Outputs must carry `national_curve_not_county_specific`, `shares_normalized_by_annual_total`, and `empirical_prediction_band`.
 
-### FR4B: County-Week Seasonal Risk Baseline
+### FR4B: County-Week Seasonal Risk Forecast
 
-The system must convert annual held-out Lyme prediction rows into a product-shaped county-week risk baseline by combining:
+The system must convert annual held-out Lyme prediction rows into a product-shaped county-week risk forecast by combining:
 
 - one selected annual model branch from `model_comparison_predictions.csv` or a legacy `model_backtest_predictions.csv` artifact.
 - one selected weekly seasonality branch from `seasonality_baseline.csv`.
@@ -174,17 +174,17 @@ The county-week output must include predicted weekly incidence, empirical season
 
 The scale output must preserve the selected model name, seasonality source id, benchmark quantile, headroom multiplier, input file SHA-256 values, benchmark weekly incidence, denominator, and score-row count. Distinct model/source/scale configurations must be able to coexist without overwriting each other.
 
-This baseline is not a weather-adjusted forecast. Outputs must carry `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted`.
+This forecast is not weather-adjusted. Outputs must carry `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted`.
 
 ### FR4C: Runtime Risk Lookup
 
-The system must expose a local runtime lookup over the derived county-week risk baseline before the full HTTP API is implemented.
+The system must expose a local runtime lookup over the derived county-week risk forecast before the full HTTP API is implemented.
 
 The lookup must:
 
 - read `county_week_seasonal_risk_baseline.csv` without requiring raw source files, Postgres credentials, or live network access.
-- accept `county_fips` and calendar date, convert the date to CDC MMWR year/week, and return the matching county-week baseline row.
-- use the requested MMWR year when present and otherwise fall back to the latest available baseline year for that county/week with explicit quality flags.
+- accept `county_fips` and calendar date, convert the date to CDC MMWR year/week, and return the matching county-week forecast row.
+- use the requested MMWR year when present and otherwise fall back to the latest available forecast year for that county/week with explicit quality flags.
 - require explicit score-scale selectors when multiple benchmark/headroom configurations overlap for the same county/week.
 - return JSON-friendly fields for risk score, category, weekly incidence bands, model/source metadata, feature quality flags, backtest assumption flags, CDC guidance links, and a plain-language medical disclaimer.
 
@@ -193,7 +193,7 @@ The lookup output must not be presented as per-bite infection probability, diagn
 ### FR4D: Single-Bite Runtime
 
 The system must expose a local single-bite runtime over the derived county-week
-risk baseline before a full HTTP API is implemented.
+risk forecast before a full HTTP API is implemented.
 
 The single-bite runtime must:
 
@@ -208,7 +208,7 @@ The single-bite runtime must:
 - return CDC prophylaxis consideration criteria as separate `meets`, `not_met`,
   or `uncertain` statuses.
 - include CDC guidance links, a clinical disclaimer, caveats, normalized inputs,
-  evidence modifiers, and baseline context.
+  evidence modifiers, and forecast context.
 
 The single-bite runtime must not be presented as an absolute infection
 probability, diagnosis, treatment recommendation, or substitute for a healthcare
@@ -219,24 +219,24 @@ Plain-language public wording should say: this is not an absolute infection prob
 
 ### FR4E: Static Public Risk Export
 
-The system must expose a static export command over the derived county-week risk baseline for a public web/runtime bundle.
+The system must expose a static export command over the derived county-week risk forecast for a public web/runtime bundle.
 
 The export must:
 
 - read `county_week_seasonal_risk_baseline.csv` without requiring raw source files, Postgres credentials, or live network access.
 - require one unambiguous score branch across model name, seasonality source, score-scale settings, and source artifact versions.
-- publish the latest available baseline row per county/MMWR week rather than all historical held-out rows.
+- publish the latest available forecast row per county/MMWR week rather than all historical held-out rows.
 - write `md_county_risk_weekly.json`, `md_county_metadata.json`, `model_card.json`, `source_catalog.json`, and `static_export_manifest.json`.
 - include CDC guidance links, plain-language caveats, source SHA-256 provenance, score-scale metadata, quality flags, and a clinical disclaimer.
 - avoid raw source tables, private warehouse rows, credentials, and terms-unclear source extracts.
 
-The static export must be framed as a relative Maryland county-week Lyme baseline, not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.
+The static export must be framed as a relative Maryland county-week Lyme forecast, not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.
 
 ### FR4F: Static Dashboard Prototype
 
 The system must expose a static dashboard under `public/` that reads only
 `public/data` assets, requires no backend credentials, and presents the
-county-week Lyme baseline with accessible map, county list, detail panel, CDC
+county-week Lyme forecast with accessible map, county list, detail panel, CDC
 guidance links, and plain-language caveats. The dashboard must not describe the
 score as diagnosis, treatment guidance, personal infection probability, or
 weather-adjusted forecast.
@@ -346,9 +346,9 @@ Display categories:
 - `7-8`: high
 - `9-10`: very high
 
-The first product-shaped risk artifact is a relative county-week seasonal baseline. It combines a selected annual prediction branch, currently from the model-comparison artifact by default, with the CDC national MMWR-week disease-onset curve and maps the resulting weekly incidence estimate to the 1-10 scale. It must be labeled as `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted` until weather, habitat, host, and intervention modifiers are explicitly added.
+The first product-shaped risk artifact is a relative county-week seasonal forecast. It combines a selected annual prediction branch, currently from the model-comparison artifact by default, with the CDC national MMWR-week disease-onset curve and maps the resulting weekly incidence estimate to the 1-10 scale. It must be labeled as `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted` until weather, habitat, host, and intervention modifiers are explicitly added.
 
-The first runtime surfaces for this score are the local `tickbiterisk risk lookup` command and the `tickbiterisk risk export-static` public JSON bundle. Both preserve the non-medical, relative-baseline framing.
+The first runtime surfaces for this score are the local `tickbiterisk risk lookup` command and the `tickbiterisk risk export-static` public JSON bundle. Both preserve the non-medical, relative-forecast framing.
 
 ### FR11: Model Backtesting
 
@@ -466,7 +466,7 @@ The next build slice is accepted when:
 - Weather acquisition has a runnable small-range fixture path.
 - CDC Lyme seasonality baselines can be materialized for monthly and MMWR-week disease-onset curves.
 - At least one baseline backtest can run on a Maryland county-year panel.
-- A county-week seasonal risk baseline can be materialized from model-comparison predictions and CDC MMWR-week seasonality.
+- A county-week seasonal risk forecast can be materialized from model-comparison predictions and CDC MMWR-week seasonality.
 
 ## 10. Open Questions
 

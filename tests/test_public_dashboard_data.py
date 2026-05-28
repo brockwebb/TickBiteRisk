@@ -129,7 +129,24 @@ def test_model_card_matches_weekly_export_metadata() -> None:
         assert model_card[key] == weekly[key]
 
     assert model_card["target_definition"] == "lyme_incidence_per_100k"
-    assert model_card["product_framing"] == "relative county-week seasonal Lyme baseline"
+    assert model_card["product_framing"] == (
+        "Lyme risk forecasting tool for Maryland county-week conditions"
+    )
+    assert model_card["score_interpretation"].startswith(
+        "Relative seasonal Lyme forecast"
+    )
+    assert model_card["forecasting_status"] == {
+        "status": "risk_forecasting_tool",
+        "public_score_role": (
+            "relative county-week Lyme risk forecast with source-lag and "
+            "update diagnostics"
+        ),
+        "update_policy": (
+            "New surveillance, ecology, exposure, and calibration evidence are "
+            "reconciled against prior forecasts and backtests before they are "
+            "considered for future reviewed estimates."
+        ),
+    }
     assert model_card["quality_flags"] == [
         "relative_seasonal_baseline",
         "static_seasonality_prior",
@@ -192,6 +209,22 @@ def test_source_catalog_exposes_selected_annual_prediction_branch() -> None:
     assert annual_prediction["notes"].startswith(
         "Selected annual prediction rows from model-comparison output"
     )
+
+
+def test_source_catalog_explains_forecast_lag_and_reconciliation() -> None:
+    source_catalog = load_public_json("source_catalog.json")
+
+    policy = source_catalog["data_lag_and_update_policy"]
+
+    assert policy["summary"].startswith("Official Lyme surveillance data lag")
+    assert policy["why_forecasting"].startswith("Forecasting gives timely")
+    assert policy["reconciliation_policy"].startswith(
+        "New observed reports are reconciled"
+    )
+    assert "surveillance-regime diagnostics" in policy["reconciliation_policy"]
+    assert "calibration backtests" in policy["reconciliation_policy"]
+    assert "source quality flags" in policy["reconciliation_policy"]
+    assert policy["medical_boundary"].startswith("Forecasts do not diagnose")
 
 
 def test_public_guidance_links_use_http_urls() -> None:

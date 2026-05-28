@@ -77,7 +77,7 @@ class SingleBiteRiskResponse:
     single_bite_risk_score_raw: float
     pep_consideration: str
     pep_criteria: list[dict[str, str]]
-    baseline_context: dict[str, object]
+    forecast_context: dict[str, object]
     input_summary: dict[str, object]
     evidence_modifiers: dict[str, float]
     caveats: list[str]
@@ -154,7 +154,7 @@ def estimate_single_bite_risk(
         single_bite_risk_score_raw=score_raw,
         pep_consideration=_pep_consideration(pep_criteria),
         pep_criteria=pep_criteria,
-        baseline_context={
+        forecast_context={
             "county_week_risk_score": baseline.risk_score,
             "county_week_risk_category": baseline.risk_category,
             "data_year": baseline.data_year,
@@ -178,7 +178,7 @@ def estimate_single_bite_risk(
         caveats=_caveats(species=species, stage=stage, baseline=baseline),
         risk_interpretation=(
             "Single-bite Lyme decision-support score on a 1-10 scale. It uses "
-            "the county-week baseline as location/season context and adjusts "
+            "the county-week forecast as location/season context and adjusts "
             "for tick identity, life stage, attachment time, engorgement, and "
             "tick count. This is not an absolute infection probability, "
             "diagnosis, or treatment recommendation."
@@ -204,7 +204,7 @@ def _pep_criteria(
             "status": "meets" if baseline.county_fips.startswith("24") else "uncertain",
             "explanation": (
                 "Maryland is treated as a Lyme-common geography for this v0 "
-                "Maryland-only product; local county-week baseline is included "
+                "Maryland-only product; local county-week forecast is included "
                 "separately as context."
             ),
         },
@@ -374,7 +374,7 @@ def _caveats(
     if stage == "unknown" or species in {"unknown", "possible_ixodes"}:
         caveats.append("tick_identification_uncertain")
     if "using_latest_available_year" in baseline.data_quality_flags:
-        caveats.append("using_latest_available_baseline_year")
+        caveats.append("using_latest_available_forecast_year")
     if baseline.county_fips.startswith("24") and baseline.risk_score < 5:
         caveats.append("maryland_high_incidence_geography_floor")
     return caveats

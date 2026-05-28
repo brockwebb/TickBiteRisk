@@ -10,9 +10,11 @@
     <a class="skip-link" href="#county-panel">Skip to county risk details</a>
     <header class="site-header">
       <div>
-        <p class="eyebrow">Maryland county-week Lyme baseline</p>
+        <p class="eyebrow">Maryland county-week Lyme risk forecast</p>
         <h1>TickBiteRisk</h1>
-        <p class="lede">Relative seasonal Lyme risk context by Maryland county.</p>
+        <p class="lede">
+          Lyme risk forecasting tool for timely, relative county-week prevention context.
+        </p>
       </div>
       <p class="disclaimer">
         Informational only. Not medical advice. Follow CDC guidance and contact
@@ -50,7 +52,7 @@
       <aside id="county-panel" class="county-panel" aria-labelledby="panel-title">
         <h2 id="panel-title">County risk details</h2>
         <div id="panel-content" aria-live="polite">
-          <p>Select a county to see its relative seasonal Lyme baseline.</p>
+          <p>Select a county to see its relative seasonal Lyme forecast.</p>
         </div>
         <section class="bite-calculator" aria-labelledby="bite-title">
           <h3 id="bite-title">Attached tick check</h3>
@@ -123,8 +125,10 @@
           </p>
           <h3>How new data updates the model</h3>
           <p>
-            New surveillance, ecology, and exposure signals are reconciled
-            against prior forecasts before they are considered for future reviewed estimates.
+            New observed reports are reconciled against prior forecasts with
+            surveillance-regime diagnostics, calibration backtests, source quality
+            flags, ecology, and exposure signals before they are considered for
+            future reviewed estimates.
           </p>
         </div>
       </section>

@@ -16,11 +16,12 @@ MODEL_BACKGROUND = Path("docs/model-background.md")
 SRS = Path("docs/software-requirements-spec.md")
 
 
-def test_user_guide_matches_implemented_maryland_baseline_product() -> None:
+def test_user_guide_matches_implemented_maryland_forecast_product() -> None:
     guide = USER_GUIDE.read_text(encoding="utf-8")
 
     for token in [
-        "relative county-week seasonal Lyme baseline",
+        "relative county-week seasonal Lyme forecast",
+        "risk forecasting tool",
         "single-bite Lyme decision-support score",
         "not an absolute infection probability",
         "CDC MMWR week",
@@ -102,6 +103,9 @@ def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() ->
     assert "tickbiterisk risk export-static" in quick_start
     assert "--model-summary-path build/etl/model-comparison/model_comparison_summary.csv" in quick_start
     assert "python -m http.server 8000 --directory public" in quick_start
+    assert "risk forecasting tool" in quick_start
+    assert "## why forecast Lyme risk?" in quick_start
+    assert "## how forecast updates work" in quick_start
     assert "quick start (docker)" not in quick_start
     assert "docker compose up -d" not in quick_start
     assert "curl 'http://localhost:8000/risk" not in quick_start
@@ -223,13 +227,54 @@ def test_public_modeling_docs_do_not_overclaim_unimplemented_model_lanes() -> No
         assert token in docs_text
 
 
+def test_current_public_docs_use_forecast_language_for_product_surfaces() -> None:
+    docs_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in [
+            README,
+            API_SPEC,
+            USER_GUIDE,
+            ROADMAP,
+            VISION_SCOPE,
+            DATA_SOURCES,
+            Path("docs/data-manifest.md"),
+            ETL_PIPELINE,
+            Path("docs/public-product-boundary.md"),
+            SRS,
+            MODEL_BACKGROUND,
+        ]
+    )
+
+    for token in [
+        "relative county-week seasonal Lyme baseline",
+        "county-week Lyme baseline",
+        "derived county-week baseline",
+        "latest available baseline per county/MMWR week",
+        "baseline uncertainty, not clinical confidence",
+        "risk baseline CSV",
+        "county-week baseline",
+        "baseline lookup",
+        "Relative seasonal Lyme baseline",
+    ]:
+        assert token not in docs_text
+
+    for token in [
+        "relative county-week seasonal Lyme forecast",
+        "risk forecasting tool",
+        "latest available forecast per county/MMWR week",
+        "forecast_context",
+        "exact_forecast_year",
+    ]:
+        assert token in docs_text
+
+
 def test_roadmap_starts_from_shipped_static_maryland_v0() -> None:
     roadmap = ROADMAP.read_text(encoding="utf-8")
 
     for token in [
-        "Current v0 baseline",
+        "Current v0 forecast",
         "Maryland static dashboard",
-        "county-week seasonal Lyme baseline",
+        "county-week seasonal Lyme forecast",
         "single-bite Lyme decision-support overlay",
         "GitHub Pages",
         "model comparison",
@@ -252,7 +297,7 @@ def test_vision_scope_includes_single_bite_score_without_absolute_probability_cl
 
     for token in [
         "Current v0 scope",
-        "relative county-week seasonal Lyme baseline",
+        "relative county-week seasonal Lyme forecast",
         "single-bite Lyme decision-support score",
         "not an absolute infection probability",
         "Future research scope",

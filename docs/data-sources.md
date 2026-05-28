@@ -12,7 +12,7 @@ boundary clearly allow redistribution.
 | `cdc_lyme_public_use` | CDC Lyme public-use aggregated geography files | County-year | Long-run Lyme outcome spine | active_etl |
 | `cdc_lyme_dashboard_exports` | CDC county/state/region Lyme dashboard exports through 2023 | County/state/region-year | Reconciliation and validation checks | active_etl |
 | `maryland_lyme_pdf` | Maryland Department of Health Lyme PDF, 2013-2024 | Maryland county-year | Latest Maryland 2024 outcome lane, with overlapping years kept as validation context | active_etl_latest_2024 |
-| `cdc_lyme_seasonality` | CDC Lyme onset by MMWR week and month | National week/month | Static seasonal allocation from annual predictions to county-week baseline | active_etl |
+| `cdc_lyme_seasonality` | CDC Lyme onset by MMWR week and month | National week/month | Static seasonal allocation from annual predictions to county-week forecast | active_etl |
 | `noaa_ghcnd` | NOAA daily station observations | Station-day to county-week/year | Weather feature candidates and backtesting inputs | active_etl |
 | `census_county_reference` | Census Gazetteer county file | County | County names, FIPS, land/water area, internal points | active_etl |
 | `census_population` | Census PEP/intercensal population APIs and county totals CSV | County-year | Incidence denominators and per-capita feature normalization through 2025 | active_etl |

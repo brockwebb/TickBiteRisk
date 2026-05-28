@@ -545,7 +545,7 @@ def risk_lookup(
     ),
     scores_path: Path = typer.Option(
         Path("build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv"),
-        help="County-week seasonal risk baseline CSV.",
+        help="County-week seasonal risk forecast CSV.",
     ),
     model_name: str = typer.Option(
         "linear_blend_baseline",
@@ -618,7 +618,7 @@ def risk_single_bite(
     ),
     scores_path: Path = typer.Option(
         Path("build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv"),
-        help="County-week seasonal risk baseline CSV.",
+        help="County-week seasonal risk forecast CSV.",
     ),
     tick_species: str = typer.Option(
         ...,
@@ -651,7 +651,7 @@ def risk_single_bite(
     ),
     model_name: str = typer.Option(
         "linear_blend_baseline",
-        help="Risk score model branch to query for the county-week prior.",
+        help="Risk score model branch to query for the county-week forecast.",
     ),
     seasonality_source_id: str = typer.Option(
         "cdc_seasonality_week_2023",
@@ -691,7 +691,7 @@ def risk_single_bite(
 def risk_export_static(
     scores_path: Path = typer.Option(
         Path("build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv"),
-        help="County-week seasonal risk baseline CSV.",
+        help="County-week seasonal risk forecast CSV.",
     ),
     output_dir: Path = typer.Option(
         Path("public/data"),
@@ -790,7 +790,7 @@ def _fixture_maryland_geojson() -> dict[str, object]:
 def dashboard_build_assets(
     scores_path: Path = typer.Option(
         Path("build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv"),
-        help="County-week seasonal risk baseline CSV.",
+        help="County-week seasonal risk forecast CSV.",
     ),
     output_dir: Path = typer.Option(
         Path("public/data"),

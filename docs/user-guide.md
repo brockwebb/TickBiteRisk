@@ -6,10 +6,10 @@
 
 ## 1. What TickBiteRisk Tells You Today
 
-The implemented v0 product has two local runtime views:
+The implemented v0 risk forecasting tool has two local runtime views:
 
-- a Maryland relative county-week seasonal Lyme baseline on a 1-10 scale, and
-- a single-bite Lyme decision-support score that combines that baseline with
+- a Maryland relative county-week seasonal Lyme forecast on a 1-10 scale, and
+- a single-bite Lyme decision-support score that combines that forecast with
   tick identity, life stage, attachment time, engorgement, removal timing, and
   CDC prophylaxis consideration criteria.
 
@@ -17,7 +17,7 @@ It answers a public-health context question:
 
 ```text
 For this Maryland county and date, how high is the modeled seasonal Lyme
-baseline compared with other Maryland county-week baselines?
+forecast compared with other Maryland county-week forecasts?
 ```
 
 It also answers a post-bite context question:
@@ -32,8 +32,8 @@ This is not an absolute infection probability, diagnosis, treatment
 recommendation, or weather-adjusted forecast.
 
 The date is converted to CDC MMWR week. If the requested year is not available
-in the derived baseline artifact, the runtime uses the latest available
-baseline year for that county and week and returns explicit quality flags.
+in the derived forecast artifact, the runtime uses the latest available
+forecast year for that county and week and returns explicit quality flags.
 
 ---
 
@@ -55,10 +55,10 @@ Important response fields:
 | --- | --- |
 | `county_fips`, `county_name` | Maryland county returned by the lookup. |
 | `query_date`, `mmwr_year`, `mmwr_week` | Calendar date and CDC MMWR week used for lookup. |
-| `data_year` | Baseline year used; may differ from query year when current-year data is unavailable. |
+| `data_year` | Forecast data year used; may differ from query year when current-year data is unavailable. |
 | `risk_score`, `risk_category` | Relative 1-10 Maryland seasonal score and plain category. |
-| `predicted_weekly_incidence_per_100k` | Model-derived weekly incidence baseline behind the score. |
-| `predicted_weekly_incidence_95_interval` | Empirical model interval for the baseline, not clinical confidence for an individual bite. |
+| `predicted_weekly_incidence_per_100k` | Model-derived weekly incidence forecast behind the score. |
+| `predicted_weekly_incidence_95_interval` | Empirical model interval for the forecast, not clinical confidence for an individual bite. |
 | `source_metadata` | Model-comparison and seasonality source run/hash metadata. |
 | `feature_quality_flags`, `data_quality_flags` | Caveats such as static seasonality, not weather-adjusted, or latest-year fallback. |
 
@@ -88,9 +88,9 @@ Important response fields:
 | Field | Meaning |
 | --- | --- |
 | `single_bite_risk_score`, `single_bite_risk_band` | Evidence-adjusted 1-10 Lyme concern score and category. |
-| `baseline_context` | County-week seasonal prior used as local context. |
+| `forecast_context` | County-week seasonal forecast used as local context. |
 | `input_summary` | Normalized tick species, stage, attachment, engorgement, removal timing, doxycycline safety, and tick count inputs. |
-| `evidence_modifiers` | Transparent modifiers applied to the county-week baseline. |
+| `evidence_modifiers` | Transparent modifiers applied to the county-week forecast. |
 | `pep_consideration` | Whether the inputs meet, partially meet, or do not meet CDC prophylaxis consideration criteria. |
 | `pep_criteria` | Criterion-by-criterion status for Lyme-common area, tick identity, attachment duration/engorgement, removal window, and doxycycline safety. |
 | `caveats` | Limits such as not calibrated as an absolute probability or uncertain tick identification. |
@@ -130,7 +130,7 @@ Open `http://localhost:8000`.
 ## 5. What To Do With The Score
 
 Use these scores as context for prevention and awareness, not as personal
-medical decision rules. A higher seasonal baseline can support public-health
+medical decision rules. A higher seasonal forecast can support public-health
 messaging, prevention reminders, and clinical awareness that Lyme reports are
 seasonally elevated in a county. A higher single-bite score can help organize
 what you know about the tick and whether CDC prophylaxis consideration criteria
@@ -155,12 +155,12 @@ healthcare professional about your situation.
 
 Known v0 caveats:
 
-- Maryland-only county baseline.
+- Maryland-only county forecast.
 - Lyme-only public score.
 - Static CDC national onset seasonality, not county-specific seasonality.
 - Not weather-adjusted in the current public score branch.
 - Surveillance/reporting changes and interventions are not modeled.
-- Empirical intervals describe baseline uncertainty, not clinical confidence for
+- Empirical intervals describe forecast uncertainty, not clinical confidence for
   a specific tick bite.
 - Single-bite scores are transparent decision-support estimates, not calibrated
   absolute infection probabilities.

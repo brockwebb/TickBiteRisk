@@ -43,7 +43,9 @@ def test_lookup_returns_county_date_response_with_disclaimer_and_guidance(
     assert response.predicted_weekly_incidence_per_100k == 2.5
     assert response.predicted_weekly_incidence_95_interval == [1.5, 3.5]
     assert response.score_scale["benchmark_quantile"] == 0.95
-    assert response.score_interpretation.startswith("Relative seasonal Lyme baseline")
+    assert response.score_interpretation.startswith("Relative seasonal Lyme forecast")
+    assert "exact_forecast_year" in response.data_quality_flags
+    assert "exact_baseline_year" not in response.data_quality_flags
     assert "not_weather_adjusted" in response.feature_quality_flags
     assert "not medical advice" in response.clinical_disclaimer.lower()
     assert any("CDC" in link["title"] for link in response.guidance_links)
@@ -175,7 +177,7 @@ def test_lookup_rejects_unknown_county(tmp_path: Path) -> None:
     try:
         store.lookup(county_fips="99999", query_date="2023-01-01")
     except RiskLookupInputError as exc:
-        assert "No risk baseline rows found for county_fips=99999" in str(exc)
+        assert "No risk forecast rows found for county_fips=99999" in str(exc)
     else:
         raise AssertionError("Expected unknown county lookup to fail")
 

@@ -193,7 +193,7 @@ class RiskLookupStore:
         ]
         if not county_records:
             raise RiskLookupInputError(
-                f"No risk baseline rows found for county_fips={normalized_fips}"
+                f"No risk forecast rows found for county_fips={normalized_fips}"
             )
 
         key = (normalized_fips, model_name, seasonality_source_id, week)
@@ -236,7 +236,7 @@ class RiskLookupStore:
             ]
         if not week_records:
             raise RiskLookupInputError(
-                "No risk baseline row found for "
+                "No risk forecast row found for "
                 f"county_fips={normalized_fips}, mmwr_week={week}"
             )
         scale_configs = {
@@ -270,7 +270,7 @@ class RiskLookupStore:
         exact_records = [record for record in week_records if record.year == mmwr_year]
         if len(exact_records) > 1:
             raise RiskLookupInputError(
-                "Multiple risk baseline rows found for selected county, week, "
+                "Multiple risk forecast rows found for selected county, week, "
                 "year, and score scale"
             )
         exact_record = exact_records[0] if exact_records else None
@@ -282,7 +282,7 @@ class RiskLookupStore:
             )
         else:
             record = exact_record
-            data_quality_flags.append("exact_baseline_year")
+            data_quality_flags.append("exact_forecast_year")
 
         return CountyWeekRiskResponse(
             county_fips=record.county_fips,
@@ -331,7 +331,7 @@ class RiskLookupStore:
             backtest_assumption_flags=_split_flags(record.backtest_assumption_flags),
             data_quality_flags=data_quality_flags,
             score_interpretation=(
-                "Relative seasonal Lyme baseline on a 1-10 scale. This is not "
+                "Relative seasonal Lyme forecast on a 1-10 scale. This is not "
                 "a per-bite infection probability, diagnosis, treatment "
                 "recommendation, or weather-adjusted forecast."
             ),

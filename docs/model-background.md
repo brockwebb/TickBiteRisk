@@ -4,11 +4,11 @@
 
 TickBiteRisk started with the bigger idea of estimating disease risk after a
 specific tick encounter. The current shipped work is narrower: a Maryland
-county-week seasonal Lyme baseline derived from historical surveillance,
+county-week seasonal Lyme forecast derived from historical surveillance,
 seasonality, and model comparison.
 
 That narrower scope is intentional. The data support a transparent public
-baseline before they support a bite-specific disease calculator.
+forecast before they support a bite-specific disease calculator.
 
 ## Why the current model is comparison-first
 

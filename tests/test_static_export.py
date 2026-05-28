@@ -40,7 +40,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert weekly["score_scale"]["range"] == [1, 10]
     assert weekly["selected_score_config"]["source_prediction_sha256"] == "a" * 64
     assert (
-        "Relative Maryland county-week Lyme baseline, not a per-bite infection probability."
+        "Relative Maryland county-week Lyme forecast, not a per-bite infection probability."
         in weekly["caveats"]
     )
     assert "Not a personal infection probability." in weekly["caveats"]
@@ -62,8 +62,11 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert anne_arundel["source_available_years"] == [2022, 2023]
     assert anne_arundel["max_risk_score"] == 7
 
+    assert model_card["product_framing"] == (
+        "Lyme risk forecasting tool for Maryland county-week conditions"
+    )
     assert model_card["score_interpretation"].startswith(
-        "Relative seasonal Lyme baseline"
+        "Relative seasonal Lyme forecast"
     )
     assert "not medical advice" in model_card["clinical_disclaimer"].lower()
     assert "Not a personal infection probability." in model_card["caveats"]
@@ -96,13 +99,15 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     }
     assert "model-comparison" in model_card["method_summary"]
     assert model_card["forecasting_status"] == {
-        "status": "forecasting_transition_research",
+        "status": "risk_forecasting_tool",
         "public_score_role": (
-            "relative county-week seasonal baseline with forecast-transition diagnostics"
+            "relative county-week Lyme risk forecast with source-lag and "
+            "update diagnostics"
         ),
         "update_policy": (
-            "New surveillance and exposure signals are reconciled against prior "
-            "forecasts before they are considered for future reviewed estimates."
+            "New surveillance, ecology, exposure, and calibration evidence are "
+            "reconciled against prior forecasts and backtests before they are "
+            "considered for future reviewed estimates."
         ),
     }
     assert source_catalog["sources"][0]["artifact_type"] == "derived"
@@ -114,6 +119,18 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert source_catalog["data_lag_and_update_policy"]["summary"].startswith(
         "Official Lyme surveillance data lag"
     )
+    assert source_catalog["data_lag_and_update_policy"]["why_forecasting"].startswith(
+        "Forecasting gives timely"
+    )
+    assert source_catalog["data_lag_and_update_policy"][
+        "reconciliation_policy"
+    ].startswith("New observed reports are reconciled")
+    assert "surveillance-regime diagnostics" in source_catalog[
+        "data_lag_and_update_policy"
+    ]["reconciliation_policy"]
+    assert "source quality flags" in source_catalog["data_lag_and_update_policy"][
+        "reconciliation_policy"
+    ]
     assert source_catalog["data_lag_and_update_policy"]["forecast_boundary"] == (
         "Forecast-safe branches use prior-year and trailing data; nowcast or "
         "retrospective branches must be labeled separately."

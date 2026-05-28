@@ -16,7 +16,7 @@ recommendation, or weather-adjusted forecast.
 The current v0 scope is deliberately narrower than the long-term idea:
 
 - Maryland county-level public dashboard.
-- A relative county-week seasonal Lyme baseline on a 1-10 scale.
+- A relative county-week seasonal Lyme forecast on a 1-10 scale.
 - A single-bite Lyme decision-support score that uses tick species/stage,
   attachment time, engorgement, removal timing, and doxycycline safety fields.
 - Local CLI lookup and static JSON export from derived artifacts.
@@ -30,7 +30,7 @@ The current v0 scope is deliberately narrower than the long-term idea:
   redistribution.
 
 The v0 dashboard answers: "Compared with other Maryland county-weeks in the
-data product, how elevated is the seasonal Lyme baseline here?"
+data product, how elevated is the seasonal Lyme forecast here?"
 
 The v0 single-bite CLI answers: "Given what I know about this attached tick,
 how elevated is my Lyme concern score, and which CDC consideration criteria are

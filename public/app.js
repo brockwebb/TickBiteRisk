@@ -17,7 +17,7 @@ const dataPaths = {
 };
 
 const flagLabels = {
-  relative_seasonal_baseline: "Relative seasonal baseline",
+  relative_seasonal_baseline: "Relative seasonal forecast",
   static_seasonality_prior:
     "Uses static CDC onset seasonality and is not county-specific",
   not_weather_adjusted: "This is not a weather-adjusted forecast",
@@ -49,7 +49,7 @@ const flagLabels = {
   missing_deer_harvest_prior_season:
     "Prior-season deer harvest data are missing for this county-year",
   observational_not_causal:
-    "This observational baseline does not prove causes",
+    "This observational forecast does not prove causes",
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -190,7 +190,7 @@ function renderMap() {
   const height = 520;
   const paths = features.map((feature) => countyPath(feature, bounds, width, height)).join("");
 
-  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="group" aria-label="Maryland counties colored by relative Lyme seasonal baseline">${paths}</svg>`;
+  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="group" aria-label="Maryland counties colored by relative Lyme forecast">${paths}</svg>`;
   container.querySelectorAll("[data-county]").forEach((shape) => {
     shape.addEventListener("click", () => selectCounty(shape.dataset.county));
     shape.addEventListener("keydown", (event) => {
@@ -209,7 +209,7 @@ function countyPath(feature, bounds, width, height) {
   const score = record ? record.risk_score : 0;
   const label = record
     ? `${props.county_name}, ${categoryLabel(record.risk_category)}, ${score} of 10`
-    : `${props.county_name}, no baseline available`;
+    : `${props.county_name}, no forecast available`;
 
   return `<path
     class="county-shape ${record ? riskClass(score) : "risk-unavailable"}"
@@ -254,7 +254,7 @@ function selectCounty(countyFips) {
   const panel = document.getElementById("panel-content");
 
   if (!record) {
-    panel.innerHTML = `<p>No baseline row available for ${escapeHtml(countyName)} in MMWR week ${state.selectedWeek}.</p>`;
+    panel.innerHTML = `<p>No forecast row available for ${escapeHtml(countyName)} in MMWR week ${state.selectedWeek}.</p>`;
     updateSelectedControls();
     return;
   }
@@ -264,7 +264,7 @@ function selectCounty(countyFips) {
     <p class="muted">MMWR week ${escapeHtml(record.mmwr_week)}, data year ${escapeHtml(record.data_year)}</p>
     <h3>${escapeHtml(record.county_name)}</h3>
     <p><span class="score-badge ${riskClass(record.risk_score)}">${escapeHtml(record.risk_score)}/10</span> ${escapeHtml(categoryLabel(record.risk_category))}</p>
-    <p>${escapeHtml(sentenceCase(record.risk_category))} relative seasonal baseline for Lyme reports in Maryland counties like this one during this week.</p>
+    <p>${escapeHtml(sentenceCase(record.risk_category))} relative seasonal forecast for Lyme reports in Maryland counties like this one during this week.</p>
     <p>Predicted weekly incidence: ${formatNumber(record.predicted_weekly_incidence_per_100k)} per 100k.</p>
     <p>95% empirical interval: ${formatNumber(interval95[0])} to ${formatNumber(interval95[1])} per 100k.</p>
     ${renderModelLineage(record)}
@@ -279,7 +279,7 @@ function renderBiteResult() {
   const target = document.getElementById("bite-result");
   const record = getRecord(state.selectedCounty);
   if (!record) {
-    target.innerHTML = "<p>Select a county/date with an available baseline first.</p>";
+    target.innerHTML = "<p>Select a county/date with an available forecast first.</p>";
     return;
   }
   const result = estimateSingleBiteRisk(record, readBiteInputs());
@@ -371,7 +371,7 @@ function estimateSingleBiteRisk(record, input) {
     evidence_modifiers: modifiers,
     caveats: biteCaveats(record, input),
     risk_interpretation:
-      "This score combines the selected county-week baseline with tick identity, stage, attachment, engorgement, and tick count. It is not an absolute infection probability.",
+      "This score combines the selected county-week forecast with tick identity, stage, attachment, engorgement, and tick count. It is not an absolute infection probability.",
   };
 }
 
@@ -651,7 +651,7 @@ function sourceChainItems(sourceRows) {
         "CDC national Lyme disease onset timing allocates annual predictions across MMWR weeks.",
     },
     {
-      title: "Derived county-week risk baseline",
+      title: "Derived county-week risk forecast",
       description:
         baseline.notes ||
         "Public-safe county-week score derived from selected predictions and seasonality.",
@@ -668,7 +668,7 @@ function readableSourceTitle(sourceId) {
   const labels = {
     annual_prediction_branch: "Selected model-comparison predictions",
     cdc_seasonality_week_2023: "CDC Lyme onset seasonality",
-    county_week_seasonal_risk_baseline: "Derived county-week risk baseline",
+    county_week_seasonal_risk_baseline: "Derived county-week risk forecast",
   };
   return labels[sourceId] || readableModelName(sourceId);
 }
@@ -706,28 +706,40 @@ function renderForecastExplainer() {
   const status = state.modelCard && state.modelCard.forecasting_status;
   const policy =
     state.sourceCatalog && state.sourceCatalog.data_lag_and_update_policy;
+  const statusCode =
+    status && status.status ? status.status : "risk_forecasting_tool";
   const statusText =
     status && status.public_score_role
       ? status.public_score_role
-      : "relative county-week seasonal baseline with forecast-transition diagnostics";
+      : "relative county-week Lyme risk forecast with source-lag and update diagnostics";
   const policyText =
     policy && policy.summary
       ? policy.summary
       : "Official Lyme surveillance data lag real-world exposure conditions.";
+  const whyForecastingText =
+    policy && policy.why_forecasting
+      ? policy.why_forecasting
+      : "Forecasting gives timely prevention context while reviewed county-level data catch up.";
   const updatePolicyText =
     status && status.update_policy
       ? status.update_policy
-      : "New surveillance and exposure signals are reconciled against prior forecasts before they are considered for future reviewed estimates.";
+      : "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates.";
+  const reconciliationText =
+    policy && policy.reconciliation_policy
+      ? policy.reconciliation_policy
+      : "New observed reports are reconciled against prior forecasts using surveillance-regime diagnostics, calibration backtests, and source quality flags.";
   const boundaryText =
     policy && policy.forecast_boundary
       ? policy.forecast_boundary
       : "Forecast-safe branches use prior-year and trailing data.";
 
   container.innerHTML = `
+    <p data-forecast-status="${escapeHtml(statusCode)}"><b>Lyme risk forecasting tool.</b> ${escapeHtml(whyForecastingText)}</p>
     <p>${escapeHtml(policyText)}</p>
     <p>${escapeHtml(statusText)}.</p>
     <h3>How new data updates the model</h3>
     <p>${escapeHtml(updatePolicyText)}</p>
+    <p>${escapeHtml(reconciliationText)}</p>
     <p>${escapeHtml(boundaryText)}</p>
     <p>Forecasts are informational estimates, not diagnosis, treatment advice, or certainty about an individual bite.</p>
   `;

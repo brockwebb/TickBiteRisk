@@ -2,7 +2,9 @@
   "data_lag_and_update_policy": {
     "forecast_boundary": "Forecast-safe branches use prior-year and trailing data; nowcast or retrospective branches must be labeled separately.",
     "medical_boundary": "Forecasts do not diagnose disease, decide treatment, or determine whether an individual bite caused infection.",
-    "summary": "Official Lyme surveillance data lag real-world exposure conditions, so TickBiteRisk treats forecasts as provisional informational estimates that improve as new validated data arrive."
+    "reconciliation_policy": "New observed reports are reconciled against prior forecasts using surveillance-regime diagnostics, calibration backtests, and source quality flags before they are promoted into future reviewed estimates.",
+    "summary": "Official Lyme surveillance data lag real-world exposure conditions, so TickBiteRisk treats forecasts as provisional informational estimates that improve as new validated data arrive.",
+    "why_forecasting": "Forecasting gives timely prevention context while county-level surveillance reports, population denominators, and reviewed source updates catch up."
   },
   "export_type": "source_catalog",
   "generated_at": "2026-05-28T11:35:57+00:00",

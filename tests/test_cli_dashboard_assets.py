@@ -58,6 +58,16 @@ def test_dashboard_build_assets_fails_cleanly_when_scores_missing(
     assert "Traceback" not in result.output
 
 
+def test_dashboard_build_assets_help_uses_forecast_language() -> None:
+    result = runner.invoke(app, ["dashboard", "build-assets", "--help"])
+    normalized = " ".join(result.output.split())
+
+    assert result.exit_code == 0
+    assert "risk forecast" in normalized
+    assert "CSV" in normalized
+    assert "risk baseline CSV" not in normalized
+
+
 def test_dashboard_build_assets_accepts_source_branch_selectors(
     tmp_path: Path,
 ) -> None:

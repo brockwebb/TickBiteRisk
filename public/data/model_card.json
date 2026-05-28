@@ -12,19 +12,19 @@
     "Informational and educational only; not medical advice.",
     "Does not diagnose disease or determine whether a person is infected.",
     "Not a treatment recommendation or substitute for a healthcare professional.",
-    "Relative Maryland county-week Lyme baseline, not a per-bite infection probability.",
+    "Relative Maryland county-week Lyme forecast, not a per-bite infection probability.",
     "Not a personal infection probability.",
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
     "Surveillance/reporting changes and interventions are unmodeled.",
-    "Empirical intervals describe baseline uncertainty, not clinical confidence for an individual bite."
+    "Empirical intervals describe forecast uncertainty, not clinical confidence for an individual bite."
   ],
   "clinical_disclaimer": "TickBiteRisk is for informational and educational purposes only. It is not medical advice, does not diagnose disease, and does not determine whether you are infected. Follow CDC guidance and contact a qualified healthcare professional about your situation.",
   "export_type": "model_card",
   "forecasting_status": {
-    "public_score_role": "relative county-week seasonal baseline with forecast-transition diagnostics",
-    "status": "forecasting_transition_research",
-    "update_policy": "New surveillance and exposure signals are reconciled against prior forecasts before they are considered for future reviewed estimates."
+    "public_score_role": "relative county-week Lyme risk forecast with source-lag and update diagnostics",
+    "status": "risk_forecasting_tool",
+    "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
   "generated_at": "2026-05-28T11:35:57+00:00",
   "method_summary": "Selected annual model-comparison prediction rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
@@ -35,14 +35,14 @@
     "treatment recommendation",
     "weather-adjusted forecast"
   ],
-  "product_framing": "relative county-week seasonal Lyme baseline",
+  "product_framing": "Lyme risk forecasting tool for Maryland county-week conditions",
   "quality_flags": [
     "relative_seasonal_baseline",
     "static_seasonality_prior",
     "not_weather_adjusted"
   ],
   "schema_version": "county-week-risk-static-v1",
-  "score_interpretation": "Relative seasonal Lyme baseline on a 1-10 Maryland scale; not a per-bite infection probability.",
+  "score_interpretation": "Relative seasonal Lyme forecast on a 1-10 Maryland scale; not a per-bite infection probability.",
   "target_definition": "lyme_incidence_per_100k",
   "validation_summary": {
     "comparison_assumption_flags": [

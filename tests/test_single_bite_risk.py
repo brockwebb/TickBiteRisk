@@ -28,7 +28,7 @@ def test_single_bite_risk_combines_county_week_prior_with_bite_evidence(
     assert response.single_bite_risk_score >= baseline.risk_score
     assert response.single_bite_risk_band in {"elevated", "high"}
     assert response.pep_consideration == "meets_cdc_consideration_criteria"
-    assert response.baseline_context["county_week_risk_score"] == 7
+    assert response.forecast_context["county_week_risk_score"] == 7
     assert response.input_summary["tick_species"] == "ixodes_scapularis"
     assert response.evidence_modifiers["attachment"] >= 1.0
     assert _criterion(response, "attachment_duration")["status"] == "meets"
@@ -107,11 +107,26 @@ def test_high_risk_bite_is_not_suppressed_by_low_seasonal_baseline(tmp_path) -> 
         doxycycline_safe=True,
     )
 
-    assert response.baseline_context["county_week_risk_score"] == 1
+    assert response.forecast_context["county_week_risk_score"] == 1
     assert response.single_bite_risk_score >= 5
     assert response.pep_consideration == "meets_cdc_consideration_criteria"
     assert response.evidence_modifiers["location_season"] > 0.1
     assert "maryland_high_incidence_geography_floor" in response.caveats
+
+
+def test_single_bite_risk_uses_forecast_language_for_latest_year_caveat(
+    tmp_path,
+) -> None:
+    store = RiskLookupStore.from_csv(_write_scores(tmp_path / "scores.csv"))
+    forecast = store.lookup(county_fips="24003", query_date="2026-01-04")
+
+    response = estimate_single_bite_risk(
+        baseline=forecast,
+        tick_species="ixodes_scapularis",
+    )
+
+    assert "using_latest_available_forecast_year" in response.caveats
+    assert "using_latest_available_baseline_year" not in response.caveats
 
 
 def test_single_bite_risk_validates_inputs(tmp_path) -> None:

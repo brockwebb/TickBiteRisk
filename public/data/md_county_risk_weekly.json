@@ -3,12 +3,12 @@
     "Informational and educational only; not medical advice.",
     "Does not diagnose disease or determine whether a person is infected.",
     "Not a treatment recommendation or substitute for a healthcare professional.",
-    "Relative Maryland county-week Lyme baseline, not a per-bite infection probability.",
+    "Relative Maryland county-week Lyme forecast, not a per-bite infection probability.",
     "Not a personal infection probability.",
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
     "Surveillance/reporting changes and interventions are unmodeled.",
-    "Empirical intervals describe baseline uncertainty, not clinical confidence for an individual bite."
+    "Empirical intervals describe forecast uncertainty, not clinical confidence for an individual bite."
   ],
   "date_system": {
     "name": "CDC MMWR",

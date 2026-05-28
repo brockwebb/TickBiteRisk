@@ -95,7 +95,7 @@ def test_dashboard_javascript_renders_visible_plain_language_source_chain() -> N
         "Public source chain",
         "CDC Lyme onset seasonality",
         "Selected model-comparison predictions",
-        "Derived county-week risk baseline",
+        "Derived county-week risk forecast",
         "US Census TIGERweb county geometry",
         "source-chain",
         "source-detail-list",
@@ -151,8 +151,11 @@ def test_dashboard_explains_forecasting_and_update_policy() -> None:
 
     for token in [
         "Why this is a forecast",
+        "Lyme risk forecasting tool",
         "Official Lyme surveillance data lag",
         "How new data updates the model",
+        "calibration backtests",
+        "observed reports are reconciled",
         "future reviewed estimates",
     ]:
         assert token in html
@@ -160,9 +163,13 @@ def test_dashboard_explains_forecasting_and_update_policy() -> None:
     for token in [
         "function renderForecastExplainer",
         "forecasting_status",
+        "risk_forecasting_tool",
         "update_policy",
         "data_lag_and_update_policy",
+        "why_forecasting",
+        "reconciliation_policy",
         "Forecast-safe branches",
+        "calibration backtests",
         "future reviewed estimates",
         "not diagnosis, treatment advice, or certainty about an individual bite",
     ]:
@@ -188,6 +195,7 @@ def test_dashboard_javascript_renders_one_accessible_svg_path_map() -> None:
 
     for token in [
         "<svg",
+        "Maryland counties colored by relative Lyme forecast",
         "<path",
         "role=\"group\"",
         "role=\"button\"",
@@ -206,7 +214,7 @@ def test_dashboard_javascript_translates_quality_flags_to_readable_caveats() -> 
     for token in [
         "const flagLabels",
         "relative_seasonal_baseline",
-        "Relative seasonal baseline",
+        "Relative seasonal forecast",
         "static_seasonality_prior",
         "static CDC onset seasonality",
         "not county-specific",
@@ -224,7 +232,7 @@ def test_dashboard_javascript_translates_quality_flags_to_readable_caveats() -> 
         "empirical_prediction_band",
         "not clinical confidence for an individual bite",
         "observational_not_causal",
-        "This observational baseline does not prove causes",
+        "This observational forecast does not prove causes",
     ]:
         assert token in js
 

@@ -9,11 +9,11 @@
 Current implemented local contracts:
 
 - `tickbiterisk risk lookup` reads the derived Maryland county-week seasonal
-  risk baseline CSV and returns local JSON for a county/date query.
-- `tickbiterisk risk single-bite` uses that county-week baseline as context and
+  risk forecast CSV and returns local JSON for a county/date query.
+- `tickbiterisk risk single-bite` uses that county-week forecast as context and
   combines it with bite-specific evidence.
 
-The baseline lookup is a relative 1-10 Lyme seasonality baseline for Maryland
+The forecast lookup is a relative 1-10 Lyme seasonality forecast for Maryland
 counties. The single-bite runtime is a decision-support score and CDC criteria
 summary. Neither response is an absolute infection probability, diagnosis,
 treatment recommendation, or weather-adjusted forecast.
@@ -104,7 +104,7 @@ tickbiterisk risk lookup \
     "requested_year_unavailable",
     "using_latest_available_year"
   ],
-  "score_interpretation": "Relative seasonal Lyme baseline on a 1-10 scale. This is not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.",
+  "score_interpretation": "Relative seasonal Lyme forecast on a 1-10 scale. This is not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.",
   "clinical_disclaimer": "TickBiteRisk is for informational and educational purposes only...",
   "guidance_links": [
     {
@@ -119,9 +119,9 @@ tickbiterisk risk lookup \
 
 - Dates use CDC MMWR week boundaries.
 - If the query MMWR year exists in the selected derived artifact, the response
-  uses that year and includes `exact_baseline_year`.
+  uses that year and includes `exact_forecast_year`.
 - If the query MMWR year is unavailable, the response uses the latest available
-  baseline for the same county/week and includes `requested_year_unavailable`
+  forecast for the same county/week and includes `requested_year_unavailable`
   and `using_latest_available_year`.
 - If multiple score-scale branches overlap, callers must provide score-scale
   selectors.
@@ -151,7 +151,7 @@ tickbiterisk risk single-bite \
 
 | Name | Required | Example | Description |
 | --- | --- | --- | --- |
-| `--county-fips` | yes | `24003` | Five-digit Maryland county FIPS code used for the county-week prior. |
+| `--county-fips` | yes | `24003` | Five-digit Maryland county FIPS code used for the county-week forecast. |
 | `--date` | no | `2026-05-26` | Calendar date converted to CDC MMWR year/week. Defaults to today. |
 | `--scores-path` | no | `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv` | Derived county-week score CSV. |
 | `--tick-species` | yes | `blacklegged` | Tick identity. Supported examples include `blacklegged`, `ixodes_scapularis`, `possible_ixodes`, `unknown`, and `not_ixodes`. |
@@ -161,8 +161,8 @@ tickbiterisk risk single-bite \
 | `--hours-since-removal` | no | `24` | Hours since the tick was removed. |
 | `--doxycycline-safe` / `--doxycycline-unsafe` | no | `--doxycycline-safe` | Optional known safety flag; omit when unknown. |
 | `--tick-count` | no | `1` | Number of attached ticks represented by the estimate. |
-| `--model-name` | no | `linear_blend_baseline` | County-week prior model branch. |
-| `--seasonality-source-id` | no | `cdc_seasonality_week_2023` | Weekly seasonality source used for the prior. |
+| `--model-name` | no | `linear_blend_baseline` | County-week forecast model branch. |
+| `--seasonality-source-id` | no | `cdc_seasonality_week_2023` | Weekly seasonality source used for the forecast. |
 | `--pretty` | no | `--pretty` | Pretty-print JSON output. |
 
 ### 3.3. Successful Response Shape
@@ -186,7 +186,7 @@ tickbiterisk risk single-bite \
       "explanation": "CDC clinician guidance uses estimated attachment of at least 36 hours or engorgement as a key Lyme prophylaxis consideration."
     }
   ],
-  "baseline_context": {
+  "forecast_context": {
     "county_week_risk_score": 7,
     "county_week_risk_category": "high",
     "model_name": "linear_blend_baseline"
@@ -224,7 +224,7 @@ tickbiterisk risk single-bite \
 
 ### 3.4. Runtime Behavior
 
-- The county-week baseline is used as local/seasonal context.
+- The county-week forecast is used as local/seasonal context.
 - The score adjusts that context with tick identity, life stage, attachment
   duration, engorgement, and tick count.
 - The response separately reports CDC prophylaxis consideration criteria as
