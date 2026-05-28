@@ -5,7 +5,7 @@
     "model_family": "ensemble",
     "model_name": "linear_blend_baseline",
     "run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0",
-    "sha256": "0f4cfc8ba65722e09da63dbc7eecd61d010b3cf8a298515451ba6b31d6787250",
+    "sha256": "f4bcbaa3d5e6a1104007c6962b8adc1d45b74e059bc03ff0e67d355e33223c69",
     "weather_mode": "not_used_by_lagged_model"
   },
   "caveats": [
@@ -21,7 +21,12 @@
   ],
   "clinical_disclaimer": "TickBiteRisk is for informational and educational purposes only. It is not medical advice, does not diagnose disease, and does not determine whether you are infected. Follow CDC guidance and contact a qualified healthcare professional about your situation.",
   "export_type": "model_card",
-  "generated_at": "2026-05-27T14:01:32+00:00",
+  "forecasting_status": {
+    "public_score_role": "relative county-week seasonal baseline with forecast-transition diagnostics",
+    "status": "forecasting_transition_research",
+    "update_policy": "New surveillance and exposure signals are reconciled against prior forecasts before they are considered for future reviewed estimates."
+  },
+  "generated_at": "2026-05-28T11:35:57+00:00",
   "method_summary": "Selected annual model-comparison prediction rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
   "model_name": "linear_blend_baseline",
   "not_for": [

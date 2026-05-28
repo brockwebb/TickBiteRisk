@@ -1,6 +1,11 @@
 {
+  "data_lag_and_update_policy": {
+    "forecast_boundary": "Forecast-safe branches use prior-year and trailing data; nowcast or retrospective branches must be labeled separately.",
+    "medical_boundary": "Forecasts do not diagnose disease, decide treatment, or determine whether an individual bite caused infection.",
+    "summary": "Official Lyme surveillance data lag real-world exposure conditions, so TickBiteRisk treats forecasts as provisional informational estimates that improve as new validated data arrive."
+  },
   "export_type": "source_catalog",
-  "generated_at": "2026-05-27T14:01:32+00:00",
+  "generated_at": "2026-05-28T11:35:57+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -15,17 +20,17 @@
       "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
     }
   ],
-  "input_artifact_sha256": "0920dd9d2b5195dbd9c4e7af91727afbc3cd20459ab9797950ceb153618f467e",
+  "input_artifact_sha256": "734cfd2fb40aeac61f4789a802e2b6c96802cb631d79356a93fe4da50d64aaac",
   "schema_version": "county-week-risk-static-v1",
   "source_prediction_run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0",
-  "source_prediction_sha256": "0f4cfc8ba65722e09da63dbc7eecd61d010b3cf8a298515451ba6b31d6787250",
+  "source_prediction_sha256": "f4bcbaa3d5e6a1104007c6962b8adc1d45b74e059bc03ff0e67d355e33223c69",
   "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
   "sources": [
     {
       "artifact_type": "derived",
       "notes": "Derived from selected model-comparison annual predictions and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
       "redistribution": "public derived data",
-      "sha256": "0920dd9d2b5195dbd9c4e7af91727afbc3cd20459ab9797950ceb153618f467e",
+      "sha256": "734cfd2fb40aeac61f4789a802e2b6c96802cb631d79356a93fe4da50d64aaac",
       "source_id": "county_week_seasonal_risk_baseline"
     },
     {
@@ -36,7 +41,7 @@
       "notes": "Selected annual prediction rows from model-comparison output; not raw surveillance data.",
       "redistribution": "public derived data",
       "run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0",
-      "sha256": "0f4cfc8ba65722e09da63dbc7eecd61d010b3cf8a298515451ba6b31d6787250",
+      "sha256": "f4bcbaa3d5e6a1104007c6962b8adc1d45b74e059bc03ff0e67d355e33223c69",
       "source_id": "annual_prediction_branch",
       "weather_mode": "not_used_by_lagged_model"
     },

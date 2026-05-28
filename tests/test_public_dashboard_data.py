@@ -156,6 +156,21 @@ def test_model_card_matches_weekly_export_metadata() -> None:
     assert "observational_not_causal" in validation["comparison_assumption_flags"]
 
 
+def test_public_weekly_export_excludes_probable_only_state_source_rows() -> None:
+    weekly = load_public_json("md_county_risk_weekly.json")
+    all_flags = {
+        flag
+        for record in weekly["records"]
+        for flag in record.get("feature_quality_flags", [])
+    }
+
+    assert "mdh_probable_only_2024" not in all_flags
+    assert "state_source_not_cdc_public_use" not in all_flags
+    assert weekly["selected_score_config"]["source_prediction_run_id"].endswith(
+        "end2023_mintrain5_ridge1p0_shrink5p0"
+    )
+
+
 def test_source_catalog_exposes_selected_annual_prediction_branch() -> None:
     weekly = load_public_json("md_county_risk_weekly.json")
     source_catalog = load_public_json("source_catalog.json")
