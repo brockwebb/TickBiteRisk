@@ -1169,6 +1169,10 @@ def model_compare(
         f"{outputs.predictions_path}"
     )
     typer.echo(
+        f"Wrote {len(result.intervals)} model comparison interval row(s) to "
+        f"{outputs.intervals_path}"
+    )
+    typer.echo(
         f"Wrote {len(result.metrics)} model comparison metric row(s) to "
         f"{outputs.metrics_path}"
     )

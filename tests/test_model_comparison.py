@@ -5,6 +5,7 @@ from pathlib import Path
 from tickbiterisk.modeling import model_compare
 from tickbiterisk.modeling.model_compare import run_model_comparison
 from tickbiterisk.modeling.model_compare_build import (
+    MODEL_COMPARISON_INTERVAL_COLUMNS,
     MODEL_COMPARISON_METRIC_COLUMNS,
     MODEL_COMPARISON_PREDICTION_COLUMNS,
     MODEL_COMPARISON_RUN_COLUMNS,
@@ -28,6 +29,7 @@ def test_run_model_comparison_uses_prior_year_training_windows(
 
     model_names = {row.model_name for row in result.predictions}
     assert model_names == {
+        "analog_year_forecast",
         "empirical_bayes_shrinkage",
         "linear_blend_baseline",
         "prior_year_incidence",
@@ -140,6 +142,7 @@ def test_run_model_comparison_omits_spatial_lane_without_spatial_features(
     )
 
     model_names = {row.model_name for row in result.predictions}
+    assert "analog_year_forecast" in model_names
     assert "ridge_forecast_spatial" not in model_names
     assert "ridge_forecast_safe" in model_names
 
@@ -313,6 +316,67 @@ def test_write_model_comparison_outputs_orders_and_dedupes(
     assert len(metrics) == len(result.metrics)
     assert len(summary) == len(result.summary)
     assert summary[0]["rank_by_mae"] == "1"
+
+
+def test_analog_year_forecast_uses_training_rows_only_and_emits_intervals(
+    tmp_path: Path,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv")
+
+    result = run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+    )
+
+    analog = next(
+        row
+        for row in result.predictions
+        if row.model_name == "analog_year_forecast"
+        and row.county_fips == "24001"
+        and row.test_year == 2021
+    )
+    assert analog.model_family == "analog"
+    assert analog.feature_profile == "forecast_safe_analog_years"
+    assert analog.weather_mode == "not_used_by_forecast_safe_model"
+    assert analog.train_end_year == 2020
+    assert analog.predicted_incidence_per_100k >= 0
+
+    interval = next(
+        row
+        for row in result.intervals
+        if row.model_name == "analog_year_forecast"
+        and row.county_fips == "24001"
+        and row.test_year == 2021
+    )
+    assert interval.interval_method == "weighted_analog_bootstrap"
+    assert interval.bootstrap_seed == 1337
+    assert interval.bootstrap_iterations == 200
+    assert (
+        interval.lower_80_incidence_per_100k
+        <= interval.median_incidence_per_100k
+        <= interval.upper_80_incidence_per_100k
+    )
+    assert "2021" not in interval.analog_years
+
+
+def test_write_model_comparison_outputs_writes_interval_artifact(
+    tmp_path: Path,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv")
+    result = run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+    )
+
+    outputs = write_model_comparison_outputs(result, tmp_path / "out")
+
+    assert outputs.intervals_path.exists()
+    with outputs.intervals_path.open(newline="", encoding="utf-8") as handle:
+        intervals = list(csv.DictReader(handle))
+    assert list(intervals[0]) == MODEL_COMPARISON_INTERVAL_COLUMNS
+    assert {row["model_name"] for row in intervals} == {"analog_year_forecast"}
 
 
 def _write_design_matrix(path: Path, *, include_spatial: bool = True) -> Path:

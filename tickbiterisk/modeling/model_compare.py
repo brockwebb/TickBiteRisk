@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import math
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
@@ -20,6 +21,11 @@ WEATHER_MODE = "retrospective_current_year_weather"
 RUN_WEATHER_MODE = "mixed_model_specific"
 FORECAST_SAFE_WEATHER_MODE = "not_used_by_forecast_safe_model"
 LAGGED_WEATHER_MODE = "not_used_by_lagged_model"
+ANALOG_BOOTSTRAP_SEED = 1337
+ANALOG_BOOTSTRAP_ITERATIONS = 200
+ANALOG_NEIGHBOR_COUNT = 5
+ANALOG_FEATURE_PROFILE = "forecast_safe_analog_years"
+ANALOG_INTERVAL_METHOD = "weighted_analog_bootstrap"
 EXCLUDED_FEATURE_PREFIXES = ("feature_tick_",)
 REQUIRED_MODEL_COMPARISON_COLUMNS = [
     "county_fips",
@@ -211,6 +217,39 @@ class ModelComparisonMetric:
 
 
 @dataclass(frozen=True)
+class ModelComparisonInterval:
+    run_id: str
+    model_name: str
+    model_family: str
+    target_definition: str
+    feature_set: str
+    feature_profile: str
+    evaluation_mode: str
+    weather_mode: str
+    source_file_sha256: str
+    county_fips: str
+    county_name: str
+    test_year: int
+    train_start_year: int
+    train_end_year: int
+    interval_method: str
+    bootstrap_seed: int
+    bootstrap_iterations: int
+    analog_count: int
+    analog_years: str
+    analog_counties: str
+    lower_80_incidence_per_100k: float
+    median_incidence_per_100k: float
+    upper_80_incidence_per_100k: float
+    lower_95_incidence_per_100k: float
+    upper_95_incidence_per_100k: float
+    observed_incidence_per_100k: float
+    covered_80: bool
+    covered_95: bool
+    comparison_assumption_flags: str
+
+
+@dataclass(frozen=True)
 class ModelComparisonSummary:
     run_id: str
     rank_by_mae: int
@@ -229,6 +268,7 @@ class ModelComparisonResult:
     run_id: str
     run: ModelComparisonRun
     predictions: list[ModelComparisonPrediction]
+    intervals: list[ModelComparisonInterval]
     metrics: list[ModelComparisonMetric]
     summary: list[ModelComparisonSummary]
 
@@ -287,6 +327,7 @@ def run_model_comparison(
         f"shrink{_slug_float(shrinkage_strength)}"
     )
     predictions: list[ModelComparisonPrediction] = []
+    intervals: list[ModelComparisonInterval] = []
     for test_year in range(start_year, resolved_end_year + 1):
         train_rows = [row for row in rows if row.year < test_year]
         if not _has_training_depth(train_rows, min_train_years=min_train_years):
@@ -320,6 +361,18 @@ def run_model_comparison(
                         train_county_count=train_county_count,
                     )
                 )
+                if model_name == "analog_year_forecast":
+                    intervals.append(
+                        _analog_interval_row(
+                            run_id=run_id,
+                            row=row,
+                            train_rows=train_rows,
+                            feature_columns=feature_columns,
+                            source_sha=source_sha,
+                            train_start_year=train_start_year,
+                            train_end_year=train_end_year,
+                        )
+                    )
     metrics = _metric_rows(run_id, predictions)
     summary = _summary_rows(run_id, metrics)
     model_names = ",".join(sorted({row.model_name for row in predictions}))
@@ -345,6 +398,7 @@ def run_model_comparison(
         run_id=run_id,
         run=run,
         predictions=predictions,
+        intervals=intervals,
         metrics=metrics,
         summary=summary,
     )
@@ -484,6 +538,14 @@ def _predict_models(
             _empirical_bayes_prediction(row, train_rows, shrinkage_strength),
         ),
     ]
+    predictions.append(
+        (
+            "analog_year_forecast",
+            "analog",
+            ANALOG_FEATURE_PROFILE,
+            _analog_prediction(row, train_rows, feature_columns),
+        )
+    )
     forecast_columns = [
         column for column in feature_columns if _is_forecast_safe_feature_column(column)
     ]
@@ -553,6 +615,170 @@ def _predict_models(
         )
     )
     return predictions
+
+
+def _analog_prediction(
+    row: _DesignRow,
+    train_rows: list[_DesignRow],
+    feature_columns: list[str],
+) -> float:
+    forecast = _analog_forecast(row, train_rows, feature_columns)
+    return forecast[0]
+
+
+def _analog_forecast(
+    row: _DesignRow,
+    train_rows: list[_DesignRow],
+    feature_columns: list[str],
+) -> tuple[float, list[tuple[_DesignRow, float, float]]]:
+    columns = [
+        column
+        for column in feature_columns
+        if (
+            _is_forecast_spatial_feature_column(column)
+            or _is_forecast_ecology_feature_column(column)
+        )
+    ]
+    if not train_rows or not columns:
+        return _county_trailing_mean(row, train_rows), []
+    means = {
+        column: mean(train_row.features.get(column, 0.0) for train_row in train_rows)
+        for column in columns
+    }
+    scales = {
+        column: _stddev(
+            [train_row.features.get(column, 0.0) for train_row in train_rows]
+        )
+        for column in columns
+    }
+    distances = []
+    for train_row in train_rows:
+        squared_distance = sum(
+            (
+                _standardized(row.features.get(column, 0.0), means[column], scales[column])
+                - _standardized(
+                    train_row.features.get(column, 0.0),
+                    means[column],
+                    scales[column],
+                )
+            )
+            ** 2
+            for column in columns
+        )
+        distances.append((math.sqrt(squared_distance), train_row))
+    nearest = sorted(
+        distances,
+        key=lambda item: (item[0], item[1].year, item[1].county_fips),
+    )[:ANALOG_NEIGHBOR_COUNT]
+    if not nearest:
+        return _county_trailing_mean(row, train_rows), []
+    if all(distance <= 1e-12 for distance, _train_row in nearest):
+        weights = [1.0 / len(nearest) for _distance, _train_row in nearest]
+    else:
+        raw_weights = [1.0 / (distance + 1e-9) for distance, _train_row in nearest]
+        total_weight = sum(raw_weights)
+        weights = [weight / total_weight for weight in raw_weights]
+    analogs = [
+        (train_row, distance, weight)
+        for (distance, train_row), weight in zip(nearest, weights, strict=True)
+    ]
+    prediction = sum(
+        analog.incidence_per_100k * weight
+        for analog, _distance, weight in analogs
+    )
+    return prediction, analogs
+
+
+def _analog_interval_row(
+    *,
+    run_id: str,
+    row: _DesignRow,
+    train_rows: list[_DesignRow],
+    feature_columns: list[str],
+    source_sha: str,
+    train_start_year: int,
+    train_end_year: int,
+) -> ModelComparisonInterval:
+    prediction, analogs = _analog_forecast(row, train_rows, feature_columns)
+    if not analogs:
+        lower_95 = lower_80 = median = upper_80 = upper_95 = _round(prediction)
+        analog_years = ""
+        analog_counties = ""
+    else:
+        bootstrap_values = _analog_bootstrap_values(row, analogs)
+        lower_95 = _round(_percentile(bootstrap_values, 2.5))
+        lower_80 = _round(_percentile(bootstrap_values, 10.0))
+        median = _round(_percentile(bootstrap_values, 50.0))
+        upper_80 = _round(_percentile(bootstrap_values, 90.0))
+        upper_95 = _round(_percentile(bootstrap_values, 97.5))
+        analog_years = ";".join(str(analog.year) for analog, _distance, _weight in analogs)
+        analog_counties = ";".join(
+            analog.county_fips for analog, _distance, _weight in analogs
+        )
+    observed = _round(row.incidence_per_100k)
+    return ModelComparisonInterval(
+        run_id=run_id,
+        model_name="analog_year_forecast",
+        model_family="analog",
+        target_definition=TARGET_DEFINITION,
+        feature_set="safe_numeric_design_matrix",
+        feature_profile=ANALOG_FEATURE_PROFILE,
+        evaluation_mode=EVALUATION_MODE,
+        weather_mode=FORECAST_SAFE_WEATHER_MODE,
+        source_file_sha256=source_sha,
+        county_fips=row.county_fips,
+        county_name=row.county_name,
+        test_year=row.year,
+        train_start_year=train_start_year,
+        train_end_year=train_end_year,
+        interval_method=ANALOG_INTERVAL_METHOD,
+        bootstrap_seed=ANALOG_BOOTSTRAP_SEED,
+        bootstrap_iterations=ANALOG_BOOTSTRAP_ITERATIONS,
+        analog_count=len(analogs),
+        analog_years=analog_years,
+        analog_counties=analog_counties,
+        lower_80_incidence_per_100k=lower_80,
+        median_incidence_per_100k=median,
+        upper_80_incidence_per_100k=upper_80,
+        lower_95_incidence_per_100k=lower_95,
+        upper_95_incidence_per_100k=upper_95,
+        observed_incidence_per_100k=observed,
+        covered_80=lower_80 <= observed <= upper_80,
+        covered_95=lower_95 <= observed <= upper_95,
+        comparison_assumption_flags=COMPARISON_ASSUMPTION_FLAGS,
+    )
+
+
+def _analog_bootstrap_values(
+    row: _DesignRow,
+    analogs: list[tuple[_DesignRow, float, float]],
+) -> list[float]:
+    rng = random.Random(
+        ANALOG_BOOTSTRAP_SEED + row.year * 100000 + int(row.county_fips)
+    )
+    rows = [analog for analog, _distance, _weight in analogs]
+    weights = [weight for _analog, _distance, weight in analogs]
+    values = []
+    for _iteration in range(ANALOG_BOOTSTRAP_ITERATIONS):
+        sampled = rng.choices(rows, weights=weights, k=len(rows))
+        values.append(mean(analog.incidence_per_100k for analog in sampled))
+    return values
+
+
+def _percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    position = (len(ordered) - 1) * percentile / 100
+    lower_index = math.floor(position)
+    upper_index = math.ceil(position)
+    if lower_index == upper_index:
+        return ordered[lower_index]
+    lower_value = ordered[lower_index]
+    upper_value = ordered[upper_index]
+    return lower_value + (upper_value - lower_value) * (position - lower_index)
 
 
 def _county_trailing_mean(row: _DesignRow, train_rows: list[_DesignRow]) -> float:

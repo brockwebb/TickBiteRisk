@@ -34,8 +34,10 @@ def test_model_compare_command_writes_runs_predictions_metrics_and_summary(
     assert result.exit_code == 0
     assert "Wrote 1 model comparison run row(s)" in result.stdout
     assert "model_comparison_predictions.csv" in result.stdout
+    assert "model_comparison_intervals.csv" in result.stdout
     assert (output_dir / "model_comparison_runs.csv").exists()
     assert (output_dir / "model_comparison_predictions.csv").exists()
+    assert (output_dir / "model_comparison_intervals.csv").exists()
     assert (output_dir / "model_comparison_metrics.csv").exists()
     assert (output_dir / "model_comparison_summary.csv").exists()
 
@@ -44,6 +46,7 @@ def test_model_compare_command_writes_runs_predictions_metrics_and_summary(
     ) as handle:
         summary = list(csv.DictReader(handle))
     assert {row["model_name"] for row in summary} == {
+        "analog_year_forecast",
         "empirical_bayes_shrinkage",
         "linear_blend_baseline",
         "prior_year_incidence",

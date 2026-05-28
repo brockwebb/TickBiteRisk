@@ -78,6 +78,38 @@ MODEL_COMPARISON_METRIC_COLUMNS = [
     "comparison_assumption_flags",
 ]
 
+MODEL_COMPARISON_INTERVAL_COLUMNS = [
+    "run_id",
+    "model_name",
+    "model_family",
+    "target_definition",
+    "feature_set",
+    "feature_profile",
+    "evaluation_mode",
+    "weather_mode",
+    "source_file_sha256",
+    "county_fips",
+    "county_name",
+    "test_year",
+    "train_start_year",
+    "train_end_year",
+    "interval_method",
+    "bootstrap_seed",
+    "bootstrap_iterations",
+    "analog_count",
+    "analog_years",
+    "analog_counties",
+    "lower_80_incidence_per_100k",
+    "median_incidence_per_100k",
+    "upper_80_incidence_per_100k",
+    "lower_95_incidence_per_100k",
+    "upper_95_incidence_per_100k",
+    "observed_incidence_per_100k",
+    "covered_80",
+    "covered_95",
+    "comparison_assumption_flags",
+]
+
 MODEL_COMPARISON_SUMMARY_COLUMNS = [
     "run_id",
     "rank_by_mae",
@@ -96,6 +128,7 @@ MODEL_COMPARISON_SUMMARY_COLUMNS = [
 class ModelComparisonOutputPaths:
     runs_path: Path
     predictions_path: Path
+    intervals_path: Path
     metrics_path: Path
     summary_path: Path
 
@@ -109,10 +142,12 @@ def write_model_comparison_outputs(
     output_dir.mkdir(parents=True, exist_ok=True)
     runs_path = output_dir / "model_comparison_runs.csv"
     predictions_path = output_dir / "model_comparison_predictions.csv"
+    intervals_path = output_dir / "model_comparison_intervals.csv"
     metrics_path = output_dir / "model_comparison_metrics.csv"
     summary_path = output_dir / "model_comparison_summary.csv"
     run_records = [asdict(result.run)]
     prediction_records = [asdict(row) for row in result.predictions]
+    interval_records = [asdict(row) for row in result.intervals]
     metric_records = [asdict(row) for row in result.metrics]
     summary_records = [asdict(row) for row in result.summary]
     if append and runs_path.exists():
@@ -121,6 +156,11 @@ def write_model_comparison_outputs(
         prediction_records = [
             *_read_existing_records(predictions_path),
             *prediction_records,
+        ]
+    if append and intervals_path.exists():
+        interval_records = [
+            *_read_existing_records(intervals_path),
+            *interval_records,
         ]
     if append and metrics_path.exists():
         metric_records = [*_read_existing_records(metrics_path), *metric_records]
@@ -137,6 +177,11 @@ def write_model_comparison_outputs(
         MODEL_COMPARISON_PREDICTION_COLUMNS,
     )
     _write_records(
+        intervals_path,
+        _dedupe_interval_records(interval_records),
+        MODEL_COMPARISON_INTERVAL_COLUMNS,
+    )
+    _write_records(
         metrics_path,
         _dedupe_metric_records(metric_records),
         MODEL_COMPARISON_METRIC_COLUMNS,
@@ -149,6 +194,7 @@ def write_model_comparison_outputs(
     return ModelComparisonOutputPaths(
         runs_path=runs_path,
         predictions_path=predictions_path,
+        intervals_path=intervals_path,
         metrics_path=metrics_path,
         summary_path=summary_path,
     )
@@ -205,6 +251,19 @@ def _dedupe_metric_records(records: list[dict[str, object]]) -> list[dict[str, o
     ]
 
 
+def _dedupe_interval_records(
+    records: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    keyed = {_interval_key(record): record for record in records}
+    return [
+        keyed[key]
+        for key in sorted(
+            keyed,
+            key=lambda key: (key[0], key[1], int(key[2]), key[3]),
+        )
+    ]
+
+
 def _dedupe_summary_records(
     records: list[dict[str, object]],
 ) -> list[dict[str, object]]:
@@ -233,6 +292,15 @@ def _metric_key(record: dict[str, object]) -> tuple[str, str, str, str]:
         str(record["model_name"]),
         str(record["aggregation"]),
         _format_value(record.get("test_year")),
+    )
+
+
+def _interval_key(record: dict[str, object]) -> tuple[str, str, str, str]:
+    return (
+        str(record["run_id"]),
+        str(record["model_name"]),
+        str(record["test_year"]),
+        str(record["county_fips"]).zfill(5),
     )
 
 
