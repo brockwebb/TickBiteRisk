@@ -288,6 +288,13 @@ from tickbiterisk.modeling.model_diagnostics import (
 from tickbiterisk.modeling.model_diagnostics_build import (
     write_model_diagnostics_outputs,
 )
+from tickbiterisk.modeling.regional_annual_forecast import (
+    RegionalAnnualForecastInputError,
+    build_regional_annual_forecast,
+)
+from tickbiterisk.modeling.regional_annual_forecast_build import (
+    write_regional_annual_forecast_outputs,
+)
 from tickbiterisk.modeling.regional_outcome_stress import (
     RegionalOutcomeStressInputError,
     build_regional_outcome_stress,
@@ -2867,6 +2874,87 @@ def regional_incidence_stress(
     typer.echo(
         f"Wrote {len(result.metrics)} regional incidence stress metric row(s) to "
         f"{outputs.metrics_path}"
+    )
+
+
+@etl_app.command("regional-annual-forecast")
+def regional_annual_forecast(
+    regional_incidence_path: Path = typer.Option(
+        Path("build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv"),
+        help="Input Mid-Atlantic Lyme incidence county-year panel.",
+    ),
+    population_path: Path = typer.Option(
+        Path("build/etl/regional-population/midatlantic_county_population_year.csv"),
+        "--regional-population-path",
+        "--population-path",
+        help="Mid-Atlantic county-year population panel containing the target year.",
+    ),
+    target_year: int = typer.Option(
+        2026,
+        help="Future regional forecast year to score.",
+    ),
+    forecast_origin_year: int | None = typer.Option(
+        None,
+        help=(
+            "Latest observed regional outcome year allowed in training. "
+            "Defaults to the latest incidence year in the input."
+        ),
+    ),
+    min_train_years: int = typer.Option(
+        3,
+        help="Minimum prior county years required for regional forecast.",
+    ),
+    lookback_years: int = typer.Option(
+        3,
+        help="Number of origin-era years used to estimate forecast baselines.",
+    ),
+    shrinkage_strength: float = typer.Option(
+        5.0,
+        help="Pseudo-year strength for empirical-Bayes incidence shrinkage.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-annual-forecast"),
+        help="Output directory for regional annual forecast artifacts.",
+    ),
+) -> None:
+    if not regional_incidence_path.exists():
+        raise typer.BadParameter(
+            f"Regional incidence panel not found: {regional_incidence_path}"
+        )
+    if not population_path.exists():
+        raise typer.BadParameter(f"Population panel not found: {population_path}")
+    if forecast_origin_year is not None and target_year <= forecast_origin_year:
+        raise typer.BadParameter(
+            "target-year must be greater than forecast-origin-year"
+        )
+    if min_train_years < 1:
+        raise typer.BadParameter("min-train-years must be at least 1")
+    if lookback_years < min_train_years:
+        raise typer.BadParameter(
+            "lookback-years must be greater than or equal to min-train-years"
+        )
+    if not math.isfinite(shrinkage_strength) or shrinkage_strength < 0:
+        raise typer.BadParameter(
+            "shrinkage-strength must be finite and non-negative"
+        )
+
+    try:
+        result = build_regional_annual_forecast(
+            regional_incidence_path=regional_incidence_path,
+            population_path=population_path,
+            target_year=target_year,
+            forecast_origin_year=forecast_origin_year,
+            min_train_years=min_train_years,
+            lookback_years=lookback_years,
+            shrinkage_strength=shrinkage_strength,
+        )
+    except RegionalAnnualForecastInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_regional_annual_forecast_outputs(result, output_dir)
+    typer.echo(f"Wrote 1 regional annual forecast run row(s) to {outputs.runs_path}")
+    typer.echo(
+        f"Wrote {len(result.predictions)} regional annual forecast prediction row(s) "
+        f"to {outputs.predictions_path}"
     )
 
 

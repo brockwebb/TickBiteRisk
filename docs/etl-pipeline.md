@@ -157,6 +157,19 @@ artifacts.
      historical-range tests. These are research diagnostics over reported
      incidence per 100k, not public forecasts or latent true disease estimates.
 
+1i-2. `tickbiterisk etl regional-annual-forecast`
+   - Projects the Mid-Atlantic reported-incidence panel into a target year
+     without observed target-year Lyme outcomes.
+   - Defaults the forecast origin to the latest incidence year in the input
+     panel, currently 2023 for the CDC dashboard-based regional panel.
+   - Uses target-year regional population denominators. Current 2026 runs use
+     projected Census denominators and preserve projection flags.
+   - Writes `regional_annual_forecast_runs.csv` and
+     `regional_annual_forecast_predictions.csv`.
+   - Prediction rows intentionally omit actual, residual, error, and metrics
+     columns. This is a regional forecast scaffold, not the public Maryland
+     dashboard default.
+
 1j. `tickbiterisk etl regional-incidence-clusters`
    - Assigns county-years to low, moderate, high, and very-high regional
      incidence-pressure bands using only prior-year/trailing county incidence.

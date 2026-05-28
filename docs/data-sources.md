@@ -76,6 +76,8 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `regional_incidence_stress_runs.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate stress run manifest |
 | `regional_incidence_stress_predictions.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate shrinkage stress predictions |
 | `regional_incidence_stress_metrics.csv` | `tickbiterisk etl regional-incidence-stress` | Incidence MAE/RMSE metrics for regional historical-range baselines |
+| `regional_annual_forecast_runs.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic target-year forecast run manifest with origin, hashes, and forecast caveats |
+| `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows without observed target, residual, or error columns |
 | `regional_incidence_cluster_runs.csv` | `tickbiterisk etl regional-incidence-clusters` | Mid-Atlantic prior-incidence cluster run manifest |
 | `regional_incidence_cluster_county_year.csv` | `tickbiterisk etl regional-incidence-clusters` | Forecast-safe low/moderate/high/very-high prior-incidence band assignments |
 | `regional_incidence_cluster_summary.csv` | `tickbiterisk etl regional-incidence-clusters` | Prior cluster capacity bands and held-out actual incidence diagnostics |
@@ -144,5 +146,9 @@ feature ideas to test in time-aware backtests before any public model claim.
   2024 origin and use flagged projected 2026 population denominators; they do
   not contain observed 2026 Lyme outcomes, actuals, residuals, or error
   columns.
+- The regional annual forecast artifact applies the same no-observed-target
+  boundary to the DE/DC/MD/PA/VA/WV incidence panel. Current 2026 rows are
+  trained through the latest regional incidence origin year, 2023, and use
+  projected 2026 regional population denominators.
 
 Last updated: 2026-05-28.
