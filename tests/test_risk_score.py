@@ -112,6 +112,51 @@ def test_build_seasonal_risk_scores_reads_model_comparison_predictions(
     assert "surveillance_reporting_sensitive" in first.backtest_assumption_flags
 
 
+def test_build_seasonal_risk_scores_filters_unused_research_flags_for_lagged_branch(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_csv(
+        tmp_path / "model_comparison_predictions.csv",
+        [
+            {
+                **_model_comparison_prediction_row(
+                    "24003",
+                    "Anne Arundel County",
+                    "30.0",
+                    "7.5",
+                ),
+                "model_name": "linear_blend_baseline",
+                "model_family": "ensemble",
+                "feature_profile": "lagged_outcome_blend",
+                "weather_mode": "not_used_by_lagged_model",
+                "model_feature_quality_flags": (
+                    "population_structure_proxy,human_exposure_context_only,"
+                    "not_tick_bite_counts,census_vintage_revision_sensitive,"
+                    "missing_mast_acorn_prior_year,mdh_probable_only_2024,"
+                    "state_source_not_cdc_public_use,lyme_case_definition_change"
+                ),
+            }
+        ],
+    )
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+
+    result = build_seasonal_risk_scores(
+        predictions_path=predictions_path,
+        seasonality_baseline_path=seasonality_path,
+        model_name="linear_blend_baseline",
+    )
+
+    flags = set(result.rows[0].feature_quality_flags.split(","))
+    assert "mdh_probable_only_2024" in flags
+    assert "state_source_not_cdc_public_use" in flags
+    assert "lyme_case_definition_change" in flags
+    assert "population_structure_proxy" not in flags
+    assert "human_exposure_context_only" not in flags
+    assert "not_tick_bite_counts" not in flags
+    assert "census_vintage_revision_sensitive" not in flags
+    assert "missing_mast_acorn_prior_year" not in flags
+
+
 def test_build_seasonal_risk_scores_filters_to_requested_seasonality_source(
     tmp_path: Path,
 ) -> None:

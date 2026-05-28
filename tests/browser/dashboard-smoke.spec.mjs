@@ -36,7 +36,7 @@ test("static dashboard renders map, bite score, validation, and sources", async 
   await expect(page.locator("#bite-result")).toContainText("Bite-specific caveats");
 
   await expect(page.locator("#validation-summary")).toContainText("rank_by_mae");
-  await expect(page.locator("#validation-summary")).toContainText("18.24 per 100k");
+  await expect(page.locator("#validation-summary")).toContainText("18.47 per 100k");
   await expect(page.locator("#forecast-explainer")).toContainText(
     "Why this is a forecast"
   );

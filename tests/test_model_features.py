@@ -3,6 +3,8 @@ import math
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from tickbiterisk.etl.model_features import (
     ModelCountyYearFeature,
     build_model_feature_matrix,
@@ -265,6 +267,130 @@ def test_build_model_feature_matrix_adds_prior_year_population_growth_features(
     assert row.population_change_prior_year == 3090
     assert row.population_pct_change_prior_year == 2.999418
     assert row.population_pct_change_trailing_3yr_mean == 1.999806
+
+
+def test_build_model_feature_matrix_joins_regional_demographics_as_prior_year_context(
+    tmp_path: Path,
+) -> None:
+    lyme = _write_csv(tmp_path / "lyme.csv", [_lyme_row("24003", 2022, 15)])
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [_population_row("24003", "Anne Arundel County", 2022)],
+    )
+    weather = _write_csv(
+        tmp_path / "weather.csv",
+        [_weather_row(county_fips="24003", iso_year="2022")],
+    )
+    demographics = _write_csv(
+        tmp_path / "regional_demographics.csv",
+        [
+            _regional_demographics_row(
+                county_fips="24003",
+                year=2021,
+                median_age="39.2",
+                age5_17_share="0.161",
+                age65plus_share="0.172",
+            ),
+            _regional_demographics_row(
+                county_fips="24003",
+                year=2022,
+                median_age="99.9",
+                age5_17_share="0.999",
+                age65plus_share="0.999",
+            ),
+        ],
+    )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme,
+        population_path=population,
+        weather_weekly_path=weather,
+        regional_demographics_path=demographics,
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.age_structure_median_age_prior_year == 39.2
+    assert row.age_structure_under5_share_prior_year == 0.052
+    assert row.age_structure_age5_17_share_prior_year == 0.161
+    assert row.age_structure_age18_24_share_prior_year == 0.083
+    assert row.age_structure_age25_44_share_prior_year == 0.251
+    assert row.age_structure_age45_64_share_prior_year == 0.281
+    assert row.age_structure_age65plus_share_prior_year == 0.172
+    assert row.age_structure_source_id_prior_year == "census_pep_2024_county_age_sex_24"
+    assert row.age_structure_vintage_prior_year == 2024
+    assert row.age_structure_source_url_hash_prior_year == "agehash"
+    assert row.age_structure_feature_quality_flags_prior_year == (
+        "population_structure_proxy,human_exposure_context_only,"
+        "not_tick_bite_counts,census_vintage_revision_sensitive"
+    )
+    assert "human_exposure_context_only" in row.model_feature_quality_flags
+    assert "not_tick_bite_counts" in row.model_feature_quality_flags
+
+
+def test_build_model_feature_matrix_flags_missing_regional_demographics_when_opted_in(
+    tmp_path: Path,
+) -> None:
+    lyme = _write_csv(tmp_path / "lyme.csv", [_lyme_row("24003", 2022, 15)])
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [_population_row("24003", "Anne Arundel County", 2022)],
+    )
+    weather = _write_csv(
+        tmp_path / "weather.csv",
+        [_weather_row(county_fips="24003", iso_year="2022")],
+    )
+    demographics = _write_csv(
+        tmp_path / "regional_demographics.csv",
+        [_regional_demographics_row(county_fips="24005", year=2021)],
+    )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme,
+        population_path=population,
+        weather_weekly_path=weather,
+        regional_demographics_path=demographics,
+    )
+
+    assert rows[0].age_structure_median_age_prior_year is None
+    assert "missing_age_structure_prior_year" in (
+        rows[0].model_feature_quality_flags.split(",")
+    )
+
+
+def test_build_model_feature_matrix_rejects_malformed_regional_demographics(
+    tmp_path: Path,
+) -> None:
+    lyme = _write_csv(tmp_path / "lyme.csv", [_lyme_row("24003", 2022, 15)])
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [_population_row("24003", "Anne Arundel County", 2022)],
+    )
+    weather = _write_csv(
+        tmp_path / "weather.csv",
+        [_weather_row(county_fips="24003", iso_year="2022")],
+    )
+    demographics = _write_csv(
+        tmp_path / "regional_demographics.csv",
+        [
+            {
+                "county_fips": "24003",
+                "year": "2021",
+                "source_id": "census_pep_2024_county_age_sex_24",
+            }
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="regional demographics.*age5_17_share.*median_age",
+    ):
+        build_model_feature_matrix(
+            lyme_outcomes_path=lyme,
+            population_path=population,
+            weather_weekly_path=weather,
+            regional_demographics_path=demographics,
+        )
 
 
 def test_build_model_feature_matrix_preserves_rows_when_optional_inputs_missing(
@@ -1024,6 +1150,52 @@ def _mast_row(
         "black_oak_subjective_crown_pct": "34.00",
         "feature_quality_flags": "western_maryland_only,study_plot_not_countywide",
         "extracted_text_excerpt": "excerpt",
+    }
+
+
+def _regional_demographics_row(
+    *,
+    county_fips: str = "24003",
+    year: int = 2021,
+    median_age: str = "39.2",
+    under5_share: str = "0.052",
+    age5_17_share: str = "0.161",
+    age18_24_share: str = "0.083",
+    age25_44_share: str = "0.251",
+    age45_64_share: str = "0.281",
+    age65plus_share: str = "0.172",
+) -> dict[str, str]:
+    return {
+        "state_fips": "24",
+        "state_abbr": "MD",
+        "state_name": "Maryland",
+        "county_fips": county_fips,
+        "county_name": "Anne Arundel County",
+        "year": str(year),
+        "population": "600000",
+        "under5_population": "31200",
+        "age5_13_population": "63000",
+        "age14_17_population": "33600",
+        "age5_17_population": "96600",
+        "age18_24_population": "49800",
+        "age25_44_population": "150600",
+        "age45_64_population": "168600",
+        "age65plus_population": "103200",
+        "median_age": median_age,
+        "under5_share": under5_share,
+        "age5_17_share": age5_17_share,
+        "age18_24_share": age18_24_share,
+        "age25_44_share": age25_44_share,
+        "age45_64_share": age45_64_share,
+        "age65plus_share": age65plus_share,
+        "source_id": "census_pep_2024_county_age_sex_24",
+        "census_dataset": "2020-2024/counties/asrh/cc-est2024-agesex-24.csv",
+        "vintage": "2024",
+        "source_url_hash": "agehash",
+        "feature_quality_flags": (
+            "population_structure_proxy,human_exposure_context_only,"
+            "not_tick_bite_counts,census_vintage_revision_sensitive"
+        ),
     }
 
 

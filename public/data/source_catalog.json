@@ -7,7 +7,7 @@
     "why_forecasting": "Forecasting gives timely prevention context while county-level surveillance reports, population denominators, and reviewed source updates catch up."
   },
   "export_type": "source_catalog",
-  "generated_at": "2026-05-28T11:35:57+00:00",
+  "generated_at": "2026-05-28T20:54:14+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -22,17 +22,17 @@
       "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
     }
   ],
-  "input_artifact_sha256": "734cfd2fb40aeac61f4789a802e2b6c96802cb631d79356a93fe4da50d64aaac",
+  "input_artifact_sha256": "17b9b34103002e05d32ee23a55a342df047642a211b6ba750deb3f02c0887fa8",
   "schema_version": "county-week-risk-static-v1",
-  "source_prediction_run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0",
-  "source_prediction_sha256": "f4bcbaa3d5e6a1104007c6962b8adc1d45b74e059bc03ff0e67d355e33223c69",
+  "source_prediction_run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
+  "source_prediction_sha256": "289a1394e95ce292ca83fdf91c08d1b2f8511d0c2724538d1f08107c0a63af95",
   "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
   "sources": [
     {
       "artifact_type": "derived",
       "notes": "Derived from selected model-comparison annual predictions and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
       "redistribution": "public derived data",
-      "sha256": "734cfd2fb40aeac61f4789a802e2b6c96802cb631d79356a93fe4da50d64aaac",
+      "sha256": "17b9b34103002e05d32ee23a55a342df047642a211b6ba750deb3f02c0887fa8",
       "source_id": "county_week_seasonal_risk_baseline"
     },
     {
@@ -42,8 +42,8 @@
       "model_name": "linear_blend_baseline",
       "notes": "Selected annual prediction rows from model-comparison output; not raw surveillance data.",
       "redistribution": "public derived data",
-      "run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0",
-      "sha256": "f4bcbaa3d5e6a1104007c6962b8adc1d45b74e059bc03ff0e67d355e33223c69",
+      "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
+      "sha256": "289a1394e95ce292ca83fdf91c08d1b2f8511d0c2724538d1f08107c0a63af95",
       "source_id": "annual_prediction_branch",
       "weather_mode": "not_used_by_lagged_model"
     },

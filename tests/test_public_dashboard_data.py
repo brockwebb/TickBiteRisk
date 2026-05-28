@@ -165,15 +165,15 @@ def test_model_card_matches_weekly_export_metadata() -> None:
     validation = model_card["validation_summary"]
     assert validation["model_name"] == weekly["model_name"]
     assert validation["run_id"] == weekly["selected_score_config"]["source_prediction_run_id"]
-    assert validation["rank_by_mae"] == 1
-    assert validation["n_predictions"] == 408
-    assert validation["mae_incidence_per_100k"] == 18.240783
-    assert validation["rmse_incidence_per_100k"] == 29.536604
-    assert validation["pearson_correlation"] == 0.755185
+    assert validation["rank_by_mae"] == 2
+    assert validation["n_predictions"] == 432
+    assert validation["mae_incidence_per_100k"] == 18.47245
+    assert validation["rmse_incidence_per_100k"] == 29.737192
+    assert validation["pearson_correlation"] == 0.771554
     assert "observational_not_causal" in validation["comparison_assumption_flags"]
 
 
-def test_public_weekly_export_excludes_probable_only_state_source_rows() -> None:
+def test_public_weekly_export_surfaces_probable_only_state_source_caveats() -> None:
     weekly = load_public_json("md_county_risk_weekly.json")
     all_flags = {
         flag
@@ -181,10 +181,14 @@ def test_public_weekly_export_excludes_probable_only_state_source_rows() -> None
         for flag in record.get("feature_quality_flags", [])
     }
 
-    assert "mdh_probable_only_2024" not in all_flags
-    assert "state_source_not_cdc_public_use" not in all_flags
+    assert "mdh_probable_only_2024" in all_flags
+    assert "state_source_not_cdc_public_use" in all_flags
+    assert "population_structure_proxy" not in all_flags
+    assert "human_exposure_context_only" not in all_flags
+    assert "not_tick_bite_counts" not in all_flags
+    assert "missing_mast_acorn_prior_year" not in all_flags
     assert weekly["selected_score_config"]["source_prediction_run_id"].endswith(
-        "end2023_mintrain5_ridge1p0_shrink5p0"
+        "end2024_mintrain5_ridge1p0_shrink5p0"
     )
 
 

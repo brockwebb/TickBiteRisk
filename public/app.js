@@ -50,6 +50,17 @@ const flagLabels = {
     "Prior-season deer harvest data are missing for this county-year",
   observational_not_causal:
     "This observational forecast does not prove causes",
+  population_structure_proxy:
+    "Age structure is a population context proxy, not a direct exposure measure",
+  human_exposure_context_only:
+    "Human exposure context, not observed tick encounters",
+  not_tick_bite_counts: "Not tick-bite counts",
+  census_vintage_revision_sensitive:
+    "Census estimate vintages can be revised",
+  mdh_probable_only_2024:
+    "2024 MDH row is probable-only and not directly comparable to final CDC public-use data",
+  state_source_not_cdc_public_use:
+    "State source row, not CDC public-use data",
 };
 
 document.addEventListener("DOMContentLoaded", init);

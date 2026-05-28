@@ -10,6 +10,24 @@ from statistics import mean
 from typing import Any
 
 
+REGIONAL_DEMOGRAPHICS_REQUIRED_COLUMNS = [
+    "county_fips",
+    "year",
+    "median_age",
+    "under5_share",
+    "age5_17_share",
+    "age18_24_share",
+    "age25_44_share",
+    "age45_64_share",
+    "age65plus_share",
+    "source_id",
+    "census_dataset",
+    "vintage",
+    "source_url_hash",
+    "feature_quality_flags",
+]
+
+
 @dataclass(frozen=True)
 class ModelCountyYearFeature:
     county_fips: str
@@ -146,6 +164,18 @@ class ModelCountyYearFeature:
     population_change_prior_year: int | None = None
     population_pct_change_prior_year: float | None = None
     population_pct_change_trailing_3yr_mean: float | None = None
+    age_structure_median_age_prior_year: float | None = None
+    age_structure_under5_share_prior_year: float | None = None
+    age_structure_age5_17_share_prior_year: float | None = None
+    age_structure_age18_24_share_prior_year: float | None = None
+    age_structure_age25_44_share_prior_year: float | None = None
+    age_structure_age45_64_share_prior_year: float | None = None
+    age_structure_age65plus_share_prior_year: float | None = None
+    age_structure_source_id_prior_year: str | None = None
+    age_structure_census_dataset_prior_year: str | None = None
+    age_structure_vintage_prior_year: int | None = None
+    age_structure_source_url_hash_prior_year: str | None = None
+    age_structure_feature_quality_flags_prior_year: str | None = None
 
 
 def build_model_feature_matrix(
@@ -160,6 +190,7 @@ def build_model_feature_matrix(
     enviroatlas_habitat_path: Path | None = None,
     enso_oni_path: Path | None = None,
     enso_mei_v2_path: Path | None = None,
+    regional_demographics_path: Path | None = None,
     tick_status_path: Path | None = None,
 ) -> list[ModelCountyYearFeature]:
     population = _read_population(population_path)
@@ -171,6 +202,7 @@ def build_model_feature_matrix(
     habitat = _read_enviroatlas_habitat(enviroatlas_habitat_path)
     enso = _read_enso_oni(enso_oni_path)
     mei_v2 = _read_enso_mei_v2(enso_mei_v2_path)
+    age_structure = _read_regional_demographics(regional_demographics_path)
     tick_status = _read_tick_status(tick_status_path)
     tick_status_enabled = tick_status_path is not None
     mast_enabled = mast_acorn_path is not None
@@ -178,6 +210,7 @@ def build_model_feature_matrix(
     habitat_enabled = enviroatlas_habitat_path is not None
     enso_enabled = enso_oni_path is not None
     mei_v2_enabled = enso_mei_v2_path is not None
+    age_structure_enabled = regional_demographics_path is not None
 
     rows = []
     for lyme in _read_csv(lyme_outcomes_path):
@@ -204,6 +237,7 @@ def build_model_feature_matrix(
         habitat_row = habitat.get(county_fips)
         enso_row = enso.get(year)
         mei_v2_row = mei_v2.get(year)
+        age_structure_prior_year_row = age_structure.get((county_fips, year - 1))
         tick_status_row = tick_status.get(county_fips)
         total_cases = _parse_int(lyme["total_cases"])
         weather_ratio = weather_row["weather_observation_ratio"]
@@ -231,6 +265,12 @@ def build_model_feature_matrix(
             enso_flags=_enso_quality_flags(enso_row),
             enso_mei_v2_missing=mei_v2_enabled and mei_v2_row is None,
             enso_mei_v2_flags=_enso_quality_flags(mei_v2_row),
+            age_structure_missing=(
+                age_structure_enabled and age_structure_prior_year_row is None
+            ),
+            age_structure_flags=_age_structure_quality_flags(
+                age_structure_prior_year_row
+            ),
             tick_status_missing=tick_status_enabled and tick_status_row is None,
             tick_status_flags=_tick_status_quality_flags(tick_status_row),
         )
@@ -489,6 +529,42 @@ def build_model_feature_matrix(
                     mei_v2_row, "source_url_hashes"
                 ),
                 mei_v2_feature_quality_flags=_enso_quality_flags(mei_v2_row),
+                age_structure_median_age_prior_year=_age_structure_float(
+                    age_structure_prior_year_row, "median_age"
+                ),
+                age_structure_under5_share_prior_year=_age_structure_float(
+                    age_structure_prior_year_row, "under5_share"
+                ),
+                age_structure_age5_17_share_prior_year=_age_structure_float(
+                    age_structure_prior_year_row, "age5_17_share"
+                ),
+                age_structure_age18_24_share_prior_year=_age_structure_float(
+                    age_structure_prior_year_row, "age18_24_share"
+                ),
+                age_structure_age25_44_share_prior_year=_age_structure_float(
+                    age_structure_prior_year_row, "age25_44_share"
+                ),
+                age_structure_age45_64_share_prior_year=_age_structure_float(
+                    age_structure_prior_year_row, "age45_64_share"
+                ),
+                age_structure_age65plus_share_prior_year=_age_structure_float(
+                    age_structure_prior_year_row, "age65plus_share"
+                ),
+                age_structure_source_id_prior_year=_age_structure_text(
+                    age_structure_prior_year_row, "source_id"
+                ),
+                age_structure_census_dataset_prior_year=_age_structure_text(
+                    age_structure_prior_year_row, "census_dataset"
+                ),
+                age_structure_vintage_prior_year=_age_structure_int(
+                    age_structure_prior_year_row, "vintage"
+                ),
+                age_structure_source_url_hash_prior_year=_age_structure_text(
+                    age_structure_prior_year_row, "source_url_hash"
+                ),
+                age_structure_feature_quality_flags_prior_year=(
+                    _age_structure_quality_flags(age_structure_prior_year_row)
+                ),
             )
         )
     return sorted(rows, key=lambda row: (row.county_fips, row.year))
@@ -761,6 +837,31 @@ def _read_enso_mei_v2(path: Path | None) -> dict[int, dict[str, str]]:
     }
 
 
+def _read_regional_demographics(
+    path: Path | None,
+) -> dict[tuple[str, int], dict[str, str]]:
+    if path is None:
+        return {}
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = set(reader.fieldnames or [])
+        missing_columns = sorted(
+            column
+            for column in REGIONAL_DEMOGRAPHICS_REQUIRED_COLUMNS
+            if column not in fieldnames
+        )
+        if missing_columns:
+            raise ValueError(
+                "regional demographics file is missing required column(s): "
+                f"{', '.join(missing_columns)}"
+            )
+        rows = list(reader)
+    return {
+        (str(row["county_fips"]).zfill(5), int(row["year"])): row
+        for row in rows
+    }
+
+
 def _mast_preferred_sort_key(row: dict[str, str]) -> tuple[int, str]:
     return (
         _parse_int_or_none(row.get("source_report_year", "")) or _parse_int(row["year"]),
@@ -798,6 +899,8 @@ def _model_quality_flags(
     enso_flags: str,
     enso_mei_v2_missing: bool,
     enso_mei_v2_flags: str,
+    age_structure_missing: bool,
+    age_structure_flags: str,
     tick_status_missing: bool,
     tick_status_flags: str,
 ) -> list[str]:
@@ -831,6 +934,9 @@ def _model_quality_flags(
     if enso_mei_v2_missing:
         flags.append("missing_enso_mei_v2_prior_year")
     flags.extend(_split_flags(enso_mei_v2_flags))
+    if age_structure_missing:
+        flags.append("missing_age_structure_prior_year")
+    flags.extend(_split_flags(age_structure_flags))
     if tick_status_missing:
         flags.append("missing_tick_status")
     flags.extend(_split_flags(tick_status_flags))
@@ -957,6 +1063,31 @@ def _enso_float(row: dict[str, str] | None, column: str) -> float | None:
 
 
 def _enso_quality_flags(row: dict[str, str] | None) -> str:
+    if row is None:
+        return ""
+    return ",".join(_dedupe_preserve_order(_split_flags(row.get("feature_quality_flags", ""))))
+
+
+def _age_structure_text(row: dict[str, str] | None, column: str) -> str | None:
+    if row is None:
+        return None
+    text = str(row.get(column, "")).strip()
+    return text or None
+
+
+def _age_structure_int(row: dict[str, str] | None, column: str) -> int | None:
+    if row is None:
+        return None
+    return _parse_int_or_none(row.get(column, ""))
+
+
+def _age_structure_float(row: dict[str, str] | None, column: str) -> float | None:
+    if row is None:
+        return None
+    return _parse_float_or_none(row.get(column, ""))
+
+
+def _age_structure_quality_flags(row: dict[str, str] | None) -> str:
     if row is None:
         return ""
     return ",".join(_dedupe_preserve_order(_split_flags(row.get("feature_quality_flags", ""))))

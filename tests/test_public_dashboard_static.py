@@ -233,6 +233,16 @@ def test_dashboard_javascript_translates_quality_flags_to_readable_caveats() -> 
         "not clinical confidence for an individual bite",
         "observational_not_causal",
         "This observational forecast does not prove causes",
+        "population_structure_proxy",
+        "Age structure is a population context proxy",
+        "human_exposure_context_only",
+        "Human exposure context, not observed tick encounters",
+        "not_tick_bite_counts",
+        "Not tick-bite counts",
+        "mdh_probable_only_2024",
+        "2024 MDH row is probable-only",
+        "state_source_not_cdc_public_use",
+        "State source row, not CDC public-use data",
     ]:
         assert token in js
 

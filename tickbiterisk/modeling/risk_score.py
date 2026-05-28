@@ -12,6 +12,25 @@ RISK_SCORE_FEATURE_FLAGS = (
     "static_seasonality_prior,"
     "not_weather_adjusted"
 )
+LAGGED_OUTCOME_MODEL_NAMES = {
+    "prior_year_incidence",
+    "trailing_mean_incidence",
+    "linear_blend_baseline",
+    "empirical_bayes_shrinkage",
+}
+LAGGED_OUTCOME_FEATURE_PROFILES = {
+    "",
+    "lagged_outcome",
+    "lagged_outcome_blend",
+    "lagged_outcome_with_shrinkage",
+}
+LAGGED_OUTCOME_PUBLIC_MODEL_FLAGS = {
+    "covid_reporting_disruption",
+    "lyme_case_definition_change",
+    "mdh_probable_only_2024",
+    "state_source_not_cdc_public_use",
+    "missing_population",
+}
 
 
 class RiskScoreInputError(ValueError):
@@ -91,6 +110,7 @@ class _PredictionInput:
     model_family: str
     target_definition: str
     feature_set: str
+    feature_profile: str
     evaluation_mode: str
     weather_mode: str
     county_fips: str
@@ -211,6 +231,7 @@ def _risk_score_row(
 ) -> SeasonalRiskScore:
     raw_score = 0.0 if denominator <= 0 else 10 * weekly_incidence / denominator
     score = _risk_score(raw_score)
+    model_feature_quality_flags = _score_model_feature_quality_flags(prediction)
     return SeasonalRiskScore(
         source_prediction_run_id=prediction.run_id,
         source_prediction_sha256=prediction_sha256,
@@ -258,11 +279,11 @@ def _risk_score_row(
         risk_score=score,
         risk_category=_risk_category(score),
         seasonality_source_id=seasonality.source_id,
-        model_feature_quality_flags=prediction.model_feature_quality_flags,
+        model_feature_quality_flags=model_feature_quality_flags,
         seasonality_feature_quality_flags=seasonality.feature_quality_flags,
         feature_quality_flags=_join_flags(
             RISK_SCORE_FEATURE_FLAGS,
-            prediction.model_feature_quality_flags,
+            model_feature_quality_flags,
             seasonality.feature_quality_flags,
         ),
         backtest_assumption_flags=prediction.backtest_assumption_flags,
@@ -285,35 +306,48 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
     ]
     rows = _read_csv(path, required_columns=required_columns)
     return [
-            _PredictionInput(
-                run_id=row["run_id"],
-                model_name=row["model_name"],
-                model_family=row["model_family"],
-                target_definition=row["target_definition"],
-                feature_set=row["feature_set"],
-                evaluation_mode=row["evaluation_mode"],
-                weather_mode=row["weather_mode"],
-                county_fips=str(row["county_fips"]).zfill(5),
-                county_name=row["county_name"],
-                year=_parse_int(row["test_year"], "test_year"),
-                predicted_cases=_parse_float(
-                    row.get("predicted_cases", ""),
-                    "predicted_cases",
-                ),
-                predicted_incidence_per_100k=_parse_float(
-                    row["predicted_incidence_per_100k"],
-                    "predicted_incidence_per_100k",
-                ),
-                model_feature_quality_flags=row.get(
-                    "model_feature_quality_flags", ""
-                ),
-                backtest_assumption_flags=(
-                    row.get("backtest_assumption_flags", "")
-                    or row.get("comparison_assumption_flags", "")
-                ),
-            )
-            for row in rows
+        _PredictionInput(
+            run_id=row["run_id"],
+            model_name=row["model_name"],
+            model_family=row["model_family"],
+            target_definition=row["target_definition"],
+            feature_set=row["feature_set"],
+            feature_profile=row.get("feature_profile", ""),
+            evaluation_mode=row["evaluation_mode"],
+            weather_mode=row["weather_mode"],
+            county_fips=str(row["county_fips"]).zfill(5),
+            county_name=row["county_name"],
+            year=_parse_int(row["test_year"], "test_year"),
+            predicted_cases=_parse_float(
+                row.get("predicted_cases", ""),
+                "predicted_cases",
+            ),
+            predicted_incidence_per_100k=_parse_float(
+                row["predicted_incidence_per_100k"],
+                "predicted_incidence_per_100k",
+            ),
+            model_feature_quality_flags=row.get("model_feature_quality_flags", ""),
+            backtest_assumption_flags=(
+                row.get("backtest_assumption_flags", "")
+                or row.get("comparison_assumption_flags", "")
+            ),
+        )
+        for row in rows
     ]
+
+
+def _score_model_feature_quality_flags(prediction: _PredictionInput) -> str:
+    flags = _split_flags(prediction.model_feature_quality_flags)
+    if (
+        prediction.model_name in LAGGED_OUTCOME_MODEL_NAMES
+        and prediction.feature_profile in LAGGED_OUTCOME_FEATURE_PROFILES
+    ):
+        flags = [
+            flag
+            for flag in flags
+            if flag in LAGGED_OUTCOME_PUBLIC_MODEL_FLAGS
+        ]
+    return ",".join(flags)
 
 
 def _read_weekly_lyme_seasonality(
@@ -396,11 +430,18 @@ def _risk_category(score: int) -> str:
 def _join_flags(*values: str) -> str:
     flags = []
     for value in values:
-        for flag in str(value).split(","):
-            flag = flag.strip()
-            if flag and flag not in flags:
+        for flag in _split_flags(value):
+            if flag not in flags:
                 flags.append(flag)
     return ",".join(flags)
+
+
+def _split_flags(value: str) -> list[str]:
+    return [
+        flag
+        for raw_flag in str(value).split(",")
+        if (flag := raw_flag.strip())
+    ]
 
 
 def _read_csv(path: Path, *, required_columns: list[str]) -> list[dict[str, str]]:

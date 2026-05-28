@@ -1914,6 +1914,13 @@ def model_features(
         Path("build/etl/enso/noaa_psl_mei_v2_model_year_features.csv"),
         help="Optional NOAA PSL MEI.v2 prior-year global climate feature CSV.",
     ),
+    regional_demographics_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional Mid-Atlantic Census PEP county age/sex CSV for prior-year "
+            "age-structure exposure-context features."
+        ),
+    ),
     tick_status_path: Path | None = typer.Option(
         None,
         help=(
@@ -1936,6 +1943,13 @@ def model_features(
         )
     if tick_status_path is not None and not tick_status_path.exists():
         raise typer.BadParameter(f"Tick status file not found: {tick_status_path}")
+    if (
+        regional_demographics_path is not None
+        and not regional_demographics_path.exists()
+    ):
+        raise typer.BadParameter(
+            f"Regional demographics file not found: {regional_demographics_path}"
+        )
 
     rows = build_model_feature_matrix(
         lyme_outcomes_path=lyme_outcomes_path,
@@ -1958,6 +1972,7 @@ def model_features(
         enso_mei_v2_path=(
             enso_mei_v2_path if enso_mei_v2_path.exists() else None
         ),
+        regional_demographics_path=regional_demographics_path,
         tick_status_path=tick_status_path,
     )
     output = write_model_feature_matrix_output(rows, output_dir)

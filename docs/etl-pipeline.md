@@ -282,10 +282,13 @@ artifacts.
 
 13. `tickbiterisk etl model-features`
     - Joins Lyme outcomes, population, timing-safe prior-year population
-      growth, weather, deer, contact-pressure, construction lags, prior-year
-      mast/acorn, USDM drought, EnviroAtlas habitat, complete prior-year ONI
-      and MEI.v2, and optional surveillance features into the county-year
-      feature matrix.
+      growth, prior-year Census PEP age-structure context, weather, deer,
+      contact-pressure, construction lags, prior-year mast/acorn, USDM
+      drought, EnviroAtlas habitat, complete prior-year ONI and MEI.v2, and
+      optional surveillance features into the county-year feature matrix.
+    - Age-structure values are human-exposure context proxies only; they carry
+      source/vintage/hash fields and are joined from observation year N into
+      model year N+1.
     - Writes `model_features_county_year.csv`.
 
 14. `tickbiterisk etl county-adjacency`
@@ -297,8 +300,8 @@ artifacts.
     - Converts the feature panel into numeric model inputs with missingness
       indicators, optional prior-year neighbor incidence features, optional
       regional signal features, optional regional prior-incidence cluster
-      features, a fixed-scale ecological pressure composite, and a schema
-      sidecar.
+      features, optional prior-year age-structure features, a fixed-scale
+      ecological pressure composite, and a schema sidecar.
     - Regional cluster joins use only prior-history assignment and incidence
       summary fields from `regional_incidence_cluster_county_year.csv`;
       same-year actual incidence, cases, population, run metadata, cluster IDs,
@@ -310,6 +313,8 @@ artifacts.
     - Runs rolling-origin comparisons across transparent baseline and ridge
       branches, including forecast spatial and forecast-safe regional
       signal/cluster lanes when those optional feature columns are present.
+      Prior-year age structure is only in the ecology/exposure research lane,
+      not the conservative public-safe baseline.
     - Writes `model_comparison_runs.csv`,
       `model_comparison_predictions.csv`,
       `model_comparison_intervals.csv`, `model_comparison_metrics.csv`, and

@@ -76,6 +76,31 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
             }
         ],
     )
+    demographics = _write_csv(
+        tmp_path / "regional_demographics.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2021",
+                "median_age": "39.2",
+                "under5_share": "0.052",
+                "age5_17_share": "0.161",
+                "age18_24_share": "0.083",
+                "age25_44_share": "0.251",
+                "age45_64_share": "0.281",
+                "age65plus_share": "0.172",
+                "source_id": "census_pep_2024_county_age_sex_24",
+                "census_dataset": "2020-2024/counties/asrh/cc-est2024-agesex-24.csv",
+                "vintage": "2024",
+                "source_url_hash": "agehash",
+                "feature_quality_flags": (
+                    "population_structure_proxy,human_exposure_context_only,"
+                    "not_tick_bite_counts,census_vintage_revision_sensitive"
+                ),
+            }
+        ],
+    )
     tick_status = _write_csv(
         tmp_path / "tick_status.csv",
         [
@@ -125,6 +150,8 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
             str(enso),
             "--enso-mei-v2-path",
             str(mei_v2),
+            "--regional-demographics-path",
+            str(demographics),
             "--tick-status-path",
             str(tick_status),
             "--output-dir",
@@ -144,12 +171,18 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
     assert rows[0]["oni_prior_year_mean_anomaly_c"] == "-0.42"
     assert rows[0]["mei_v2_prior_year_mean"] == "-0.31"
     assert rows[0]["mei_v2_source_ids"] == "noaa_psl_mei_v2"
+    assert rows[0]["age_structure_median_age_prior_year"] == "39.2"
+    assert rows[0]["age_structure_age65plus_share_prior_year"] == "0.172"
+    assert rows[0]["age_structure_source_id_prior_year"] == (
+        "census_pep_2024_county_age_sex_24"
+    )
     assert rows[0]["ixodes_scapularis_status"] == "established"
     assert rows[0]["borrelia_burgdorferi_status"] == "present"
     assert rows[0]["model_feature_quality_flags"] == (
         "missing_contact_pressure,missing_deer_harvest_prior_season,"
         "global_climate_index,not_maryland_specific,prior_year_signal,"
-        "mei_v2_index,"
+        "mei_v2_index,population_structure_proxy,human_exposure_context_only,"
+        "not_tick_bite_counts,census_vintage_revision_sensitive,"
         "current_status_retrospective_proxy,status_only_not_prevalence,"
         "no_records_not_absence"
     )
@@ -245,6 +278,62 @@ def test_model_features_command_fails_cleanly_when_explicit_tick_status_missing(
 
     assert result.exit_code != 0
     assert "Tick status file not found" in result.output
+    assert "Traceback" not in result.output
+    assert not (tmp_path / "out" / "model_features_county_year.csv").exists()
+
+
+def test_model_features_command_fails_cleanly_when_regional_demographics_missing(
+    tmp_path: Path,
+) -> None:
+    lyme = _write_csv(
+        tmp_path / "lyme.csv",
+        [
+            {
+                "county_fips": "24003",
+                "year": "2022",
+                "confirmed_cases": "10",
+                "probable_cases": "5",
+                "total_cases": "15",
+                "canonical_source_id": "cdc_2022",
+                "source_values_summary": "",
+                "reconciliation_status": "matched",
+                "data_quality_flags": "",
+            }
+        ],
+    )
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2022",
+                "population": "600000",
+            }
+        ],
+    )
+    weather = _write_csv(tmp_path / "weather.csv", [_weather_row()])
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-features",
+            "--lyme-outcomes-path",
+            str(lyme),
+            "--population-path",
+            str(population),
+            "--weather-weekly-path",
+            str(weather),
+            "--regional-demographics-path",
+            str(tmp_path / "missing-regional-demographics.csv"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Regional demographics file not found" in result.output
     assert "Traceback" not in result.output
     assert not (tmp_path / "out" / "model_features_county_year.csv").exists()
 

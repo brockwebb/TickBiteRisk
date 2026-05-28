@@ -63,8 +63,9 @@ Current model-ready feature groups include:
 - Historical Lyme incidence and population-normalized rates.
 - Census denominator-derived prior-year population growth, used only as a
   timing-safe demographic/contact-pressure proxy.
-- Census PEP regional age-structure context through 2024, currently a
-  research-only human exposure proxy and not a public default model input.
+- Census PEP regional age-structure context through 2024, joined only as
+  prior-year population-structure context and currently a research-only human
+  exposure proxy, not a public default model input.
 - ACS 2023-2024 residential form, tenure, age, and density context, currently a
   research-only human exposure proxy and not a public default model input.
 - NOAA weekly weather aggregates rolled to county-year predictors.
@@ -105,14 +106,14 @@ baseline, and should be read as localized ecological context rather than
 countywide or statewide mast production.
 
 The 2026-05-28 expanded feature comparison now includes prior-year population
-growth, USDM drought, EnviroAtlas habitat, construction-lag features, prior-year
-USDM drought, complete prior-year ONI, complete prior-year MEI.v2, and a
-transparent ecological pressure composite in the timing-safe ecology/exposure
-lane. ONI and MEI.v2 stay as separate global climate-context predictors because
-MEI.v2 is a dimensionless ocean-atmosphere index rather than a CPC seasonal
-temperature anomaly. Held-out MAE still ranks `prior_year_incidence` first;
-these features remain available for research lanes but are not promoted into
-the public score.
+growth, prior-year Census PEP age structure, USDM drought, EnviroAtlas habitat,
+construction-lag features, prior-year USDM drought, complete prior-year ONI,
+complete prior-year MEI.v2, and a transparent ecological pressure composite in
+the timing-safe ecology/exposure lane. ONI and MEI.v2 stay as separate global
+climate-context predictors because MEI.v2 is a dimensionless ocean-atmosphere
+index rather than a CPC seasonal temperature anomaly. Held-out MAE still ranks
+`prior_year_incidence` first; these features remain available for research
+lanes but are not promoted into the public score.
 
 The next spatial-lag comparison added county adjacency from public Census
 geometry and a `ridge_forecast_spatial` lane using only prior-year neighbor
@@ -120,12 +121,15 @@ incidence. It ranked behind the simple blend and conservative safe ridge, with
 MAE 19.005867 per 100k in the current 2024-inclusive run, so it remains a
 diagnostic research lane. The regional and population-growth additions also
 remain research lanes unless a future validation slice shows stable improvement.
-After adding MEI.v2 and regional prior-incidence clusters to the research
-lanes, `ridge_forecast_ecology` ranked at 23.466694 MAE per 100k,
+After adding MEI.v2, regional prior-incidence clusters, and prior-year age
+structure to the research lanes, `analog_year_forecast` ranked at 21.778584 MAE
+per 100k, `ridge_forecast_ecology` ranked at 23.763644,
 `ridge_forecast_regional` ranked at 24.728232, and
-`ridge_lag_weather_ecology` ranked at 25.233508 in the same run. That is useful
-negative evidence: these features remain available for research, but they do
-not currently justify public promotion.
+`ridge_lag_weather_ecology` ranked at 25.233508 in the same run. Age structure
+is limited to the ecology/exposure ridge lane, so analog-year and retrospective
+weather/ecology metrics remain scoped to their earlier feature families. That
+is useful negative evidence: these features remain available for research, but
+they do not currently justify public promotion.
 
 ## Research lanes and diagnostics
 

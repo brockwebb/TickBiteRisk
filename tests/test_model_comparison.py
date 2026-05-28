@@ -397,6 +397,15 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
         "feature_population_pct_change_trailing_3yr_mean"
     )
     assert model_compare._is_forecast_ecology_feature_column(
+        "feature_age_structure_age65plus_share_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_age_structure_median_age_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_missing_age_structure_age65plus_share_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
         "feature_missing_population_pct_change_prior_year"
     )
     assert not model_compare._is_forecast_safe_feature_column(
@@ -407,6 +416,21 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     )
     assert not model_compare._is_forecast_safe_feature_column(
         "feature_missing_population_prior_year"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_age_structure_age65plus_share_prior_year"
+    )
+    assert not model_compare._is_analog_feature_column(
+        "feature_age_structure_age65plus_share_prior_year"
+    )
+    assert not model_compare._is_retrospective_weather_ecology_feature_column(
+        "feature_age_structure_age65plus_share_prior_year"
+    )
+    assert not model_compare._is_retrospective_weather_ecology_feature_column(
+        "feature_missing_age_structure_age65plus_share_prior_year"
+    )
+    assert not model_compare._is_forecast_ecology_feature_column(
+        "feature_age_structure_age65plus_share_current_year"
     )
     assert not model_compare._is_forecast_ecology_feature_column(
         "feature_population_pct_change_current_year"

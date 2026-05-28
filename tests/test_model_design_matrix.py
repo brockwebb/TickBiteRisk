@@ -89,6 +89,9 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_population_change_prior_year"] == "1200.0"
     assert mast_row["feature_population_pct_change_prior_year"] == "1.23"
     assert mast_row["feature_population_pct_change_trailing_3yr_mean"] == "0.9"
+    assert mast_row["feature_age_structure_median_age_prior_year"] == "39.2"
+    assert mast_row["feature_age_structure_age5_17_share_prior_year"] == "0.161"
+    assert mast_row["feature_age_structure_age65plus_share_prior_year"] == "0.172"
     assert mast_row["feature_ecological_pressure_prior_year_index"] == "29.87"
     assert mast_row["feature_ecological_pressure_component_count"] == "6"
     assert mast_row["feature_missing_ecological_pressure_prior_year_index"] == "0"
@@ -101,6 +104,7 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_missing_units_authorized_per_sqmi_prior_year"] == "0"
     assert mast_row["feature_missing_oni_prior_year_mean_anomaly_c"] == "0"
     assert mast_row["feature_missing_mei_v2_prior_year_mean"] == "0"
+    assert mast_row["feature_missing_age_structure_median_age_prior_year"] == "0"
     assert "feature_usdm_dsci_mean" in result.schema.feature_columns
     assert "feature_usdm_prior_year_dsci_mean" in result.schema.feature_columns
     assert "feature_forest_pct" in result.schema.feature_columns
@@ -111,6 +115,14 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
         in result.schema.feature_columns
     )
     assert "feature_population_pct_change_prior_year" in result.schema.feature_columns
+    assert (
+        "feature_age_structure_median_age_prior_year"
+        in result.schema.feature_columns
+    )
+    assert (
+        "feature_missing_age_structure_median_age_prior_year"
+        in result.schema.feature_columns
+    )
     assert (
         "feature_missing_population_pct_change_prior_year"
         in result.schema.feature_columns
@@ -139,12 +151,55 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert missing_new_row["feature_missing_oni_prior_year_mean_anomaly_c"] == "1"
     assert missing_new_row["feature_mei_v2_prior_year_mean"] == "0.0"
     assert missing_new_row["feature_missing_mei_v2_prior_year_mean"] == "1"
+    assert missing_new_row["feature_age_structure_median_age_prior_year"] == "0.0"
+    assert (
+        missing_new_row["feature_missing_age_structure_median_age_prior_year"]
+        == "1"
+    )
     assert missing_new_row["feature_ecological_pressure_prior_year_index"] == "0.0"
     assert missing_new_row["feature_ecological_pressure_component_count"] == "0"
     assert (
         missing_new_row["feature_missing_ecological_pressure_prior_year_index"]
         == "1"
     )
+
+
+def test_build_model_design_matrix_keeps_age_structure_provenance_flags_non_numeric(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+    with feature_matrix.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    for row in rows:
+        if row["county_fips"] == "24005" and row["year"] == "2020":
+            row["model_feature_quality_flags"] = (
+                row["model_feature_quality_flags"]
+                + ",missing_age_structure_prior_year,population_structure_proxy,"
+                "human_exposure_context_only,not_tick_bite_counts,"
+                "census_vintage_revision_sensitive"
+            )
+    _write_csv(feature_matrix, rows)
+
+    result = build_model_design_matrix(
+        model_features_path=feature_matrix,
+        lookback_years=2,
+    )
+    row = next(
+        item
+        for item in result.rows
+        if item["county_fips"] == "24005" and item["year"] == "2020"
+    )
+
+    assert "population_structure_proxy" in row["model_feature_quality_flags"]
+    assert "missing_age_structure_prior_year" in row["model_feature_quality_flags"]
+    for flag in [
+        "missing_age_structure_prior_year",
+        "population_structure_proxy",
+        "human_exposure_context_only",
+        "not_tick_bite_counts",
+        "census_vintage_revision_sensitive",
+    ]:
+        assert f"feature_flag_{flag}" not in result.schema.feature_columns
 
 
 def test_write_model_design_matrix_outputs_writes_csv_and_schema_json(
@@ -503,6 +558,49 @@ def _write_feature_matrix(path: Path) -> Path:
                     ),
                     "population_pct_change_trailing_3yr_mean": (
                         "0.9" if has_new_features else ""
+                    ),
+                    "age_structure_median_age_prior_year": (
+                        "39.2" if has_new_features else ""
+                    ),
+                    "age_structure_under5_share_prior_year": (
+                        "0.052" if has_new_features else ""
+                    ),
+                    "age_structure_age5_17_share_prior_year": (
+                        "0.161" if has_new_features else ""
+                    ),
+                    "age_structure_age18_24_share_prior_year": (
+                        "0.083" if has_new_features else ""
+                    ),
+                    "age_structure_age25_44_share_prior_year": (
+                        "0.251" if has_new_features else ""
+                    ),
+                    "age_structure_age45_64_share_prior_year": (
+                        "0.281" if has_new_features else ""
+                    ),
+                    "age_structure_age65plus_share_prior_year": (
+                        "0.172" if has_new_features else ""
+                    ),
+                    "age_structure_source_id_prior_year": (
+                        "census_pep_2024_county_age_sex_24"
+                        if has_new_features
+                        else ""
+                    ),
+                    "age_structure_census_dataset_prior_year": (
+                        "2020-2024/counties/asrh/cc-est2024-agesex-24.csv"
+                        if has_new_features
+                        else ""
+                    ),
+                    "age_structure_vintage_prior_year": (
+                        "2024" if has_new_features else ""
+                    ),
+                    "age_structure_source_url_hash_prior_year": (
+                        "agehash" if has_new_features else ""
+                    ),
+                    "age_structure_feature_quality_flags_prior_year": (
+                        "population_structure_proxy,human_exposure_context_only,"
+                        "not_tick_bite_counts,census_vintage_revision_sensitive"
+                        if has_new_features
+                        else ""
                     ),
                     "lyme_canonical_source_id": "cdc_lyme_public_2008_2021",
                     "lyme_reconciliation_status": "matched",

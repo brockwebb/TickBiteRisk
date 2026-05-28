@@ -4,8 +4,8 @@
     "evaluation_mode": "rolling_origin_prior_years",
     "model_family": "ensemble",
     "model_name": "linear_blend_baseline",
-    "run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0",
-    "sha256": "f4bcbaa3d5e6a1104007c6962b8adc1d45b74e059bc03ff0e67d355e33223c69",
+    "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
+    "sha256": "289a1394e95ce292ca83fdf91c08d1b2f8511d0c2724538d1f08107c0a63af95",
     "weather_mode": "not_used_by_lagged_model"
   },
   "caveats": [
@@ -26,7 +26,7 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-28T11:35:57+00:00",
+  "generated_at": "2026-05-28T20:54:14+00:00",
   "method_summary": "Selected annual model-comparison prediction rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
   "model_name": "linear_blend_baseline",
   "not_for": [
@@ -51,12 +51,12 @@
       "intervention_history_unmodeled",
       "surveillance_reporting_sensitive"
     ],
-    "mae_incidence_per_100k": 18.240783,
+    "mae_incidence_per_100k": 18.47245,
     "model_name": "linear_blend_baseline",
-    "n_predictions": 408,
-    "pearson_correlation": 0.755185,
-    "rank_by_mae": 1,
-    "rmse_incidence_per_100k": 29.536604,
-    "run_id": "model_compare_start2007_end2023_mintrain5_ridge1p0_shrink5p0"
+    "n_predictions": 432,
+    "pearson_correlation": 0.771554,
+    "rank_by_mae": 2,
+    "rmse_incidence_per_100k": 29.737192,
+    "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0"
   }
 }

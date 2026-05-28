@@ -93,6 +93,20 @@ FORECAST_ECOLOGY_EXACT_FEATURES = {
     "feature_missing_population_change_prior_year",
     "feature_missing_population_pct_change_prior_year",
     "feature_missing_population_pct_change_trailing_3yr_mean",
+    "feature_age_structure_median_age_prior_year",
+    "feature_age_structure_under5_share_prior_year",
+    "feature_age_structure_age5_17_share_prior_year",
+    "feature_age_structure_age18_24_share_prior_year",
+    "feature_age_structure_age25_44_share_prior_year",
+    "feature_age_structure_age45_64_share_prior_year",
+    "feature_age_structure_age65plus_share_prior_year",
+    "feature_missing_age_structure_median_age_prior_year",
+    "feature_missing_age_structure_under5_share_prior_year",
+    "feature_missing_age_structure_age5_17_share_prior_year",
+    "feature_missing_age_structure_age18_24_share_prior_year",
+    "feature_missing_age_structure_age25_44_share_prior_year",
+    "feature_missing_age_structure_age45_64_share_prior_year",
+    "feature_missing_age_structure_age65plus_share_prior_year",
     "feature_ecological_pressure_prior_year_index",
     "feature_ecological_pressure_component_count",
     "feature_missing_ecological_pressure_prior_year_index",
@@ -156,6 +170,22 @@ FORECAST_ECOLOGY_EXACT_FEATURES = {
     "feature_missing_mei_v2_prior_year_min",
     "feature_missing_mei_v2_prior_year_positive_month_count",
     "feature_missing_mei_v2_prior_year_negative_month_count",
+}
+AGE_STRUCTURE_EXACT_FEATURES = {
+    "feature_age_structure_median_age_prior_year",
+    "feature_age_structure_under5_share_prior_year",
+    "feature_age_structure_age5_17_share_prior_year",
+    "feature_age_structure_age18_24_share_prior_year",
+    "feature_age_structure_age25_44_share_prior_year",
+    "feature_age_structure_age45_64_share_prior_year",
+    "feature_age_structure_age65plus_share_prior_year",
+    "feature_missing_age_structure_median_age_prior_year",
+    "feature_missing_age_structure_under5_share_prior_year",
+    "feature_missing_age_structure_age5_17_share_prior_year",
+    "feature_missing_age_structure_age18_24_share_prior_year",
+    "feature_missing_age_structure_age25_44_share_prior_year",
+    "feature_missing_age_structure_age45_64_share_prior_year",
+    "feature_missing_age_structure_age65plus_share_prior_year",
 }
 FORECAST_SPATIAL_EXACT_FEATURES = {
     "feature_neighbor_prior_year_lyme_incidence_mean",
@@ -587,16 +617,26 @@ def _is_regional_incidence_cluster_feature_column(column: str) -> bool:
     return column in REGIONAL_INCIDENCE_CLUSTER_EXACT_FEATURES
 
 
+def _is_age_structure_feature_column(column: str) -> bool:
+    return column in AGE_STRUCTURE_EXACT_FEATURES
+
+
 def _is_analog_feature_column(column: str) -> bool:
     return (
         _is_forecast_spatial_feature_column(column)
-        or _is_forecast_ecology_feature_column(column)
+        or (
+            _is_forecast_ecology_feature_column(column)
+            and not _is_age_structure_feature_column(column)
+        )
         or _is_forecast_regional_signal_feature_column(column)
     )
 
 
 def _is_retrospective_weather_ecology_feature_column(column: str) -> bool:
-    return not _is_regional_incidence_cluster_feature_column(column)
+    return (
+        not _is_regional_incidence_cluster_feature_column(column)
+        and not _is_age_structure_feature_column(column)
+    )
 
 
 def _has_training_depth(

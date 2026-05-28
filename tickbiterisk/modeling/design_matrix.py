@@ -15,6 +15,13 @@ TARGET_COLUMNS = [
     "target_population",
 ]
 PASSTHROUGH_COLUMNS = ["model_feature_quality_flags"]
+NON_NUMERIC_PROVENANCE_QUALITY_FLAGS = {
+    "missing_age_structure_prior_year",
+    "population_structure_proxy",
+    "human_exposure_context_only",
+    "not_tick_bite_counts",
+    "census_vintage_revision_sensitive",
+}
 STATUS_COLUMNS = [
     "ixodes_scapularis_status",
     "ixodes_pacificus_status",
@@ -31,6 +38,13 @@ NUMERIC_SOURCE_COLUMNS = [
     "population_change_prior_year",
     "population_pct_change_prior_year",
     "population_pct_change_trailing_3yr_mean",
+    "age_structure_median_age_prior_year",
+    "age_structure_under5_share_prior_year",
+    "age_structure_age5_17_share_prior_year",
+    "age_structure_age18_24_share_prior_year",
+    "age_structure_age25_44_share_prior_year",
+    "age_structure_age45_64_share_prior_year",
+    "age_structure_age65plus_share_prior_year",
     "weather_weeks_observed",
     "weather_complete_week_count",
     "weather_days_observed",
@@ -117,6 +131,13 @@ OPTIONAL_NUMERIC_COLUMNS = [
     "population_change_prior_year",
     "population_pct_change_prior_year",
     "population_pct_change_trailing_3yr_mean",
+    "age_structure_median_age_prior_year",
+    "age_structure_under5_share_prior_year",
+    "age_structure_age5_17_share_prior_year",
+    "age_structure_age18_24_share_prior_year",
+    "age_structure_age25_44_share_prior_year",
+    "age_structure_age45_64_share_prior_year",
+    "age_structure_age65plus_share_prior_year",
     "residential_units_authorized",
     "units_authorized_per_sqmi",
     "units_authorized_per_100k",
@@ -582,7 +603,7 @@ def _quality_flags(
             for row in regional_signals.values()
             for flag in _split_flags(row.get("feature_quality_flags", ""))
         )
-    return sorted(flags)
+    return sorted(flags - NON_NUMERIC_PROVENANCE_QUALITY_FLAGS)
 
 
 def _feature_columns(
