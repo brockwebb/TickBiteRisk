@@ -26,8 +26,34 @@ def test_census_population_dry_run_prints_sanitized_urls(tmp_path, monkeypatch) 
     assert "Planned Census population query(s)" in result.stdout
     assert "1990/pep/int_charagegroups" in result.stdout
     assert "2023/pep/charv" in result.stdout
+    assert "co-est2025-alldata.csv" in result.stdout
     assert "secret-key" not in result.stdout
     assert not (tmp_path / "county_population_year.csv").exists()
+
+
+def test_census_population_latest_only_dry_run_uses_static_csv_without_api_key(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("tickbiterisk.cli.get_census_api_key", lambda: "secret-key")
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "census-population",
+            "--output-dir",
+            str(tmp_path),
+            "--latest-only",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Planned Census population query(s): 1" in result.stdout
+    assert "co-est2025-alldata.csv" in result.stdout
+    assert "secret-key" not in result.stdout
+    assert "api.census.gov" not in result.stdout
 
 
 def test_census_population_command_writes_population_output(tmp_path, monkeypatch) -> None:
@@ -67,6 +93,52 @@ def test_census_population_command_writes_population_output(tmp_path, monkeypatc
     assert result.exit_code == 0
     assert "Wrote 1 county-year population row(s)" in result.stdout
     assert (tmp_path / "county_population_year.csv").exists()
+
+
+def test_census_population_latest_only_appends_to_existing_output(tmp_path, monkeypatch) -> None:
+    output = tmp_path / "county_population_year.csv"
+    output.write_text(
+        "county_fips,county_name,year,population,source_id,census_dataset,vintage,source_url_hash\n"
+        "24003,Anne Arundel County,2023,590336,census_pep_2023_charv,2023/pep/charv,2023,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+        encoding="utf-8",
+    )
+    rows = [
+        CensusCountyPopulation(
+            county_fips="24003",
+            county_name="Anne Arundel County",
+            year=2024,
+            population=594582,
+            source_id="census_pep_2025_county_totals",
+            census_dataset="2020-2025/counties/totals/co-est2025-alldata.csv",
+            vintage=2025,
+            source_url_hash="d" * 64,
+        )
+    ]
+
+    monkeypatch.setattr(
+        "tickbiterisk.cli.fetch_maryland_latest_county_population_estimates",
+        lambda: rows,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "census-population",
+            "--output-dir",
+            str(tmp_path),
+            "--latest-only",
+            "--append",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 1 county-year population row(s)" in result.stdout
+    assert "append=True" in result.stdout
+    lines = output.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 3
+    assert "24003,Anne Arundel County,2023,590336" in lines[1]
+    assert "24003,Anne Arundel County,2024,594582" in lines[2]
 
 
 def test_county_reference_command_writes_maryland_gazetteer_output(

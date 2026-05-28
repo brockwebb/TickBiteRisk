@@ -7,8 +7,11 @@ from tickbiterisk.etl.census_population import (
     build_census_intercensal_2000_population_url,
     build_census_pep_2019_population_url,
     build_census_pep_2023_charv_population_url,
+    build_census_pep_2025_county_totals_url,
     fetch_maryland_county_population_estimates,
+    fetch_maryland_latest_county_population_estimates,
     get_census_api_key,
+    parse_census_pep_2025_county_totals_population,
     parse_census_intercensal_1990_population,
     parse_census_intercensal_2000_population,
     parse_census_pep_2019_population,
@@ -116,6 +119,35 @@ def test_parse_census_pep_2023_charv_population_keeps_total_july_estimates() -> 
     assert rows[0].source_id == "census_pep_2023_charv"
 
 
+def test_parse_census_pep_2025_county_totals_population_keeps_maryland_latest_years() -> None:
+    csv_text = (
+        "SUMLEV,STATE,COUNTY,STNAME,CTYNAME,POPESTIMATE2023,POPESTIMATE2024,POPESTIMATE2025\n"
+        "040,24,000,Maryland,Maryland,6177224,6263220,6315000\n"
+        "050,24,003,Maryland,Anne Arundel County,590336,594582,598000\n"
+        "050,24,510,Maryland,Baltimore city,565239,568271,570100\n"
+        "050,51,013,Virginia,Arlington County,238643,240000,241000\n"
+    )
+
+    rows = parse_census_pep_2025_county_totals_population(
+        csv_text,
+        source_url="https://example.test/co-est2025-alldata.csv",
+        min_year=2024,
+        max_year=2025,
+    )
+
+    assert [(row.county_fips, row.year, row.population) for row in rows] == [
+        ("24003", 2024, 594582),
+        ("24003", 2025, 598000),
+        ("24510", 2024, 568271),
+        ("24510", 2025, 570100),
+    ]
+    assert rows[0].county_name == "Anne Arundel County"
+    assert rows[0].source_id == "census_pep_2025_county_totals"
+    assert rows[0].census_dataset == "2020-2025/counties/totals/co-est2025-alldata.csv"
+    assert rows[0].vintage == 2025
+    assert len(rows[0].source_url_hash) == 64
+
+
 def test_fetch_maryland_county_population_estimates_combines_source_eras() -> None:
     calls: list[str] = []
 
@@ -141,13 +173,44 @@ def test_fetch_maryland_county_population_estimates_combines_source_eras() -> No
             ]
         raise AssertionError(url)
 
+    def fake_text_get(url: str) -> str:
+        calls.append(url)
+        if "co-est2025-alldata.csv" in url:
+            return (
+                "SUMLEV,STATE,COUNTY,STNAME,CTYNAME,POPESTIMATE2024,POPESTIMATE2025\n"
+                "050,24,003,Maryland,Anne Arundel County,500,600\n"
+            )
+        raise AssertionError(url)
+
     rows = fetch_maryland_county_population_estimates(
         api_key="secret-census-key",
         json_get=fake_json_get,
+        text_get=fake_text_get,
     )
 
-    assert [row.year for row in rows] == [1992, 2001, 2019, 2023]
-    assert all("key=secret-census-key" in call for call in calls)
+    assert [row.year for row in rows] == [1992, 2001, 2019, 2023, 2024, 2025]
+    api_calls = [call for call in calls if "api.census.gov" in call]
+    static_calls = [call for call in calls if "www2.census.gov" in call]
+    assert api_calls
+    assert static_calls == [build_census_pep_2025_county_totals_url()]
+    assert all("key=secret-census-key" in call for call in api_calls)
+    assert all("key=secret-census-key" not in call for call in static_calls)
+
+
+def test_fetch_maryland_latest_county_population_estimates_uses_static_csv_without_key() -> None:
+    calls: list[str] = []
+
+    def fake_text_get(url: str) -> str:
+        calls.append(url)
+        return (
+            "SUMLEV,STATE,COUNTY,STNAME,CTYNAME,POPESTIMATE2024,POPESTIMATE2025\n"
+            "050,24,003,Maryland,Anne Arundel County,500,600\n"
+        )
+
+    rows = fetch_maryland_latest_county_population_estimates(text_get=fake_text_get)
+
+    assert build_census_pep_2025_county_totals_url() in calls
+    assert [(row.year, row.population) for row in rows] == [(2024, 500), (2025, 600)]
 
 
 def test_fetch_maryland_county_population_rejects_non_json_without_leaking_key() -> None:
@@ -167,3 +230,6 @@ def test_census_population_url_builders_target_expected_datasets() -> None:
     assert "/2000/pep/int_population?" in build_census_intercensal_2000_population_url()
     assert "/2019/pep/population?" in build_census_pep_2019_population_url()
     assert "YEAR=2023" in build_census_pep_2023_charv_population_url(year=2023)
+    assert build_census_pep_2025_county_totals_url().endswith(
+        "/2020-2025/counties/totals/co-est2025-alldata.csv"
+    )

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from csv import DictReader
+from dataclasses import dataclass
 import hashlib
+from io import StringIO
 import json
 import os
 import re
-from collections.abc import Mapping
-from dataclasses import dataclass
 from typing import Any, Callable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -16,6 +18,13 @@ CENSUS_INTERCENSAL_1990_DATASET = "1990/pep/int_charagegroups"
 CENSUS_INTERCENSAL_2000_DATASET = "2000/pep/int_population"
 CENSUS_PEP_2019_DATASET = "2019/pep/population"
 CENSUS_PEP_2023_CHARV_DATASET = "2023/pep/charv"
+CENSUS_PEP_2025_COUNTY_TOTALS_DATASET = (
+    "2020-2025/counties/totals/co-est2025-alldata.csv"
+)
+CENSUS_PEP_2025_COUNTY_TOTALS_URL = (
+    "https://www2.census.gov/programs-surveys/popest/datasets/"
+    f"{CENSUS_PEP_2025_COUNTY_TOTALS_DATASET}"
+)
 
 
 class CensusApiResponseError(RuntimeError):
@@ -91,10 +100,15 @@ def build_census_pep_2023_charv_population_url(
     )
 
 
+def build_census_pep_2025_county_totals_url() -> str:
+    return CENSUS_PEP_2025_COUNTY_TOTALS_URL
+
+
 def fetch_maryland_county_population_estimates(
     *,
     api_key: str | None = None,
     json_get: Callable[[str], list[list[str]]] | None = None,
+    text_get: Callable[[str], str] | None = None,
 ) -> list[CensusCountyPopulation]:
     urls_and_parsers = [
         (
@@ -131,8 +145,24 @@ def fetch_maryland_county_population_estimates(
         payload = _ensure_census_table(_json_get(url, json_get=json_get), url)
         for row in parser(payload, url):
             output[(row.county_fips, row.year)] = row
+    for row in fetch_maryland_latest_county_population_estimates(text_get=text_get):
+        output[(row.county_fips, row.year)] = row
 
     return sorted(output.values(), key=lambda row: (row.county_fips, row.year))
+
+
+def fetch_maryland_latest_county_population_estimates(
+    *,
+    text_get: Callable[[str], str] | None = None,
+) -> list[CensusCountyPopulation]:
+    url = build_census_pep_2025_county_totals_url()
+    text = _text_get(url, text_get=text_get)
+    return parse_census_pep_2025_county_totals_population(
+        text,
+        source_url=url,
+        min_year=2024,
+        max_year=2025,
+    )
 
 
 def parse_census_intercensal_1990_population(
@@ -255,6 +285,39 @@ def parse_census_pep_2023_charv_population(
     return sorted(records, key=lambda row: (row.county_fips, row.year))
 
 
+def parse_census_pep_2025_county_totals_population(
+    csv_text: str,
+    *,
+    source_url: str,
+    min_year: int = 2024,
+    max_year: int = 2025,
+) -> list[CensusCountyPopulation]:
+    records = []
+    for row in DictReader(StringIO(csv_text)):
+        if row.get("SUMLEV") != "050" or row.get("STATE") != "24":
+            continue
+        for year in range(min_year, max_year + 1):
+            population = row.get(f"POPESTIMATE{year}")
+            if population in (None, ""):
+                continue
+            records.append(
+                _population_row(
+                    row={
+                        "STATE": row["STATE"],
+                        "COUNTY": row["COUNTY"],
+                        "NAME": row["CTYNAME"],
+                    },
+                    year=year,
+                    population=int(population),
+                    source_id="census_pep_2025_county_totals",
+                    census_dataset=CENSUS_PEP_2025_COUNTY_TOTALS_DATASET,
+                    vintage=2025,
+                    source_url=source_url,
+                )
+            )
+    return sorted(records, key=lambda row: (row.county_fips, row.year))
+
+
 def fetch_census_json(url: str) -> list[list[str]]:
     request = Request(url, headers={"User-Agent": "tickbiterisk-etl/0.1"})
     with urlopen(request, timeout=60) as response:
@@ -266,6 +329,12 @@ def fetch_census_json(url: str) -> list[list[str]]:
                 f"endpoint requires a key. url={sanitize_census_url(url)}"
             ) from exc
     return _ensure_census_table(payload, url)
+
+
+def fetch_census_text(url: str) -> str:
+    request = Request(url, headers={"User-Agent": "tickbiterisk-etl/0.1"})
+    with urlopen(request, timeout=60) as response:
+        return response.read().decode("latin-1")
 
 
 def sanitize_census_url(url: str) -> str:
@@ -300,6 +369,16 @@ def _json_get(
     if json_get is None:
         return fetch_census_json(url)
     return json_get(url)
+
+
+def _text_get(
+    url: str,
+    *,
+    text_get: Callable[[str], str] | None,
+) -> str:
+    if text_get is None:
+        return fetch_census_text(url)
+    return text_get(url)
 
 
 def _ensure_census_table(payload: Any, url: str) -> list[list[str]]:

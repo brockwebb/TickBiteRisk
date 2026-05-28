@@ -15,7 +15,7 @@ boundary clearly allow redistribution.
 | `cdc_lyme_seasonality` | CDC Lyme onset by MMWR week and month | National week/month | Static seasonal allocation from annual predictions to county-week baseline | active_etl |
 | `noaa_ghcnd` | NOAA daily station observations | Station-day to county-week/year | Weather feature candidates and backtesting inputs | active_etl |
 | `census_county_reference` | Census Gazetteer county file | County | County names, FIPS, land/water area, internal points | active_etl |
-| `census_population` | Census PEP/intercensal population APIs | County-year | Incidence denominators and per-capita feature normalization | active_etl |
+| `census_population` | Census PEP/intercensal population APIs and county totals CSV | County-year | Incidence denominators and per-capita feature normalization through 2025 | active_etl |
 | `maryland_dnr_deer_harvest` | Maryland DNR deer harvest tables and annual reports | County-season | Host-pressure proxy; prior completed season maps into model year | active_etl |
 | `cdc_tick_vector_status` | CDC public tick vector county table | County/species/status | Vector presence/status feature candidates | active_etl |
 | `cdc_tick_pathogen_status` | CDC public Ixodes pathogen county table | County/pathogen/status | Pathogen detection feature candidates | active_etl |
@@ -94,7 +94,10 @@ feature ideas to test in time-aware backtests before any public model claim.
   model-feature candidate, not the selected public weather source.
 - Maryland 2024 Lyme outcomes now come from the MDH PDF because CDC public-use
   county outputs still stop at 2023. Those 2024 rows are flagged
-  `mdh_probable_only_2024` and `state_source_not_cdc_public_use`; they do not
-  enter model features until 2024 population denominators are wired in.
+  `mdh_probable_only_2024` and `state_source_not_cdc_public_use`; with Census
+  2024 denominators now materialized, they enter the local model panel.
+- Census 2024-2025 county population denominators come from the official
+  keyless `CO-EST2025-alldata` CSV, while older rows currently remain from the
+  prior API-era pulls.
 
 Last updated: 2026-05-28.

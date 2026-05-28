@@ -23,6 +23,8 @@ from tickbiterisk.etl.census_population import (
     build_census_intercensal_2000_population_url,
     build_census_pep_2019_population_url,
     build_census_pep_2023_charv_population_url,
+    build_census_pep_2025_county_totals_url,
+    fetch_maryland_latest_county_population_estimates,
     fetch_maryland_county_population_estimates,
     get_census_api_key,
     sanitize_census_url,
@@ -581,9 +583,17 @@ def census_population(
         Path("build/etl"), help="Output directory for ETL artifacts."
     ),
     dry_run: bool = typer.Option(False, help="Print planned Census queries."),
+    latest_only: bool = typer.Option(
+        False,
+        help="Fetch only the latest static Census county totals CSV.",
+    ),
+    append: bool = typer.Option(
+        False,
+        help="Append to an existing population CSV and dedupe by county-year.",
+    ),
 ) -> None:
     api_key = get_census_api_key()
-    urls = _census_population_urls(api_key=api_key)
+    urls = _census_population_urls(api_key=api_key, latest_only=latest_only)
     if dry_run:
         typer.echo(f"Planned Census population query(s): {len(urls)}")
         for url in urls:
@@ -591,12 +601,18 @@ def census_population(
         return
 
     try:
-        rows = fetch_maryland_county_population_estimates(api_key=api_key)
+        if latest_only:
+            rows = fetch_maryland_latest_county_population_estimates()
+        else:
+            rows = fetch_maryland_county_population_estimates(api_key=api_key)
     except CensusApiResponseError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
-    output = write_county_population_output(rows, output_dir)
-    typer.echo(f"Wrote {len(rows)} county-year population row(s) to {output}")
+    output = write_county_population_output(rows, output_dir, append=append)
+    typer.echo(
+        f"Wrote {len(rows)} county-year population row(s) to {output} "
+        f"(append={append})"
+    )
 
 
 @etl_app.command("ecology-sources")
@@ -1900,7 +1916,12 @@ def _parse_iso_date(value: str, option_name: str) -> date:
         ) from exc
 
 
-def _census_population_urls(*, api_key: str | None) -> list[str]:
+def _census_population_urls(
+    *, api_key: str | None, latest_only: bool = False
+) -> list[str]:
+    latest_url = build_census_pep_2025_county_totals_url()
+    if latest_only:
+        return [latest_url]
     return [
         build_census_intercensal_1990_population_url(api_key=api_key),
         build_census_intercensal_2000_population_url(api_key=api_key),
@@ -1909,6 +1930,7 @@ def _census_population_urls(*, api_key: str | None) -> list[str]:
             build_census_pep_2023_charv_population_url(year=year, api_key=api_key)
             for year in range(2020, 2024)
         ],
+        latest_url,
     ]
 
 

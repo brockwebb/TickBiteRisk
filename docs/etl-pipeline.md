@@ -27,6 +27,8 @@ candidates until backtesting shows they improve the public score.
 
 3. `tickbiterisk etl census-population`
    - Fetches or refreshes county-year population denominators.
+   - Use `--latest-only --append` to refresh the official Census 2024-2025
+     county totals CSV without requiring a Census API key.
    - Writes `county_population_year.csv`.
 
 4. `tickbiterisk etl noaa-weather-features`
@@ -160,7 +162,10 @@ probability or a treatment recommendation.
 - Spatial lag features use prior-year neighbor outcomes only; same-year
   neighbor outcomes are not forecast-safe.
 - MDH 2024 Lyme rows are latest-outcome context, not a CDC public-use update.
-  They remain outside `model_features_county_year.csv` until 2024 county
-  population denominators are available.
+  They join into local model features only because matching Census 2024
+  population denominators and NOAA 2024 weather aggregates are now present.
+- The current population output mixes Census API-era 2020-2023 rows with
+  Vintage 2025 CSV rows for 2024-2025; use source IDs and vintages when
+  comparing denominators across vintages.
 
 Last updated: 2026-05-28.
