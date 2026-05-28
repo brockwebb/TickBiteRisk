@@ -381,6 +381,11 @@ artifacts.
     - This is a falsification harness for calibration/update ideas. A
       calibration multiplier can remain useful as a research prior even when it
       does not improve held-out MAE enough to become a public correction.
+    - Metric rows include `calibration_gate_decision` and
+      `calibration_gate_reason`: only overall improvements in both incidence
+      and case MAE become `candidate_review_required`; worsening or mixed
+      overall results become `do_not_apply_to_public_forecast`; subgroup/year
+      results remain `diagnostic_subgroup_only`.
 
 18. `tickbiterisk etl county-week-risk`
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.

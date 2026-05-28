@@ -58,6 +58,10 @@ def test_build_forecast_calibration_backtest_applies_prior_shrunken_ratio(
     assert overall.original_mae_incidence_per_100k == 30.0
     assert overall.calibrated_mae_incidence_per_100k == 10.0
     assert overall.mae_improvement_incidence_per_100k == 20.0
+    assert overall.calibration_gate_decision == "candidate_review_required"
+    assert overall.calibration_gate_reason == (
+        "calibration improved overall held-out incidence and case MAE"
+    )
     assert result.run.n_predictions == 2
 
 
@@ -80,6 +84,85 @@ def test_build_forecast_calibration_backtest_leaves_rows_uncalibrated_without_pr
     assert all(
         row.original_predicted_cases == row.calibrated_predicted_cases
         for row in result.predictions
+    )
+
+
+def test_build_forecast_calibration_backtest_rejects_worsening_overall_gate(
+    tmp_path: Path,
+) -> None:
+    predictions = tmp_path / "predictions.csv"
+    rows = []
+    for year in (2017, 2018):
+        rows.extend(
+            [
+                _prediction_row(
+                    county_fips="24001",
+                    county_name="County 24001",
+                    test_year=year,
+                    actual_cases=20,
+                    predicted_cases=10,
+                    actual_incidence=20.0,
+                    predicted_incidence=10.0,
+                    quality_flags="",
+                ),
+                _prediction_row(
+                    county_fips="24003",
+                    county_name="County 24003",
+                    test_year=year,
+                    actual_cases=40,
+                    predicted_cases=20,
+                    actual_incidence=40.0,
+                    predicted_incidence=20.0,
+                    quality_flags="",
+                ),
+            ]
+        )
+    rows.extend(
+        [
+            _prediction_row(
+                county_fips="24001",
+                county_name="County 24001",
+                test_year=2019,
+                actual_cases=30,
+                predicted_cases=30,
+                actual_incidence=30.0,
+                predicted_incidence=30.0,
+                quality_flags="",
+            ),
+            _prediction_row(
+                county_fips="24003",
+                county_name="County 24003",
+                test_year=2019,
+                actual_cases=30,
+                predicted_cases=30,
+                actual_incidence=30.0,
+                predicted_incidence=30.0,
+                quality_flags="",
+            ),
+        ]
+    )
+    _write_rows(predictions, rows)
+
+    result = build_forecast_calibration_backtest(
+        predictions_path=predictions,
+        start_year=2019,
+        min_calibration_updates=2,
+        calibration_prior_strength=2.0,
+    )
+
+    overall = next(
+        row
+        for row in result.metrics
+        if row.aggregation == "overall"
+        and row.model_name == "linear_blend_baseline"
+        and row.forecast_year is None
+    )
+    assert overall.original_mae_incidence_per_100k == 0.0
+    assert overall.calibrated_mae_incidence_per_100k == 20.0
+    assert overall.mae_improvement_incidence_per_100k == -20.0
+    assert overall.calibration_gate_decision == "do_not_apply_to_public_forecast"
+    assert overall.calibration_gate_reason == (
+        "calibration did not improve overall held-out incidence and case MAE"
     )
 
 
@@ -153,6 +236,17 @@ def test_build_forecast_calibration_backtest_falls_back_when_same_regime_zero_pr
     assert row.n_calibration_updates == 4
     assert row.raw_actual_to_predicted_case_ratio == 2.666667
     assert row.shrunken_case_multiplier == 2.111111
+
+    subgroup = next(
+        row
+        for row in result.metrics
+        if row.aggregation == "surveillance_regime"
+        and row.surveillance_regime == "case_definition_change_2022_plus"
+    )
+    assert subgroup.calibration_gate_decision == "diagnostic_subgroup_only"
+    assert subgroup.calibration_gate_reason == (
+        "subgroup result is diagnostic evidence, not a standalone public update gate"
+    )
 
 
 def test_build_forecast_calibration_backtest_rejects_non_numeric_inputs(

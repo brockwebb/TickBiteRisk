@@ -74,6 +74,8 @@ FORECAST_CALIBRATION_BACKTEST_METRIC_COLUMNS = [
     "original_mae_cases",
     "calibrated_mae_cases",
     "mae_improvement_cases",
+    "calibration_gate_decision",
+    "calibration_gate_reason",
     "recommended_update_use",
     "comparison_assumption_flags",
 ]

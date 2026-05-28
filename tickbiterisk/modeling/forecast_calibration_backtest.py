@@ -103,6 +103,8 @@ class ForecastCalibrationBacktestMetric:
     original_mae_cases: float
     calibrated_mae_cases: float
     mae_improvement_cases: float
+    calibration_gate_decision: str
+    calibration_gate_reason: str
     recommended_update_use: str
     comparison_assumption_flags: str
 
@@ -498,6 +500,13 @@ def _metric_row(
     calibrated_mae_incidence = _round(mean(calibrated_incidence_errors))
     original_mae_cases = _round(mean(original_case_errors))
     calibrated_mae_cases = _round(mean(calibrated_case_errors))
+    mae_improvement_incidence = _round(original_mae_incidence - calibrated_mae_incidence)
+    mae_improvement_cases = _round(original_mae_cases - calibrated_mae_cases)
+    gate_decision, gate_reason = _calibration_gate(
+        aggregation=aggregation,
+        mae_improvement_incidence=mae_improvement_incidence,
+        mae_improvement_cases=mae_improvement_cases,
+    )
     return ForecastCalibrationBacktestMetric(
         run_id=run_id,
         model_name=model_name,
@@ -511,9 +520,7 @@ def _metric_row(
         n_predictions=len(rows),
         original_mae_incidence_per_100k=original_mae_incidence,
         calibrated_mae_incidence_per_100k=calibrated_mae_incidence,
-        mae_improvement_incidence_per_100k=_round(
-            original_mae_incidence - calibrated_mae_incidence
-        ),
+        mae_improvement_incidence_per_100k=mae_improvement_incidence,
         original_rmse_incidence_per_100k=_round(
             math.sqrt(
                 mean(
@@ -534,11 +541,35 @@ def _metric_row(
         ),
         original_mae_cases=original_mae_cases,
         calibrated_mae_cases=calibrated_mae_cases,
-        mae_improvement_cases=_round(original_mae_cases - calibrated_mae_cases),
+        mae_improvement_cases=mae_improvement_cases,
+        calibration_gate_decision=gate_decision,
+        calibration_gate_reason=gate_reason,
         recommended_update_use=RECOMMENDED_UPDATE_USE,
         comparison_assumption_flags=_combined_flags(
             *(row.comparison_assumption_flags for row in rows)
         ),
+    )
+
+
+def _calibration_gate(
+    *,
+    aggregation: str,
+    mae_improvement_incidence: float,
+    mae_improvement_cases: float,
+) -> tuple[str, str]:
+    if aggregation != "overall":
+        return (
+            "diagnostic_subgroup_only",
+            "subgroup result is diagnostic evidence, not a standalone public update gate",
+        )
+    if mae_improvement_incidence > 0 and mae_improvement_cases > 0:
+        return (
+            "candidate_review_required",
+            "calibration improved overall held-out incidence and case MAE",
+        )
+    return (
+        "do_not_apply_to_public_forecast",
+        "calibration did not improve overall held-out incidence and case MAE",
     )
 
 

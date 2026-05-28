@@ -222,6 +222,11 @@ branches, even though it helped some surveillance-regime subsets. That argues
 for a cautious hierarchical/Bayesian update design with explicit regime
 reliability rather than a blanket multiplier.
 
+Calibration metrics now carry a gate decision. Only an overall improvement in
+both incidence and case MAE can become `candidate_review_required`; mixed or
+worse overall results are labeled `do_not_apply_to_public_forecast`, and
+year/regime subsets remain `diagnostic_subgroup_only`.
+
 ## Public score transform
 
 The selected annual predicted incidence is multiplied by the selected CDC
