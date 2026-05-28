@@ -118,6 +118,43 @@ CREATE TABLE IF NOT EXISTS midatlantic_age_demographics (
     PRIMARY KEY (county_fips, year, source_id)
 );
 
+CREATE TABLE IF NOT EXISTS midatlantic_acs_exposure (
+    state_fips char(2) NOT NULL,
+    state_abbr char(2) NOT NULL,
+    state_name text NOT NULL,
+    county_fips char(5) NOT NULL,
+    county_name text NOT NULL,
+    year integer NOT NULL,
+    acs_total_population integer CHECK (acs_total_population IS NULL OR acs_total_population >= 0),
+    age_under_18_population integer CHECK (age_under_18_population IS NULL OR age_under_18_population >= 0),
+    age_18_64_population integer CHECK (age_18_64_population IS NULL OR age_18_64_population >= 0),
+    age_65_plus_population integer CHECK (age_65_plus_population IS NULL OR age_65_plus_population >= 0),
+    age_under_18_share double precision,
+    age_18_64_share double precision,
+    age_65_plus_share double precision,
+    total_housing_units integer CHECK (total_housing_units IS NULL OR total_housing_units >= 0),
+    single_family_detached_units integer CHECK (single_family_detached_units IS NULL OR single_family_detached_units >= 0),
+    single_family_attached_units integer CHECK (single_family_attached_units IS NULL OR single_family_attached_units >= 0),
+    single_family_units integer CHECK (single_family_units IS NULL OR single_family_units >= 0),
+    single_family_detached_share double precision,
+    single_family_share double precision,
+    occupied_housing_units integer CHECK (occupied_housing_units IS NULL OR occupied_housing_units >= 0),
+    owner_occupied_units integer CHECK (owner_occupied_units IS NULL OR owner_occupied_units >= 0),
+    owner_occupied_share double precision,
+    land_area_sqmi double precision,
+    population_per_sqmi double precision,
+    housing_units_per_sqmi double precision,
+    single_family_units_per_sqmi double precision,
+    source_id text NOT NULL,
+    census_dataset text NOT NULL,
+    vintage integer NOT NULL,
+    acs_source_url_hash text NOT NULL,
+    geography_source_url_hash text NOT NULL,
+    feature_quality_flags text DEFAULT '',
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, year, source_id)
+);
+
 CREATE TABLE IF NOT EXISTS tick_vector_status (
     source_id text NOT NULL,
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),

@@ -4,7 +4,7 @@ Version: 0.2 draft
 Date: 2026-05-24  
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, NSSP coverage feasibility normalization, Census county reference/area, Census population denominators, regional Census age-structure context, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, county-week seasonal risk forecasts, runtime lookup/static export, and Postgres-ready schema.
+Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, NSSP coverage feasibility normalization, Census county reference/area, Census population denominators, regional Census age-structure context, ACS residential exposure context, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, county-week seasonal risk forecasts, runtime lookup/static export, and Postgres-ready schema.
 
 ## 1. Purpose
 
@@ -111,6 +111,7 @@ Initial normalized tables:
 - `maryland_dnr_deer_harvest`
 - `county_population_year`
 - `midatlantic_age_demographics`
+- `midatlantic_acs_exposure`
 - `weather_locations`
 - `weather_daily`
 - `weather_features_weekly`

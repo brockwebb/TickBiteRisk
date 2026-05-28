@@ -15,6 +15,7 @@ Primary artifacts:
 - `build/etl/model/model_design_matrix_schema.json`
 - `build/etl/regional-population/midatlantic_county_population_year.csv`
 - `build/etl/regional-demographics/midatlantic_age_demographics_county_year.csv`
+- `build/etl/acs-exposure/midatlantic_acs_exposure_county_year.csv`
 - `build/etl/regional-hotspots/midatlantic_hotspot_county_year.csv`
 - `build/etl/regional-hotspots/midatlantic_hotspot_summary.csv`
 - `build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv`
@@ -63,6 +64,8 @@ Current model-ready feature groups include:
 - Census denominator-derived prior-year population growth, used only as a
   timing-safe demographic/contact-pressure proxy.
 - Census PEP regional age-structure context through 2024, currently a
+  research-only human exposure proxy and not a public default model input.
+- ACS 2024 residential form, tenure, age, and density context, currently a
   research-only human exposure proxy and not a public default model input.
 - NOAA weekly weather aggregates rolled to county-year predictors.
 - CDC Lyme seasonality shares by week and month of onset.
@@ -171,11 +174,12 @@ that join while preserving missing denominator rows, and the cluster diagnostic
 summarizes prior-history pressure bands. They remain diagnostic panels, not
 public Maryland forecast branches.
 
-Regional Census age/sex demographics are also materialized as a candidate
-human-exposure context layer. Age mix may help explain who is more likely to
-be diagnosed, exposed, or represented in reported incidence, but it is not a
-tick-encounter measure. ACS detailed-table residential form and tenure fields
-remain a separate candidate for low-density/single-family contact proxies.
+Regional Census age/sex demographics and 2024 ACS residential-form summaries
+are also materialized as candidate human-exposure context layers. Age mix may
+help explain who is more likely to be diagnosed, exposed, or represented in
+reported incidence, and ACS single-family/owner-occupied/density fields may
+proxy residential edge contact. Neither source is a tick-encounter measure,
+annual observed exposure, or public-default model input.
 
 ## Forecast Update Contract
 

@@ -12,6 +12,15 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import typer
 
 from tickbiterisk.dashboard_assets import write_dashboard_assets
+from tickbiterisk.etl.acs_exposure import (
+    ACS_TABLE_BASED_SUMMARY_FILE_CITATION_URL,
+    AcsExposureInputError,
+    AcsExposureSourceUrls,
+    build_acs_exposure_source_urls,
+    build_midatlantic_acs_exposure_from_paths,
+    materialize_acs_exposure_sources,
+)
+from tickbiterisk.etl.acs_exposure_build import write_acs_exposure_output
 from tickbiterisk.etl.acquisition_provenance import (
     AcquisitionProvenanceRecord,
     write_acquisition_provenance_manifest,
@@ -1197,6 +1206,76 @@ def regional_demographics(
     typer.echo(
         f"Wrote {len(rows)} Mid-Atlantic county-year demographic row(s) to {output}"
     )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
+@etl_app.command("acs-exposure")
+def acs_exposure(
+    year: int = typer.Option(
+        2024,
+        help="ACS 5-year table-based summary file vintage year.",
+    ),
+    raw_dir: Path = typer.Option(
+        Path("data/raw/acs-exposure"),
+        help="Ignored raw-data directory for ACS exposure source files.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/acs-exposure"),
+        help="Output directory for ACS exposure artifacts.",
+    ),
+    download_if_missing: bool = typer.Option(
+        True,
+        help="Download public ACS source files if they are missing from --raw-dir.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        help="Print planned ACS source URLs without fetching data.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for source acquisition provenance.",
+    ),
+) -> None:
+    try:
+        source_urls = build_acs_exposure_source_urls(year=year)
+    except AcsExposureInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if dry_run:
+        typer.echo(f"Planned ACS exposure source URL(s): {len(source_urls.all_urls)}")
+        for url in source_urls.all_urls:
+            typer.echo(url)
+        return
+
+    try:
+        source_paths = materialize_acs_exposure_sources(
+            raw_dir,
+            year=year,
+            download_if_missing=download_if_missing,
+        )
+        rows = build_midatlantic_acs_exposure_from_paths(
+            source_paths,
+            source_urls=source_urls,
+        )
+    except AcsExposureInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    output = write_acs_exposure_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _acs_exposure_provenance_records(
+            source_urls=source_urls,
+            source_paths=source_paths,
+            output_path=output,
+            output_dir=output_dir,
+            raw_dir=raw_dir,
+            manifest_path=resolved_manifest_path,
+            row_count=len(rows),
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(f"Wrote {len(rows)} ACS exposure row(s) to {output}")
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
@@ -4834,6 +4913,100 @@ def _regional_demographics_url_metadata(url: str) -> dict[str, str]:
         ),
         "parser_method": "parse_census_pep_2024_age_sex",
     }
+
+
+def _acs_exposure_provenance_records(
+    *,
+    source_urls: AcsExposureSourceUrls,
+    source_paths: dict[str, Path],
+    output_path: Path,
+    output_dir: Path,
+    raw_dir: Path,
+    manifest_path: Path,
+    row_count: int,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "acs-exposure",
+            "--year",
+            str(source_urls.year),
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+    source_items = [
+        (
+            "census_acs5_{year}_geography",
+            "ACS 5-year table-based summary file geography table",
+            source_urls.geography_url,
+            source_paths["geography"],
+            "parse_acs_geography",
+        ),
+        *[
+            (
+                f"census_acs5_{{year}}_{table}",
+                f"ACS 5-year detailed table {table.upper()}",
+                source_urls.table_urls[table],
+                source_paths[table],
+                f"parse_acs_table:{table}",
+            )
+            for table in ["b01001", "b25024", "b25003"]
+        ],
+        (
+            "census_gazetteer_2024_counties_national",
+            "Census Gazetteer 2024 national counties",
+            source_urls.gazetteer_url,
+            source_paths["gazetteer"],
+            "parse_gazetteer_land_area",
+        ),
+    ]
+    return [
+        AcquisitionProvenanceRecord(
+            source_id=source_id_template.format(year=source_urls.year),
+            source_name=source_name,
+            source_url=url,
+            citation_url=ACS_TABLE_BASED_SUMMARY_FILE_CITATION_URL,
+            acquisition_command=command,
+            acquisition_procedure=(
+                "Download or read keyless public ACS 5-year table-based summary "
+                "files, filter Mid-Atlantic county rows, combine age, housing "
+                "structure, tenure, and Census Gazetteer land-area context."
+            ),
+            request_method="GET_OR_LOCAL_FILE_READ",
+            request_description=(
+                f"ACS exposure source file {source_path.name} for vintage "
+                f"{source_urls.year}."
+            ),
+            derived_artifact_paths=[source_path, output_path],
+            derived_artifact_path_labels=[source_path.name, output_path.name],
+            row_count=row_count,
+            parser_method=parser_method,
+            extraction_quality="accepted",
+            access_notes=(
+                "Public Census static file; no API key required. Raw ACS "
+                "summary files stay in ignored local storage."
+            ),
+            modeling_caveats=(
+                "ACS 5-year rolling survey context only; residential form and "
+                "density are exposure proxies, not tick-bite counts, direct "
+                "exposure evidence, Lyme incidence, disease truth, and not "
+                "public-default model inputs."
+            ),
+        )
+        for (
+            source_id_template,
+            source_name,
+            url,
+            source_path,
+            parser_method,
+        ) in source_items
+    ]
 
 
 def _census_url_state_fips(url: str) -> str:

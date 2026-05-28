@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, NSSP coverage, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, NSSP coverage, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -78,6 +78,18 @@ artifacts.
      `acquisition_provenance.csv`.
    - These rows are age-structure context for human-exposure research only;
      they are not tick-bite counts, direct exposure evidence, or Lyme outcomes.
+
+1c-3. `tickbiterisk etl acs-exposure`
+   - Pulls or reads cached keyless ACS 5-year table-based summary files for
+     `B01001`, `B25024`, `B25003`, and `Geos{year}5YR.txt`, plus Census
+     Gazetteer county land area.
+   - Writes `midatlantic_acs_exposure_county_year.csv` and
+     `acquisition_provenance.csv`.
+   - These rows are rolling-survey residential-form, tenure, age, and density
+     exposure-context proxies only. They are not tick-bite counts, direct
+     exposure observations, Lyme outcomes, or public-default model inputs.
+   - Raw ACS files are large and should remain cached under ignored raw storage
+     after acquisition.
 
 1d. `tickbiterisk etl regional-lyme-outcomes`
    - Reshapes the CDC county dashboard export into DE, DC, MD, PA, VA, and WV
@@ -347,6 +359,9 @@ probability or a treatment recommendation.
   migration or exposure.
 - Prior-year population growth is a demographic/contact-pressure proxy derived
   from Census denominators, not proof of exposure or new construction.
+- ACS residential-form and density fields are rolling 5-year survey context,
+  not annual observed exposure, tick-bite counts, Lyme outcomes, or disease
+  truth.
 - The ecological pressure composite is a transparent fixed-scale average of
   timing-safe component proxies; component columns stay visible and should be
   reviewed alongside the index.
