@@ -62,6 +62,17 @@ from tickbiterisk.etl.enviroatlas import (
     parse_enviroatlas_county_habitat,
 )
 from tickbiterisk.etl.enviroatlas_build import write_enviroatlas_county_habitat_output
+from tickbiterisk.etl.enso import (
+    NOAA_CPC_ONI_URL,
+    OniInputError,
+    build_oni_model_year_features,
+    fetch_oni_text,
+    parse_oni_ascii_text,
+)
+from tickbiterisk.etl.enso_build import (
+    write_oni_model_year_output,
+    write_oni_season_output,
+)
 from tickbiterisk.etl.lyme import (
     parse_cdc_county_dashboard,
     parse_cdc_lyme_geodata,
@@ -702,6 +713,34 @@ def usdm_drought(
     )
 
 
+@etl_app.command("enso-oni")
+def enso_oni(
+    source_url: str = typer.Option(
+        NOAA_CPC_ONI_URL,
+        help="NOAA CPC ONI ASCII table URL.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/enso"),
+        help="Output directory for ENSO ONI ETL artifacts.",
+    ),
+) -> None:
+    try:
+        rows = parse_oni_ascii_text(
+            fetch_oni_text(source_url),
+            source_url=source_url,
+        )
+    except OniInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    season_output = write_oni_season_output(rows, output_dir)
+    model_year_rows = build_oni_model_year_features(rows)
+    model_year_output = write_oni_model_year_output(model_year_rows, output_dir)
+    typer.echo(f"Wrote {len(rows)} NOAA CPC ONI season row(s) to {season_output}")
+    typer.echo(
+        f"Wrote {len(model_year_rows)} NOAA CPC ONI model-year feature row(s) "
+        f"to {model_year_output}"
+    )
+
+
 @etl_app.command("enviroatlas-habitat")
 def enviroatlas_habitat(
     output_dir: Path = typer.Option(
@@ -863,6 +902,10 @@ def model_features(
         Path("build/etl/enviroatlas/enviroatlas_county_habitat.csv"),
         help="Optional EPA EnviroAtlas static county habitat feature CSV.",
     ),
+    enso_oni_path: Path = typer.Option(
+        Path("build/etl/enso/noaa_cpc_oni_model_year_features.csv"),
+        help="Optional NOAA CPC ONI prior-year global climate feature CSV.",
+    ),
     tick_status_path: Path | None = typer.Option(
         None,
         help=(
@@ -903,6 +946,7 @@ def model_features(
             if enviroatlas_habitat_path.exists()
             else None
         ),
+        enso_oni_path=enso_oni_path if enso_oni_path.exists() else None,
         tick_status_path=tick_status_path,
     )
     output = write_model_feature_matrix_output(rows, output_dir)

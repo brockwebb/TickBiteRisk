@@ -22,6 +22,7 @@ boundary clearly allow redistribution.
 | `nlcd_mrlc` | MRLC/NLCD land cover files | Raster/county summary candidate | Habitat and forest/edge proxy source | acquired_needs_feature_depth |
 | `census_bps` | Census Building Permits Survey county files | County-year | Contact/land-use pressure proxy | active_etl |
 | `maryland_mast_reports` | Maryland DNR mast/acorn reports | Region/report | Ecological food pulse candidate | acquired_low_confidence |
+| `noaa_cpc_oni` | NOAA CPC Oceanic Nino Index | Global seasonal climate index | Lagged ENSO phase overtone candidate; materialized as complete prior-year model features, not joined into public model yet | active_etl_candidate_feature |
 | `nssp_coverage` | NSSP coverage map table | County/status | Feasibility check for future ED tick-bite feed | acquired_not_model_input |
 | `capc_dog_serology` | CAPC canine Lyme data | County/month | Possible veterinary sentinel source | not_redistributed_license_sensitive |
 
@@ -36,8 +37,8 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `usda_fia_fiadb` | USDA Forest Service FIA / FIADB / EVALIDator | Forest inventory estimate | Oak-hickory and forest-composition context that may be more biologically meaningful than generic forest percent | source_manifested_needs_feature_extraction |
 | `maryland_dnr_archery_hunter_survey` | Maryland DNR Archery Hunter / Bowhunter Survey | Hunter report / county-season if extractable | Host and wildlife observation proxy, potentially lighter than raster GIS if report tables are defensible | source_manifested_needs_review |
 | `usda_nass_maryland_cdl` | USDA NASS Cropland Data Layer / CropScape | Raster/county summary candidate | Annual crop, pasture, hay, and open-land change context around land-use and edge habitat | source_manifested_needs_feature_extraction |
-| `noaa_cpc_enso_index` | NOAA CPC ENSO index, ONI/RONI | Global seasonal climate index | El Nino / La Nina phase as a lagged climate-regime overtone, likely prior winter/spring only | candidate_needs_etl |
-| `noaa_psl_mei_v2` | NOAA PSL Multivariate ENSO Index v2 | Global bimonthly climate index | Ocean-atmosphere ENSO strength companion to ONI/RONI, useful only as lagged broad climate context | candidate_needs_etl |
+| `noaa_cpc_enso_index` | NOAA CPC ENSO index, ONI/RONI | Global seasonal climate index | ONI is now materialized; RONI remains a candidate companion index to test as a lagged climate-regime overtone | oni_active_roni_candidate_needs_etl |
+| `noaa_psl_mei_v2` | NOAA PSL Multivariate ENSO Index v2 | Global monthly climate index | Ocean-atmosphere ENSO strength companion to ONI/RONI, useful only as lagged broad climate context | candidate_needs_etl |
 | `cdc_tick_bite_tracker` | CDC Tick Bite Data Tracker | HHS region/week dashboard | Activity overlay if backing data becomes available; current public dashboard grain is not county-year | candidate_missing_bulk_data |
 | `inaturalist_tick_observations` | iNaturalist tick observations | Point observation | Experimental tick-observation activity proxy if normalized by observer effort and license terms | candidate_bias_sensitive |
 | `gbif_tick_occurrences` | GBIF tick occurrence records | Point occurrence | Comparator for public tick observations and museum/citizen-science records, with per-record license review | candidate_bias_sensitive |
@@ -56,6 +57,8 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `model_design_matrix_county_year.csv` | `tickbiterisk etl model-design-matrix` | Numeric feature matrix |
 | `model_design_matrix_schema.json` | `tickbiterisk etl model-design-matrix` | Design-matrix schema sidecar |
 | `model_comparison_predictions.csv` | `tickbiterisk etl model-compare` | Rolling-origin predictions from candidate model branches |
+| `noaa_cpc_oni_seasons.csv` | `tickbiterisk etl enso-oni` | NOAA CPC ONI seasonal anomalies and El Nino / La Nina phase labels |
+| `noaa_cpc_oni_model_year_features.csv` | `tickbiterisk etl enso-oni` | Complete prior-year ONI model-year climate context features |
 | `seasonality_baseline.csv` | `tickbiterisk etl seasonality-baseline` | CDC weekly/monthly Lyme onset share baseline |
 | `county_week_seasonal_risk_baseline.csv` | `tickbiterisk etl county-week-risk` | Product-shaped county-week relative risk rows |
 | `md_county_risk_weekly.json` | `tickbiterisk risk export-static` | Public dashboard score payload |
@@ -82,11 +85,12 @@ feature ideas to test in time-aware backtests before any public model claim.
   review exists.
 - Land-cover features need deeper county summarization before they should drive
   public model claims.
-- ENSO and composite ecological-pressure features are not implemented yet. If
-  tested, they should use timing-safe lags and preserve component values rather
-  than hiding source uncertainty inside a single score.
+- ONI ETL and model joins are implemented as lagged global climate context
+  artifacts. The first time-aware backtest did not improve the selected public
+  branch, so RONI, MEI.v2, and composite ecological-pressure features still
+  need separate evidence before any public model claim.
 - Open-Meteo recent backfill is local under ignored `build/etl/open-meteo`.
   It currently covers 2020-2023 for all 24 Maryland jurisdictions and is a
   model-feature candidate, not the selected public weather source.
 
-Last updated: 2026-05-27.
+Last updated: 2026-05-28.

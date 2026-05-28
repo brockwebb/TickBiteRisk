@@ -37,6 +37,25 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
         ],
     )
     weather = _write_csv(tmp_path / "weather.csv", [_weather_row()])
+    enso = _write_csv(
+        tmp_path / "enso.csv",
+        [
+            {
+                "model_year": "2022",
+                "oni_prior_year_season_count": "12",
+                "oni_prior_year_mean_anomaly_c": "-0.42",
+                "oni_prior_year_max_anomaly_c": "0.1",
+                "oni_prior_year_min_anomaly_c": "-1.2",
+                "oni_prior_year_el_nino_season_count": "0",
+                "oni_prior_year_la_nina_season_count": "5",
+                "source_ids": "noaa_cpc_oni",
+                "source_url_hashes": "hash",
+                "feature_quality_flags": (
+                    "global_climate_index,not_maryland_specific,prior_year_signal"
+                ),
+            }
+        ],
+    )
     tick_status = _write_csv(
         tmp_path / "tick_status.csv",
         [
@@ -82,6 +101,8 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
             str(tmp_path / "missing-drought.csv"),
             "--enviroatlas-habitat-path",
             str(tmp_path / "missing-habitat.csv"),
+            "--enso-oni-path",
+            str(enso),
             "--tick-status-path",
             str(tick_status),
             "--output-dir",
@@ -98,10 +119,12 @@ def test_model_features_command_writes_feature_matrix(tmp_path: Path) -> None:
         rows = list(csv.DictReader(handle))
     assert rows[0]["county_fips"] == "24003"
     assert rows[0]["lyme_incidence_per_100k"] == "2.5"
+    assert rows[0]["oni_prior_year_mean_anomaly_c"] == "-0.42"
     assert rows[0]["ixodes_scapularis_status"] == "established"
     assert rows[0]["borrelia_burgdorferi_status"] == "present"
     assert rows[0]["model_feature_quality_flags"] == (
         "missing_contact_pressure,missing_deer_harvest_prior_season,"
+        "global_climate_index,not_maryland_specific,prior_year_signal,"
         "current_status_retrospective_proxy,status_only_not_prevalence,"
         "no_records_not_absence"
     )

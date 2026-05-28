@@ -459,6 +459,25 @@ def test_build_model_feature_matrix_joins_drought_habitat_and_construction_lags(
             }
         ],
     )
+    enso = _write_csv(
+        tmp_path / "enso.csv",
+        [
+            {
+                "model_year": "2022",
+                "oni_prior_year_season_count": "12",
+                "oni_prior_year_mean_anomaly_c": "-0.42",
+                "oni_prior_year_max_anomaly_c": "0.1",
+                "oni_prior_year_min_anomaly_c": "-1.2",
+                "oni_prior_year_el_nino_season_count": "0",
+                "oni_prior_year_la_nina_season_count": "5",
+                "source_ids": "noaa_cpc_oni",
+                "source_url_hashes": "hash",
+                "feature_quality_flags": (
+                    "global_climate_index,not_maryland_specific,prior_year_signal"
+                ),
+            }
+        ],
+    )
 
     rows = build_model_feature_matrix(
         lyme_outcomes_path=lyme,
@@ -467,6 +486,7 @@ def test_build_model_feature_matrix_joins_drought_habitat_and_construction_lags(
         contact_pressure_path=contact,
         usdm_drought_path=drought,
         enviroatlas_habitat_path=habitat,
+        enso_oni_path=enso,
     )
 
     assert len(rows) == 1
@@ -488,11 +508,19 @@ def test_build_model_feature_matrix_joins_drought_habitat_and_construction_lags(
     assert row.impervious_pct == 11.8
     assert row.riparian_natural_45m_pct == 75.0
     assert row.natural_land_cover_index == 48.4
+    assert row.oni_prior_year_season_count == 12
+    assert row.oni_prior_year_mean_anomaly_c == -0.42
+    assert row.oni_prior_year_min_anomaly_c == -1.2
+    assert row.oni_prior_year_la_nina_season_count == 5
+    assert row.enso_source_ids == "noaa_cpc_oni"
     flags = row.model_feature_quality_flags.split(",")
     assert "construction_proxy_only" in flags
     assert "missing_construction_lag" in flags
     assert "drought_monitor_retro_observed" in flags
     assert "static_enviroatlas_2011" in flags
+    assert "global_climate_index" in flags
+    assert "not_maryland_specific" in flags
+    assert "prior_year_signal" in flags
 
 
 def test_build_model_feature_matrix_flags_missing_drought_and_habitat_when_enabled(
@@ -544,6 +572,25 @@ def test_build_model_feature_matrix_flags_missing_drought_and_habitat_when_enabl
             }
         ],
     )
+    enso = _write_csv(
+        tmp_path / "enso.csv",
+        [
+            {
+                "model_year": "2021",
+                "oni_prior_year_season_count": "12",
+                "oni_prior_year_mean_anomaly_c": "0.2",
+                "oni_prior_year_max_anomaly_c": "1.0",
+                "oni_prior_year_min_anomaly_c": "-0.1",
+                "oni_prior_year_el_nino_season_count": "2",
+                "oni_prior_year_la_nina_season_count": "0",
+                "source_ids": "noaa_cpc_oni",
+                "source_url_hashes": "hash",
+                "feature_quality_flags": (
+                    "global_climate_index,not_maryland_specific,prior_year_signal"
+                ),
+            }
+        ],
+    )
 
     rows = build_model_feature_matrix(
         lyme_outcomes_path=lyme,
@@ -551,6 +598,7 @@ def test_build_model_feature_matrix_flags_missing_drought_and_habitat_when_enabl
         weather_weekly_path=weather,
         usdm_drought_path=drought,
         enviroatlas_habitat_path=habitat,
+        enso_oni_path=enso,
     )
 
     assert rows[0].usdm_dsci_mean is None
@@ -560,6 +608,7 @@ def test_build_model_feature_matrix_flags_missing_drought_and_habitat_when_enabl
     assert "missing_usdm_drought" in flags
     assert "missing_usdm_drought_prior_year" in flags
     assert "missing_enviroatlas_habitat" in flags
+    assert "missing_enso_oni_prior_year" in flags
 
 
 def test_build_model_feature_matrix_flags_missing_tick_status_only_when_opted_in(

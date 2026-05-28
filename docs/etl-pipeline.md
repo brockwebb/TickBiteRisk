@@ -72,6 +72,14 @@ candidates until backtesting shows they improve the public score.
     - Pulls EPA EnviroAtlas county landscape habitat fields for Maryland.
     - Writes `enviroatlas_county_habitat.csv`.
 
+11a. `tickbiterisk etl enso-oni`
+    - Pulls the NOAA CPC ONI ASCII table as a global ENSO climate context
+      source.
+    - Writes `noaa_cpc_oni_seasons.csv` and
+      `noaa_cpc_oni_model_year_features.csv`.
+    - Model-year rows use only complete 12-season prior years and remain
+      optional; ONI is not Maryland-specific and is not a public-default input.
+
 12. `tickbiterisk etl seasonality-baseline`
     - Normalizes CDC Lyme onset exports by month and MMWR week.
     - Writes `seasonality_observations.csv` and `seasonality_baseline.csv`.
@@ -79,8 +87,8 @@ candidates until backtesting shows they improve the public score.
 13. `tickbiterisk etl model-features`
     - Joins Lyme outcomes, population, weather, deer, contact-pressure,
       construction lags, prior-year mast/acorn, USDM drought, EnviroAtlas
-      habitat, and optional surveillance features into the county-year feature
-      matrix.
+      habitat, complete prior-year ONI, and optional surveillance features into
+      the county-year feature matrix.
     - Writes `model_features_county_year.csv`.
 
 14. `tickbiterisk etl county-adjacency`
@@ -149,4 +157,4 @@ probability or a treatment recommendation.
 - Spatial lag features use prior-year neighbor outcomes only; same-year
   neighbor outcomes are not forecast-safe.
 
-Last updated: 2026-05-27.
+Last updated: 2026-05-28.

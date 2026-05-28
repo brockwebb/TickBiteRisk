@@ -118,6 +118,15 @@ MODEL_FEATURE_COLUMNS = [
     "natural_land_cover_index",
     "enviroatlas_source_url_hash",
     "enviroatlas_feature_quality_flags",
+    "oni_prior_year_season_count",
+    "oni_prior_year_mean_anomaly_c",
+    "oni_prior_year_max_anomaly_c",
+    "oni_prior_year_min_anomaly_c",
+    "oni_prior_year_el_nino_season_count",
+    "oni_prior_year_la_nina_season_count",
+    "enso_source_ids",
+    "enso_source_url_hashes",
+    "enso_feature_quality_flags",
     "model_feature_quality_flags",
 ]
 

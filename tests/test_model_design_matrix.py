@@ -79,12 +79,16 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_impervious_pct"] == "9.7"
     assert mast_row["feature_units_authorized_per_sqmi_prior_year"] == "1.5"
     assert mast_row["feature_units_authorized_per_100k_trailing_3yr_mean"] == "30.0"
+    assert mast_row["feature_oni_prior_year_mean_anomaly_c"] == "-0.42"
+    assert mast_row["feature_oni_prior_year_la_nina_season_count"] == "5.0"
     assert mast_row["feature_missing_usdm_dsci_mean"] == "0"
     assert mast_row["feature_missing_forest_pct"] == "0"
     assert mast_row["feature_missing_units_authorized_per_sqmi_prior_year"] == "0"
+    assert mast_row["feature_missing_oni_prior_year_mean_anomaly_c"] == "0"
     assert "feature_usdm_dsci_mean" in result.schema.feature_columns
     assert "feature_usdm_prior_year_dsci_mean" in result.schema.feature_columns
     assert "feature_forest_pct" in result.schema.feature_columns
+    assert "feature_oni_prior_year_mean_anomaly_c" in result.schema.feature_columns
     assert (
         "feature_units_authorized_per_sqmi_prior_year"
         in result.schema.feature_columns
@@ -101,6 +105,8 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert missing_new_row["feature_missing_usdm_prior_year_dsci_mean"] == "1"
     assert missing_new_row["feature_forest_pct"] == "0.0"
     assert missing_new_row["feature_missing_forest_pct"] == "1"
+    assert missing_new_row["feature_oni_prior_year_mean_anomaly_c"] == "0.0"
+    assert missing_new_row["feature_missing_oni_prior_year_mean_anomaly_c"] == "1"
 
 
 def test_write_model_design_matrix_outputs_writes_csv_and_schema_json(
@@ -384,6 +390,31 @@ def _write_feature_matrix(path: Path) -> Path:
                     ),
                     "enviroatlas_feature_quality_flags": (
                         "static_enviroatlas_2011" if has_new_features else ""
+                    ),
+                    "oni_prior_year_season_count": (
+                        "12" if has_new_features else ""
+                    ),
+                    "oni_prior_year_mean_anomaly_c": (
+                        "-0.42" if has_new_features else ""
+                    ),
+                    "oni_prior_year_max_anomaly_c": (
+                        "0.1" if has_new_features else ""
+                    ),
+                    "oni_prior_year_min_anomaly_c": (
+                        "-1.2" if has_new_features else ""
+                    ),
+                    "oni_prior_year_el_nino_season_count": (
+                        "0" if has_new_features else ""
+                    ),
+                    "oni_prior_year_la_nina_season_count": (
+                        "5" if has_new_features else ""
+                    ),
+                    "enso_source_ids": "noaa_cpc_oni" if has_new_features else "",
+                    "enso_source_url_hashes": "hash" if has_new_features else "",
+                    "enso_feature_quality_flags": (
+                        "global_climate_index,not_maryland_specific,prior_year_signal"
+                        if has_new_features
+                        else ""
                     ),
                     "model_feature_quality_flags": (
                         "current_status_retrospective_proxy,no_records_not_absence"

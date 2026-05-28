@@ -97,6 +97,11 @@ NUMERIC_SOURCE_COLUMNS = [
     "riparian_forest_45m_pct",
     "riparian_forest_woody_wetland_45m_pct",
     "natural_land_cover_index",
+    "oni_prior_year_mean_anomaly_c",
+    "oni_prior_year_max_anomaly_c",
+    "oni_prior_year_min_anomaly_c",
+    "oni_prior_year_el_nino_season_count",
+    "oni_prior_year_la_nina_season_count",
 ]
 OPTIONAL_NUMERIC_COLUMNS = [
     "residential_units_authorized",
@@ -146,6 +151,11 @@ OPTIONAL_NUMERIC_COLUMNS = [
     "riparian_forest_45m_pct",
     "riparian_forest_woody_wetland_45m_pct",
     "natural_land_cover_index",
+    "oni_prior_year_mean_anomaly_c",
+    "oni_prior_year_max_anomaly_c",
+    "oni_prior_year_min_anomaly_c",
+    "oni_prior_year_el_nino_season_count",
+    "oni_prior_year_la_nina_season_count",
 ]
 SPATIAL_NEIGHBOR_FEATURE_COLUMNS = [
     "feature_neighbor_prior_year_lyme_incidence_mean",

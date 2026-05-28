@@ -191,6 +191,18 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     assert model_compare._is_forecast_ecology_feature_column(
         "feature_missing_usdm_prior_year_dsci_mean"
     )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_oni_prior_year_mean_anomaly_c"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_oni_prior_year_la_nina_season_count"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_missing_oni_prior_year_mean_anomaly_c"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_oni_prior_year_mean_anomaly_c"
+    )
     assert not model_compare._is_forecast_safe_feature_column(
         "feature_usdm_prior_year_dsci_mean"
     )
