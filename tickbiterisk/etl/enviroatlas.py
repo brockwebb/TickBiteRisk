@@ -11,6 +11,7 @@ ENVIROATLAS_HABITAT_QUERY_BASE_URL = (
     "https://enviroatlas.epa.gov/arcgis/rest/services/"
     "Other/CMA_Landscape/MapServer/1"
 )
+EPA_ENVIROATLAS_DATA_DOWNLOAD_URL = "https://www.epa.gov/enviroatlas/data-download"
 ENVIROATLAS_HABITAT_FIELDS = [
     "GEOID",
     "NAMELSAD",

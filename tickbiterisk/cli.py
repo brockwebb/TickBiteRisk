@@ -2,13 +2,19 @@ from __future__ import annotations
 
 import csv
 import json
+import shlex
 from dataclasses import asdict
 from datetime import date
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import typer
 
 from tickbiterisk.dashboard_assets import write_dashboard_assets
+from tickbiterisk.etl.acquisition_provenance import (
+    AcquisitionProvenanceRecord,
+    write_acquisition_provenance_manifest,
+)
 from tickbiterisk.etl.build import write_reconciled_lyme_outputs
 from tickbiterisk.etl.building_permits import (
     build_census_bps_county_annual_url,
@@ -59,6 +65,7 @@ from tickbiterisk.etl.ecology_sources import (
     MARYLAND_DNR_MAST_REPORT_URLS,
 )
 from tickbiterisk.etl.enviroatlas import (
+    EPA_ENVIROATLAS_DATA_DOWNLOAD_URL,
     build_enviroatlas_maryland_habitat_query_url,
     fetch_enviroatlas_json,
     parse_enviroatlas_county_habitat,
@@ -747,6 +754,10 @@ def enso_oni(
         Path("build/etl/enso"),
         help="Output directory for ENSO ONI ETL artifacts.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     try:
         rows = parse_oni_ascii_text(
@@ -758,11 +769,53 @@ def enso_oni(
     season_output = write_oni_season_output(rows, output_dir)
     model_year_rows = build_oni_model_year_features(rows)
     model_year_output = write_oni_model_year_output(model_year_rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_source_url = _sanitize_provenance_url(source_url)
+    manifest_output = _write_single_request_provenance_manifest(
+        manifest_path=resolved_manifest_path,
+        record=AcquisitionProvenanceRecord(
+            source_id="noaa_cpc_oni",
+            source_name="NOAA CPC Oceanic Nino Index",
+            source_url=provenance_source_url,
+            citation_url=provenance_source_url,
+            acquisition_command=_format_cli_command(
+                [
+                    "tickbiterisk",
+                    "etl",
+                    "enso-oni",
+                    "--source-url",
+                    provenance_source_url,
+                    "--output-dir",
+                    str(output_dir),
+                    "--provenance-manifest-path",
+                    str(resolved_manifest_path),
+                ]
+            ),
+            acquisition_procedure=(
+                "Fetch the official NOAA CPC ONI ASCII table and parse seasonal "
+                "rows into lagged model-year ENSO features."
+            ),
+            request_method="GET",
+            request_description="NOAA CPC ONI ASCII table request.",
+            derived_artifact_paths=[season_output, model_year_output],
+            row_count=len(rows),
+            parser_method="parse_oni_ascii_text",
+            extraction_quality="accepted",
+            access_notes="Public NOAA CPC endpoint; no API key required.",
+            modeling_caveats=(
+                "Global climate context only; not Maryland-specific and not a "
+                "public-default input without model evidence."
+            ),
+        ),
+    )
     typer.echo(f"Wrote {len(rows)} NOAA CPC ONI season row(s) to {season_output}")
     typer.echo(
         f"Wrote {len(model_year_rows)} NOAA CPC ONI model-year feature row(s) "
         f"to {model_year_output}"
     )
+    typer.echo(f"Wrote acquisition provenance manifest to {manifest_output}")
 
 
 @etl_app.command("enviroatlas-habitat")
@@ -771,12 +824,55 @@ def enviroatlas_habitat(
         Path("build/etl/enviroatlas"),
         help="Output directory for EnviroAtlas habitat ETL artifacts.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     source_url = build_enviroatlas_maryland_habitat_query_url()
     response_json = fetch_enviroatlas_json(source_url)
     rows = parse_enviroatlas_county_habitat(response_json, source_url=source_url)
     output = write_enviroatlas_county_habitat_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    manifest_output = _write_single_request_provenance_manifest(
+        manifest_path=resolved_manifest_path,
+        record=AcquisitionProvenanceRecord(
+            source_id="epa_enviroatlas_habitat",
+            source_name="EPA EnviroAtlas county landscape layer",
+            source_url=source_url,
+            citation_url=EPA_ENVIROATLAS_DATA_DOWNLOAD_URL,
+            acquisition_command=_format_cli_command(
+                [
+                    "tickbiterisk",
+                    "etl",
+                    "enviroatlas-habitat",
+                    "--output-dir",
+                    str(output_dir),
+                    "--provenance-manifest-path",
+                    str(resolved_manifest_path),
+                ]
+            ),
+            acquisition_procedure=(
+                "Fetch the EPA EnviroAtlas ArcGIS query for Maryland county "
+                "landscape attributes and normalize accepted county records."
+            ),
+            request_method="GET",
+            request_description="EPA EnviroAtlas ArcGIS county habitat query.",
+            derived_artifact_paths=[output],
+            row_count=len(rows),
+            parser_method="parse_enviroatlas_county_habitat",
+            extraction_quality="accepted",
+            access_notes="Public EPA ArcGIS endpoint; no API key required.",
+            modeling_caveats=(
+                "Static county context; not annual land-cover change and not "
+                "causal exposure evidence by itself."
+            ),
+        ),
+    )
     typer.echo(f"Wrote {len(rows)} EnviroAtlas county habitat row(s) to {output}")
+    typer.echo(f"Wrote acquisition provenance manifest to {manifest_output}")
 
 
 @etl_app.command("tick-status")
@@ -1998,6 +2094,52 @@ def _parse_iso_date(value: str, option_name: str) -> date:
         raise typer.BadParameter(
             f"{option_name} must use YYYY-MM-DD format"
         ) from exc
+
+
+def _write_single_request_provenance_manifest(
+    *,
+    manifest_path: Path,
+    record: AcquisitionProvenanceRecord,
+) -> Path:
+    return write_acquisition_provenance_manifest(
+        [record],
+        manifest_path=manifest_path,
+    )
+
+
+def _format_cli_command(parts: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in parts)
+
+
+def _sanitize_provenance_url(url: str) -> str:
+    secret_key_terms = ("auth", "key", "password", "secret", "token")
+    parsed = urlsplit(url)
+    if not parsed.query:
+        return url
+    sanitized_query = urlencode(
+        [
+            (
+                key,
+                "<redacted>"
+                if any(term in _normalized_query_key(key) for term in secret_key_terms)
+                else value,
+            )
+            for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        ]
+    )
+    return urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            sanitized_query,
+            parsed.fragment,
+        )
+    )
+
+
+def _normalized_query_key(key: str) -> str:
+    return "".join(character for character in key.lower() if character.isalnum())
 
 
 def _census_population_urls(

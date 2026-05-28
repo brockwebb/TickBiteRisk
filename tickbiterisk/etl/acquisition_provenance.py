@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+import csv
+import hashlib
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+ACQUISITION_PROVENANCE_COLUMNS = [
+    "source_id",
+    "source_name",
+    "source_url",
+    "citation_url",
+    "acquisition_command",
+    "acquisition_procedure",
+    "request_method",
+    "request_description",
+    "derived_artifact_paths",
+    "derived_artifact_sha256s",
+    "row_count",
+    "retrieved_at",
+    "parser_method",
+    "extraction_quality",
+    "access_notes",
+    "modeling_caveats",
+]
+
+
+@dataclass(frozen=True)
+class AcquisitionProvenanceRecord:
+    source_id: str
+    source_name: str
+    source_url: str
+    citation_url: str
+    acquisition_command: str
+    acquisition_procedure: str
+    request_method: str
+    request_description: str
+    derived_artifact_paths: list[Path] | None = None
+    row_count: int = 0
+    parser_method: str = "not_recorded"
+    extraction_quality: str = "not_recorded"
+    access_notes: str = ""
+    modeling_caveats: str = ""
+
+
+def write_acquisition_provenance_manifest(
+    records: list[AcquisitionProvenanceRecord],
+    *,
+    manifest_path: Path,
+    retrieved_at: str | None = None,
+) -> Path:
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    timestamp = retrieved_at or datetime.now(timezone.utc).isoformat()
+    rows = [_record_to_row(record, timestamp) for record in records]
+    with manifest_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=ACQUISITION_PROVENANCE_COLUMNS)
+        writer.writeheader()
+        writer.writerows(
+            sorted(rows, key=lambda row: (row["source_id"], row["source_url"]))
+        )
+    return manifest_path
+
+
+def _record_to_row(
+    record: AcquisitionProvenanceRecord,
+    retrieved_at: str,
+) -> dict[str, object]:
+    artifact_paths = record.derived_artifact_paths or []
+    return {
+        "source_id": record.source_id,
+        "source_name": record.source_name,
+        "source_url": record.source_url,
+        "citation_url": record.citation_url,
+        "acquisition_command": record.acquisition_command,
+        "acquisition_procedure": record.acquisition_procedure,
+        "request_method": record.request_method,
+        "request_description": record.request_description,
+        "derived_artifact_paths": ";".join(str(path) for path in artifact_paths),
+        "derived_artifact_sha256s": ";".join(
+            f"{path.name}={_compute_sha256(path)}" for path in artifact_paths
+        ),
+        "row_count": record.row_count,
+        "retrieved_at": retrieved_at,
+        "parser_method": record.parser_method,
+        "extraction_quality": record.extraction_quality,
+        "access_notes": record.access_notes,
+        "modeling_caveats": record.modeling_caveats,
+    }
+
+
+def _compute_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
