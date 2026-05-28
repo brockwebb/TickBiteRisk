@@ -1,3 +1,5 @@
+import csv
+
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
@@ -29,6 +31,7 @@ def test_census_population_dry_run_prints_sanitized_urls(tmp_path, monkeypatch) 
     assert "co-est2025-alldata.csv" in result.stdout
     assert "secret-key" not in result.stdout
     assert not (tmp_path / "county_population_year.csv").exists()
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
 
 
 def test_census_population_latest_only_dry_run_uses_static_csv_without_api_key(
@@ -54,6 +57,7 @@ def test_census_population_latest_only_dry_run_uses_static_csv_without_api_key(
     assert "co-est2025-alldata.csv" in result.stdout
     assert "secret-key" not in result.stdout
     assert "api.census.gov" not in result.stdout
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
 
 
 def test_census_population_command_writes_population_output(tmp_path, monkeypatch) -> None:
@@ -93,6 +97,21 @@ def test_census_population_command_writes_population_output(tmp_path, monkeypatc
     assert result.exit_code == 0
     assert "Wrote 1 county-year population row(s)" in result.stdout
     assert (tmp_path / "county_population_year.csv").exists()
+    manifest_path = tmp_path / "acquisition_provenance.csv"
+    assert manifest_path.exists()
+    with manifest_path.open(encoding="utf-8", newline="") as handle:
+        manifest_rows = list(csv.DictReader(handle))
+    assert len(manifest_rows) == 8
+    manifest_text = manifest_path.read_text(encoding="utf-8")
+    assert "secret-key" not in manifest_text
+    assert "key=%3Credacted%3E" in manifest_text
+    assert all(row["source_id"].startswith("census_population_") for row in manifest_rows)
+    assert all(row["request_method"] == "GET" for row in manifest_rows)
+    assert all(row["citation_url"].startswith("https://www.census.gov/") for row in manifest_rows)
+    assert all("county_population_year.csv=" in row["derived_artifact_sha256s"] for row in manifest_rows)
+    assert any(row["row_count"] == "1" for row in manifest_rows)
+    assert all("tickbiterisk etl census-population" in row["acquisition_command"] for row in manifest_rows)
+    assert all("--provenance-manifest-path" in row["acquisition_command"] for row in manifest_rows)
 
 
 def test_census_population_latest_only_appends_to_existing_output(tmp_path, monkeypatch) -> None:
@@ -139,6 +158,18 @@ def test_census_population_latest_only_appends_to_existing_output(tmp_path, monk
     assert len(lines) == 3
     assert "24003,Anne Arundel County,2023,590336" in lines[1]
     assert "24003,Anne Arundel County,2024,594582" in lines[2]
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        manifest_rows = list(csv.DictReader(handle))
+    assert len(manifest_rows) == 1
+    row = manifest_rows[0]
+    assert row["source_id"] == "census_population_2025_county_totals"
+    assert "co-est2025-alldata.csv" in row["source_url"]
+    assert row["row_count"] == "1"
+    assert "--latest-only" in row["acquisition_command"]
+    assert "--append" in row["acquisition_command"]
 
 
 def test_county_reference_command_writes_maryland_gazetteer_output(

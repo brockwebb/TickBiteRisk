@@ -25,6 +25,8 @@ from tickbiterisk.etl.building_permits import (
 from tickbiterisk.etl.building_permits_build import write_building_permits_output
 from tickbiterisk.etl.census_population import (
     CensusApiResponseError,
+    CENSUS_INTERCENSAL_1990_DATASET,
+    CENSUS_INTERCENSAL_2000_DATASET,
     build_census_intercensal_1990_population_url,
     build_census_intercensal_2000_population_url,
     build_census_pep_2019_population_url,
@@ -607,6 +609,10 @@ def census_population(
         False,
         help="Append to an existing population CSV and dedupe by county-year.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     api_key = get_census_api_key()
     urls = _census_population_urls(api_key=api_key, latest_only=latest_only)
@@ -625,10 +631,27 @@ def census_population(
         raise typer.BadParameter(str(exc)) from exc
 
     output = write_county_population_output(rows, output_dir, append=append)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _census_population_provenance_records(
+            urls=urls,
+            rows=rows,
+            output_path=output,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+            latest_only=latest_only,
+            append=append,
+            api_key_present=api_key is not None,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
     typer.echo(
         f"Wrote {len(rows)} county-year population row(s) to {output} "
         f"(append={append})"
     )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("ecology-sources")
@@ -2203,6 +2226,152 @@ def _usdm_provenance_records(
             )
         )
     return records
+
+
+def _census_population_provenance_records(
+    *,
+    urls: list[str],
+    rows: list[object],
+    output_path: Path,
+    output_dir: Path,
+    manifest_path: Path,
+    latest_only: bool,
+    append: bool,
+    api_key_present: bool,
+) -> list[AcquisitionProvenanceRecord]:
+    command_parts = [
+        "tickbiterisk",
+        "etl",
+        "census-population",
+        "--output-dir",
+        str(output_dir),
+    ]
+    if latest_only:
+        command_parts.append("--latest-only")
+    if append:
+        command_parts.append("--append")
+    command_parts.extend(["--provenance-manifest-path", str(manifest_path)])
+    command = _format_cli_command(command_parts)
+    row_counts = _census_population_row_counts(rows)
+    return [
+        AcquisitionProvenanceRecord(
+            source_id=metadata["source_id"],
+            source_name="U.S. Census Bureau county population estimates",
+            source_url=sanitize_census_url(url),
+            citation_url=metadata["citation_url"],
+            acquisition_command=command,
+            acquisition_procedure=metadata["acquisition_procedure"],
+            request_method="GET",
+            request_description=metadata["request_description"],
+            derived_artifact_paths=[output_path],
+            row_count=row_counts.get(metadata["row_count_key"], 0),
+            parser_method=metadata["parser_method"],
+            extraction_quality="accepted",
+            access_notes=(
+                "Public Census API endpoint; optional CENSUS_API_KEY is read "
+                "from the local environment and redacted from provenance."
+                if api_key_present and "api.census.gov" in url
+                else "Public Census endpoint; no secret is required in provenance."
+            ),
+            modeling_caveats=(
+                "County population denominator estimate; not exposure evidence "
+                "and subject to Census vintage/revision changes."
+            ),
+        )
+        for url, metadata in zip(
+            urls,
+            _census_population_source_metadata(latest_only=latest_only),
+            strict=True,
+        )
+    ]
+
+
+def _census_population_row_counts(rows: list[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        source_id = str(getattr(row, "source_id", ""))
+        census_dataset = str(getattr(row, "census_dataset", ""))
+        year = getattr(row, "year", "")
+        if source_id == "census_pep_2023_charv":
+            key = f"{source_id}_{year}"
+        elif source_id == "census_pep_2025_county_totals":
+            key = source_id
+        elif census_dataset == CENSUS_INTERCENSAL_1990_DATASET:
+            key = "census_pep_intercensal_1990_2000"
+        elif census_dataset == CENSUS_INTERCENSAL_2000_DATASET:
+            key = "census_pep_intercensal_2000_2010"
+        else:
+            key = source_id
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _census_population_source_metadata(*, latest_only: bool = False) -> list[dict[str, str]]:
+    metadata = [
+        {
+            "source_id": "census_population_intercensal_1990_2000",
+            "row_count_key": "census_pep_intercensal_1990_2000",
+            "citation_url": "https://www.census.gov/programs-surveys/popest.html",
+            "acquisition_procedure": (
+                "Fetch Census intercensal county population API rows and "
+                "normalize Maryland county denominators for 1992-1999."
+            ),
+            "request_description": "Census intercensal 1990 population API request.",
+            "parser_method": "parse_census_intercensal_1990_population",
+        },
+        {
+            "source_id": "census_population_intercensal_2000_2010",
+            "row_count_key": "census_pep_intercensal_2000_2010",
+            "citation_url": "https://www.census.gov/programs-surveys/popest.html",
+            "acquisition_procedure": (
+                "Fetch Census intercensal county population API rows and "
+                "normalize Maryland county denominators for 2000-2009."
+            ),
+            "request_description": "Census intercensal 2000 population API request.",
+            "parser_method": "parse_census_intercensal_2000_population",
+        },
+        {
+            "source_id": "census_population_pep_2019",
+            "row_count_key": "census_pep_2019",
+            "citation_url": "https://www.census.gov/programs-surveys/popest.html",
+            "acquisition_procedure": (
+                "Fetch Census PEP 2019 API rows and normalize Maryland county "
+                "denominators for 2010-2019."
+            ),
+            "request_description": "Census PEP 2019 county population API request.",
+            "parser_method": "parse_census_pep_2019_population",
+        },
+        *[
+            {
+                "source_id": f"census_population_pep_2023_charv_{year}",
+                "row_count_key": f"census_pep_2023_charv_{year}",
+                "citation_url": "https://www.census.gov/programs-surveys/popest.html",
+                "acquisition_procedure": (
+                    "Fetch Census PEP 2023 characteristics API rows and "
+                    f"normalize Maryland July {year} total county denominators."
+                ),
+                "request_description": (
+                    f"Census PEP 2023 characteristics population API request for {year}."
+                ),
+                "parser_method": "parse_census_pep_2023_charv_population",
+            }
+            for year in range(2020, 2024)
+        ],
+        {
+            "source_id": "census_population_2025_county_totals",
+            "row_count_key": "census_pep_2025_county_totals",
+            "citation_url": "https://www.census.gov/programs-surveys/popest.html",
+            "acquisition_procedure": (
+                "Fetch the official Census county totals CSV and normalize "
+                "Maryland county denominators for 2024-2025."
+            ),
+            "request_description": "Census Vintage 2025 county totals CSV request.",
+            "parser_method": "parse_census_pep_2025_county_totals_population",
+        },
+    ]
+    if latest_only:
+        return [metadata[-1]]
+    return metadata
 
 
 def _format_cli_command(parts: list[str]) -> str:
