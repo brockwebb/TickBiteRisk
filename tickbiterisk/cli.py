@@ -231,6 +231,9 @@ app.add_typer(dashboard_app, name="dashboard")
 OPEN_METEO_HISTORICAL_WEATHER_CITATION_URL = (
     "https://open-meteo.com/en/docs/historical-weather-api"
 )
+NOAA_CDO_WEBSERVICES_CITATION_URL = (
+    "https://www.ncei.noaa.gov/cdo-web/webservices/v2"
+)
 
 
 @etl_app.command("check")
@@ -1980,6 +1983,10 @@ def noaa_stations(
         14, help="Allowed station-reporting lag at the requested end date."
     ),
     dry_run: bool = typer.Option(False, help="Print URL without fetching data."),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     parsed_start_date = _parse_iso_date(start_date, "start-date")
     parsed_end_date = _parse_iso_date(end_date, "end-date")
@@ -2002,7 +2009,44 @@ def noaa_stations(
         max_end_lag_days=max_end_lag_days,
     )
     output = write_noaa_stations_output(selected, output_dir, append=True)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        [
+            _noaa_provenance_record(
+                source_id=(
+                    f"noaa_cdo_ghcnd_stations_{county_fips.zfill(5)}_"
+                    f"{_date_slug(parsed_start_date)}_{_date_slug(parsed_end_date)}"
+                ),
+                source_name="NOAA CDO GHCND station discovery",
+                source_url=url,
+                acquisition_command=_noaa_stations_acquisition_command(
+                    county_fips=county_fips,
+                    start_date=start_date,
+                    end_date=end_date,
+                    output_dir=output_dir,
+                    min_data_coverage=min_data_coverage,
+                    max_end_lag_days=max_end_lag_days,
+                    manifest_path=resolved_manifest_path,
+                ),
+                request_description=(
+                    "NOAA CDO GHCND station discovery request for "
+                    f"Maryland county FIPS {county_fips.zfill(5)}."
+                ),
+                output_path=output,
+                row_count=len(selected),
+                parser_method=(
+                    "fetch_noaa_stations;parse_noaa_station_response;"
+                    "select_long_coverage_stations"
+                ),
+            )
+        ],
+        manifest_path=resolved_manifest_path,
+        append=True,
+    )
     typer.echo(f"Wrote {output}")
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("noaa-daily")
@@ -2015,6 +2059,10 @@ def noaa_daily(
         Path("build/etl"), help="Output directory for ETL artifacts."
     ),
     dry_run: bool = typer.Option(False, help="Print URL without fetching data."),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     parsed_start_date = _parse_iso_date(start_date, "start-date")
     parsed_end_date = _parse_iso_date(end_date, "end-date")
@@ -2031,7 +2079,44 @@ def noaa_daily(
         token=get_noaa_token(),
     )
     output = write_noaa_daily_observations_output(rows, output_dir, append=True)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        [
+            _noaa_provenance_record(
+                source_id=(
+                    f"noaa_cdo_ghcnd_daily_{county_fips.zfill(5)}_"
+                    f"{_source_id_slug(station_id)}_"
+                    f"{_date_slug(parsed_start_date)}_{_date_slug(parsed_end_date)}"
+                ),
+                source_name="NOAA CDO GHCND daily observations",
+                source_url=url,
+                acquisition_command=_noaa_daily_acquisition_command(
+                    county_fips=county_fips,
+                    station_id=station_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                    output_dir=output_dir,
+                    manifest_path=resolved_manifest_path,
+                ),
+                request_description=(
+                    "NOAA CDO daily observations request for "
+                    f"{station_id} mapped to Maryland county FIPS "
+                    f"{county_fips.zfill(5)}."
+                ),
+                output_path=output,
+                row_count=len(rows),
+                parser_method=(
+                    "fetch_noaa_daily_observations;parse_noaa_daily_data_response"
+                ),
+            )
+        ],
+        manifest_path=resolved_manifest_path,
+        append=True,
+    )
     typer.echo(f"Wrote {output}")
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("noaa-weather-features")
@@ -2883,11 +2968,118 @@ def _open_meteo_provenance_record(
     )
 
 
-def _open_meteo_source_slug(weather_model: str) -> str:
+def _noaa_stations_acquisition_command(
+    *,
+    county_fips: str,
+    start_date: str,
+    end_date: str,
+    output_dir: Path,
+    min_data_coverage: float,
+    max_end_lag_days: int,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "noaa-stations",
+            "--county-fips",
+            county_fips,
+            "--start-date",
+            start_date,
+            "--end-date",
+            end_date,
+            "--output-dir",
+            str(output_dir),
+            "--min-data-coverage",
+            str(min_data_coverage),
+            "--max-end-lag-days",
+            str(max_end_lag_days),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+
+
+def _noaa_daily_acquisition_command(
+    *,
+    county_fips: str,
+    station_id: str,
+    start_date: str,
+    end_date: str,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "noaa-daily",
+            "--county-fips",
+            county_fips,
+            "--station-id",
+            station_id,
+            "--start-date",
+            start_date,
+            "--end-date",
+            end_date,
+            "--output-dir",
+            str(output_dir),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+
+
+def _noaa_provenance_record(
+    *,
+    source_id: str,
+    source_name: str,
+    source_url: str,
+    acquisition_command: str,
+    request_description: str,
+    output_path: Path,
+    row_count: int,
+    parser_method: str,
+) -> AcquisitionProvenanceRecord:
+    return AcquisitionProvenanceRecord(
+        source_id=source_id,
+        source_name=source_name,
+        source_url=source_url,
+        citation_url=NOAA_CDO_WEBSERVICES_CITATION_URL,
+        acquisition_command=acquisition_command,
+        acquisition_procedure=(
+            "Fetch NOAA Climate Data Online GHCND API JSON using a local "
+            "NOAA_TOKEN request header, then normalize the selected weather "
+            "records for TickBiteRisk ETL artifacts."
+        ),
+        request_method="GET",
+        request_description=request_description,
+        derived_artifact_paths=[output_path],
+        row_count=row_count,
+        parser_method=parser_method,
+        extraction_quality="accepted",
+        access_notes=(
+            "Public NOAA CDO API endpoint; a local NOAA_TOKEN is required in "
+            "the request header and is not written to provenance."
+        ),
+        modeling_caveats=(
+            "Station weather observations mapped to county features; weather "
+            "is an environmental proxy, not a direct tick exposure or disease "
+            "observation."
+        ),
+    )
+
+
+def _source_id_slug(value: str) -> str:
     return "".join(
         character if character.isalnum() else "_"
-        for character in weather_model.lower()
+        for character in value.lower()
     ).strip("_")
+
+
+def _open_meteo_source_slug(weather_model: str) -> str:
+    return _source_id_slug(weather_model)
 
 
 def _date_slug(value: date) -> str:

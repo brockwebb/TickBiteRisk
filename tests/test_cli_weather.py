@@ -6,6 +6,7 @@ import pytest
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
+from tickbiterisk.etl.noaa import NoaaDailyObservation, NoaaStation
 from tickbiterisk.etl.noaa_backfill import (
     NoaaCountyBackfillFailure,
     NoaaCountyBackfillResult,
@@ -308,6 +309,78 @@ def test_noaa_stations_dry_run_prints_noaa_url(tmp_path) -> None:
     assert "ncei.noaa.gov" in result.stdout
     assert "FIPS%3A24003" in result.stdout
     assert not (tmp_path / "noaa_ghcnd_stations.csv").exists()
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
+
+
+def test_noaa_stations_command_writes_acquisition_provenance(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_fetch(county_fips, start_date, end_date, *, token):
+        assert county_fips == "24003"
+        assert start_date == date(1992, 1, 1)
+        assert end_date == date(2026, 5, 24)
+        assert token == "fake-noaa-token"
+        return [
+            NoaaStation(
+                county_fips="24003",
+                station_id="GHCND:USW00093721",
+                name="BWI",
+                latitude=39.1733,
+                longitude=-76.684,
+                mindate=date(1939, 7, 1),
+                maxdate=date(2026, 5, 24),
+                data_coverage=0.99,
+            )
+        ]
+
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", lambda: "fake-noaa-token")
+    monkeypatch.setattr("tickbiterisk.cli.fetch_noaa_stations", fake_fetch)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-stations",
+            "--county-fips",
+            "24003",
+            "--start-date",
+            "1992-01-01",
+            "--end-date",
+            "2026-05-24",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (tmp_path / "noaa_ghcnd_stations.csv").exists()
+    assert "Wrote acquisition provenance manifest" in result.stdout
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["source_id"] == "noaa_cdo_ghcnd_stations_24003_1992_01_01_2026_05_24"
+    assert row["source_name"] == "NOAA CDO GHCND station discovery"
+    assert "ncei.noaa.gov/cdo-web/api/v2/stations" in row["source_url"]
+    assert "FIPS%3A24003" in row["source_url"]
+    assert row["citation_url"] == "https://www.ncei.noaa.gov/cdo-web/webservices/v2"
+    assert row["request_method"] == "GET"
+    assert row["row_count"] == "1"
+    assert (
+        row["parser_method"]
+        == "fetch_noaa_stations;parse_noaa_station_response;select_long_coverage_stations"
+    )
+    assert row["extraction_quality"] == "accepted"
+    assert "fake-noaa-token" not in "\n".join(row.values())
+    assert "NOAA_TOKEN" in row["access_notes"]
+    assert "--provenance-manifest-path" in row["acquisition_command"]
+    assert "noaa_ghcnd_stations.csv=" in row["derived_artifact_sha256s"]
 
 
 def test_noaa_daily_dry_run_prints_noaa_url(tmp_path) -> None:
@@ -334,6 +407,82 @@ def test_noaa_daily_dry_run_prints_noaa_url(tmp_path) -> None:
     assert "ncei.noaa.gov" in result.stdout
     assert "GHCND%3AUSW00093721" in result.stdout
     assert not (tmp_path / "noaa_ghcnd_daily_observations.csv").exists()
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
+
+
+def test_noaa_daily_command_writes_acquisition_provenance(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_fetch(county_fips, station_id, start_date, end_date, *, token):
+        assert county_fips == "24003"
+        assert station_id == "GHCND:USW00093721"
+        assert start_date == date(1992, 5, 1)
+        assert end_date == date(1992, 5, 7)
+        assert token == "fake-noaa-token"
+        return [
+            NoaaDailyObservation(
+                county_fips="24003",
+                station_id="GHCND:USW00093721",
+                date=date(1992, 5, 1),
+                source="noaa_cdo_ghcnd_daily",
+                tmax_f=72.0,
+                tmin_f=50.0,
+                prcp_inches=0.1,
+                snow_inches=0.0,
+                snwd_inches=None,
+                source_url_hash="a" * 64,
+            )
+        ]
+
+    monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", lambda: "fake-noaa-token")
+    monkeypatch.setattr("tickbiterisk.cli.fetch_noaa_daily_observations", fake_fetch)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "noaa-daily",
+            "--county-fips",
+            "24003",
+            "--station-id",
+            "GHCND:USW00093721",
+            "--start-date",
+            "1992-05-01",
+            "--end-date",
+            "1992-05-07",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (tmp_path / "noaa_ghcnd_daily_observations.csv").exists()
+    assert "Wrote acquisition provenance manifest" in result.stdout
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["source_id"] == (
+        "noaa_cdo_ghcnd_daily_24003_ghcnd_usw00093721_1992_05_01_1992_05_07"
+    )
+    assert row["source_name"] == "NOAA CDO GHCND daily observations"
+    assert "ncei.noaa.gov/cdo-web/api/v2/data" in row["source_url"]
+    assert "stationid=GHCND%3AUSW00093721" in row["source_url"]
+    assert row["row_count"] == "1"
+    assert (
+        row["parser_method"]
+        == "fetch_noaa_daily_observations;parse_noaa_daily_data_response"
+    )
+    assert "fake-noaa-token" not in "\n".join(row.values())
+    assert "NOAA_TOKEN" in row["access_notes"]
+    assert "--provenance-manifest-path" in row["acquisition_command"]
+    assert "noaa_ghcnd_daily_observations.csv=" in row["derived_artifact_sha256s"]
 
 
 def test_noaa_weather_features_command_reads_raw_noaa_csv(tmp_path) -> None:
