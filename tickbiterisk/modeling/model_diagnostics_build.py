@@ -48,8 +48,53 @@ SURVEILLANCE_REGIME_SUMMARY_COLUMNS = [
     "comparison_assumption_flags",
 ]
 
-REGIONAL_HOTSPOT_SUMMARY_COLUMNS = ["model_name"]
-REGIONAL_CAPACITY_INTERVAL_COLUMNS = ["model_name"]
+REGIONAL_HOTSPOT_SUMMARY_COLUMNS = [
+    "run_id",
+    "model_name",
+    "model_family",
+    "feature_profile",
+    "evaluation_mode",
+    "source_file_sha256",
+    "test_year",
+    "region_id",
+    "region_name",
+    "n_counties",
+    "actual_total_cases",
+    "predicted_total_cases",
+    "residual_cases",
+    "absolute_error_cases",
+    "actual_incidence_per_100k_mean",
+    "predicted_incidence_per_100k_mean",
+    "spearman_rank_correlation",
+    "top3_hit_count",
+    "top5_hit_count",
+    "county_share_mae",
+    "predicted_case_hhi",
+    "actual_case_hhi",
+    "comparison_assumption_flags",
+]
+REGIONAL_CAPACITY_INTERVAL_COLUMNS = [
+    "run_id",
+    "model_name",
+    "model_family",
+    "feature_profile",
+    "evaluation_mode",
+    "source_file_sha256",
+    "test_year",
+    "region_id",
+    "region_name",
+    "interval_method",
+    "n_counties",
+    "lower_80_cases",
+    "median_cases",
+    "upper_80_cases",
+    "lower_95_cases",
+    "upper_95_cases",
+    "actual_cases",
+    "covered_80",
+    "covered_95",
+    "comparison_assumption_flags",
+]
 
 
 @dataclass(frozen=True)
@@ -82,12 +127,12 @@ def write_model_diagnostics_outputs(
     )
     _write_records(
         regional_hotspot_summary_path,
-        result.regional_hotspot_summary,
+        [asdict(row) for row in result.regional_hotspot_summary],
         REGIONAL_HOTSPOT_SUMMARY_COLUMNS,
     )
     _write_records(
         regional_capacity_intervals_path,
-        result.regional_capacity_intervals,
+        [asdict(row) for row in result.regional_capacity_intervals],
         REGIONAL_CAPACITY_INTERVAL_COLUMNS,
     )
     return ModelDiagnosticsOutputPaths(
