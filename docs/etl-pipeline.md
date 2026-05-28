@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -64,6 +64,15 @@ request/run manifests as those sources graduate into the modeling lane.
    - This panel is a regional expansion/stress-test artifact for hotspot,
      spatial-neighbor, and capacity diagnostics; it does not replace the
      reconciled Maryland outcome target or the public Maryland default.
+
+1d. `tickbiterisk etl regional-signals`
+   - Derives Mid-Atlantic reported-case structure from
+     `midatlantic_lyme_county_year.csv`.
+   - Writes `midatlantic_regional_signals.csv`.
+   - `diagnostic_*` columns describe same-year regional totals and county
+     shares for retrospective hotspot/capacity review. `feature_*` columns use
+     prior-year or trailing regional history and are the only columns intended
+     for forecast-time model experiments.
 
 2. `tickbiterisk etl county-reference`
    - Builds Maryland county FIPS, names, area, and internal point reference.

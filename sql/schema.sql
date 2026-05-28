@@ -59,6 +59,33 @@ CREATE TABLE IF NOT EXISTS midatlantic_lyme_county_year (
     PRIMARY KEY (county_fips, year, source_id)
 );
 
+CREATE TABLE IF NOT EXISTS midatlantic_regional_signals (
+    state_fips char(2) NOT NULL,
+    state_abbr char(2) NOT NULL,
+    state_name text NOT NULL,
+    county_fips char(5) NOT NULL,
+    county_name text NOT NULL,
+    year integer NOT NULL,
+    total_cases integer NOT NULL CHECK (total_cases >= 0),
+    diagnostic_state_total_cases integer NOT NULL CHECK (diagnostic_state_total_cases >= 0),
+    diagnostic_midatlantic_total_cases integer NOT NULL CHECK (diagnostic_midatlantic_total_cases >= 0),
+    diagnostic_county_share_of_state_cases double precision,
+    diagnostic_county_share_of_midatlantic_cases double precision,
+    feature_prior_year_total_cases integer,
+    feature_prior_year_county_share_of_state_cases double precision,
+    feature_prior_year_county_share_of_midatlantic_cases double precision,
+    feature_prior_year_state_total_cases integer,
+    feature_prior_year_midatlantic_total_cases integer,
+    feature_trailing_5yr_midatlantic_total_min integer,
+    feature_trailing_5yr_midatlantic_total_mean double precision,
+    feature_trailing_5yr_midatlantic_total_max integer,
+    diagnostic_midatlantic_total_within_trailing_5yr_band boolean,
+    source_panel_sha256 text NOT NULL,
+    feature_quality_flags text DEFAULT '',
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, year, source_panel_sha256)
+);
+
 CREATE TABLE IF NOT EXISTS tick_vector_status (
     source_id text NOT NULL,
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),

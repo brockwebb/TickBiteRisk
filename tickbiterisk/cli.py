@@ -108,6 +108,8 @@ from tickbiterisk.etl.regional_lyme import (
     parse_cdc_midatlantic_county_dashboard,
 )
 from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
+from tickbiterisk.etl.regional_signals import build_midatlantic_regional_signals
+from tickbiterisk.etl.regional_signals_build import write_regional_signals_output
 from tickbiterisk.etl.mast_acorn import (
     build_mast_acorn_from_pdf,
     read_manual_mast_observations,
@@ -159,6 +161,7 @@ from tickbiterisk.etl.seasonality import (
     parse_cdc_lyme_weekly_onset,
 )
 from tickbiterisk.etl.seasonality_build import write_seasonality_outputs
+from tickbiterisk.etl.sources import compute_sha256
 from tickbiterisk.etl.tick_status import (
     build_tick_status_county_features,
     parse_ixodes_status,
@@ -1945,6 +1948,51 @@ def regional_lyme_outcomes(
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
+@etl_app.command("regional-signals")
+def regional_signals(
+    regional_lyme_path: Path = typer.Option(
+        Path("build/etl/regional-lyme/midatlantic_lyme_county_year.csv"),
+        help="Input Mid-Atlantic Lyme county-year panel.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-signals"),
+        help="Output directory for Mid-Atlantic regional signal artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for source artifact provenance.",
+    ),
+) -> None:
+    if not regional_lyme_path.exists():
+        raise typer.BadParameter(f"Regional Lyme panel not found: {regional_lyme_path}")
+
+    source_panel_sha256 = compute_sha256(regional_lyme_path)
+    rows = build_midatlantic_regional_signals(
+        regional_lyme_path,
+        source_panel_sha256=source_panel_sha256,
+    )
+    output_path = write_regional_signals_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        [
+            _regional_signals_provenance_record(
+                rows=rows,
+                regional_lyme_path=regional_lyme_path,
+                output_path=output_path,
+                output_dir=output_dir,
+                manifest_path=resolved_manifest_path,
+            )
+        ],
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(rows)} Mid-Atlantic regional signal row(s) to {output_path}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
 @etl_app.command("lyme-outcomes")
 def lyme_outcomes(
     raw_dir: Path = typer.Option(
@@ -3169,6 +3217,72 @@ def _regional_lyme_acquisition_command(
             "regional-lyme-outcomes",
             "--raw-dir",
             _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _regional_signals_provenance_record(
+    *,
+    rows: list[object],
+    regional_lyme_path: Path,
+    output_path: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> AcquisitionProvenanceRecord:
+    return AcquisitionProvenanceRecord(
+        source_id="midatlantic_regional_signals",
+        source_name="Mid-Atlantic regional Lyme reported-case signal table",
+        source_url=regional_lyme_path.name,
+        citation_url=CDC_LYME_SURVEILLANCE_CITATION_URL,
+        acquisition_command=_regional_signals_acquisition_command(
+            regional_lyme_path=regional_lyme_path,
+            output_dir=output_dir,
+            manifest_path=manifest_path,
+        ),
+        acquisition_procedure=(
+            "Read the derived Mid-Atlantic CDC county dashboard outcome panel "
+            "and compute same-year diagnostic regional totals plus prior-year "
+            "and trailing-history regional signal features."
+        ),
+        request_method="LOCAL_FILE_READ",
+        request_description=(
+            f"Read derived regional Lyme panel {regional_lyme_path.name} and "
+            "write forecast-safe lagged regional signal candidates."
+        ),
+        derived_artifact_paths=[regional_lyme_path, output_path],
+        derived_artifact_path_labels=[regional_lyme_path.name, output_path.name],
+        row_count=len(rows),
+        parser_method="build_midatlantic_regional_signals",
+        extraction_quality="accepted",
+        access_notes=(
+            "Derived from a local public CDC dashboard panel; no secret or "
+            "credential required."
+        ),
+        modeling_caveats=(
+            "Regional signal candidate only; same-year diagnostic columns are "
+            "not forecast-time features, case counts are not population rates, "
+            "and reported cases are not stable true incidence."
+        ),
+    )
+
+
+def _regional_signals_acquisition_command(
+    *,
+    regional_lyme_path: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "regional-signals",
+            "--regional-lyme-path",
+            _public_provenance_path(regional_lyme_path),
             "--output-dir",
             _public_provenance_path(output_dir),
             "--provenance-manifest-path",

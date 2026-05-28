@@ -9,6 +9,7 @@ def test_schema_defines_core_tables() -> None:
         "lyme_county_year_source_values",
         "lyme_county_year_reconciled",
         "midatlantic_lyme_county_year",
+        "midatlantic_regional_signals",
         "tick_vector_status",
         "tick_pathogen_status",
         "lone_star_status",
@@ -48,6 +49,20 @@ def test_midatlantic_lyme_county_year_schema_is_region_safe() -> None:
     assert "total_cases integer NOT NULL CHECK (total_cases >= 0)" in table_schema
     assert "feature_quality_flags text DEFAULT ''" in table_schema
     assert "PRIMARY KEY (county_fips, year, source_id)" in table_schema
+    assert "REFERENCES md_jurisdictions" not in table_schema
+
+
+def test_midatlantic_regional_signals_schema_separates_diagnostics_and_features() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+    table_schema = schema.split(
+        "CREATE TABLE IF NOT EXISTS midatlantic_regional_signals", maxsplit=1
+    )[1].split("CREATE TABLE IF NOT EXISTS", maxsplit=1)[0]
+
+    assert "diagnostic_midatlantic_total_cases integer NOT NULL" in table_schema
+    assert "feature_prior_year_midatlantic_total_cases integer" in table_schema
+    assert "feature_trailing_5yr_midatlantic_total_mean double precision" in table_schema
+    assert "source_panel_sha256 text NOT NULL" in table_schema
+    assert "PRIMARY KEY (county_fips, year, source_panel_sha256)" in table_schema
     assert "REFERENCES md_jurisdictions" not in table_schema
 
 
