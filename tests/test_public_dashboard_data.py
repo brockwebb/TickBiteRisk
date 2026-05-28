@@ -147,6 +147,15 @@ def test_model_card_matches_weekly_export_metadata() -> None:
             "considered for future reviewed estimates."
         ),
     }
+    assert {item["topic"] for item in model_card["explainer_placeholders"]} == {
+        "why_forecasting",
+        "data_lag_and_reconciliation",
+        "forecast_update_research",
+        "regional_hotspot_patterns",
+    }
+    placeholder_text = json.dumps(model_card["explainer_placeholders"]).lower()
+    assert "bayesian" not in placeholder_text
+    assert "hierarchical" not in placeholder_text
     assert model_card["quality_flags"] == [
         "relative_seasonal_baseline",
         "static_seasonality_prior",
@@ -161,7 +170,7 @@ def test_model_card_matches_weekly_export_metadata() -> None:
     assert model_card["annual_prediction_source"]["sha256"] == (
         weekly["selected_score_config"]["source_prediction_sha256"]
     )
-    assert "model-comparison" in model_card["method_summary"]
+    assert "Selected annual forecast" in model_card["method_summary"]
     validation = model_card["validation_summary"]
     assert validation["model_name"] == weekly["model_name"]
     assert validation["run_id"] == weekly["selected_score_config"]["source_prediction_run_id"]
@@ -210,9 +219,15 @@ def test_source_catalog_exposes_selected_annual_prediction_branch() -> None:
     assert annual_prediction["sha256"] == (
         weekly["selected_score_config"]["source_prediction_sha256"]
     )
-    assert annual_prediction["notes"].startswith(
-        "Selected annual prediction rows from model-comparison output"
+    assert annual_prediction["notes"].startswith("Selected annual forecast rows")
+    seasonality = next(
+        source
+        for source in source_catalog["sources"]
+        if source["source_id"] == "cdc_seasonality_week_2023"
     )
+    assert seasonality["artifact_type"] == "derived seasonality prior"
+    public_notes = " ".join(source["notes"] for source in source_catalog["sources"])
+    assert "model-comparison" not in public_notes
 
 
 def test_source_catalog_explains_forecast_lag_and_reconciliation() -> None:

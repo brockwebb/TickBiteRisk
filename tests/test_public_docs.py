@@ -111,6 +111,27 @@ def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() ->
     assert "curl 'http://localhost:8000/risk" not in quick_start
 
 
+def test_readme_frames_current_build_as_forecasting_product_with_explainer_placeholders() -> None:
+    readme = README.read_text(encoding="utf-8")
+
+    for token in [
+        "static risk forecasting product",
+        "Public explainer placeholders",
+        "Why forecasting is necessary",
+        "How lagged data are reconciled",
+        "How forecast updating will be evaluated",
+        "Regional hotspot and temporal pattern review",
+    ]:
+        assert token in readme
+
+    assert "static dashboard prototype" not in readme
+    public_placeholder_section = readme.split(
+        "## Public explainer placeholders", maxsplit=1
+    )[1].split("## data sources", maxsplit=1)[0]
+    assert "Bayesian" not in public_placeholder_section
+    assert "hierarchical" not in public_placeholder_section
+
+
 def test_readme_contribution_checks_match_configured_tooling() -> None:
     readme = README.read_text(encoding="utf-8")
     contribute = readme.split("## contribute", maxsplit=1)[1].split(

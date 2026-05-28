@@ -97,7 +97,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
             "intervention_history_unmodeled",
         ],
     }
-    assert "model-comparison" in model_card["method_summary"]
+    assert "Selected annual forecast" in model_card["method_summary"]
     assert model_card["forecasting_status"] == {
         "status": "risk_forecasting_tool",
         "public_score_role": (
@@ -110,12 +110,24 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
             "considered for future reviewed estimates."
         ),
     }
+    assert {item["topic"] for item in model_card["explainer_placeholders"]} == {
+        "why_forecasting",
+        "data_lag_and_reconciliation",
+        "forecast_update_research",
+        "regional_hotspot_patterns",
+    }
+    placeholder_text = json.dumps(model_card["explainer_placeholders"]).lower()
+    assert "bayesian" not in placeholder_text
+    assert "hierarchical" not in placeholder_text
     assert source_catalog["sources"][0]["artifact_type"] == "derived"
-    assert "model-comparison annual predictions" in source_catalog["sources"][0]["notes"]
+    assert "selected annual forecast rows" in source_catalog["sources"][0]["notes"]
     assert source_catalog["sources"][1]["source_id"] == "annual_prediction_branch"
     assert source_catalog["sources"][1]["run_id"] == "run1"
     assert source_catalog["sources"][1]["sha256"] == "a" * 64
     assert source_catalog["sources"][1]["model_name"] == "linear_blend_baseline"
+    assert source_catalog["sources"][2]["artifact_type"] == "derived seasonality prior"
+    public_notes = " ".join(source["notes"] for source in source_catalog["sources"])
+    assert "model-comparison" not in public_notes
     assert source_catalog["data_lag_and_update_policy"]["summary"].startswith(
         "Official Lyme surveillance data lag"
     )
@@ -211,6 +223,33 @@ def test_export_static_risk_data_rejects_ambiguous_score_denominator(
 
     assert weekly["selected_score_config"]["score_denominator"] == 4.5
     assert weekly["records"][0]["risk_score"] == 8
+
+
+def test_export_static_risk_data_preserves_existing_county_geojson_manifest(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "public-data"
+    output_dir.mkdir()
+    (output_dir / "md_counties.geojson").write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "metadata": {"feature_count": 24},
+                "features": [{"type": "Feature"} for _ in range(24)],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    outputs = export_static_risk_data(
+        scores_path=_write_scores(tmp_path / "scores.csv"),
+        output_dir=output_dir,
+    )
+
+    manifest = _read_json(outputs.export_manifest_path)
+
+    assert "md_counties.geojson" in manifest["files"]
+    assert manifest["record_counts"]["county_geojson_features"] == 24
 
 
 def test_export_static_risk_data_rejects_missing_model_summary_match(

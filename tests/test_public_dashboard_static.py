@@ -94,7 +94,7 @@ def test_dashboard_javascript_renders_visible_plain_language_source_chain() -> N
     for token in [
         "Public source chain",
         "CDC Lyme onset seasonality",
-        "Selected model-comparison predictions",
+        "Selected annual forecast",
         "Derived county-week risk forecast",
         "US Census TIGERweb county geometry",
         "source-chain",
@@ -130,7 +130,7 @@ def test_dashboard_javascript_renders_validation_and_limits_summary() -> None:
     for token in [
         "Validation and limits",
         "rolling-origin prior-years validation",
-        "selected model branch",
+        "selected forecast method",
         "mae_incidence_per_100k",
         "rank_by_mae",
         "n_predictions",
@@ -174,6 +174,31 @@ def test_dashboard_explains_forecasting_and_update_policy() -> None:
         "not diagnosis, treatment advice, or certainty about an individual bite",
     ]:
         assert token in js
+
+
+def test_dashboard_copy_uses_forecast_product_language_not_internal_dashboard_labels() -> None:
+    html = (PUBLIC_DIR / "index.html").read_text(encoding="utf-8")
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "<title>TickBiteRisk Maryland Lyme Forecast</title>",
+        "Annual forecast method",
+        "Forecast source:",
+        "selected forecast method",
+        "Forecast data bundle is unavailable.",
+    ]:
+        assert token in html + js
+
+    for token in [
+        "<title>TickBiteRisk Maryland Dashboard</title>",
+        "Annual model",
+        "Source branch:",
+        "selected model branch",
+        "Dashboard data bundle is unavailable.",
+        "source.notes || source.artifact_type",
+        "Selected model-comparison predictions",
+    ]:
+        assert token not in html + js
 
 
 def test_dashboard_javascript_mmwr_logic_handles_year_boundaries() -> None:

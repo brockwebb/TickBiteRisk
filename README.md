@@ -12,9 +12,9 @@ This project ships as self-hosted code; we do not currently provide a public API
 
 ## current build status
 
-The active implementation is a Maryland-first ETL, modeling, and static
-dashboard prototype. The current code handles source cataloging, Maryland Lyme
-county-year reconciliation, CDC seasonality baselines, tick/vector status
+The active implementation is a Maryland-first static risk forecasting product
+with ETL and modeling support. The current code handles source cataloging,
+Maryland Lyme county-year reconciliation, CDC seasonality baselines, tick/vector status
 normalization, weather and ecological feature assembly, model comparison,
 county-week seasonal risk forecasts, runtime lookup over derived risk files,
 static public JSON export, and a Postgres-ready warehouse schema.
@@ -110,6 +110,20 @@ That reconciliation is the path toward stronger Bayesian or hierarchical
 forecasting: new information should update the next forecast with its caveats
 attached, not silently overwrite the model as if every source were equally
 stable truth.
+
+## Public explainer placeholders
+
+These are captured now so final release polish can turn the model work into
+plain-language public pages instead of burying it in implementation notes.
+
+- Why forecasting is necessary: surveillance lags, seasonal decisions, and
+  the need for timely prevention context before final case data arrive.
+- How lagged data are reconciled: source vintages, surveillance-regime flags,
+  forecast update audits, and calibration backtests.
+- How forecast updating will be evaluated: new observations should update
+  prior forecast expectations with uncertainty and caveats attached.
+- Regional hotspot and temporal pattern review: county clusters, neighboring
+  counties, year-over-year shifts, and temporal visualization candidates.
 
 ## data sources
 

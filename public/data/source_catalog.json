@@ -7,7 +7,7 @@
     "why_forecasting": "Forecasting gives timely prevention context while county-level surveillance reports, population denominators, and reviewed source updates catch up."
   },
   "export_type": "source_catalog",
-  "generated_at": "2026-05-28T20:54:14+00:00",
+  "generated_at": "2026-05-28T23:46:18+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -30,7 +30,7 @@
   "sources": [
     {
       "artifact_type": "derived",
-      "notes": "Derived from selected model-comparison annual predictions and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
+      "notes": "Derived from selected annual forecast rows and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
       "redistribution": "public derived data",
       "sha256": "17b9b34103002e05d32ee23a55a342df047642a211b6ba750deb3f02c0887fa8",
       "source_id": "county_week_seasonal_risk_baseline"
@@ -40,7 +40,7 @@
       "evaluation_mode": "rolling_origin_prior_years",
       "model_family": "ensemble",
       "model_name": "linear_blend_baseline",
-      "notes": "Selected annual prediction rows from model-comparison output; not raw surveillance data.",
+      "notes": "Selected annual forecast rows from prior-year validation; not raw surveillance data.",
       "redistribution": "public derived data",
       "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
       "sha256": "289a1394e95ce292ca83fdf91c08d1b2f8511d0c2724538d1f08107c0a63af95",
@@ -48,7 +48,7 @@
       "weather_mode": "not_used_by_lagged_model"
     },
     {
-      "artifact_type": "derived seasonality baseline",
+      "artifact_type": "derived seasonality prior",
       "notes": "CDC national onset seasonality; not county-specific.",
       "redistribution": "public derived data",
       "sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",

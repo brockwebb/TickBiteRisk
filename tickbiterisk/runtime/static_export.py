@@ -31,6 +31,39 @@ PUBLIC_CAVEATS = [
     "Empirical intervals describe forecast uncertainty, not clinical confidence for an individual bite.",
 ]
 
+EXPLAINER_PLACEHOLDERS = [
+    {
+        "topic": "why_forecasting",
+        "status": "captured_for_public_review",
+        "plain_language_goal": (
+            "Explain why official Lyme data lag current prevention decisions."
+        ),
+    },
+    {
+        "topic": "data_lag_and_reconciliation",
+        "status": "captured_for_public_review",
+        "plain_language_goal": (
+            "Explain how new reports are compared with prior forecasts before updates."
+        ),
+    },
+    {
+        "topic": "forecast_update_research",
+        "status": "captured_for_public_review",
+        "plain_language_goal": (
+            "Explain how validated observations could revise future forecasts "
+            "with uncertainty and caveats attached."
+        ),
+    },
+    {
+        "topic": "regional_hotspot_patterns",
+        "status": "captured_for_public_review",
+        "plain_language_goal": (
+            "Explain regional clusters, neighboring counties, and year-over-year "
+            "hotspot movement without overclaiming migration or causality."
+        ),
+    },
+]
+
 SCORE_CATEGORIES = {
     "1-2": "very_low",
     "3-4": "low",
@@ -371,7 +404,7 @@ def _model_card_payload(
         ],
         "clinical_disclaimer": CLINICAL_DISCLAIMER,
         "method_summary": (
-            "Selected annual model-comparison prediction rows apportioned by "
+            "Selected annual forecast rows apportioned by "
             "CDC national MMWR-week Lyme onset seasonality."
         ),
         "forecasting_status": {
@@ -386,6 +419,7 @@ def _model_card_payload(
                 "considered for future reviewed estimates."
             ),
         },
+        "explainer_placeholders": EXPLAINER_PLACEHOLDERS,
         "annual_prediction_source": _annual_prediction_source(first),
         "quality_flags": [
             "relative_seasonal_baseline",
@@ -488,7 +522,7 @@ def _source_catalog_payload(
                 "redistribution": "public derived data",
                 "sha256": input_sha256,
                 "notes": (
-                    "Derived from selected model-comparison annual predictions "
+                    "Derived from selected annual forecast rows "
                     "and CDC seasonality; do not publish raw restricted or "
                     "terms-unclear source extracts."
                 ),
@@ -504,13 +538,13 @@ def _source_catalog_payload(
                 "evaluation_mode": first.evaluation_mode,
                 "weather_mode": first.weather_mode,
                 "notes": (
-                    "Selected annual prediction rows from model-comparison output; "
+                    "Selected annual forecast rows from prior-year validation; "
                     "not raw surveillance data."
                 ),
             },
             {
                 "source_id": first.seasonality_source_id,
-                "artifact_type": "derived seasonality baseline",
+                "artifact_type": "derived seasonality prior",
                 "redistribution": "public derived data",
                 "sha256": first.source_seasonality_sha256,
                 "notes": "CDC national onset seasonality; not county-specific.",
@@ -538,22 +572,38 @@ def _manifest_payload(
     county_payload: dict[str, object],
     generated_at: str,
 ) -> dict[str, object]:
+    files = [
+        paths.weekly_risk_path.name,
+        paths.county_metadata_path.name,
+        paths.model_card_path.name,
+        paths.source_catalog_path.name,
+        paths.export_manifest_path.name,
+    ]
+    record_counts = {
+        "weekly_risk": int(weekly_payload["record_count"]),
+        "county_metadata": int(county_payload["county_count"]),
+    }
+    county_geojson_path = paths.export_manifest_path.parent / "md_counties.geojson"
+    if county_geojson_path.exists():
+        files.append(county_geojson_path.name)
+        record_counts["county_geojson_features"] = _county_geojson_feature_count(
+            county_geojson_path
+        )
     return {
         "schema_version": STATIC_EXPORT_SCHEMA_VERSION,
         "export_type": "static_export_manifest",
         "generated_at": generated_at,
-        "files": [
-            paths.weekly_risk_path.name,
-            paths.county_metadata_path.name,
-            paths.model_card_path.name,
-            paths.source_catalog_path.name,
-            paths.export_manifest_path.name,
-        ],
-        "record_counts": {
-            "weekly_risk": int(weekly_payload["record_count"]),
-            "county_metadata": int(county_payload["county_count"]),
-        },
+        "files": files,
+        "record_counts": record_counts,
     }
+
+
+def _county_geojson_feature_count(path: Path) -> int:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    metadata_count = payload.get("metadata", {}).get("feature_count")
+    if metadata_count is not None:
+        return int(metadata_count)
+    return len(payload.get("features", []))
 
 
 def _selected_score_config(record: CountyWeekRiskRecord) -> dict[str, object]:

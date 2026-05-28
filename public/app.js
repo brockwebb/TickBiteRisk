@@ -543,7 +543,7 @@ function renderModelLineage(record) {
     <h4 id="lineage-heading">Model source</h4>
     <dl class="lineage-grid">
       <div>
-        <dt>Annual model</dt>
+        <dt>Annual forecast method</dt>
         <dd>${escapeHtml(readableModelName(modelName))} (${escapeHtml(readableModelName(modelFamily))})</dd>
       </div>
       <div>
@@ -628,7 +628,10 @@ function renderSources() {
     .map((link) => `<li><a href="${escapeAttribute(safeUrl(link.url))}">${escapeHtml(link.title)}</a></li>`)
     .join("");
   const sources = sourceRows
-    .map((source) => `<li><b>${escapeHtml(readableSourceTitle(source.source_id))}</b>: ${escapeHtml(source.notes || source.artifact_type)}</li>`)
+    .map(
+      (source) =>
+        `<li><b>${escapeHtml(readableSourceTitle(source.source_id))}</b>: ${escapeHtml(readablePublicSourceNote(source))}</li>`
+    )
     .join("");
 
   target.innerHTML = `<section class="source-chain" aria-labelledby="source-chain-title">
@@ -638,7 +641,7 @@ function renderSources() {
     <p>${escapeHtml(state.modelCard.score_interpretation)}</p>
     <ul>${links}</ul>
     ${sources ? `<ul class="source-detail-list">${sources}</ul>` : ""}
-    <p>Source branch: ${escapeHtml(state.weekly.model_name)} / ${escapeHtml(state.weekly.seasonality_source_id)}</p>`;
+    <p>Forecast source: selected annual prediction branch with CDC onset seasonality prior.</p>`;
 }
 
 function sourceChainItems(sourceRows) {
@@ -650,10 +653,10 @@ function sourceChainItems(sourceRows) {
     {};
   return [
     {
-      title: "Selected model-comparison predictions",
+      title: "Selected annual forecast",
       description:
-        annualPrediction.notes ||
-        "Annual Maryland Lyme prediction branch selected from rolling-origin model comparison.",
+        readablePublicSourceNote(annualPrediction) ||
+        "Annual Maryland Lyme forecast selected from prior-year validation.",
     },
     {
       title: "CDC Lyme onset seasonality",
@@ -677,11 +680,23 @@ function sourceChainItems(sourceRows) {
 
 function readableSourceTitle(sourceId) {
   const labels = {
-    annual_prediction_branch: "Selected model-comparison predictions",
+    annual_prediction_branch: "Selected annual forecast",
     cdc_seasonality_week_2023: "CDC Lyme onset seasonality",
     county_week_seasonal_risk_baseline: "Derived county-week risk forecast",
   };
   return labels[sourceId] || readableModelName(sourceId);
+}
+
+function readablePublicSourceNote(source) {
+  const notes = {
+    annual_prediction_branch:
+      "Selected annual forecast rows from prior-year validation; not raw surveillance data.",
+    county_week_seasonal_risk_baseline:
+      "Derived from the selected annual forecast and CDC onset seasonality prior.",
+    cdc_seasonality_week_2023:
+      "CDC national onset seasonality prior; not county-specific.",
+  };
+  return notes[source.source_id] || source.public_notes || "Public derived forecast input.";
 }
 
 function renderValidationSummary() {
@@ -759,7 +774,7 @@ function renderForecastExplainer() {
 function validationOutcomeItems(selectedModel, evaluationMode, validation) {
   return [
     {
-      label: "selected model branch",
+      label: "selected forecast method",
       value: selectedModel || "unknown",
     },
     {
@@ -823,7 +838,7 @@ function renderValidationItem(item) {
 function renderLoadError(error) {
   document.getElementById("risk-map").innerHTML = `<p role="alert">${escapeHtml(error.message)}</p>`;
   document.getElementById("county-list").innerHTML = "";
-  document.getElementById("panel-content").innerHTML = "<p>Dashboard data bundle is unavailable.</p>";
+  document.getElementById("panel-content").innerHTML = "<p>Forecast data bundle is unavailable.</p>";
   document.getElementById("validation-content").innerHTML = "<p>Validation notes are unavailable.</p>";
   document.getElementById("source-content").innerHTML = "<p>Source notes are unavailable.</p>";
 }

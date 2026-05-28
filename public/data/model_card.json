@@ -20,14 +20,36 @@
     "Empirical intervals describe forecast uncertainty, not clinical confidence for an individual bite."
   ],
   "clinical_disclaimer": "TickBiteRisk is for informational and educational purposes only. It is not medical advice, does not diagnose disease, and does not determine whether you are infected. Follow CDC guidance and contact a qualified healthcare professional about your situation.",
+  "explainer_placeholders": [
+    {
+      "plain_language_goal": "Explain why official Lyme data lag current prevention decisions.",
+      "status": "captured_for_public_review",
+      "topic": "why_forecasting"
+    },
+    {
+      "plain_language_goal": "Explain how new reports are compared with prior forecasts before updates.",
+      "status": "captured_for_public_review",
+      "topic": "data_lag_and_reconciliation"
+    },
+    {
+      "plain_language_goal": "Explain how validated observations could revise future forecasts with uncertainty and caveats attached.",
+      "status": "captured_for_public_review",
+      "topic": "forecast_update_research"
+    },
+    {
+      "plain_language_goal": "Explain regional clusters, neighboring counties, and year-over-year hotspot movement without overclaiming migration or causality.",
+      "status": "captured_for_public_review",
+      "topic": "regional_hotspot_patterns"
+    }
+  ],
   "export_type": "model_card",
   "forecasting_status": {
     "public_score_role": "relative county-week Lyme risk forecast with source-lag and update diagnostics",
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-28T20:54:14+00:00",
-  "method_summary": "Selected annual model-comparison prediction rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
+  "generated_at": "2026-05-28T23:46:18+00:00",
+  "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
   "model_name": "linear_blend_baseline",
   "not_for": [
     "per-bite infection probability",
