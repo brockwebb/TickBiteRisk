@@ -175,6 +175,13 @@ from tickbiterisk.modeling.model_compare import (
     run_model_comparison,
 )
 from tickbiterisk.modeling.model_compare_build import write_model_comparison_outputs
+from tickbiterisk.modeling.model_diagnostics import (
+    ModelDiagnosticsInputError,
+    build_model_diagnostics,
+)
+from tickbiterisk.modeling.model_diagnostics_build import (
+    write_model_diagnostics_outputs,
+)
 from tickbiterisk.modeling.spatial_neighbors import (
     build_county_adjacency_from_geojson,
     write_county_adjacency_output,
@@ -1168,6 +1175,54 @@ def model_compare(
     typer.echo(
         f"Wrote {len(result.summary)} model comparison summary row(s) to "
         f"{outputs.summary_path}"
+    )
+
+
+@etl_app.command("model-diagnostics")
+def model_diagnostics(
+    predictions_path: Path = typer.Option(
+        Path("build/etl/model-comparison/model_comparison_predictions.csv"),
+        help="Input model comparison predictions CSV.",
+    ),
+    intervals_path: Path | None = typer.Option(
+        None,
+        help="Optional model interval CSV reserved for capacity diagnostics.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/model-diagnostics"),
+        help="Output directory for model diagnostics artifacts.",
+    ),
+) -> None:
+    if not predictions_path.exists():
+        raise typer.BadParameter(
+            f"Model comparison predictions file not found: {predictions_path}"
+        )
+    if intervals_path is not None and not intervals_path.exists():
+        raise typer.BadParameter(f"Model intervals file not found: {intervals_path}")
+
+    try:
+        result = build_model_diagnostics(
+            predictions_path=predictions_path,
+            intervals_path=intervals_path,
+        )
+    except ModelDiagnosticsInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_model_diagnostics_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote {len(result.surveillance_residuals)} surveillance residual row(s) to "
+        f"{outputs.surveillance_residuals_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.surveillance_summary)} surveillance summary row(s) to "
+        f"{outputs.surveillance_summary_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.regional_hotspot_summary)} regional hotspot row(s) to "
+        f"{outputs.regional_hotspot_summary_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.regional_capacity_intervals)} regional capacity row(s) to "
+        f"{outputs.regional_capacity_intervals_path}"
     )
 
 
