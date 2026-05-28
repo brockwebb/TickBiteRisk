@@ -8,6 +8,7 @@ def test_schema_defines_core_tables() -> None:
         "md_jurisdictions",
         "lyme_county_year_source_values",
         "lyme_county_year_reconciled",
+        "midatlantic_lyme_county_year",
         "tick_vector_status",
         "tick_pathogen_status",
         "lone_star_status",
@@ -33,6 +34,21 @@ def test_reconciled_data_quality_flags_allows_null_copy_values() -> None:
 
     assert "data_quality_flags text DEFAULT ''" in schema
     assert "data_quality_flags text NOT NULL" not in schema
+
+
+def test_midatlantic_lyme_county_year_schema_is_region_safe() -> None:
+    schema = Path("sql/schema.sql").read_text(encoding="utf-8")
+    table_schema = schema.split(
+        "CREATE TABLE IF NOT EXISTS midatlantic_lyme_county_year", maxsplit=1
+    )[1].split("CREATE TABLE IF NOT EXISTS", maxsplit=1)[0]
+
+    assert "state_fips char(2) NOT NULL" in table_schema
+    assert "state_abbr char(2) NOT NULL" in table_schema
+    assert "county_fips char(5) NOT NULL" in table_schema
+    assert "total_cases integer NOT NULL CHECK (total_cases >= 0)" in table_schema
+    assert "feature_quality_flags text DEFAULT ''" in table_schema
+    assert "PRIMARY KEY (county_fips, year, source_id)" in table_schema
+    assert "REFERENCES md_jurisdictions" not in table_schema
 
 
 def test_tick_vector_status_preserves_parser_source_columns() -> None:

@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -55,6 +55,15 @@ request/run manifests as those sources graduate into the modeling lane.
      `cdc_lyme_national_year.csv`, and `acquisition_provenance.csv`.
    - These rows are aggregate validation and regional-capacity anchors only;
      they are not county outcomes or direct exposure observations.
+
+1c. `tickbiterisk etl regional-lyme-outcomes`
+   - Reshapes the CDC county dashboard export into DE, DC, MD, PA, VA, and WV
+     county/county-equivalent annual Lyme totals for 2001-2023.
+   - Writes `midatlantic_lyme_county_year.csv` and
+     `acquisition_provenance.csv`.
+   - This panel is a regional expansion/stress-test artifact for hotspot,
+     spatial-neighbor, and capacity diagnostics; it does not replace the
+     reconciled Maryland outcome target or the public Maryland default.
 
 2. `tickbiterisk etl county-reference`
    - Builds Maryland county FIPS, names, area, and internal point reference.

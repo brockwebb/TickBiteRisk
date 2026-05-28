@@ -103,6 +103,11 @@ from tickbiterisk.etl.lyme_aggregate_build import (
     LymeAggregateOutputPaths,
     write_lyme_aggregate_outputs,
 )
+from tickbiterisk.etl.regional_lyme import (
+    RegionalLymeCountyYear,
+    parse_cdc_midatlantic_county_dashboard,
+)
+from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
 from tickbiterisk.etl.mast_acorn import (
     build_mast_acorn_from_pdf,
     read_manual_mast_observations,
@@ -458,6 +463,20 @@ LYME_AGGREGATE_SOURCE_METADATA = [
         "output_kind": "national",
     },
 ]
+REGIONAL_LYME_SOURCE_METADATA = {
+    "filename": "cdc_lyme_county_dashboard_2023.csv",
+    "source_id": "cdc_lyme_county_dashboard_2023",
+    "source_name": "CDC Lyme county counts dashboard export, 2023",
+    "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+    "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+    "parser_method": "parse_cdc_midatlantic_county_dashboard",
+    "modeling_caveats": (
+        "Mid-Atlantic regional expansion/stress-test panel only; not the "
+        "public Maryland default, not a direct exposure observation, and "
+        "reported cases are not stable true incidence across surveillance "
+        "regime changes."
+    ),
+}
 
 
 @etl_app.command("check")
@@ -1880,6 +1899,52 @@ def lyme_aggregate_validation(
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
+@etl_app.command("regional-lyme-outcomes")
+def regional_lyme_outcomes(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/lyme"),
+        help="Raw directory containing the CDC Lyme county dashboard export.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-lyme"),
+        help="Output directory for Mid-Atlantic Lyme outcome artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
+) -> None:
+    source_path = raw_dir / str(REGIONAL_LYME_SOURCE_METADATA["filename"])
+    if not source_path.exists():
+        raise typer.BadParameter(f"Regional Lyme source file not found: {source_path}")
+
+    rows = parse_cdc_midatlantic_county_dashboard(
+        source_path,
+        source_id=str(REGIONAL_LYME_SOURCE_METADATA["source_id"]),
+    )
+    output_path = write_regional_lyme_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _regional_lyme_provenance_records(
+            metadata=REGIONAL_LYME_SOURCE_METADATA,
+            rows=rows,
+            source_path=source_path,
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+            output_path=output_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(rows)} Mid-Atlantic Lyme county-year outcome row(s) to "
+        f"{output_path}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
 @etl_app.command("lyme-outcomes")
 def lyme_outcomes(
     raw_dir: Path = typer.Option(
@@ -3034,6 +3099,74 @@ def _lyme_aggregate_acquisition_command(
             "tickbiterisk",
             "etl",
             "lyme-aggregate-validation",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _regional_lyme_provenance_records(
+    *,
+    metadata: dict[str, str],
+    rows: list[RegionalLymeCountyYear],
+    source_path: Path,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+    output_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _regional_lyme_acquisition_command(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=manifest_path,
+    )
+    return [
+        AcquisitionProvenanceRecord(
+            source_id=metadata["source_id"],
+            source_name=metadata["source_name"],
+            source_url=metadata["source_url"],
+            citation_url=metadata["citation_url"],
+            acquisition_command=command,
+            acquisition_procedure=(
+                "Read an ignored local CDC Lyme county dashboard export, "
+                "filter to DE, DC, MD, PA, VA, and WV county-equivalent rows, "
+                "and reshape annual wide columns into a regional county-year "
+                "outcome panel."
+            ),
+            request_method="LOCAL_FILE_READ",
+            request_description=(
+                f"Read local raw CDC Lyme county dashboard CSV {source_path.name} "
+                "for the Mid-Atlantic regional expansion outcome panel."
+            ),
+            derived_artifact_paths=[source_path, output_path],
+            derived_artifact_path_labels=[source_path.name, output_path.name],
+            row_count=len(rows),
+            parser_method=metadata["parser_method"],
+            extraction_quality="accepted",
+            access_notes=(
+                "Local ignored raw export from public CDC Lyme surveillance "
+                "dashboard source; no secret or credential required."
+            ),
+            modeling_caveats=metadata["modeling_caveats"],
+        )
+    ]
+
+
+def _regional_lyme_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "regional-lyme-outcomes",
             "--raw-dir",
             _public_provenance_path(raw_dir),
             "--output-dir",

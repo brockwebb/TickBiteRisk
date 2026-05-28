@@ -45,6 +45,20 @@ CREATE TABLE IF NOT EXISTS lyme_county_year_reconciled (
     PRIMARY KEY (county_fips, year)
 );
 
+CREATE TABLE IF NOT EXISTS midatlantic_lyme_county_year (
+    state_fips char(2) NOT NULL,
+    state_abbr char(2) NOT NULL,
+    state_name text NOT NULL,
+    county_fips char(5) NOT NULL,
+    county_name text NOT NULL,
+    year integer NOT NULL,
+    total_cases integer NOT NULL CHECK (total_cases >= 0),
+    source_id text NOT NULL,
+    feature_quality_flags text DEFAULT '',
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, year, source_id)
+);
+
 CREATE TABLE IF NOT EXISTS tick_vector_status (
     source_id text NOT NULL,
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
