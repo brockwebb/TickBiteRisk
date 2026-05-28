@@ -3,8 +3,9 @@
 ## Current v0 ETL pipeline
 
 The ETL layer turns acquired source files into reproducible Maryland county-year
-and county-week artifacts. The current pipeline supports model comparison and a
-static public dashboard. It does not run a live disease forecast service.
+and county-week artifacts. This pipeline builds research-grade static forecast
+artifacts and a static public dashboard. It does not run a live backend forecast
+service.
 
 No live weekly ED scaler is wired into the current product. Weather, ecology,
 deer, construction, and tick surveillance fields are model features or research
@@ -120,6 +121,10 @@ candidates until backtesting shows they improve the public score.
     - Summarizes comparison predictions and bootstrap intervals into research
       diagnostics for branch uncertainty, surveillance-regime checks, regional
       hotspot patterns, and capacity-sensitive error review.
+    - Also writes `forecast_update_audit.csv` and
+      `forecast_update_summary.csv`, which compare pre-update rolling-origin
+      forecasts with newly observed held-out outcomes using explicit as-of,
+      data-cutoff, source-vintage, and surveillance-regime fields.
     - Writes diagnostics under the chosen model-diagnostics output directory.
 
 18. `tickbiterisk etl county-week-risk`

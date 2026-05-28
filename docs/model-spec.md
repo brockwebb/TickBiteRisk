@@ -112,6 +112,19 @@ or where public-health reporting changes appear to dominate signal, but those
 diagnostics are research context. They do not promote exposure candidates or
 calibration indicators into the selected public dashboard branch.
 
+## Forecast Update Contract
+
+Forecast-safe lanes use only prior-year and trailing information available
+before the target year. Update-audit artifacts compare those prior forecasts
+with later observed outcomes and preserve `forecast_year`,
+`forecast_origin_year`, `as_of_date`, `data_cutoff_date`, `source_vintage`,
+`evaluation_mode`, `update_mode`, and `surveillance_regime`.
+
+Update interpretations are diagnostic labels. They do not convert observed
+reported cases into latent true disease burden. Known reporting-break regimes
+are kept separate from clean disease-pressure signals so future Bayesian or
+hierarchical models can assign reliability to incoming evidence.
+
 ## Public score transform
 
 The selected annual predicted incidence is multiplied by the selected CDC

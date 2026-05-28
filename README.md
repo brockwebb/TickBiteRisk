@@ -2,10 +2,11 @@
 
 ## mission
 
-Build a transparent, Maryland-first tickborne disease risk data product from
-open public data. The current implementation communicates relative county-week
-Lyme risk baselines and a single-bite Lyme decision-support score. Calibrated
-absolute infection probabilities for any U.S. county remain a research goal.
+Build a transparent, Maryland-first tickborne disease risk forecasting research
+product from open public data. The current implementation communicates relative
+county-week Lyme seasonal baselines, forecast-update diagnostics, and a
+single-bite Lyme decision-support score. Calibrated absolute infection
+probabilities for any U.S. county remain a research goal.
 
 This project ships as self-hosted code; we do not currently provide a public API.
 
@@ -84,6 +85,32 @@ Then open `http://localhost:8000`.
 GitHub Pages deployment uses the committed `public/` directory and requires no
 runtime secrets or raw data access.
 
+## why forecast Lyme risk?
+
+Official Lyme surveillance data often lag the conditions people are living
+through now. Final county case counts may arrive months or years after the tick
+season, while households, clinicians, parks, schools, and public health teams
+need actionable risk context during the season itself.
+
+TickBiteRisk treats forecasting as a way to make uncertainty visible before all
+official data are final. The public score is informational risk context, not a
+diagnosis, treatment recommendation, or certainty about any individual bite.
+
+## how forecast updates work
+
+The model starts with a prior forecast from historical Lyme incidence,
+seasonality, forecast-safe weather/ecology and habitat context, host and human
+exposure proxies, regional patterns, and surveillance caveats. When new
+information arrives, the update-audit layer compares it with the prior forecast,
+labels the source vintage and surveillance regime, and records whether the
+change looks like disease-pressure signal, reporting-regime signal, or an
+ambiguous update.
+
+That reconciliation is the path toward stronger Bayesian or hierarchical
+forecasting: new information should update the next forecast with its caveats
+attached, not silently overwrite the model as if every source were equally
+stable truth.
+
 ## data sources
 
 | feed | current role |
@@ -119,6 +146,7 @@ tickbiterisk etl model-features --output-dir build/etl/model
 tickbiterisk etl county-adjacency --county-geojson-path public/data/md_counties.geojson --output-dir build/etl/county-adjacency
 tickbiterisk etl model-design-matrix --model-features-path build/etl/model/model_features_county_year.csv --county-adjacency-path build/etl/county-adjacency/md_county_adjacency.csv --output-dir build/etl/model
 tickbiterisk etl model-compare --design-matrix-path build/etl/model/model_design_matrix_county_year.csv --output-dir build/etl/model-comparison
+tickbiterisk etl model-diagnostics --predictions-path build/etl/model-comparison/model_comparison_predictions.csv --intervals-path build/etl/model-comparison/model_comparison_intervals.csv --as-of-date 2026-05-28 --data-cutoff-date 2024-12-31 --source-vintage 2024-inclusive-local --output-dir build/etl/model-diagnostics
 tickbiterisk etl model-backtest --model-features-path build/etl/model/model_features_county_year.csv --output-dir build/etl/backtest
 tickbiterisk etl county-week-risk --predictions-path build/etl/model-comparison/model_comparison_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --output-dir build/etl/county-week-risk
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest
