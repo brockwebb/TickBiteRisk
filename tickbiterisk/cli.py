@@ -108,6 +108,8 @@ from tickbiterisk.etl.regional_lyme import (
     RegionalLymeCountyYear,
     parse_cdc_midatlantic_county_dashboard,
 )
+from tickbiterisk.etl.regional_hotspots import build_midatlantic_hotspot_diagnostics
+from tickbiterisk.etl.regional_hotspots_build import write_regional_hotspot_outputs
 from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
 from tickbiterisk.etl.regional_signals import build_midatlantic_regional_signals
 from tickbiterisk.etl.regional_signals_build import write_regional_signals_output
@@ -2008,6 +2010,36 @@ def regional_signals(
         f"Wrote {len(rows)} Mid-Atlantic regional signal row(s) to {output_path}"
     )
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
+@etl_app.command("regional-hotspots")
+def regional_hotspots(
+    regional_lyme_path: Path = typer.Option(
+        Path("build/etl/regional-lyme/midatlantic_lyme_county_year.csv"),
+        help="Input Mid-Atlantic Lyme county-year panel.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-hotspots"),
+        help="Output directory for Mid-Atlantic hotspot diagnostic artifacts.",
+    ),
+) -> None:
+    if not regional_lyme_path.exists():
+        raise typer.BadParameter(f"Regional Lyme panel not found: {regional_lyme_path}")
+
+    source_panel_sha256 = compute_sha256(regional_lyme_path)
+    result = build_midatlantic_hotspot_diagnostics(
+        regional_lyme_path,
+        source_panel_sha256=source_panel_sha256,
+    )
+    outputs = write_regional_hotspot_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote {len(result.county_year_rows)} Mid-Atlantic hotspot county-year "
+        f"row(s) to {outputs.county_year_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.summary_rows)} Mid-Atlantic hotspot summary row(s) to "
+        f"{outputs.summary_path}"
+    )
 
 
 @etl_app.command("regional-outcome-stress")

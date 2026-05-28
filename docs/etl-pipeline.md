@@ -74,7 +74,16 @@ request/run manifests as those sources graduate into the modeling lane.
      prior-year or trailing regional history and are the only columns intended
      for forecast-time model experiments.
 
-1e. `tickbiterisk etl regional-outcome-stress`
+1e. `tickbiterisk etl regional-hotspots`
+   - Summarizes same-year Mid-Atlantic reported-case rank, share, hotspot
+     tier, prior-year movement, and top-quintile entry/exit diagnostics.
+   - Writes `midatlantic_hotspot_county_year.csv` and
+     `midatlantic_hotspot_summary.csv`.
+   - Every hotspot field is `diagnostic_*`; these outputs are for regional
+     movement review and surveillance-regime inspection, not forecast-time
+     public scoring.
+
+1f. `tickbiterisk etl regional-outcome-stress`
    - Runs rolling-origin, outcome-only stress tests against the Mid-Atlantic
      county panel.
    - Writes `regional_outcome_stress_runs.csv`,

@@ -13,6 +13,8 @@ Primary artifacts:
 - `build/etl/model/model_features_county_year.csv`
 - `build/etl/model/model_design_matrix_county_year.csv`
 - `build/etl/model/model_design_matrix_schema.json`
+- `build/etl/regional-hotspots/midatlantic_hotspot_county_year.csv`
+- `build/etl/regional-hotspots/midatlantic_hotspot_summary.csv`
 - `build/etl/regional-outcome-stress/regional_outcome_stress_predictions.csv`
 - `build/etl/regional-outcome-stress/regional_outcome_stress_metrics.csv`
 - `build/etl/model-comparison/model_comparison_predictions.csv`
@@ -131,6 +133,11 @@ Regional hotspot and capacity diagnostics may summarize where errors cluster
 or where public-health reporting changes appear to dominate signal, but those
 diagnostics are research context. They do not promote exposure candidates or
 calibration indicators into the selected public dashboard branch.
+
+The Mid-Atlantic hotspot diagnostic uses only same-year reported case counts
+to classify county rank tiers and year-over-year movement. Its fields are
+intentionally named `diagnostic_*` because they can reveal regional movement or
+surveillance-regime disruptions, but they are not forecast-safe model features.
 
 ## Forecast Update Contract
 
