@@ -33,6 +33,12 @@ preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
 source URL hashes and output fields, but this is the target shape for future
 request/run manifests as those sources graduate into the modeling lane.
+Run `tickbiterisk etl provenance-audit --root-dir build/etl` to scan
+`acquisition_provenance.csv` and `source_manifest.csv` files for source URLs,
+citation URLs, rerunnable commands, secret-free requests, derived-artifact
+checksums, retrieval timestamps, parser methods, extraction quality, and
+source caveats before promoting new data into model features or public
+artifacts.
 
 ## Main flow
 

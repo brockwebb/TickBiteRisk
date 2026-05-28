@@ -149,6 +149,7 @@ tickbiterisk etl regional-incidence --regional-lyme-path build/etl/regional-lyme
 tickbiterisk etl regional-outcome-stress --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --output-dir build/etl/regional-outcome-stress
 tickbiterisk etl regional-incidence-stress --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --output-dir build/etl/regional-incidence-stress
 tickbiterisk etl regional-incidence-clusters --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --output-dir build/etl/regional-incidence-clusters
+tickbiterisk etl provenance-audit --root-dir build/etl
 tickbiterisk etl seasonality-baseline --raw-dir data/raw/seasonality --output-dir build/etl/seasonality
 tickbiterisk etl model-features --output-dir build/etl/model
 tickbiterisk etl county-adjacency --county-geojson-path public/data/md_counties.geojson --output-dir build/etl/county-adjacency

@@ -104,5 +104,6 @@ def test_project_docs_define_acquisition_provenance_contract() -> None:
         "retrieval timestamp",
         "parser method",
         "extraction quality",
+        "tickbiterisk etl provenance-audit",
     ]:
         assert token in docs_text

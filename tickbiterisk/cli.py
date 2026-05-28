@@ -165,6 +165,10 @@ from tickbiterisk.etl.open_meteo_backfill import (
     validate_open_meteo_backfill_args,
 )
 from tickbiterisk.etl.population_build import write_county_population_output
+from tickbiterisk.etl.provenance_audit import (
+    audit_provenance_manifests,
+    discover_provenance_manifests,
+)
 from tickbiterisk.etl.raw_download import download_source_files
 from tickbiterisk.etl.seasonality import (
     SeasonalityInputError,
@@ -530,6 +534,41 @@ def etl_check(
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     typer.echo(f"ETL output directory ready: {output_dir}")
+
+
+@etl_app.command("provenance-audit")
+def etl_provenance_audit(
+    root_dir: Path = typer.Option(
+        Path("build/etl"),
+        help="Root directory to scan for acquisition provenance manifests.",
+    ),
+    manifest_paths: list[Path] | None = typer.Option(
+        None,
+        "--manifest-path",
+        help="Specific acquisition_provenance.csv or source_manifest.csv to audit.",
+    ),
+) -> None:
+    paths = manifest_paths or discover_provenance_manifests(root_dir)
+    if not paths:
+        typer.echo(f"No provenance manifests found under {root_dir}.")
+        raise typer.Exit(1)
+    missing_paths = [path for path in paths if not path.exists()]
+    if missing_paths:
+        for path in missing_paths:
+            typer.echo(f"Provenance manifest not found: {path}")
+        raise typer.Exit(1)
+
+    result = audit_provenance_manifests(paths)
+    summary = (
+        f"Audited {result.manifest_count} provenance manifest(s), "
+        f"{result.row_count} row(s), {result.issue_count} issue(s)."
+    )
+    if result.issue_count:
+        typer.echo(f"Provenance audit found {result.issue_count} issue(s).")
+        for issue in result.issues:
+            typer.echo(issue.format())
+        raise typer.Exit(1)
+    typer.echo(summary)
 
 
 @risk_app.command("lookup")
