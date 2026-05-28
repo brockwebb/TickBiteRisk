@@ -105,12 +105,90 @@ class RegionalCapacityInterval:
     comparison_assumption_flags: str
 
 
+MATERIAL_RESIDUAL_INCIDENCE_PER_100K = 10.0
+REPORTING_BREAK_REGIMES = {
+    "covid_reporting_disruption",
+    "case_definition_change_2022_plus",
+    "mdh_probable_only_2024",
+}
+
+
+@dataclass(frozen=True)
+class ForecastUpdateAudit:
+    run_id: str
+    model_name: str
+    model_family: str
+    feature_profile: str
+    source_file_sha256: str
+    source_vintage: str
+    county_fips: str
+    county_name: str
+    forecast_year: int
+    forecast_origin_year: int
+    as_of_date: str
+    data_cutoff_date: str
+    target_definition: str
+    evaluation_mode: str
+    update_mode: str
+    surveillance_regime: str
+    predicted_incidence_per_100k: float
+    predicted_cases: float
+    lower_80_incidence_per_100k: float | None
+    median_incidence_per_100k: float | None
+    upper_80_incidence_per_100k: float | None
+    lower_95_incidence_per_100k: float | None
+    upper_95_incidence_per_100k: float | None
+    interval_available: bool
+    covered_80: bool | None
+    covered_95: bool | None
+    actual_incidence_per_100k: float
+    actual_cases: int
+    residual_incidence_per_100k: float
+    absolute_error_incidence_per_100k: float
+    signed_percent_error: float | None
+    update_direction: str
+    update_interpretation: str
+    model_feature_quality_flags: str
+    comparison_assumption_flags: str
+
+
+@dataclass(frozen=True)
+class ForecastUpdateSummary:
+    run_id: str
+    model_name: str
+    model_family: str
+    feature_profile: str
+    source_file_sha256: str
+    source_vintage: str
+    evaluation_mode: str
+    surveillance_regime: str
+    forecast_year: int | None
+    n_updates: int
+    mean_residual_incidence_per_100k: float
+    mae_incidence_per_100k: float
+    rmse_incidence_per_100k: float
+    interval_available_count: int
+    covered_80_count: int
+    covered_95_count: int
+    forecast_signal_count: int
+    surveillance_regime_signal_count: int
+    ambiguous_signal_count: int
+    insufficient_signal_count: int
+    forecast_signal_share: float
+    surveillance_regime_signal_share: float
+    ambiguous_signal_share: float
+    insufficient_signal_share: float
+    comparison_assumption_flags: str
+
+
 @dataclass(frozen=True)
 class ModelDiagnosticsResult:
     surveillance_residuals: list[SurveillanceRegimeResidual]
     surveillance_summary: list[SurveillanceRegimeSummary]
     regional_hotspot_summary: list[RegionalHotspotSummary]
     regional_capacity_intervals: list[RegionalCapacityInterval]
+    forecast_update_audit: list[ForecastUpdateAudit]
+    forecast_update_summary: list[ForecastUpdateSummary]
 
 
 REQUIRED_PREDICTION_COLUMNS = [
@@ -156,10 +234,22 @@ REQUIRED_INTERVAL_COLUMNS = [
 def build_model_diagnostics(
     predictions_path: Path,
     intervals_path: Path | None = None,
+    *,
+    as_of_date: str = "unspecified",
+    data_cutoff_date: str = "unspecified",
+    source_vintage: str | None = None,
 ) -> ModelDiagnosticsResult:
     prediction_rows = _read_prediction_rows(predictions_path)
     residuals = [_build_residual(row) for row in prediction_rows]
     interval_rows = _read_interval_rows(intervals_path) if intervals_path else []
+    interval_by_key = {_county_model_key(row): row for row in interval_rows}
+    forecast_update_audit = _build_forecast_update_audit(
+        prediction_rows,
+        interval_by_key,
+        as_of_date=as_of_date,
+        data_cutoff_date=data_cutoff_date,
+        source_vintage=source_vintage,
+    )
     return ModelDiagnosticsResult(
         surveillance_residuals=sorted(
             residuals,
@@ -180,6 +270,8 @@ def build_model_diagnostics(
             prediction_rows,
             interval_rows,
         ),
+        forecast_update_audit=forecast_update_audit,
+        forecast_update_summary=_build_forecast_update_summary(forecast_update_audit),
     )
 
 
@@ -238,6 +330,129 @@ def _build_residual(row: dict[str, str]) -> SurveillanceRegimeResidual:
         model_feature_quality_flags=quality_flags,
         comparison_assumption_flags=row.get("comparison_assumption_flags", ""),
     )
+
+
+def _build_forecast_update_audit(
+    prediction_rows: list[dict[str, str]],
+    interval_by_key: dict[
+        tuple[str, str, str, str, str, str, int, str],
+        dict[str, str],
+    ],
+    *,
+    as_of_date: str,
+    data_cutoff_date: str,
+    source_vintage: str | None,
+) -> list[ForecastUpdateAudit]:
+    rows = [
+        _forecast_update_audit_row(
+            row,
+            interval_by_key.get(_county_model_key(row)),
+            as_of_date=as_of_date,
+            data_cutoff_date=data_cutoff_date,
+            source_vintage=source_vintage,
+        )
+        for row in prediction_rows
+    ]
+    return sorted(
+        rows,
+        key=lambda row: (
+            row.run_id,
+            row.model_name,
+            row.feature_profile,
+            row.evaluation_mode,
+            row.source_file_sha256,
+            row.forecast_year,
+            row.county_fips,
+        ),
+    )
+
+
+def _forecast_update_audit_row(
+    row: dict[str, str],
+    interval_row: dict[str, str] | None,
+    *,
+    as_of_date: str,
+    data_cutoff_date: str,
+    source_vintage: str | None,
+) -> ForecastUpdateAudit:
+    forecast_year = _parse_int(row["test_year"], "test_year")
+    forecast_origin_year = _parse_int(row["train_end_year"], "train_end_year")
+    actual_incidence = _parse_float(
+        row["actual_incidence_per_100k"],
+        "actual_incidence_per_100k",
+    )
+    predicted_incidence = _parse_float(
+        row["predicted_incidence_per_100k"],
+        "predicted_incidence_per_100k",
+    )
+    predicted_cases = _parse_float(row["predicted_cases"], "predicted_cases")
+    actual_cases = _parse_int(row["actual_cases"], "actual_cases")
+    residual_incidence = _round(actual_incidence - predicted_incidence)
+    quality_flags = row.get("model_feature_quality_flags", "")
+    surveillance_regime = _classify_surveillance_regime(quality_flags, forecast_year)
+    lower_80 = _optional_interval_float(interval_row, "lower_80_incidence_per_100k")
+    median = _optional_interval_float(interval_row, "median_incidence_per_100k")
+    upper_80 = _optional_interval_float(interval_row, "upper_80_incidence_per_100k")
+    lower_95 = _optional_interval_float(interval_row, "lower_95_incidence_per_100k")
+    upper_95 = _optional_interval_float(interval_row, "upper_95_incidence_per_100k")
+    covered_80 = _optional_interval_bool(interval_row, "covered_80")
+    covered_95 = _optional_interval_bool(interval_row, "covered_95")
+    signed_percent_error = (
+        None
+        if abs(predicted_incidence) < 1e-12
+        else _round(residual_incidence / predicted_incidence * 100)
+    )
+    interpretation = _classify_update_interpretation(
+        surveillance_regime=surveillance_regime,
+        residual_incidence=residual_incidence,
+        covered_95=covered_95,
+        as_of_date=as_of_date,
+        data_cutoff_date=data_cutoff_date,
+        source_vintage=source_vintage,
+    )
+    return ForecastUpdateAudit(
+        run_id=row["run_id"],
+        model_name=row["model_name"],
+        model_family=row["model_family"],
+        feature_profile=row["feature_profile"],
+        source_file_sha256=row["source_file_sha256"],
+        source_vintage=source_vintage or row["source_file_sha256"],
+        county_fips=row["county_fips"].zfill(5),
+        county_name=row["county_name"],
+        forecast_year=forecast_year,
+        forecast_origin_year=forecast_origin_year,
+        as_of_date=as_of_date,
+        data_cutoff_date=data_cutoff_date,
+        target_definition=row.get("target_definition", "lyme_incidence_per_100k"),
+        evaluation_mode=row["evaluation_mode"],
+        update_mode="post_observed_outcome",
+        surveillance_regime=surveillance_regime,
+        predicted_incidence_per_100k=_round(predicted_incidence),
+        predicted_cases=_round(predicted_cases),
+        lower_80_incidence_per_100k=lower_80,
+        median_incidence_per_100k=median,
+        upper_80_incidence_per_100k=upper_80,
+        lower_95_incidence_per_100k=lower_95,
+        upper_95_incidence_per_100k=upper_95,
+        interval_available=interval_row is not None,
+        covered_80=covered_80,
+        covered_95=covered_95,
+        actual_incidence_per_100k=_round(actual_incidence),
+        actual_cases=actual_cases,
+        residual_incidence_per_100k=residual_incidence,
+        absolute_error_incidence_per_100k=_round(abs(residual_incidence)),
+        signed_percent_error=signed_percent_error,
+        update_direction=_update_direction(residual_incidence),
+        update_interpretation=interpretation,
+        model_feature_quality_flags=quality_flags,
+        comparison_assumption_flags=row.get("comparison_assumption_flags", ""),
+    )
+
+
+def _build_forecast_update_summary(
+    _audit_rows: list[ForecastUpdateAudit],
+) -> list[ForecastUpdateSummary]:
+    return []
 
 
 def _classify_surveillance_regime(quality_flags: str, test_year: int) -> str:
@@ -559,6 +774,50 @@ def _summarize_group(
 
 def _split_flags(value: str) -> set[str]:
     return {flag.strip() for flag in value.split(",") if flag.strip()}
+
+
+def _optional_interval_float(row: dict[str, str] | None, column: str) -> float | None:
+    if row is None:
+        return None
+    return _round(_parse_float(row[column], column))
+
+
+def _optional_interval_bool(row: dict[str, str] | None, column: str) -> bool | None:
+    if row is None:
+        return None
+    return _parse_bool(row[column], column)
+
+
+def _update_direction(residual_incidence: float) -> str:
+    if residual_incidence > 0:
+        return "observed_above_forecast"
+    if residual_incidence < 0:
+        return "observed_below_forecast"
+    return "observed_matches_forecast"
+
+
+def _classify_update_interpretation(
+    *,
+    surveillance_regime: str,
+    residual_incidence: float,
+    covered_95: bool | None,
+    as_of_date: str,
+    data_cutoff_date: str,
+    source_vintage: str | None,
+) -> str:
+    if as_of_date == "unspecified" or data_cutoff_date == "unspecified":
+        return "insufficient_signal"
+    if source_vintage in {None, "", "unspecified"}:
+        return "insufficient_signal"
+    if covered_95 is None:
+        return "insufficient_signal"
+    interval_break = covered_95 is False
+    material_residual = abs(residual_incidence) >= MATERIAL_RESIDUAL_INCIDENCE_PER_100K
+    if not interval_break and not material_residual:
+        return "ambiguous_signal"
+    if surveillance_regime in REPORTING_BREAK_REGIMES:
+        return "surveillance_regime_signal"
+    return "forecast_signal"
 
 
 def _read_interval_rows(path: Path) -> list[dict[str, str]]:

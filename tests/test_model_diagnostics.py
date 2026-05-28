@@ -134,6 +134,146 @@ def test_model_diagnostics_builds_regional_hotspot_and_capacity_rows(
         assert next(csv.reader(handle)) == REGIONAL_CAPACITY_INTERVAL_COLUMNS
 
 
+def test_build_model_diagnostics_builds_forecast_update_audit_rows(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    intervals = _write_intervals(tmp_path / "intervals.csv")
+
+    result = build_model_diagnostics(
+        predictions,
+        intervals_path=intervals,
+        as_of_date="2026-05-28",
+        data_cutoff_date="2024-12-31",
+        source_vintage="model_compare_fixture_v1",
+    )
+
+    audit = next(
+        row
+        for row in result.forecast_update_audit
+        if row.model_name == "analog_year_forecast"
+        and row.county_fips == "24009"
+        and row.forecast_year == 2024
+    )
+    assert audit.run_id == "run-1"
+    assert audit.model_family == "analog"
+    assert audit.feature_profile == "analog_year"
+    assert audit.source_file_sha256 == "abc123"
+    assert audit.source_vintage == "model_compare_fixture_v1"
+    assert audit.forecast_origin_year == 2023
+    assert audit.as_of_date == "2026-05-28"
+    assert audit.data_cutoff_date == "2024-12-31"
+    assert audit.target_definition == "lyme_incidence_per_100k"
+    assert audit.evaluation_mode == "rolling_origin_prior_years"
+    assert audit.update_mode == "post_observed_outcome"
+    assert audit.surveillance_regime == "mdh_probable_only_2024"
+    assert audit.predicted_incidence_per_100k == 25.0
+    assert audit.predicted_cases == 25.0
+    assert audit.lower_80_incidence_per_100k == 20.0
+    assert audit.median_incidence_per_100k == 30.0
+    assert audit.upper_80_incidence_per_100k == 40.0
+    assert audit.lower_95_incidence_per_100k == 10.0
+    assert audit.upper_95_incidence_per_100k == 50.0
+    assert audit.interval_available is True
+    assert audit.covered_80 is True
+    assert audit.covered_95 is True
+    assert audit.actual_incidence_per_100k == 30.0
+    assert audit.actual_cases == 30
+    assert audit.residual_incidence_per_100k == 5.0
+    assert audit.absolute_error_incidence_per_100k == 5.0
+    assert audit.signed_percent_error == 20.0
+    assert audit.update_direction == "observed_above_forecast"
+    assert audit.update_interpretation == "ambiguous_signal"
+    assert "mdh_probable_only_2024" in audit.model_feature_quality_flags
+    assert audit.comparison_assumption_flags == "surveillance_reporting_sensitive"
+
+
+def test_forecast_update_audit_marks_missing_intervals_as_insufficient(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+
+    result = build_model_diagnostics(
+        predictions,
+        as_of_date="2026-05-28",
+        data_cutoff_date="2024-12-31",
+        source_vintage="model_compare_fixture_v1",
+    )
+
+    audit = next(
+        row
+        for row in result.forecast_update_audit
+        if row.model_name == "analog_year_forecast" and row.county_fips == "24009"
+    )
+    assert audit.interval_available is False
+    assert audit.covered_80 is None
+    assert audit.covered_95 is None
+    assert audit.update_interpretation == "insufficient_signal"
+
+
+def test_forecast_update_audit_does_not_reuse_wrong_model_interval(
+    tmp_path: Path,
+) -> None:
+    predictions = tmp_path / "predictions.csv"
+    analog_prediction = _prediction_row(
+        county_fips="24009",
+        county_name="County 24009",
+        test_year=2024,
+        actual_cases=30,
+        predicted_cases=25,
+        actual_incidence=30.0,
+        predicted_incidence=25.0,
+        quality_flags="mdh_probable_only_2024,lyme_case_definition_change",
+        model_name="analog_year_forecast",
+        model_family="analog",
+        feature_profile="analog_year",
+    )
+    wrong_model_prediction = {
+        **analog_prediction,
+        "model_name": "different_model",
+        "model_family": "baseline",
+        "feature_profile": "different_profile",
+    }
+    _write_rows(predictions, [analog_prediction, wrong_model_prediction])
+    intervals = _write_interval_rows(
+        tmp_path / "intervals.csv",
+        [
+            {
+                **_interval_row(
+                    county_fips="24009",
+                    county_name="County 24009",
+                    lower_80_incidence=1.0,
+                    median_incidence=2.0,
+                    upper_80_incidence=3.0,
+                    lower_95_incidence=0.5,
+                    upper_95_incidence=3.5,
+                    observed_incidence=30.0,
+                ),
+                "model_name": "different_model",
+                "model_family": "baseline",
+                "feature_profile": "different_profile",
+            }
+        ],
+    )
+
+    result = build_model_diagnostics(
+        predictions,
+        intervals_path=intervals,
+        as_of_date="2026-05-28",
+        data_cutoff_date="2024-12-31",
+        source_vintage="model_compare_fixture_v1",
+    )
+
+    audit = next(
+        row
+        for row in result.forecast_update_audit
+        if row.model_name == "analog_year_forecast" and row.county_fips == "24009"
+    )
+    assert audit.interval_available is False
+    assert audit.lower_80_incidence_per_100k is None
+    assert audit.update_interpretation == "insufficient_signal"
+
+
 def test_build_model_diagnostics_keeps_runs_in_separate_summary_groups(
     tmp_path: Path,
 ) -> None:
