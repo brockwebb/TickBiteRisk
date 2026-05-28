@@ -2,7 +2,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from tests.test_model_diagnostics import _write_predictions
+from tests.test_model_diagnostics import _write_intervals, _write_predictions
 from tickbiterisk.cli import app
 
 
@@ -31,6 +31,50 @@ def test_model_diagnostics_command_writes_surveillance_outputs(
     assert "surveillance_regime_residuals.csv" in result.stdout
     assert (output_dir / "surveillance_regime_residuals.csv").exists()
     assert (output_dir / "surveillance_regime_summary.csv").exists()
+
+
+def test_model_diagnostics_command_writes_forecast_update_outputs(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    intervals = _write_intervals(tmp_path / "intervals.csv")
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-diagnostics",
+            "--predictions-path",
+            str(predictions),
+            "--intervals-path",
+            str(intervals),
+            "--output-dir",
+            str(output_dir),
+            "--as-of-date",
+            "2026-05-28",
+            "--data-cutoff-date",
+            "2024-12-31",
+            "--source-vintage",
+            "model_compare_fixture_v1",
+        ],
+        env={"COLUMNS": "200"},
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 7 forecast update audit row(s)" in result.stdout
+    assert "forecast_update_audit.csv" in result.stdout
+    assert "Wrote 10 forecast update summary row(s)" in result.stdout
+    assert "forecast_update_summary.csv" in result.stdout
+
+    audit_path = output_dir / "forecast_update_audit.csv"
+    summary_path = output_dir / "forecast_update_summary.csv"
+    assert audit_path.exists()
+    assert summary_path.exists()
+    audit_text = audit_path.read_text(encoding="utf-8")
+    assert "2026-05-28" in audit_text
+    assert "2024-12-31" in audit_text
+    assert "model_compare_fixture_v1" in audit_text
 
 
 def test_model_diagnostics_command_fails_cleanly_when_predictions_missing(

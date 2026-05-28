@@ -1196,6 +1196,18 @@ def model_diagnostics(
         Path("build/etl/model-diagnostics"),
         help="Output directory for model diagnostics artifacts.",
     ),
+    as_of_date: str = typer.Option(
+        "unspecified",
+        help="Forecast diagnostic as-of date.",
+    ),
+    data_cutoff_date: str = typer.Option(
+        "unspecified",
+        help="Latest source data date represented in forecast diagnostics.",
+    ),
+    source_vintage: str | None = typer.Option(
+        None,
+        help="Optional source vintage label for forecast diagnostics.",
+    ),
 ) -> None:
     if not predictions_path.exists():
         raise typer.BadParameter(
@@ -1210,6 +1222,9 @@ def model_diagnostics(
         result = build_model_diagnostics(
             predictions_path=predictions_path,
             intervals_path=intervals_path,
+            as_of_date=as_of_date,
+            data_cutoff_date=data_cutoff_date,
+            source_vintage=source_vintage,
         )
     except ModelDiagnosticsInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -1229,6 +1244,14 @@ def model_diagnostics(
     typer.echo(
         f"Wrote {len(result.regional_capacity_intervals)} regional capacity row(s) to "
         f"{outputs.regional_capacity_intervals_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.forecast_update_audit)} forecast update audit row(s) to "
+        f"{outputs.forecast_update_audit_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.forecast_update_summary)} forecast update summary row(s) to "
+        f"{outputs.forecast_update_summary_path}"
     )
 
 
