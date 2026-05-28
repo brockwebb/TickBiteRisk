@@ -150,6 +150,17 @@ from tickbiterisk.etl.noaa_backfill import (
     run_noaa_maryland_backfill,
     validate_noaa_backfill_args,
 )
+from tickbiterisk.etl.nssp_coverage import (
+    CDC_NSSP_ABOUT_URL,
+    CDC_NSSP_COVERAGE_CSV_URL,
+    NSSP_COVERAGE_AS_OF_DATE,
+    NSSP_COVERAGE_SOURCE_ID,
+    NsspCoverageInputError,
+    build_maryland_nssp_coverage,
+    ensure_nssp_coverage_raw,
+    parse_nssp_coverage_csv,
+)
+from tickbiterisk.etl.nssp_coverage_build import write_nssp_coverage_output
 from tickbiterisk.etl.open_meteo import (
     build_open_meteo_archive_url,
     fetch_open_meteo_archive,
@@ -1493,6 +1504,74 @@ def tick_status(
         f"Wrote {len(feature_rows)} tick status feature row(s) to "
         f"{outputs.features_path}"
     )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
+@etl_app.command("nssp-coverage")
+def nssp_coverage(
+    raw_path: Path = typer.Option(
+        Path("data/raw/nssp/Coverage_Map_Tbl_2024Jul01.csv"),
+        help="Raw CDC NSSP county coverage CSV path.",
+    ),
+    county_reference_path: Path = typer.Option(
+        Path("build/etl/county-reference/county_reference.csv"),
+        help="County reference CSV used to attach Maryland FIPS codes.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/nssp-coverage"),
+        help="Output directory for normalized NSSP coverage artifacts.",
+    ),
+    coverage_url: str = typer.Option(
+        CDC_NSSP_COVERAGE_CSV_URL,
+        help="CDC NSSP county coverage CSV URL.",
+    ),
+    download_if_missing: bool = typer.Option(
+        True,
+        help="Download the public CDC CSV if --raw-path is missing.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
+) -> None:
+    try:
+        downloaded = ensure_nssp_coverage_raw(
+            raw_path,
+            coverage_url=coverage_url,
+            download_if_missing=download_if_missing,
+        )
+        raw_text = raw_path.read_text(encoding="utf-8-sig")
+        raw_rows = parse_nssp_coverage_csv(raw_text)
+        rows = build_maryland_nssp_coverage(
+            raw_rows,
+            county_reference_path=county_reference_path,
+            source_id=NSSP_COVERAGE_SOURCE_ID,
+            source_url=coverage_url,
+            coverage_as_of_date=NSSP_COVERAGE_AS_OF_DATE,
+        )
+    except NsspCoverageInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    output_path = write_nssp_coverage_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        [
+            _nssp_coverage_provenance_record(
+                raw_path=raw_path,
+                output_path=output_path,
+                output_dir=output_dir,
+                county_reference_path=county_reference_path,
+                manifest_path=resolved_manifest_path,
+                coverage_url=coverage_url,
+                downloaded=downloaded,
+                row_count=len(rows),
+            )
+        ],
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(f"Wrote {len(rows)} NSSP coverage row(s) to {output_path}")
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
@@ -3975,6 +4054,70 @@ def _tick_status_provenance_records(
             )
         )
     return records
+
+
+def _nssp_coverage_provenance_record(
+    *,
+    raw_path: Path,
+    output_path: Path,
+    output_dir: Path,
+    county_reference_path: Path,
+    manifest_path: Path,
+    coverage_url: str,
+    downloaded: bool,
+    row_count: int,
+) -> AcquisitionProvenanceRecord:
+    command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "nssp-coverage",
+            "--raw-path",
+            _public_provenance_path(raw_path),
+            "--county-reference-path",
+            _public_provenance_path(county_reference_path),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--coverage-url",
+            coverage_url,
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+    return AcquisitionProvenanceRecord(
+        source_id=NSSP_COVERAGE_SOURCE_ID,
+        source_name=(
+            "CDC NSSP emergency-care facility participation coverage table"
+        ),
+        source_url=coverage_url,
+        citation_url=CDC_NSSP_ABOUT_URL,
+        acquisition_command=command,
+        acquisition_procedure=(
+            "Download or read the public CDC NSSP county coverage table, "
+            "filter Maryland rows, attach county FIPS codes, and preserve "
+            "coverage-status caveats."
+        ),
+        request_method="GET" if downloaded else "LOCAL_FILE_READ",
+        request_description=(
+            f"{'Downloaded' if downloaded else 'Read local'} CDC NSSP coverage "
+            f"CSV {raw_path.name} from {coverage_url}."
+        ),
+        derived_artifact_paths=[raw_path, output_path],
+        derived_artifact_path_labels=[raw_path.name, output_path.name],
+        row_count=row_count,
+        parser_method=(
+            "parse_nssp_coverage_csv;build_maryland_nssp_coverage"
+        ),
+        extraction_quality="accepted",
+        access_notes=(
+            "Public CDC NSSP coverage table; county status only and no API "
+            "key required."
+        ),
+        modeling_caveats=(
+            "Coverage feasibility only; not tick-bite ED volume, not Lyme "
+            "incidence, and not human-exposure truth."
+        ),
+    )
 
 
 def _resolve_tick_status_sources(

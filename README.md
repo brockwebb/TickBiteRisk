@@ -123,6 +123,7 @@ stable truth.
 | Maryland DNR deer harvest | County-season host-pressure proxy |
 | CDC tick vector/pathogen status | Static surveillance status feature candidates through 2025 |
 | Census building permits | Contact/land-use pressure proxy |
+| CDC NSSP coverage table | Emergency-care feed coverage feasibility only, not tick-bite counts |
 | NLCD/MRLC land cover | Habitat source acquired for deeper feature extraction |
 | Maryland DNR mast/acorn reports | Western Maryland study-plot ecology; prior-year model candidate |
 | U.S. Drought Monitor | Retrospective county-year drought context |
@@ -150,6 +151,7 @@ tickbiterisk etl regional-outcome-stress --regional-lyme-path build/etl/regional
 tickbiterisk etl regional-incidence-stress --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --output-dir build/etl/regional-incidence-stress
 tickbiterisk etl regional-incidence-clusters --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --output-dir build/etl/regional-incidence-clusters
 tickbiterisk etl provenance-audit --root-dir build/etl
+tickbiterisk etl nssp-coverage --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/nssp-coverage
 tickbiterisk etl seasonality-baseline --raw-dir data/raw/seasonality --output-dir build/etl/seasonality
 tickbiterisk etl model-features --output-dir build/etl/model
 tickbiterisk etl county-adjacency --county-geojson-path public/data/md_counties.geojson --output-dir build/etl/county-adjacency

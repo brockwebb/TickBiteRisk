@@ -119,6 +119,22 @@ CREATE TABLE IF NOT EXISTS lone_star_status (
     PRIMARY KEY (source_id, county_fips)
 );
 
+CREATE TABLE IF NOT EXISTS nssp_coverage (
+    county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
+    state_abbr char(2) NOT NULL DEFAULT 'MD',
+    county_name text NOT NULL,
+    nssp_county_name text NOT NULL,
+    nssp_coverage_status text NOT NULL,
+    nssp_coverage_category text NOT NULL,
+    recent_data_in_nssp boolean NOT NULL,
+    coverage_as_of_date date NOT NULL,
+    source_id text NOT NULL,
+    source_url text NOT NULL,
+    feature_quality_flags text DEFAULT '',
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (source_id, county_fips)
+);
+
 CREATE TABLE IF NOT EXISTS county_reference (
     county_fips char(5) PRIMARY KEY REFERENCES md_jurisdictions(county_fips),
     state_fips char(2) NOT NULL DEFAULT '24',

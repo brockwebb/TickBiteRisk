@@ -23,7 +23,7 @@ boundary clearly allow redistribution.
 | `census_bps` | Census Building Permits Survey county files | County-year | Contact/land-use pressure proxy | active_etl |
 | `maryland_mast_reports` | Maryland DNR mast/acorn reports | Region/report | Ecological food pulse candidate | acquired_low_confidence |
 | `noaa_cpc_oni` | NOAA CPC Oceanic Nino Index | Global seasonal climate index | Lagged ENSO phase overtone candidate; materialized as complete prior-year model features, not joined into public model yet | active_etl_candidate_feature |
-| `nssp_coverage` | NSSP coverage map table | County/status | Feasibility check for future ED tick-bite feed | acquired_not_model_input |
+| `nssp_coverage` | NSSP coverage map table | County/status | Feasibility check for future ED tick-bite feed; materialized with county FIPS and caveats, but not tick-bite counts | active_etl_feasibility_only_not_model_input |
 | `capc_dog_serology` | CAPC canine Lyme data | County/month | Possible veterinary sentinel source | not_redistributed_license_sensitive |
 
 ## Potential source and feature candidates
@@ -81,6 +81,7 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `forecast_calibration_backtest_metrics.csv` | `tickbiterisk etl forecast-calibration-backtest` | Original-vs-calibrated MAE/RMSE metrics for empirical update multipliers |
 | `noaa_cpc_oni_seasons.csv` | `tickbiterisk etl enso-oni` | NOAA CPC ONI seasonal anomalies and El Nino / La Nina phase labels |
 | `noaa_cpc_oni_model_year_features.csv` | `tickbiterisk etl enso-oni` | Complete prior-year ONI model-year climate context features |
+| `nssp_coverage_county_status.csv` | `tickbiterisk etl nssp-coverage` | CDC NSSP county emergency-care coverage feasibility status |
 | `seasonality_baseline.csv` | `tickbiterisk etl seasonality-baseline` | CDC weekly/monthly Lyme onset share baseline |
 | `county_week_seasonal_risk_baseline.csv` | `tickbiterisk etl county-week-risk` | Product-shaped county-week relative risk rows |
 | `md_county_risk_weekly.json` | `tickbiterisk risk export-static` | Public dashboard score payload |
@@ -100,8 +101,9 @@ feature ideas to test in time-aware backtests before any public model claim.
 
 ## Known gaps
 
-- NSSP tick-bite ED data is not wired into the current model. The acquired
-  coverage table only tells us where future work may be feasible.
+- NSSP tick-bite ED data is not wired into the current model. The materialized
+  coverage table only tells us where future ED/syndromic data work may be
+  feasible; it is not a tick-bite feed or a disease outcome.
 - Mast/acorn reports are currently low-confidence for structured county-year
   extraction and should be treated as notes until better extraction or manual
   review exists.
