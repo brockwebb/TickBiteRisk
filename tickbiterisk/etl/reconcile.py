@@ -53,6 +53,12 @@ def reconcile_lyme_county_year(
             flags.append("covid_reporting_disruption")
         if year >= 2022:
             flags.append("lyme_case_definition_change")
+        if any(
+            value.source_id == "mdh_lyme_2013_2024_pdf" and year == 2024
+            for value in values
+        ):
+            flags.append("mdh_probable_only_2024")
+            flags.append("state_source_not_cdc_public_use")
         if any(value.source_id == "cdc_all_tbd_2022_public" for value in values):
             flags.append("contains_noncanonical_all_tbd_comparator")
 

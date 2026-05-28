@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from tickbiterisk.etl.maryland import maryland_fips_set
+from tickbiterisk.etl.maryland import load_maryland_jurisdictions, maryland_fips_set
 
 
 @dataclass(frozen=True)
@@ -157,3 +157,76 @@ def parse_cdc_lyme_geodata(path: Path, source_id: str) -> list[LymeCountyYearVal
             )
         )
     return sorted(rows, key=lambda row: (row.county_fips, row.year, row.source_id))
+
+
+def parse_mdh_lyme_pdf(path: Path, source_id: str) -> list[LymeCountyYearValue]:
+    try:
+        import pypdfium2 as pdfium
+    except ImportError as exc:  # pragma: no cover - dependency is present in CI
+        raise ValueError("pypdfium2 is required to parse the MDH Lyme PDF") from exc
+
+    pdf = pdfium.PdfDocument(path)
+    text_parts = []
+    for page in pdf:
+        text_parts.append(page.get_textpage().get_text_range())
+    return parse_mdh_lyme_pdf_text("\n".join(text_parts), source_id=source_id)
+
+
+def parse_mdh_lyme_pdf_text(text: str, source_id: str) -> list[LymeCountyYearValue]:
+    county_lookup = _mdh_county_name_lookup()
+    rows: list[LymeCountyYearValue] = []
+    for raw_line in text.splitlines():
+        line = " ".join(raw_line.strip().split())
+        if not line or line.startswith(("Lyme Disease", "2013 ", "JURISDICTION")):
+            continue
+        if line.startswith(("Statewide total", "Incidence per", "^ ", "* ", "Revised ")):
+            continue
+        parts = line.split()
+        numeric_start = next(
+            (index for index, part in enumerate(parts) if _is_number_token(part)),
+            None,
+        )
+        if numeric_start is None:
+            continue
+        county_name = " ".join(parts[:numeric_start])
+        county_fips = county_lookup.get(county_name)
+        if county_fips is None:
+            continue
+        numeric_values = [_frequency_to_int(part) for part in parts[numeric_start:-1]]
+        if len(numeric_values) != 12:
+            raise ValueError(
+                f"Expected 12 MDH Lyme year values for {county_name}, "
+                f"found {len(numeric_values)}"
+            )
+        for offset, total in enumerate(numeric_values):
+            year = 2013 + offset
+            rows.append(
+                LymeCountyYearValue(
+                    source_id=source_id,
+                    county_fips=county_fips,
+                    year=year,
+                    confirmed_cases=None,
+                    probable_cases=total if year == 2024 else None,
+                    total_cases=total,
+                )
+            )
+    if not rows:
+        raise ValueError("No MDH Lyme county-year rows parsed from PDF text")
+    return sorted(rows, key=lambda row: (row.county_fips, row.year, row.source_id))
+
+
+def _mdh_county_name_lookup() -> dict[str, str]:
+    lookup = {}
+    for jurisdiction in load_maryland_jurisdictions():
+        county_name = jurisdiction.county_name
+        mdh_name = county_name.removesuffix(" County")
+        lookup[mdh_name] = jurisdiction.county_fips
+    return lookup
+
+
+def _is_number_token(value: str) -> bool:
+    try:
+        float(str(value).replace(",", ""))
+        return True
+    except ValueError:
+        return False

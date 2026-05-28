@@ -77,6 +77,7 @@ from tickbiterisk.etl.lyme import (
     parse_cdc_county_dashboard,
     parse_cdc_lyme_geodata,
     parse_cdc_lyme_public_use,
+    parse_mdh_lyme_pdf,
 )
 from tickbiterisk.etl.mast_acorn import (
     build_mast_acorn_from_pdf,
@@ -1273,6 +1274,15 @@ def lyme_outcomes(
     for filename, source_id, parser in source_files:
         source_path = raw_dir / filename
         rows.extend(parser(source_path, source_id=source_id))
+    mdh_pdf_path = raw_dir / "mdh_lyme_2013_2024.pdf"
+    if mdh_pdf_path.exists():
+        rows.extend(
+            row
+            for row in parse_mdh_lyme_pdf(
+                mdh_pdf_path, source_id="mdh_lyme_2013_2024_pdf"
+            )
+            if row.year == 2024
+        )
 
     output = write_reconciled_lyme_outputs(rows, output_dir)
     with output.open(newline="", encoding="utf-8") as handle:

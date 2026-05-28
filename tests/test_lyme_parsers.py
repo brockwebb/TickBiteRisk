@@ -7,6 +7,7 @@ from tickbiterisk.etl.lyme import (
     parse_cdc_county_dashboard,
     parse_cdc_lyme_geodata,
     parse_cdc_lyme_public_use,
+    parse_mdh_lyme_pdf_text,
 )
 
 _GEODATA_HEADER = (
@@ -127,3 +128,40 @@ def test_parse_cdc_lyme_geodata_rejects_duplicate_total_disagreement(
             path,
             source_id="cdc_lyme_county_geodata_2000_2021",
         )
+
+
+def test_parse_mdh_lyme_pdf_text_reads_2024_probable_only_table() -> None:
+    text = """Lyme Disease in Maryland by Jurisdiction 2013-2024
+2013 2014 2015 2016 2017 2018 2019 2020 2021 2022 2023 2024
+JURISDICTION *Confirmed and Probable ^Probable only 2024 Incidence
+Allegany 33 51 80 86 87 85 71 51 84 108 153 143 213.1
+Anne Arundel 95 117 107 178 127 90 110 70 153 126 161 203 33.7
+Baltimore City 17 30 43 39 33 29 41 11 24 99 54 127 22.4
+Baltimore 144 199 218 191 212 176 138 52 81 279 413 443 52.0
+Prince George's 8 2 47 59 130 16 22 0 0 49 80 152 15.7
+Statewide total 1198 1373 1727 1867 1887 1384 1420 838 918 2036 2463 3093
+^ Change in case definition where Confirmed classification eliminated, and only Probable are reported.
+"""
+
+    rows = parse_mdh_lyme_pdf_text(text, source_id="mdh_lyme_2013_2024_pdf")
+
+    assert len(rows) == 5 * 12
+    anne_2024 = next(
+        row for row in rows if row.county_fips == "24003" and row.year == 2024
+    )
+    assert anne_2024.total_cases == 203
+    assert anne_2024.confirmed_cases is None
+    assert anne_2024.probable_cases == 203
+    baltimore_county = next(
+        row for row in rows if row.county_fips == "24005" and row.year == 2024
+    )
+    assert baltimore_county.total_cases == 443
+    baltimore_city = next(
+        row for row in rows if row.county_fips == "24510" and row.year == 2024
+    )
+    assert baltimore_city.total_cases == 127
+    prince_georges = next(
+        row for row in rows if row.county_fips == "24033" and row.year == 2024
+    )
+    assert prince_georges.total_cases == 152
+    assert all(row.source_id == "mdh_lyme_2013_2024_pdf" for row in rows)

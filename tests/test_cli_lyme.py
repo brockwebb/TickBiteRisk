@@ -5,6 +5,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
+from tickbiterisk.etl.lyme import LymeCountyYearValue
 
 
 runner = CliRunner()
@@ -75,6 +76,76 @@ def test_lyme_outcomes_command_writes_reconciled_county_years(tmp_path) -> None:
     )
     assert anne_2022["total_cases"] == "127"
     assert anne_2022["canonical_source_id"] == "cdc_lyme_public_2022_2023"
+
+
+def test_lyme_outcomes_command_includes_mdh_2024_when_pdf_is_present(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "out"
+    _create_required_lyme_sources(raw_dir)
+    (raw_dir / "mdh_lyme_2013_2024.pdf").write_bytes(b"%PDF fixture")
+
+    def fake_parse_mdh(path, source_id):
+        return [
+            LymeCountyYearValue(
+                source_id=source_id,
+                county_fips="24003",
+                year=2023,
+                confirmed_cases=161,
+                probable_cases=0,
+                total_cases=161,
+            ),
+            LymeCountyYearValue(
+                source_id=source_id,
+                county_fips="24003",
+                year=2024,
+                confirmed_cases=None,
+                probable_cases=203,
+                total_cases=203,
+            ),
+        ]
+
+    monkeypatch.setattr("tickbiterisk.cli.parse_mdh_lyme_pdf", fake_parse_mdh)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "lyme-outcomes",
+            "--raw-dir",
+            str(raw_dir),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 9 reconciled Lyme county-year outcome row(s)" in result.stdout
+
+    with (output_dir / "lyme_county_year_reconciled.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    anne_2024 = next(
+        row
+        for row in rows
+        if row["county_fips"] == "24003" and row["year"] == "2024"
+    )
+    assert anne_2024["total_cases"] == "203"
+    assert anne_2024["canonical_source_id"] == "mdh_lyme_2013_2024_pdf"
+    assert anne_2024["data_quality_flags"] == (
+        "lyme_case_definition_change;mdh_probable_only_2024;"
+        "state_source_not_cdc_public_use"
+    )
+
+    anne_2023 = next(
+        row
+        for row in rows
+        if row["county_fips"] == "24003" and row["year"] == "2023"
+    )
+    assert anne_2023["canonical_source_id"] == "cdc_lyme_public_2022_2023"
 
 
 def test_lyme_outcomes_command_fails_cleanly_when_source_file_missing(

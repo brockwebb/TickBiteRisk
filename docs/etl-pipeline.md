@@ -13,9 +13,12 @@ candidates until backtesting shows they improve the public score.
 ## Main flow
 
 1. `tickbiterisk etl lyme-outcomes`
-   - Reads ignored raw CDC Lyme source files.
+   - Reads ignored raw CDC Lyme source files and, when present, the official
+     MDH 2013-2024 Lyme PDF.
    - Reconciles Maryland county-year Lyme counts across CDC public-use,
      dashboard, and geodata sources.
+   - Includes MDH 2024 rows only, preserving CDC as canonical for overlapping
+     2013-2023 history and flagging the 2024 state/probable-only caveats.
    - Writes `lyme_county_year_reconciled.csv`.
 
 2. `tickbiterisk etl county-reference`
@@ -156,5 +159,8 @@ probability or a treatment recommendation.
   true forecast-time feature set.
 - Spatial lag features use prior-year neighbor outcomes only; same-year
   neighbor outcomes are not forecast-safe.
+- MDH 2024 Lyme rows are latest-outcome context, not a CDC public-use update.
+  They remain outside `model_features_county_year.csv` until 2024 county
+  population denominators are available.
 
 Last updated: 2026-05-28.

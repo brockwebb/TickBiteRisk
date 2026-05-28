@@ -11,7 +11,7 @@ boundary clearly allow redistribution.
 | --- | --- | --- | --- | --- |
 | `cdc_lyme_public_use` | CDC Lyme public-use aggregated geography files | County-year | Long-run Lyme outcome spine | active_etl |
 | `cdc_lyme_dashboard_exports` | CDC county/state/region Lyme dashboard exports through 2023 | County/state/region-year | Reconciliation and validation checks | active_etl |
-| `maryland_lyme_pdf` | Maryland Department of Health Lyme PDF, 2013-2024 | Maryland county-year | Maryland cross-check and source context | acquired |
+| `maryland_lyme_pdf` | Maryland Department of Health Lyme PDF, 2013-2024 | Maryland county-year | Latest Maryland 2024 outcome lane, with overlapping years kept as validation context | active_etl_latest_2024 |
 | `cdc_lyme_seasonality` | CDC Lyme onset by MMWR week and month | National week/month | Static seasonal allocation from annual predictions to county-week baseline | active_etl |
 | `noaa_ghcnd` | NOAA daily station observations | Station-day to county-week/year | Weather feature candidates and backtesting inputs | active_etl |
 | `census_county_reference` | Census Gazetteer county file | County | County names, FIPS, land/water area, internal points | active_etl |
@@ -92,5 +92,9 @@ feature ideas to test in time-aware backtests before any public model claim.
 - Open-Meteo recent backfill is local under ignored `build/etl/open-meteo`.
   It currently covers 2020-2023 for all 24 Maryland jurisdictions and is a
   model-feature candidate, not the selected public weather source.
+- Maryland 2024 Lyme outcomes now come from the MDH PDF because CDC public-use
+  county outputs still stop at 2023. Those 2024 rows are flagged
+  `mdh_probable_only_2024` and `state_source_not_cdc_public_use`; they do not
+  enter model features until 2024 population denominators are wired in.
 
 Last updated: 2026-05-28.

@@ -1,7 +1,7 @@
 # TickBiteRisk Data Manifest
 
 Version: 0.1 draft  
-Date: 2026-05-27
+Date: 2026-05-28
 Scope: Maryland-first tick-risk warehouse and modeling inputs
 
 ## Status Legend
@@ -35,7 +35,7 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 | `cdc_lyme_county_dashboard_2023` | CDC Lyme county counts dashboard export | `/Users/brock/Downloads/LD_Case_Counts_by_County_2023_updated.csv` | CSV, latin1 | County | 2001-2023 | Outcome, reconciliation | acquired, etl_supported, etl_materialized | Public CDC dashboard export | `e2fe2d71dbce065d7c89430bc3c9fede9392831d9856b636339aac00655fae45`; requires non-UTF-8 read |
 | `cdc_lyme_county_geodata_2000_2021` | CDC county Lyme geodata | `/Users/brock/Downloads/Lyme_Diseases_Cases_by_US_County_2000_2021_Geodata.csv` | CSV | County FIPS plus geometry attributes | 2000-2021 | Outcome, geography, reconciliation | acquired, etl_supported, etl_materialized | Public CDC/dashboard geodata | `cf650fb867dfbfbafb02b9e2a40a7690bd33b8d80003630f95c6fffe0d06e7a6` |
 | `cdc_lyme_county_geodata_geojson` | CDC county Lyme geodata geometry | `/Users/brock/Downloads/Lyme_Diseases_Cases_by_US_County_2000_2021_Geodata.geojson` | GeoJSON | County geometry | 2000-2021 | Geometry, optional map output | acquired, needs_etl | Large local geodata; do not commit | 89 MB; checksum not captured yet |
-| `mdh_lyme_2013_2024_pdf` | Maryland DHMH/MDH Lyme Disease Data 2013 to 2024 | `https://health.maryland.gov/phpa/OIDEOR/CZVBD/Shared%20Documents/Lyme%20Disease%20Data%202013%20to%202024.pdf` | PDF | Maryland jurisdictions | 2013-2024 | Outcome, state-specific validation | candidate, needs_acquisition, needs_etl | Public state PDF | Important for 2024; 2024 probable-only caveat |
+| `mdh_lyme_2013_2024_pdf` | Maryland DHMH/MDH Lyme Disease Data 2013 to 2024 | `https://health.maryland.gov/phpa/OIDEOR/CZVBD/Shared%20Documents/Lyme%20Disease%20Data%202013%20to%202024.pdf` | PDF | Maryland jurisdictions | 2013-2024 | Outcome, state-specific validation, latest Maryland outcome lane | acquired, etl_supported, etl_materialized_latest, model_target_candidate | Public state PDF | Official MDH/CZVBD PDF acquired 2026-05-28 into ignored raw storage. `pypdfium2` parser extracted 288 jurisdiction-year rows. The default Lyme outcome ETL includes only the 24 2024 rows so CDC remains canonical for 2013-2023. 2024 rows sum to 3,093 statewide and carry `mdh_probable_only_2024` plus `state_source_not_cdc_public_use`. |
 | `cdc_caseincid_cases_state_2023` | CDC Lyme cases by state/locality | `/Users/brock/Downloads/2023_CaseIncid-Lyme-Disease-Cases-by-State-or-Locality.csv` | CSV, latin1 | State/locality | 2008-2023 | State validation | acquired, needs_etl | Public CDC dashboard export | `ecc6b60823cb32c7c0b9c0522817beca967a771f29cf29a11f970d5bb19e8e61` |
 | `cdc_caseincid_rates_state_2023` | CDC Lyme rates by state/locality | `/Users/brock/Downloads/2023_CaseIncid-Lyme-Disease-Rates-by-State-or-Locality.csv` | CSV | State/locality | 2010-2023 | State validation, population-implied checks | acquired, needs_etl | Public CDC dashboard export | `1b12baba495bc96d412ac96fa6176b265de26e65106681b74ab29cc3d4dc0488` |
 | `cdc_caseincid_overall_cases_2023` | CDC overall Lyme cases by year | `/Users/brock/Downloads/2023_CaseIncid-Lyme-Disease-Overall-Cases-by-Year.csv` | CSV | United States | 1996-2023 | National validation | acquired, needs_etl | Public CDC dashboard export | `521879552c7d30bc881435adfd95223ac06a2777749027233329384dc592d4c5` |
@@ -93,6 +93,7 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 - CDC Lyme public-use CSVs for 1992-2023; materialized into `build/etl/lyme/lyme_county_year_reconciled.csv`.
 - CDC Lyme county dashboard export through 2023; materialized into `build/etl/lyme/lyme_county_year_reconciled.csv`.
 - CDC Lyme county geodata for 2000-2021; materialized into `build/etl/lyme/lyme_county_year_reconciled.csv`.
+- MDH Lyme Disease Data 2013 to 2024 PDF; materialized into the Lyme outcome panel for 2024 only with probable-only and state-source caveat flags.
 - CDC dashboard seasonality exports; materialized into `build/etl/seasonality/seasonality_observations.csv` and `build/etl/seasonality/seasonality_baseline.csv`.
 - County-week seasonal risk baseline; materialized into `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv` after model comparison predictions and seasonality ETL are available.
 - CDC Ixodes vector status workbook; materialized into `build/etl/tick-status/tick_vector_status.csv`.
@@ -112,7 +113,7 @@ Scope: Maryland-first tick-risk warehouse and modeling inputs
 ### Needs Review Before Modeling
 
 - 33 CDC Lyme outcome rows where public-use, county dashboard, or geodata sources disagree; `lyme_county_year_reconciled.csv` preserves these as `reconciliation_status=conflict`.
-- MDH 2013-2024 PDF vs. CDC public-use/dashboard values.
+- MDH 2013-2023 PDF values vs. CDC public-use/dashboard values remain validation context only. MDH 2024 is included because CDC county public-use outputs have not advanced beyond 2023.
 - `AllTBD2022_Public` vs. official CDC/MDH Lyme totals.
 - 2022+ Lyme case-definition change.
 - 2020 COVID reporting disruption.
@@ -143,7 +144,7 @@ For Maryland Lyme county-year modeling:
 
 1. Prefer official CDC public-use aggregated geography files for raw case provenance.
 2. Use CDC county dashboard/geodata files to simplify county-year extraction, but reconcile them back to public-use totals.
-3. Use MDH PDF/table as Maryland-specific validation and likely canonical source for 2024.
+3. Use MDH PDF/table as Maryland-specific validation for overlapping years and as the caveated canonical Maryland source for 2024 until CDC public-use county outputs catch up.
 4. Treat `AllTBD2022_Public` as a comparator until its source definition is verified.
 5. Never use current cumulative vector/pathogen status as if it were known in earlier historical years unless the model run is labeled as retrospective reconstruction.
 
@@ -151,7 +152,7 @@ For Maryland Lyme county-year modeling:
 
 The Lyme outcome ETL slice builds `lyme_county_year_reconciled.csv` with `tickbiterisk etl lyme-outcomes --raw-dir data/raw/lyme --output-dir build/etl/lyme`.
 
-The 2026-05-25 live smoke wrote 700 Maryland county-year rows for 24 jurisdictions from 1992-2023: 667 matched rows, 33 conflict rows, 24 rows flagged `covid_reporting_disruption`, and 48 rows flagged `lyme_case_definition_change`.
+The 2026-05-28 live smoke wrote 724 Maryland county-year rows for 24 jurisdictions from 1992-2024: 691 matched rows, 33 conflict rows, 24 rows flagged `covid_reporting_disruption`, 72 rows flagged `lyme_case_definition_change`, and 24 2024 rows from MDH flagged `mdh_probable_only_2024` and `state_source_not_cdc_public_use`. The 2024 MDH rows sum to 3,093 statewide. The model feature matrix still stops at 2023 until a 2024 county population denominator source is added.
 
 Columns:
 
