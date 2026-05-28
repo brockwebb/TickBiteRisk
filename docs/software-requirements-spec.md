@@ -35,6 +35,12 @@ The MVP is Maryland-only:
 
 The immediate user test case is ZIP `21146`, which maps primarily to Anne Arundel County.
 
+A future regional iteration should treat the current scope as Maryland-first,
+not Maryland-only. Candidate expansion jurisdictions are West Virginia,
+Virginia, Pennsylvania, Delaware, and Washington, DC / the District of
+Columbia, gated by county or county-equivalent outcome data, population
+denominators, geography, source terms, and time-aware validation.
+
 ## 4. Users
 
 Primary users:
@@ -234,6 +240,13 @@ county-week Lyme baseline with accessible map, county list, detail panel, CDC
 guidance links, and plain-language caveats. The dashboard must not describe the
 score as diagnosis, treatment guidance, personal infection probability, or
 weather-adjusted forecast.
+
+Future dashboard iterations should revisit the time control. The current date
+dropdown is sufficient for lookup, but a temporal slider, year-over-year
+comparison mode, or small-multiple view may better show seasonal dynamics and
+apparent spatial shifts. Any animation or change map must distinguish observed
+surveillance/reporting patterns from proven tick migration, pathogen migration,
+or individual exposure.
 
 ### FR5: Tick and Pathogen Status
 
@@ -463,4 +476,6 @@ The next build slice is accepted when:
 - Can CAPC canine data be used legally and practically as a sentinel feature?
 - Can park attendance or trail-use records become a useful exposure denominator, despite the gap between recreation location and Lyme residence/reporting county?
 - Should the first user-facing score be county-week or date-with-seasonal-overlay?
+- Should the dashboard keep a date dropdown, move to a temporal slider, or
+  support both for year-over-year comparison and apparent spatial shifts?
 - Should ZIP-code lookup use Census ZCTA crosswalks or a commercial/local geocoder?

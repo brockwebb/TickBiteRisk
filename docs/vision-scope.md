@@ -36,6 +36,11 @@ The v0 single-bite CLI answers: "Given what I know about this attached tick,
 how elevated is my Lyme concern score, and which CDC consideration criteria are
 met, not met, or uncertain?"
 
+The project is Maryland-first, not Maryland-only. A future regional iteration
+should test WV, VA, PA, DE, and Washington, DC if data availability, county or
+county-equivalent geography, and source terms support the same transparent
+validation standard.
+
 ## Out of current scope
 
 - Personal medical advice, diagnosis, prophylaxis decisions, or treatment
@@ -71,6 +76,12 @@ Future work may test:
   plain-language questions.
 - Multi-pathogen extensions for anaplasmosis, babesiosis, ehrlichiosis,
   spotted fever rickettsiosis, Powassan, and tularemia where data support it.
+- Mid-Atlantic expansion into West Virginia, Virginia, Pennsylvania, Delaware,
+  and the District of Columbia/Washington, DC, so a larger ecological and
+  surveillance region can challenge the current Maryland-only model.
+- Temporal exploration views that let users compare year-over-year patterns,
+  seasonal shifts, and apparent spatial movement without treating those
+  patterns as proof of tick migration or individual exposure.
 - Intervention-aware models for public health campaign planning.
 
 Those ideas stay labeled as research until validation, clinical wording, and
@@ -85,4 +96,4 @@ public-health review support them.
    pass.
 5. Clear separation between informational risk context and medical guidance.
 
-Last updated: 2026-05-27.
+Last updated: 2026-05-28.

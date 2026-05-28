@@ -362,6 +362,40 @@ def test_data_sources_catalog_tracks_remaining_candidate_sources() -> None:
         assert token in catalog
 
 
+def test_docs_capture_mid_atlantic_expansion_and_temporal_viz_candidates() -> None:
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+    vision = VISION_SCOPE.read_text(encoding="utf-8")
+    srs = SRS.read_text(encoding="utf-8")
+
+    for token in [
+        "Mid-Atlantic expansion",
+        "West Virginia",
+        "Virginia",
+        "Pennsylvania",
+        "Delaware",
+        "District of Columbia",
+        "Washington, DC",
+        "temporal slider",
+        "year-over-year",
+        "migratory",
+    ]:
+        assert token in roadmap
+
+    for token in [
+        "Maryland-first, not Maryland-only",
+        "WV, VA, PA, DE, and Washington, DC",
+    ]:
+        assert token in vision
+
+    for token in [
+        "date dropdown",
+        "temporal slider",
+        "year-over-year",
+        "apparent spatial shifts",
+    ]:
+        assert token in srs
+
+
 def test_testing_ci_plan_documents_current_static_pipeline_not_future_model_service() -> None:
     ci_plan = TESTING_CI_PLAN.read_text(encoding="utf-8")
 

@@ -37,6 +37,8 @@ complexity.
 | v0.4 | Ecological feature depth | Stronger NLCD/land-cover summaries, deer harvest normalization, acorn/mast notes where usable, optional park/activity proxy manifest | Each feature has source, grain, date span, license note, and missingness flags |
 | v0.5 | Refresh automation | One-command data rebuild recipe, artifact checksums, CI validation of derived public JSON | A clean machine can reproduce public artifacts from acquired source files |
 | v1.0 | Evidence-backed release | Stable Maryland public product with documented validation, source catalog, accessibility review, and conservative risk language | Release notes identify model version, data vintage, and non-medical boundary |
+| v1.1 | Mid-Atlantic expansion | Extend the modeling and public data audit beyond Maryland into West Virginia, Virginia, Pennsylvania, Delaware, and the District of Columbia (Washington, DC) where county or county-equivalent data are available | Regional model comparison shows whether broader geography helps or challenges the Maryland-first model, and docs label every state/source coverage gap |
+| v1.2 | Temporal exploration UI | Replace or augment the single date dropdown with a temporal slider for week/year exploration, year-over-year comparison, and inspection of apparent migratory or range-shift patterns | Users can scan changes over time without confusing surveillance/reporting shifts with proven tick migration or personal risk |
 
 ## Future research lanes
 
@@ -50,6 +52,12 @@ against the same data and validation harness:
 - Calibrated per-bite probability research model that validates absolute risk
   against suitable evidence before any probability language appears in public
   output.
+- Regional Mid-Atlantic model stress test across Maryland, West Virginia,
+  Virginia, Pennsylvania, Delaware, and Washington, DC, using the same
+  time-aware validation harness before changing public defaults.
+- Temporal visualization for year-over-year movement and seasonal change,
+  potentially with a slider, animation, or small multiples rather than only a
+  date dropdown.
 - Database-backed HTTP service if there is a clear need beyond static files.
 
 ## Product principles
@@ -63,4 +71,4 @@ against the same data and validation harness:
 - Model performance comes before model ambition. A simple branch that validates
   well beats a complex branch that cannot be explained or backtested.
 
-Last updated: 2026-05-27.
+Last updated: 2026-05-28.
