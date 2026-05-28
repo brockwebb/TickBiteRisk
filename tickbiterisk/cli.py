@@ -235,6 +235,99 @@ OPEN_METEO_HISTORICAL_WEATHER_CITATION_URL = (
 NOAA_CDO_WEBSERVICES_CITATION_URL = (
     "https://www.ncei.noaa.gov/cdo-web/webservices/v2"
 )
+CDC_LYME_SURVEILLANCE_CITATION_URL = (
+    "https://www.cdc.gov/lyme/data-research/facts-stats/index.html"
+)
+MDH_LYME_2013_2024_PDF_URL = (
+    "https://health.maryland.gov/phpa/OIDEOR/CZVBD/Shared%20Documents/"
+    "Lyme%20Disease%20Data%202013%20to%202024.pdf"
+)
+LYME_OUTCOME_SOURCE_METADATA = [
+    {
+        "filename": "cdc_lyme_public_1992_2007.csv",
+        "source_id": "cdc_lyme_public_1992_2007",
+        "source_name": "CDC Lyme public-use aggregated geography, 1992-2007",
+        "source_url": (
+            "https://data.cdc.gov/National-Center-for-Emerging-and-Zoonotic-"
+            "Infectio/Lyme-disease-public-use-aggregated-data-with-geogr/"
+            "84rx-ksgd/about_data"
+        ),
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_public_use",
+        "modeling_caveats": (
+            "Early CDC public-use Lyme surveillance rows include suppression "
+            "and should be reconciled with later source-vintage changes."
+        ),
+    },
+    {
+        "filename": "cdc_lyme_public_2008_2021.csv",
+        "source_id": "cdc_lyme_public_2008_2021",
+        "source_name": "CDC Lyme public-use aggregated geography, 2008-2021",
+        "source_url": (
+            "https://data.cdc.gov/National-Center-for-Emerging-and-Zoonotic-"
+            "Infectio/Lyme-disease-public-use-aggregated-data-with-geogr/"
+            "qtbi-xd4i/about_data"
+        ),
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_public_use",
+        "modeling_caveats": (
+            "CDC public-use Lyme surveillance rows include suppression and "
+            "source-vintage changes; treat as observed reported incidence."
+        ),
+    },
+    {
+        "filename": "cdc_lyme_public_2022_2023.csv",
+        "source_id": "cdc_lyme_public_2022_2023",
+        "source_name": "CDC Lyme public-use aggregated geography, 2022-2023",
+        "source_url": (
+            "https://data.cdc.gov/National-Center-for-Emerging-and-Zoonotic-"
+            "Infectio/Lyme-disease-public-use-aggregated-data-with-geogr/"
+            "4zup-3pz4/about_data"
+        ),
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_public_use",
+        "modeling_caveats": (
+            "CDC Lyme case definition changed for 2022 and later; models "
+            "should treat the surveillance regime break explicitly."
+        ),
+    },
+    {
+        "filename": "cdc_lyme_county_dashboard_2023.csv",
+        "source_id": "cdc_lyme_county_dashboard_2023",
+        "source_name": "CDC Lyme county counts dashboard export, 2023",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_county_dashboard",
+        "modeling_caveats": (
+            "CDC dashboard export is reconciliation context; CDC public-use "
+            "rows remain canonical when overlapping source vintages agree."
+        ),
+    },
+    {
+        "filename": "cdc_lyme_county_geodata_2000_2021.csv",
+        "source_id": "cdc_lyme_county_geodata_2000_2021",
+        "source_name": "CDC Lyme county geodata, 2000-2021",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_geodata",
+        "modeling_caveats": (
+            "CDC geodata is reconciliation and geography context; use public "
+            "CDC county-year outcomes as the canonical target where available."
+        ),
+    },
+]
+LYME_MDH_SOURCE_METADATA = {
+    "filename": "mdh_lyme_2013_2024.pdf",
+    "source_id": "mdh_lyme_2013_2024_pdf",
+    "source_name": "Maryland MDH Lyme Disease Data 2013 to 2024 PDF",
+    "source_url": MDH_LYME_2013_2024_PDF_URL,
+    "citation_url": MDH_LYME_2013_2024_PDF_URL,
+    "parser_method": "parse_mdh_lyme_pdf",
+    "modeling_caveats": (
+        "MDH 2024 is a latest state/probable-only outcome lane; CDC remains "
+        "canonical for overlapping 2013-2023 rows."
+    ),
+}
 
 
 @etl_app.command("check")
@@ -1557,57 +1650,69 @@ def lyme_outcomes(
         Path("build/etl/lyme"),
         help="Output directory for reconciled Lyme ETL artifacts.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
 ) -> None:
-    source_files = [
-        (
-            "cdc_lyme_public_1992_2007.csv",
-            "cdc_lyme_public_1992_2007",
-            parse_cdc_lyme_public_use,
-        ),
-        (
-            "cdc_lyme_public_2008_2021.csv",
-            "cdc_lyme_public_2008_2021",
-            parse_cdc_lyme_public_use,
-        ),
-        (
-            "cdc_lyme_public_2022_2023.csv",
-            "cdc_lyme_public_2022_2023",
-            parse_cdc_lyme_public_use,
-        ),
-        (
-            "cdc_lyme_county_dashboard_2023.csv",
-            "cdc_lyme_county_dashboard_2023",
-            parse_cdc_county_dashboard,
-        ),
-        (
-            "cdc_lyme_county_geodata_2000_2021.csv",
-            "cdc_lyme_county_geodata_2000_2021",
-            parse_cdc_lyme_geodata,
-        ),
-    ]
-    for filename, source_id, parser in source_files:
-        source_path = raw_dir / filename
+    source_parsers = {
+        "cdc_lyme_public_1992_2007": parse_cdc_lyme_public_use,
+        "cdc_lyme_public_2008_2021": parse_cdc_lyme_public_use,
+        "cdc_lyme_public_2022_2023": parse_cdc_lyme_public_use,
+        "cdc_lyme_county_dashboard_2023": parse_cdc_county_dashboard,
+        "cdc_lyme_county_geodata_2000_2021": parse_cdc_lyme_geodata,
+    }
+    for metadata in LYME_OUTCOME_SOURCE_METADATA:
+        source_path = raw_dir / str(metadata["filename"])
         if not source_path.exists():
             raise typer.BadParameter(f"Lyme source file not found: {source_path}")
 
     rows = []
-    for filename, source_id, parser in source_files:
-        source_path = raw_dir / filename
-        rows.extend(parser(source_path, source_id=source_id))
-    mdh_pdf_path = raw_dir / "mdh_lyme_2013_2024.pdf"
+    rows_by_source = {}
+    source_paths_by_id = {}
+    active_metadata = list(LYME_OUTCOME_SOURCE_METADATA)
+    for metadata in LYME_OUTCOME_SOURCE_METADATA:
+        source_id = str(metadata["source_id"])
+        source_path = raw_dir / str(metadata["filename"])
+        source_rows = list(source_parsers[source_id](source_path, source_id=source_id))
+        rows_by_source[source_id] = source_rows
+        source_paths_by_id[source_id] = source_path
+        rows.extend(source_rows)
+    mdh_pdf_path = raw_dir / str(LYME_MDH_SOURCE_METADATA["filename"])
     if mdh_pdf_path.exists():
-        rows.extend(
+        source_id = str(LYME_MDH_SOURCE_METADATA["source_id"])
+        mdh_rows = [
             row
-            for row in parse_mdh_lyme_pdf(
-                mdh_pdf_path, source_id="mdh_lyme_2013_2024_pdf"
-            )
+            for row in parse_mdh_lyme_pdf(mdh_pdf_path, source_id=source_id)
             if row.year == 2024
-        )
+        ]
+        rows_by_source[source_id] = mdh_rows
+        source_paths_by_id[source_id] = mdh_pdf_path
+        active_metadata.append(LYME_MDH_SOURCE_METADATA)
+        rows.extend(mdh_rows)
 
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
     output = write_reconciled_lyme_outputs(rows, output_dir)
+    provenance_output = write_acquisition_provenance_manifest(
+        _lyme_outcome_provenance_records(
+            source_metadata=active_metadata,
+            rows_by_source=rows_by_source,
+            source_paths_by_id=source_paths_by_id,
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+            output_path=output,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
     with output.open(newline="", encoding="utf-8") as handle:
         row_count = sum(1 for _ in csv.DictReader(handle))
-    typer.echo(f"Wrote {row_count} reconciled Lyme county-year outcome row(s) to {output}")
+    typer.echo(
+        f"Wrote {row_count} reconciled Lyme county-year outcome row(s) to {output}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("mast-acorn")
@@ -2472,6 +2577,103 @@ def _parse_iso_date(value: str, option_name: str) -> date:
         raise typer.BadParameter(
             f"{option_name} must use YYYY-MM-DD format"
         ) from exc
+
+
+def _lyme_outcome_provenance_records(
+    *,
+    source_metadata: list[dict[str, str]],
+    rows_by_source: dict[str, list[object]],
+    source_paths_by_id: dict[str, Path],
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+    output_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _lyme_outcomes_acquisition_command(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=manifest_path,
+    )
+    records = []
+    for metadata in source_metadata:
+        source_id = metadata["source_id"]
+        source_path = source_paths_by_id[source_id]
+        is_mdh_pdf = source_id == LYME_MDH_SOURCE_METADATA["source_id"]
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=source_id,
+                source_name=metadata["source_name"],
+                source_url=metadata["source_url"],
+                citation_url=metadata["citation_url"],
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read an ignored local raw Lyme outcome source file, parse "
+                    "Maryland county-year rows, and reconcile source vintages "
+                    "into the canonical outcome artifact."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=_lyme_outcome_request_description(
+                    source_path=source_path,
+                    is_mdh_pdf=is_mdh_pdf,
+                ),
+                derived_artifact_paths=[source_path, output_path],
+                derived_artifact_path_labels=[source_path.name, output_path.name],
+                row_count=len(rows_by_source.get(source_id, [])),
+                parser_method=metadata["parser_method"],
+                extraction_quality="accepted",
+                access_notes=(
+                    "Local ignored raw file from public CDC/MDH source; no "
+                    "secret or credential required."
+                ),
+                modeling_caveats=metadata["modeling_caveats"],
+            )
+        )
+    return records
+
+
+def _lyme_outcome_request_description(
+    *,
+    source_path: Path,
+    is_mdh_pdf: bool,
+) -> str:
+    if is_mdh_pdf:
+        return (
+            f"Read local raw Lyme PDF {source_path.name} from --raw-dir; "
+            "2024 rows selected from the 2013-2024 PDF before reconciliation."
+        )
+    return (
+        f"Read local raw Lyme CSV {source_path.name} from --raw-dir; source "
+        "rows contributed to reconciliation are counted before priority dedupe."
+    )
+
+
+def _lyme_outcomes_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "lyme-outcomes",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _public_provenance_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        pass
+    return path.name if path.is_absolute() else str(path)
 
 
 def _write_single_request_provenance_manifest(

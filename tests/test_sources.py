@@ -93,9 +93,9 @@ def test_project_docs_define_acquisition_provenance_contract() -> None:
 
     for token in [
         "Acquisition provenance contract",
-        "direct API ETL run manifests",
+        "Direct API and raw-source ETL run manifests",
         "acquisition_provenance.csv",
-        "ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, and NOAA weather backfill",
+        "ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, and Lyme outcomes",
         "source URL or API endpoint",
         "rerunnable command",
         "citation URL",

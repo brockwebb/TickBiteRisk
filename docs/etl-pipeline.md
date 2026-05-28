@@ -26,9 +26,9 @@ docs, or public JSON.
 manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
-extraction summaries. The direct API ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, and NOAA weather backfill
-are the first commands wired to that pattern,
+extraction summaries. Direct API and raw-source ETL run manifests use
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, and Lyme outcomes
+are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
 source URL hashes and output fields, but this is the target shape for future
@@ -43,7 +43,10 @@ request/run manifests as those sources graduate into the modeling lane.
      dashboard, and geodata sources.
    - Includes MDH 2024 rows only, preserving CDC as canonical for overlapping
      2013-2023 history and flagging the 2024 state/probable-only caveats.
-   - Writes `lyme_county_year_reconciled.csv`.
+   - Writes `lyme_county_year_reconciled.csv` and
+     `acquisition_provenance.csv` with official CDC/MDH source URLs, local
+     raw-file checksums, parser method, contributed row count, and the
+     surveillance-regime caveats needed by forecasting models.
 
 2. `tickbiterisk etl county-reference`
    - Builds Maryland county FIPS, names, area, and internal point reference.

@@ -38,6 +38,7 @@ class AcquisitionProvenanceRecord:
     request_method: str
     request_description: str
     derived_artifact_paths: list[Path] | None = None
+    derived_artifact_path_labels: list[str] | None = None
     row_count: int = 0
     parser_method: str = "not_recorded"
     extraction_quality: str = "not_recorded"
@@ -77,6 +78,8 @@ def _record_to_row(
     retrieved_at: str,
 ) -> dict[str, object]:
     artifact_paths = record.derived_artifact_paths or []
+    artifact_path_labels = _artifact_path_labels(record, artifact_paths)
+    artifact_checksum_labels = _artifact_checksum_labels(record, artifact_paths)
     return {
         "source_id": record.source_id,
         "source_name": record.source_name,
@@ -86,9 +89,14 @@ def _record_to_row(
         "acquisition_procedure": record.acquisition_procedure,
         "request_method": record.request_method,
         "request_description": record.request_description,
-        "derived_artifact_paths": ";".join(str(path) for path in artifact_paths),
+        "derived_artifact_paths": ";".join(artifact_path_labels),
         "derived_artifact_sha256s": ";".join(
-            f"{path.name}={_compute_sha256(path)}" for path in artifact_paths
+            f"{label}={_compute_sha256(path)}"
+            for path, label in zip(
+                artifact_paths,
+                artifact_checksum_labels,
+                strict=True,
+            )
         ),
         "row_count": record.row_count,
         "retrieved_at": retrieved_at,
@@ -97,6 +105,30 @@ def _record_to_row(
         "access_notes": record.access_notes,
         "modeling_caveats": record.modeling_caveats,
     }
+
+
+def _artifact_path_labels(
+    record: AcquisitionProvenanceRecord,
+    artifact_paths: list[Path],
+) -> list[str]:
+    labels = record.derived_artifact_path_labels
+    if labels is None:
+        return [str(path) for path in artifact_paths]
+    if len(labels) != len(artifact_paths):
+        raise ValueError(
+            "derived_artifact_path_labels must match derived_artifact_paths length"
+        )
+    return labels
+
+
+def _artifact_checksum_labels(
+    record: AcquisitionProvenanceRecord,
+    artifact_paths: list[Path],
+) -> list[str]:
+    labels = record.derived_artifact_path_labels
+    if labels is not None:
+        return labels
+    return [path.name for path in artifact_paths]
 
 
 def _compute_sha256(path: Path) -> str:
