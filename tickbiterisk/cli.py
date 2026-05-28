@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import shlex
 from dataclasses import asdict
 from datetime import date
@@ -2031,6 +2032,10 @@ def regional_outcome_stress(
         3,
         help="Number of prior years used to estimate capacity shares.",
     ),
+    share_prior_strength: float = typer.Option(
+        10.0,
+        help="Pseudo-case strength for empirical-Bayes county share shrinkage.",
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/regional-outcome-stress"),
         help="Output directory for regional outcome stress artifacts.",
@@ -2044,6 +2049,10 @@ def regional_outcome_stress(
         raise typer.BadParameter(
             "lookback-years must be greater than or equal to min-train-years"
         )
+    if not math.isfinite(share_prior_strength) or share_prior_strength < 0:
+        raise typer.BadParameter(
+            "share-prior-strength must be finite and non-negative"
+        )
     if end_year is not None and start_year > end_year:
         raise typer.BadParameter("start-year must be less than or equal to end-year")
 
@@ -2054,6 +2063,7 @@ def regional_outcome_stress(
             end_year=end_year,
             min_train_years=min_train_years,
             lookback_years=lookback_years,
+            share_prior_strength=share_prior_strength,
         )
     except RegionalOutcomeStressInputError as exc:
         raise typer.BadParameter(str(exc)) from exc

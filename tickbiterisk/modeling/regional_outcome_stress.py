@@ -41,6 +41,7 @@ class RegionalOutcomeStressRun:
     end_year: int
     min_train_years: int
     lookback_years: int
+    share_prior_strength: float
     model_names: str
     target_definition: str
     feature_set: str
@@ -132,12 +133,17 @@ def build_regional_outcome_stress(
     end_year: int | None = None,
     min_train_years: int = 3,
     lookback_years: int = 3,
+    share_prior_strength: float = 10.0,
 ) -> RegionalOutcomeStressResult:
     if min_train_years < 1:
         raise RegionalOutcomeStressInputError("min_train_years must be at least 1")
     if lookback_years < min_train_years:
         raise RegionalOutcomeStressInputError(
             "lookback_years must be greater than or equal to min_train_years"
+        )
+    if not math.isfinite(share_prior_strength) or share_prior_strength < 0:
+        raise RegionalOutcomeStressInputError(
+            "share_prior_strength must be finite and non-negative"
         )
 
     rows = _read_outcome_rows(regional_lyme_path)
@@ -166,10 +172,13 @@ def build_regional_outcome_stress(
     rows_by_county_year = {(row.county_fips, row.year): row for row in rows}
     state_total_by_year = _state_totals(rows)
     regional_total_by_year = _regional_totals(rows)
+    county_count_by_state = _county_counts_by_state(rows)
+    regional_county_count = len({row.county_fips for row in rows})
     source_file_sha256 = _sha256_file(regional_lyme_path)
     run_id = (
         f"regional_outcome_stress_start{start_year}_end{resolved_end_year}_"
-        f"mintrain{min_train_years}_lookback{lookback_years}"
+        f"mintrain{min_train_years}_lookback{lookback_years}_"
+        f"shareprior{_slug_float(share_prior_strength)}"
     )
 
     predictions = []
@@ -194,6 +203,9 @@ def build_regional_outcome_stress(
                 test_year=test_year,
                 state_total_by_year=state_total_by_year,
                 regional_total_by_year=regional_total_by_year,
+                county_count_by_state=county_count_by_state,
+                regional_county_count=regional_county_count,
+                share_prior_strength=share_prior_strength,
             )
             flags = _combined_flags(row.feature_quality_flags, COMPARISON_ASSUMPTION_FLAGS)
             for model_name, model_prediction in model_predictions.items():
@@ -224,6 +236,7 @@ def build_regional_outcome_stress(
         end_year=resolved_end_year,
         min_train_years=min_train_years,
         lookback_years=lookback_years,
+        share_prior_strength=share_prior_strength,
         model_names=",".join(sorted({row.model_name for row in predictions})),
         target_definition=TARGET_DEFINITION,
         feature_set=FEATURE_SET,
@@ -298,6 +311,16 @@ def _regional_totals(rows: list[_OutcomeRow]) -> dict[int, int]:
     return totals
 
 
+def _county_counts_by_state(rows: list[_OutcomeRow]) -> dict[str, int]:
+    counties_by_state: dict[str, set[str]] = {}
+    for row in rows:
+        counties_by_state.setdefault(row.state_fips, set()).add(row.county_fips)
+    return {
+        state_fips: len(county_fips)
+        for state_fips, county_fips in counties_by_state.items()
+    }
+
+
 def _predict_outcome_baselines(
     *,
     row: _OutcomeRow,
@@ -306,6 +329,9 @@ def _predict_outcome_baselines(
     test_year: int,
     state_total_by_year: dict[tuple[str, int], int],
     regional_total_by_year: dict[int, int],
+    county_count_by_state: dict[str, int],
+    regional_county_count: int,
+    share_prior_strength: float,
 ) -> dict[str, _ModelPrediction]:
     prior_state_total = state_total_by_year.get((row.state_fips, test_year - 1), 0)
     prior_regional_total = regional_total_by_year.get(test_year - 1, 0)
@@ -319,6 +345,18 @@ def _predict_outcome_baselines(
     history_county_total = sum(prior.total_cases for prior in county_history)
     state_share = _share(history_county_total, history_state_total)
     regional_share = _share(history_county_total, history_regional_total)
+    empirical_bayes_state_share = _shrunk_share(
+        numerator=history_county_total,
+        denominator=history_state_total,
+        prior_share=_equal_share(county_count_by_state.get(row.state_fips, 0)),
+        prior_strength=share_prior_strength,
+    )
+    empirical_bayes_regional_share = _shrunk_share(
+        numerator=history_county_total,
+        denominator=history_regional_total,
+        prior_share=_equal_share(regional_county_count),
+        prior_strength=share_prior_strength,
+    )
     return {
         "prior_year_county_cases": _ModelPrediction(
             predicted_cases=float(prior_year_row.total_cases),
@@ -335,9 +373,19 @@ def _predict_outcome_baselines(
             county_share_basis=state_share,
             capacity_total_basis_cases=prior_state_total,
         ),
+        "empirical_bayes_state_capacity_cases": _ModelPrediction(
+            predicted_cases=_round(empirical_bayes_state_share * prior_state_total),
+            county_share_basis=_round(empirical_bayes_state_share),
+            capacity_total_basis_cases=prior_state_total,
+        ),
         "midatlantic_capacity_share_cases": _ModelPrediction(
             predicted_cases=_round((regional_share or 0.0) * prior_regional_total),
             county_share_basis=regional_share,
+            capacity_total_basis_cases=prior_regional_total,
+        ),
+        "empirical_bayes_midatlantic_capacity_cases": _ModelPrediction(
+            predicted_cases=_round(empirical_bayes_regional_share * prior_regional_total),
+            county_share_basis=_round(empirical_bayes_regional_share),
             capacity_total_basis_cases=prior_regional_total,
         ),
     }
@@ -467,6 +515,8 @@ def _metric_row(
 
 
 def _model_family(model_name: str) -> str:
+    if model_name.startswith("empirical_bayes_"):
+        return "empirical_bayes_capacity_share"
     if model_name.endswith("capacity_share_cases"):
         return "regional_capacity_share"
     return "county_history_baseline"
@@ -476,6 +526,25 @@ def _share(numerator: int, denominator: int | None) -> float | None:
     if denominator in (None, 0):
         return None
     return _round(numerator / denominator)
+
+
+def _equal_share(count: int) -> float:
+    if count <= 0:
+        return 0.0
+    return 1.0 / count
+
+
+def _shrunk_share(
+    *,
+    numerator: int,
+    denominator: int,
+    prior_share: float,
+    prior_strength: float,
+) -> float:
+    posterior_denominator = denominator + prior_strength
+    if posterior_denominator <= 0:
+        return prior_share
+    return (numerator + (prior_strength * prior_share)) / posterior_denominator
 
 
 def _combined_flags(*flag_groups: str) -> str:
@@ -491,6 +560,10 @@ def _parse_int(value: str) -> int:
 
 def _round(value: float) -> float:
     return round(value, 6)
+
+
+def _slug_float(value: float) -> str:
+    return str(value).replace(".", "p")
 
 
 def _sha256_file(path: Path) -> str:

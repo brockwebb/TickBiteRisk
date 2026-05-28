@@ -60,3 +60,34 @@ def test_regional_outcome_stress_command_fails_cleanly_when_input_missing(
     assert result.exit_code != 0
     assert f"Regional Lyme panel not found: {missing_path}" in result.output
     assert "Traceback" not in result.output
+
+
+def test_regional_outcome_stress_command_rejects_nonfinite_share_prior(
+    tmp_path: Path,
+) -> None:
+    panel = _write_regional_panel(tmp_path / "regional.csv")
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "regional-outcome-stress",
+            "--regional-lyme-path",
+            str(panel),
+            "--start-year",
+            "2021",
+            "--min-train-years",
+            "2",
+            "--lookback-years",
+            "2",
+            "--share-prior-strength",
+            "nan",
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+        env={"COLUMNS": "200"},
+    )
+
+    assert result.exit_code != 0
+    assert "share-prior-strength must be finite and non-negative" in result.output
+    assert "Traceback" not in result.output

@@ -1,7 +1,11 @@
 import csv
+import math
 from pathlib import Path
 
+import pytest
+
 from tickbiterisk.modeling.regional_outcome_stress import (
+    RegionalOutcomeStressInputError,
     build_regional_outcome_stress,
 )
 from tickbiterisk.modeling.regional_outcome_stress_build import (
@@ -26,6 +30,8 @@ def test_build_regional_outcome_stress_compares_capacity_share_baselines(
 
     model_names = {row.model_name for row in result.predictions}
     assert model_names == {
+        "empirical_bayes_midatlantic_capacity_cases",
+        "empirical_bayes_state_capacity_cases",
         "midatlantic_capacity_share_cases",
         "prior_year_county_cases",
         "state_capacity_share_cases",
@@ -46,6 +52,16 @@ def test_build_regional_outcome_stress_compares_capacity_share_baselines(
     assert "reported_cases_not_stable_true_incidence" in (
         state_capacity.comparison_assumption_flags
     )
+    empirical_bayes_state = next(
+        row
+        for row in result.predictions
+        if row.model_name == "empirical_bayes_state_capacity_cases"
+        and row.county_fips == "24001"
+    )
+    assert empirical_bayes_state.predicted_cases == 24.444444
+    assert empirical_bayes_state.county_share_basis == 0.611111
+    assert empirical_bayes_state.capacity_total_basis_cases == 40
+    assert result.run.share_prior_strength == 10.0
 
     overall_prior = next(
         row
@@ -78,6 +94,24 @@ def test_write_regional_outcome_stress_outputs_writes_expected_columns(
         assert next(csv.reader(handle)) == REGIONAL_OUTCOME_STRESS_PREDICTION_COLUMNS
     with outputs.metrics_path.open(newline="", encoding="utf-8") as handle:
         assert next(csv.reader(handle)) == REGIONAL_OUTCOME_STRESS_METRIC_COLUMNS
+
+
+@pytest.mark.parametrize("share_prior_strength", [math.nan, math.inf])
+def test_build_regional_outcome_stress_rejects_nonfinite_share_prior_strength(
+    tmp_path: Path,
+    share_prior_strength: float,
+) -> None:
+    with pytest.raises(
+        RegionalOutcomeStressInputError,
+        match="share_prior_strength must be finite and non-negative",
+    ):
+        build_regional_outcome_stress(
+            regional_lyme_path=_write_regional_panel(tmp_path / "regional.csv"),
+            start_year=2021,
+            min_train_years=2,
+            lookback_years=2,
+            share_prior_strength=share_prior_strength,
+        )
 
 
 def _write_regional_panel(path: Path) -> Path:

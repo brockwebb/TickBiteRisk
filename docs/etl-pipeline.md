@@ -81,9 +81,10 @@ request/run manifests as those sources graduate into the modeling lane.
      `regional_outcome_stress_predictions.csv`, and
      `regional_outcome_stress_metrics.csv`.
    - Compares prior-year county cases, trailing county cases, state capacity
-     shares, and Mid-Atlantic capacity shares as transparent historical-range
-     baselines. These are research diagnostics over reported case counts, not
-     population-normalized public forecasts or latent true disease estimates.
+     shares, Mid-Atlantic capacity shares, and empirical-Bayes shrunken share
+     variants as transparent historical-range baselines. These are research
+     diagnostics over reported case counts, not population-normalized public
+     forecasts or latent true disease estimates.
 
 2. `tickbiterisk etl county-reference`
    - Builds Maryland county FIPS, names, area, and internal point reference.

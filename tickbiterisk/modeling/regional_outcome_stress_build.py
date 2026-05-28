@@ -17,6 +17,7 @@ REGIONAL_OUTCOME_STRESS_RUN_COLUMNS = [
     "end_year",
     "min_train_years",
     "lookback_years",
+    "share_prior_strength",
     "model_names",
     "target_definition",
     "feature_set",

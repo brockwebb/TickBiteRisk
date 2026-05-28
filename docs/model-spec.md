@@ -118,10 +118,11 @@ empirical uncertainty without implying clinical precision.
 The `regional-outcome-stress` diagnostic is separate from the Maryland
 incidence comparison. It tests whether state or Mid-Atlantic capacity-share
 baselines improve county reported-case forecasts across DE, DC, MD, PA, VA,
-and WV. The first materialized run ranked prior-year county cases ahead of the
-state and Mid-Atlantic capacity-share baselines on overall case MAE, so the
-capacity idea remains a useful stress test rather than an accepted public model
-assumption.
+and WV, including empirical-Bayes share shrinkage toward geography-level
+equal-share priors. The first materialized shrinkage run slightly improved the
+capacity-share lanes, but prior-year county cases still ranked first on
+overall case MAE, so the capacity idea remains a useful stress test rather
+than an accepted public model assumption.
 
 Surveillance-regime diagnostics should remain separate from disease truth
 labels. They may flag case-definition eras, ED or inquiry coverage, reporting
