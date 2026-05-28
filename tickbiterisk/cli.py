@@ -41,6 +41,7 @@ from tickbiterisk.etl.census_population import (
 from tickbiterisk.etl.contact_pressure import build_contact_pressure_features
 from tickbiterisk.etl.contact_pressure_build import write_contact_pressure_output
 from tickbiterisk.etl.county_reference import (
+    CENSUS_GAZETTEER_CITATION_URL,
     CENSUS_GAZETTEER_COUNTIES_2024_URL,
     fetch_census_gazetteer_counties_text,
     parse_census_gazetteer_counties,
@@ -586,6 +587,10 @@ def county_reference(
     output_dir: Path = typer.Option(
         Path("build/etl"), help="Output directory for ETL artifacts."
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     text = fetch_census_gazetteer_counties_text()
     rows = parse_census_gazetteer_counties(
@@ -593,7 +598,48 @@ def county_reference(
         source_url=CENSUS_GAZETTEER_COUNTIES_2024_URL,
     )
     output = write_county_reference_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        [
+            AcquisitionProvenanceRecord(
+                source_id="census_county_reference_2024",
+                source_name="U.S. Census Gazetteer county reference file",
+                source_url=CENSUS_GAZETTEER_COUNTIES_2024_URL,
+                citation_url=CENSUS_GAZETTEER_CITATION_URL,
+                acquisition_command=_format_cli_command(
+                    [
+                        "tickbiterisk",
+                        "etl",
+                        "county-reference",
+                        "--output-dir",
+                        str(output_dir),
+                        "--provenance-manifest-path",
+                        str(resolved_manifest_path),
+                    ]
+                ),
+                acquisition_procedure=(
+                    "Fetch the Census Gazetteer national counties ZIP and "
+                    "extract the county TXT table for Maryland reference rows."
+                ),
+                request_method="GET",
+                request_description="Census Gazetteer 2024 national counties ZIP request.",
+                derived_artifact_paths=[output],
+                row_count=len(rows),
+                parser_method="parse_census_gazetteer_counties",
+                extraction_quality="accepted",
+                access_notes="Public Census static ZIP; no API key required.",
+                modeling_caveats=(
+                    "County geography and area denominator reference only; not "
+                    "a disease or exposure observation."
+                ),
+            )
+        ],
+        manifest_path=resolved_manifest_path,
+    )
     typer.echo(f"Wrote {len(rows)} county reference row(s) to {output}")
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("census-population")

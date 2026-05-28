@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. The direct API ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, and building permits
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, and county reference
 are the first commands wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in

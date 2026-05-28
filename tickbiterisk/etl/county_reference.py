@@ -12,6 +12,10 @@ CENSUS_GAZETTEER_COUNTIES_2024_URL = (
     "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/"
     "2024_Gazetteer/2024_Gaz_counties_national.zip"
 )
+CENSUS_GAZETTEER_CITATION_URL = (
+    "https://www.census.gov/geographies/reference-files/time-series/geo/"
+    "gazetteer-files.html"
+)
 
 
 @dataclass(frozen=True)

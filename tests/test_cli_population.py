@@ -199,3 +199,17 @@ def test_county_reference_command_writes_maryland_gazetteer_output(
     assert result.exit_code == 0
     assert "Wrote 1 county reference row(s)" in result.stdout
     assert (tmp_path / "county_reference.csv").exists()
+    manifest_path = tmp_path / "acquisition_provenance.csv"
+    assert manifest_path.exists()
+    with manifest_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["source_id"] == "census_county_reference_2024"
+    assert rows[0]["source_url"] == CENSUS_GAZETTEER_COUNTIES_2024_URL
+    assert rows[0]["citation_url"] == "https://www.census.gov/geographies/reference-files/time-series/geo/gazetteer-files.html"
+    assert rows[0]["request_method"] == "GET"
+    assert rows[0]["row_count"] == "1"
+    assert rows[0]["parser_method"] == "parse_census_gazetteer_counties"
+    assert rows[0]["extraction_quality"] == "accepted"
+    assert "county_reference.csv=" in rows[0]["derived_artifact_sha256s"]
+    assert "tickbiterisk etl county-reference" in rows[0]["acquisition_command"]
+    assert "--provenance-manifest-path" in rows[0]["acquisition_command"]
