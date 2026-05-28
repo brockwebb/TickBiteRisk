@@ -81,6 +81,8 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `regional_incidence_cluster_summary.csv` | `tickbiterisk etl regional-incidence-clusters` | Prior cluster capacity bands and held-out actual incidence diagnostics |
 | `model_comparison_predictions.csv` | `tickbiterisk etl model-compare` | Rolling-origin predictions from candidate model branches |
 | `model_comparison_intervals.csv` | `tickbiterisk etl model-compare` | Bootstrap prediction intervals companion artifact for comparison branches |
+| `annual_forecast_runs.csv` | `tickbiterisk etl annual-forecast` | Target-year forecast run manifest with declared origin, hashes, and forecast caveats |
+| `annual_forecast_predictions.csv` | `tickbiterisk etl annual-forecast` | Maryland county-year forecast rows without observed target, residual, or error columns |
 | `forecast_calibration_summary.csv` | `tickbiterisk etl model-diagnostics` | Empirical observed-to-predicted calibration factors by branch, surveillance regime, and year |
 | `forecast_calibration_backtest_predictions.csv` | `tickbiterisk etl forecast-calibration-backtest` | Forecast-safe shrunken calibration predictions using prior update evidence only |
 | `forecast_calibration_backtest_metrics.csv` | `tickbiterisk etl forecast-calibration-backtest` | Original-vs-calibrated MAE/RMSE metrics for empirical update multipliers |
@@ -137,5 +139,10 @@ feature ideas to test in time-aware backtests before any public model claim.
 - Census 2024-2025 county population denominators come from the official
   keyless `CO-EST2025-alldata` CSV, while older rows currently remain from the
   prior API-era pulls.
+- The annual forecast artifact is a target-year forecast output, not a
+  rolling-origin evaluation. Current 2026 rows are trained through the declared
+  2024 origin and use flagged projected 2026 population denominators; they do
+  not contain observed 2026 Lyme outcomes, actuals, residuals, or error
+  columns.
 
 Last updated: 2026-05-28.

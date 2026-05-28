@@ -13,6 +13,7 @@ RISK_SCORE_FEATURE_FLAGS = (
     "not_weather_adjusted"
 )
 LAGGED_OUTCOME_MODEL_NAMES = {
+    "latest_observed_incidence",
     "prior_year_incidence",
     "trailing_mean_incidence",
     "linear_blend_baseline",
@@ -23,6 +24,10 @@ LAGGED_OUTCOME_FEATURE_PROFILES = {
     "lagged_outcome",
     "lagged_outcome_blend",
     "lagged_outcome_with_shrinkage",
+    "latest_observed_lag",
+    "trailing_county_history",
+    "latest_observed_trailing_blend",
+    "county_history_with_state_shrinkage",
 }
 LAGGED_OUTCOME_PUBLIC_MODEL_FLAGS = {
     "covid_reporting_disruption",
@@ -301,10 +306,13 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
         "weather_mode",
         "county_fips",
         "county_name",
-        "test_year",
         "predicted_incidence_per_100k",
     ]
-    rows = _read_csv(path, required_columns=required_columns)
+    rows = _read_csv(
+        path,
+        required_columns=required_columns,
+        one_of_columns=[("test_year", "forecast_year")],
+    )
     return [
         _PredictionInput(
             run_id=row["run_id"],
@@ -317,7 +325,7 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
             weather_mode=row["weather_mode"],
             county_fips=str(row["county_fips"]).zfill(5),
             county_name=row["county_name"],
-            year=_parse_int(row["test_year"], "test_year"),
+            year=_parse_prediction_year(row),
             predicted_cases=_parse_float(
                 row.get("predicted_cases", ""),
                 "predicted_cases",
@@ -330,10 +338,17 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
             backtest_assumption_flags=(
                 row.get("backtest_assumption_flags", "")
                 or row.get("comparison_assumption_flags", "")
+                or row.get("forecast_assumption_flags", "")
             ),
         )
         for row in rows
     ]
+
+
+def _parse_prediction_year(row: dict[str, str]) -> int:
+    if "test_year" in row:
+        return _parse_int(row["test_year"], "test_year")
+    return _parse_int(row.get("forecast_year", ""), "forecast_year")
 
 
 def _score_model_feature_quality_flags(prediction: _PredictionInput) -> str:
@@ -444,13 +459,21 @@ def _split_flags(value: str) -> list[str]:
     ]
 
 
-def _read_csv(path: Path, *, required_columns: list[str]) -> list[dict[str, str]]:
+def _read_csv(
+    path: Path,
+    *,
+    required_columns: list[str],
+    one_of_columns: list[tuple[str, ...]] | None = None,
+) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         fieldnames = set(reader.fieldnames or [])
         missing_columns = [
             column for column in required_columns if column not in fieldnames
         ]
+        for alternatives in one_of_columns or []:
+            if not any(column in fieldnames for column in alternatives):
+                missing_columns.append(" or ".join(alternatives))
         if missing_columns:
             raise RiskScoreInputError(
                 "missing required risk score column(s): "

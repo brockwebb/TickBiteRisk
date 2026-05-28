@@ -257,6 +257,13 @@ from tickbiterisk.etl.weather_features import (
 from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
 from tickbiterisk.modeling.backtest import BacktestInputError, run_baseline_backtests
 from tickbiterisk.modeling.backtest_build import write_model_backtest_outputs
+from tickbiterisk.modeling.annual_forecast import (
+    AnnualForecastInputError,
+    build_annual_forecast,
+)
+from tickbiterisk.modeling.annual_forecast_build import (
+    write_annual_forecast_outputs,
+)
 from tickbiterisk.modeling.design_matrix import (
     ModelDesignMatrixInputError,
     build_model_design_matrix,
@@ -2211,6 +2218,71 @@ def model_compare(
     )
 
 
+@etl_app.command("annual-forecast")
+def annual_forecast(
+    design_matrix_path: Path = typer.Option(
+        Path("build/etl/model/model_design_matrix_county_year.csv"),
+        help="Input observed-history numeric model design matrix CSV.",
+    ),
+    population_path: Path = typer.Option(
+        Path("build/etl/regional-population/midatlantic_county_population_year.csv"),
+        help="County-year population panel containing the forecast target year.",
+    ),
+    target_year: int = typer.Option(
+        2026,
+        help="Future forecast year to score.",
+    ),
+    forecast_origin_year: int = typer.Option(
+        2024,
+        help="Latest observed outcome year allowed in training.",
+    ),
+    min_train_years: int = typer.Option(
+        5,
+        help="Minimum prior county years required for annual forecast.",
+    ),
+    shrinkage_strength: float = typer.Option(
+        5.0,
+        help="Pseudo-count strength for empirical Bayes county shrinkage.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/annual-forecast"),
+        help="Output directory for annual forecast artifacts.",
+    ),
+) -> None:
+    if not design_matrix_path.exists():
+        raise typer.BadParameter(
+            f"Model design matrix file not found: {design_matrix_path}"
+        )
+    if not population_path.exists():
+        raise typer.BadParameter(f"Population file not found: {population_path}")
+    if target_year <= forecast_origin_year:
+        raise typer.BadParameter(
+            "target-year must be greater than forecast-origin-year"
+        )
+    if min_train_years < 1:
+        raise typer.BadParameter("min-train-years must be at least 1")
+    if shrinkage_strength < 0:
+        raise typer.BadParameter("shrinkage-strength must be non-negative")
+
+    try:
+        result = build_annual_forecast(
+            design_matrix_path=design_matrix_path,
+            population_path=population_path,
+            target_year=target_year,
+            forecast_origin_year=forecast_origin_year,
+            min_train_years=min_train_years,
+            shrinkage_strength=shrinkage_strength,
+        )
+    except AnnualForecastInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_annual_forecast_outputs(result, output_dir)
+    typer.echo(f"Wrote 1 annual forecast run row(s) to {outputs.runs_path}")
+    typer.echo(
+        f"Wrote {len(result.predictions)} annual forecast prediction row(s) to "
+        f"{outputs.predictions_path}"
+    )
+
+
 @etl_app.command("model-diagnostics")
 def model_diagnostics(
     predictions_path: Path = typer.Option(
@@ -2359,8 +2431,8 @@ def county_week_risk(
         "--predictions-path",
         "--backtest-predictions-path",
         help=(
-            "Input annual county prediction CSV from model comparison or "
-            "legacy backtest outputs."
+            "Input annual county prediction CSV from annual forecast, model "
+            "comparison, or legacy backtest outputs."
         ),
     ),
     seasonality_baseline_path: Path = typer.Option(

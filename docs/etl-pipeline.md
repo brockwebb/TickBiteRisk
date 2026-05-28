@@ -325,6 +325,25 @@ artifacts.
       `model_comparison_intervals.csv`, `model_comparison_metrics.csv`, and
       `model_comparison_summary.csv`.
 
+16b. `tickbiterisk etl annual-forecast`
+    - Typical 2026 run:
+      `tickbiterisk etl annual-forecast --design-matrix-path build/etl/model/model_design_matrix_county_year.csv --population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --forecast-origin-year 2024 --output-dir build/etl/annual-forecast`.
+    - Trains transparent lagged-outcome annual forecast branches through the
+      declared `forecast_origin_year` and scores a later `target_year` without
+      requiring observed target-year Lyme outcomes.
+    - Uses a target-year population panel for the forecast denominator. Current
+      2026 runs use projected denominators from official Vintage 2025 Census
+      rows and preserve explicit forecast/projection flags.
+    - Writes `annual_forecast_runs.csv` and
+      `annual_forecast_predictions.csv`.
+    - Prediction rows intentionally omit observed target, actual, residual,
+      error, and coverage columns because this artifact is a true forecast, not
+      a rolling-origin evaluation table.
+    - Current branches are transparent lagged-outcome baselines:
+      `latest_observed_incidence`, `trailing_mean_incidence`,
+      `linear_blend_baseline`, and `empirical_bayes_shrinkage`. The artifact is
+      a 2026 forecast scaffold and not yet the public dashboard default.
+
 17. `tickbiterisk etl model-diagnostics`
     - Summarizes comparison predictions and bootstrap intervals into research
       diagnostics for branch uncertainty, surveillance-regime checks, regional
@@ -352,6 +371,8 @@ artifacts.
 
 18. `tickbiterisk etl county-week-risk`
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.
+      The input can be a rolling-origin model-comparison prediction table or a
+      true annual forecast table with `forecast_year`.
     - Writes `county_week_seasonal_risk_baseline.csv` and
       `risk_score_scale.csv`.
 

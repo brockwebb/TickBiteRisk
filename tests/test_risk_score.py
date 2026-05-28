@@ -112,6 +112,31 @@ def test_build_seasonal_risk_scores_reads_model_comparison_predictions(
     assert "surveillance_reporting_sensitive" in first.backtest_assumption_flags
 
 
+def test_build_seasonal_risk_scores_reads_annual_forecast_predictions(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_annual_forecast_predictions(
+        tmp_path / "annual_forecast_predictions.csv"
+    )
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+
+    result = build_seasonal_risk_scores(
+        predictions_path=predictions_path,
+        seasonality_baseline_path=seasonality_path,
+        model_name="latest_observed_incidence",
+    )
+
+    assert len(result.rows) == 4
+    first = result.rows[0]
+    assert first.year == 2026
+    assert first.evaluation_mode == "annual_forecast_no_observed_target"
+    assert first.predicted_annual_cases == 21.0
+    assert first.model_feature_quality_flags == "mdh_probable_only_2024"
+    assert "forecast_without_observed_target" in first.backtest_assumption_flags
+    assert "no_official_2026_census_denominator" in first.backtest_assumption_flags
+    assert "drought_monitor_retro_observed" not in first.feature_quality_flags
+
+
 def test_build_seasonal_risk_scores_filters_unused_research_flags_for_lagged_branch(
     tmp_path: Path,
 ) -> None:
@@ -454,6 +479,16 @@ def _write_model_comparison_predictions(path: Path) -> Path:
     )
 
 
+def _write_annual_forecast_predictions(path: Path) -> Path:
+    return _write_csv(
+        path,
+        [
+            _annual_forecast_prediction_row("24001", "County 24001", "42.0", "21.0"),
+            _annual_forecast_prediction_row("24003", "County 24003", "30.0", "12.0"),
+        ],
+    )
+
+
 def _prediction_row(
     county_fips: str,
     county_name: str,
@@ -514,6 +549,41 @@ def _model_comparison_prediction_row(
         "model_feature_quality_flags": "current_status_retrospective_proxy",
         "comparison_assumption_flags": (
             "observational_not_causal,surveillance_reporting_sensitive"
+        ),
+    }
+
+
+def _annual_forecast_prediction_row(
+    county_fips: str,
+    county_name: str,
+    predicted_incidence: str,
+    predicted_cases: str,
+) -> dict[str, str]:
+    return {
+        "run_id": "annual-forecast-run",
+        "model_name": "latest_observed_incidence",
+        "model_family": "baseline",
+        "target_definition": "lyme_incidence_per_100k",
+        "feature_set": "lagged_outcome_forecast",
+        "feature_profile": "latest_observed_lag",
+        "evaluation_mode": "annual_forecast_no_observed_target",
+        "weather_mode": "not_used_by_lagged_model",
+        "design_matrix_sha256": "c" * 64,
+        "population_sha256": "d" * 64,
+        "county_fips": county_fips,
+        "county_name": county_name,
+        "forecast_year": "2026",
+        "forecast_origin_year": "2024",
+        "forecast_horizon_years": "2",
+        "predicted_cases": predicted_cases,
+        "predicted_incidence_per_100k": predicted_incidence,
+        "model_feature_quality_flags": (
+            "mdh_probable_only_2024,drought_monitor_retro_observed"
+        ),
+        "forecast_assumption_flags": (
+            "forecast_without_observed_target,"
+            "population_denominator_forecast,"
+            "no_official_2026_census_denominator"
         ),
     }
 
