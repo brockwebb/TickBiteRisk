@@ -1,3 +1,5 @@
+import csv
+
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
@@ -23,6 +25,7 @@ def test_deer_harvest_command_writes_density_output(tmp_path, monkeypatch) -> No
       <tr><td colspan="10">Maryland Reported Antlered and Antlerless Deer Harvest for the 2024-2025 and 2025-2026 Hunting Seasons</td></tr>
       <tr><td></td><td colspan="3">Antlered</td><td colspan="3">Antlerless</td><td colspan="3">Total</td></tr>
       <tr><td>County</td><td>2024-25</td><td>2025-26</td><td>% Change</td><td>2024-25</td><td>2025-26</td><td>% Change</td><td>2024-25</td><td>2025-26</td><td>% Change</td></tr>
+      <tr><td>Allegany</td><td>1,868</td><td>1,739</td><td>-6.9</td><td>1,544</td><td>1,185</td><td>-23.3</td><td>3,412</td><td>2,924</td><td>-14.3</td></tr>
       <tr><td>Allegany</td><td>1,868</td><td>1,739</td><td>-6.9</td><td>1,544</td><td>1,185</td><td>-23.3</td><td>3,412</td><td>2,924</td><td>-14.3</td></tr>
     </table>
     """
@@ -51,6 +54,28 @@ def test_deer_harvest_command_writes_density_output(tmp_path, monkeypatch) -> No
     assert result.exit_code == 0
     assert "Wrote 2 deer harvest row(s)" in result.stdout
     assert (tmp_path / "maryland_dnr_deer_harvest.csv").exists()
+    assert "Wrote acquisition provenance manifest" in result.stdout
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["source_id"] == "md_dnr_deer_harvest"
+    assert row["source_name"] == "Maryland DNR deer harvest news table"
+    assert row["source_url"] == "https://example.test/deer-harvest"
+    assert row["citation_url"] == "https://example.test/deer-harvest"
+    assert row["request_method"] == "GET"
+    assert row["row_count"] == "4"
+    assert row["parser_method"] == "parse_maryland_dnr_deer_harvest_html"
+    assert row["extraction_quality"] == "accepted"
+    assert "tickbiterisk etl deer-harvest" in row["acquisition_command"]
+    assert "--provenance-manifest-path" in row["acquisition_command"]
+    assert "--url https://example.test/deer-harvest" in row["acquisition_command"]
+    assert "maryland_dnr_deer_harvest.csv=" in row["derived_artifact_sha256s"]
 
 
 def test_deer_harvest_command_can_use_annual_report_pdfs(tmp_path, monkeypatch) -> None:
@@ -117,3 +142,24 @@ def test_deer_harvest_command_can_use_annual_report_pdfs(tmp_path, monkeypatch) 
 
     assert result.exit_code == 0
     assert "Wrote 4 deer harvest row(s)" in result.stdout
+    assert "Wrote acquisition provenance manifest" in result.stdout
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["source_id"] == "md_dnr_deer_annual_report_2024_2025"
+    assert row["source_name"] == "Maryland DNR deer annual report PDF"
+    assert row["source_url"] == "https://example.test/report.pdf"
+    assert (
+        row["citation_url"]
+        == "https://dnr.maryland.gov/wildlife/Pages/hunt_trap/Deer_AnnualReports.aspx"
+    )
+    assert row["row_count"] == "4"
+    assert row["parser_method"] == "parse_maryland_dnr_deer_harvest_pdf:pypdfium"
+    assert "--include-annual-report-pdfs" in row["acquisition_command"]
+    assert "--skip-news-html" in row["acquisition_command"]

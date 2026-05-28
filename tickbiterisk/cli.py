@@ -55,6 +55,7 @@ from tickbiterisk.etl.deer_build import (
     write_deer_harvest_output,
 )
 from tickbiterisk.etl.deer_harvest import (
+    MARYLAND_DNR_DEER_ANNUAL_REPORT_ARCHIVE_URL,
     MARYLAND_DNR_DEER_ANNUAL_REPORT_URLS,
     MARYLAND_DNR_DEER_HARVEST_URLS,
     attach_deer_harvest_density,
@@ -1682,37 +1683,77 @@ def deer_harvest(
         "pypdfium",
         help="Annual report PDF parser: pypdfium or docling.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     if annual_report_parser not in {"pypdfium", "docling"}:
         raise typer.BadParameter("annual-report-parser must be pypdfium or docling")
     county_references = read_county_reference_output(county_reference_path)
     source_urls = url or MARYLAND_DNR_DEER_HARVEST_URLS
     rows = []
+    provenance_records = []
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    acquisition_command = _deer_harvest_acquisition_command(
+        county_reference_path=county_reference_path,
+        output_dir=output_dir,
+        source_urls=source_urls,
+        include_annual_report_pdfs=include_annual_report_pdfs,
+        skip_news_html=skip_news_html,
+        annual_report_parser=annual_report_parser,
+        manifest_path=resolved_manifest_path,
+    )
     if not skip_news_html:
         for source_url in source_urls:
+            source_id = source_id_from_deer_harvest_url(source_url)
             html = fetch_maryland_dnr_deer_harvest_html(source_url)
-            rows.extend(
-                parse_maryland_dnr_deer_harvest_html(
-                    html,
+            source_rows = parse_maryland_dnr_deer_harvest_html(
+                html,
+                source_url=source_url,
+                source_id=source_id,
+            )
+            rows.extend(source_rows)
+            provenance_records.append(
+                _deer_harvest_html_provenance_record(
                     source_url=source_url,
-                    source_id=source_id_from_deer_harvest_url(source_url),
+                    source_id=source_id,
+                    acquisition_command=acquisition_command,
+                    output_path=output_dir / "maryland_dnr_deer_harvest.csv",
+                    row_count=len(source_rows),
                 )
             )
     if include_annual_report_pdfs:
         for source in MARYLAND_DNR_DEER_ANNUAL_REPORT_URLS:
-            rows.extend(
-                parse_maryland_dnr_deer_harvest_pdf(
-                    source.url,
+            source_rows = parse_maryland_dnr_deer_harvest_pdf(
+                source.url,
+                source_url=source.url,
+                source_id=source.source_id,
+                parser=annual_report_parser,
+            )
+            rows.extend(source_rows)
+            provenance_records.append(
+                _deer_harvest_pdf_provenance_record(
                     source_url=source.url,
                     source_id=source.source_id,
-                    parser=annual_report_parser,
+                    acquisition_command=acquisition_command,
+                    output_path=output_dir / "maryland_dnr_deer_harvest.csv",
+                    row_count=len(source_rows),
+                    annual_report_parser=annual_report_parser,
                 )
             )
     rows = dedupe_deer_harvest_rows(
         attach_deer_harvest_density(rows, county_references)
     )
     output = write_deer_harvest_output(rows, output_dir)
+    provenance_output = write_acquisition_provenance_manifest(
+        provenance_records,
+        manifest_path=resolved_manifest_path,
+    )
     typer.echo(f"Wrote {len(rows)} deer harvest row(s) to {output}")
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("weather-backfill-open-meteo")
@@ -2500,6 +2541,109 @@ def _building_permits_provenance_records(
             )
         )
     return records
+
+
+def _deer_harvest_acquisition_command(
+    *,
+    county_reference_path: Path,
+    output_dir: Path,
+    source_urls: list[str] | None,
+    include_annual_report_pdfs: bool,
+    skip_news_html: bool,
+    annual_report_parser: str,
+    manifest_path: Path,
+) -> str:
+    command_parts = [
+        "tickbiterisk",
+        "etl",
+        "deer-harvest",
+        "--county-reference-path",
+        str(county_reference_path),
+        "--output-dir",
+        str(output_dir),
+    ]
+    for source_url in source_urls or []:
+        command_parts.extend(["--url", source_url])
+    if include_annual_report_pdfs:
+        command_parts.extend(
+            [
+                "--include-annual-report-pdfs",
+                "--annual-report-parser",
+                annual_report_parser,
+            ]
+        )
+    if skip_news_html:
+        command_parts.append("--skip-news-html")
+    command_parts.extend(["--provenance-manifest-path", str(manifest_path)])
+    return _format_cli_command(command_parts)
+
+
+def _deer_harvest_html_provenance_record(
+    *,
+    source_url: str,
+    source_id: str,
+    acquisition_command: str,
+    output_path: Path,
+    row_count: int,
+) -> AcquisitionProvenanceRecord:
+    return AcquisitionProvenanceRecord(
+        source_id=source_id,
+        source_name="Maryland DNR deer harvest news table",
+        source_url=source_url,
+        citation_url=source_url,
+        acquisition_command=acquisition_command,
+        acquisition_procedure=(
+            "Fetch a Maryland DNR news-page HTML harvest table and normalize "
+            "county-season deer harvest totals."
+        ),
+        request_method="GET",
+        request_description="Maryland DNR deer harvest news page request.",
+        derived_artifact_paths=[output_path],
+        row_count=row_count,
+        parser_method="parse_maryland_dnr_deer_harvest_html",
+        extraction_quality="accepted",
+        access_notes="Public Maryland DNR news page; no API key required.",
+        modeling_caveats=(
+            "Reported harvest is a host-pressure proxy, not a direct deer "
+            "abundance, tick exposure, or disease observation."
+        ),
+    )
+
+
+def _deer_harvest_pdf_provenance_record(
+    *,
+    source_url: str,
+    source_id: str,
+    acquisition_command: str,
+    output_path: Path,
+    row_count: int,
+    annual_report_parser: str,
+) -> AcquisitionProvenanceRecord:
+    return AcquisitionProvenanceRecord(
+        source_id=source_id,
+        source_name="Maryland DNR deer annual report PDF",
+        source_url=source_url,
+        citation_url=MARYLAND_DNR_DEER_ANNUAL_REPORT_ARCHIVE_URL,
+        acquisition_command=acquisition_command,
+        acquisition_procedure=(
+            "Fetch a Maryland DNR deer/big-game annual report PDF, extract the "
+            "county harvest table, and normalize county-season totals."
+        ),
+        request_method="GET",
+        request_description="Maryland DNR deer annual report PDF request.",
+        derived_artifact_paths=[output_path],
+        row_count=row_count,
+        parser_method=f"parse_maryland_dnr_deer_harvest_pdf:{annual_report_parser}",
+        extraction_quality="accepted",
+        access_notes=(
+            "Public Maryland DNR PDF; no API key required. Older annual "
+            "reports may require OCR review before modeling use."
+        ),
+        modeling_caveats=(
+            "Reported harvest is a prior-season host-pressure proxy, not a "
+            "direct deer abundance, tick exposure, or disease observation."
+        ),
+    )
 
 
 def _format_cli_command(parts: list[str]) -> str:
