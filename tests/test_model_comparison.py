@@ -328,6 +328,11 @@ def test_analog_year_forecast_uses_training_rows_only_and_emits_intervals(
         start_year=2021,
         min_train_years=1,
     )
+    repeat_result = run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+    )
 
     analog = next(
         row
@@ -352,12 +357,36 @@ def test_analog_year_forecast_uses_training_rows_only_and_emits_intervals(
     assert interval.interval_method == "weighted_analog_bootstrap"
     assert interval.bootstrap_seed == 1337
     assert interval.bootstrap_iterations == 200
+    assert interval.analog_count > 0
     assert (
         interval.lower_80_incidence_per_100k
         <= interval.median_incidence_per_100k
         <= interval.upper_80_incidence_per_100k
     )
-    assert "2021" not in interval.analog_years
+    analog_years = [int(value) for value in interval.analog_years.split(";")]
+    analog_counties = interval.analog_counties.split(";")
+    analog_weights = interval.analog_weights.split(";")
+    assert all(year < interval.test_year for year in analog_years)
+    assert interval.analog_weights
+    assert len(analog_weights) == len(analog_years) == len(analog_counties)
+
+    repeat_interval = next(
+        row
+        for row in repeat_result.intervals
+        if row.model_name == "analog_year_forecast"
+        and row.county_fips == "24001"
+        and row.test_year == 2021
+    )
+    assert repeat_interval.lower_80_incidence_per_100k == (
+        interval.lower_80_incidence_per_100k
+    )
+    assert repeat_interval.median_incidence_per_100k == (
+        interval.median_incidence_per_100k
+    )
+    assert repeat_interval.upper_80_incidence_per_100k == (
+        interval.upper_80_incidence_per_100k
+    )
+    assert repeat_interval.analog_weights == interval.analog_weights
 
 
 def test_write_model_comparison_outputs_writes_interval_artifact(

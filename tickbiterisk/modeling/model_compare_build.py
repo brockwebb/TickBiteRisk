@@ -99,6 +99,7 @@ MODEL_COMPARISON_INTERVAL_COLUMNS = [
     "analog_count",
     "analog_years",
     "analog_counties",
+    "analog_weights",
     "lower_80_incidence_per_100k",
     "median_incidence_per_100k",
     "upper_80_incidence_per_100k",

@@ -238,6 +238,7 @@ class ModelComparisonInterval:
     analog_count: int
     analog_years: str
     analog_counties: str
+    analog_weights: str
     lower_80_incidence_per_100k: float
     median_incidence_per_100k: float
     upper_80_incidence_per_100k: float
@@ -704,6 +705,7 @@ def _analog_interval_row(
         lower_95 = lower_80 = median = upper_80 = upper_95 = _round(prediction)
         analog_years = ""
         analog_counties = ""
+        analog_weights = ""
     else:
         bootstrap_values = _analog_bootstrap_values(row, analogs)
         lower_95 = _round(_percentile(bootstrap_values, 2.5))
@@ -714,6 +716,9 @@ def _analog_interval_row(
         analog_years = ";".join(str(analog.year) for analog, _distance, _weight in analogs)
         analog_counties = ";".join(
             analog.county_fips for analog, _distance, _weight in analogs
+        )
+        analog_weights = ";".join(
+            str(_round(weight)) for _analog, _distance, weight in analogs
         )
     observed = _round(row.incidence_per_100k)
     return ModelComparisonInterval(
@@ -737,6 +742,7 @@ def _analog_interval_row(
         analog_count=len(analogs),
         analog_years=analog_years,
         analog_counties=analog_counties,
+        analog_weights=analog_weights,
         lower_80_incidence_per_100k=lower_80,
         median_incidence_per_100k=median,
         upper_80_incidence_per_100k=upper_80,
