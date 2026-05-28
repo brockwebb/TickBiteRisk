@@ -1198,7 +1198,9 @@ def model_diagnostics(
             f"Model comparison predictions file not found: {predictions_path}"
         )
     if intervals_path is not None and not intervals_path.exists():
-        raise typer.BadParameter(f"Model intervals file not found: {intervals_path}")
+        raise typer.BadParameter(
+            f"Model comparison intervals file not found: {intervals_path}"
+        )
 
     try:
         result = build_model_diagnostics(

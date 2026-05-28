@@ -52,3 +52,32 @@ def test_model_diagnostics_command_fails_cleanly_when_predictions_missing(
     assert "Model comparison predictions file not found" in result.output
     assert "Traceback" not in result.output
     assert not (tmp_path / "out" / "surveillance_regime_residuals.csv").exists()
+
+
+def test_model_diagnostics_command_fails_cleanly_when_intervals_missing(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    intervals_path = Path("missing_intervals.csv")
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-diagnostics",
+            "--predictions-path",
+            str(predictions),
+            "--intervals-path",
+            str(intervals_path),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+        env={"COLUMNS": "200"},
+    )
+
+    assert result.exit_code != 0
+    assert (
+        f"Model comparison intervals file not found: {intervals_path}" in result.output
+    )
+    assert "Traceback" not in result.output
+    assert not (tmp_path / "out" / "surveillance_regime_residuals.csv").exists()

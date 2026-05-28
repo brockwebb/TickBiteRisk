@@ -26,16 +26,16 @@ def test_build_model_diagnostics_labels_surveillance_regimes(
         "case_definition_change_2022_plus",
         "mdh_probable_only_2024",
     }
-    summary_2022 = next(
+    overall_2022_regime = next(
         row
         for row in result.surveillance_summary
         if row.model_name == "linear_blend_baseline"
         and row.surveillance_regime == "case_definition_change_2022_plus"
-        and row.test_year == 2022
+        and row.test_year is None
     )
-    assert summary_2022.n_predictions == 1
-    assert summary_2022.mean_residual_incidence_per_100k == 20.0
-    assert summary_2022.mae_incidence_per_100k == 20.0
+    assert overall_2022_regime.n_predictions == 1
+    assert overall_2022_regime.mean_residual_incidence_per_100k == 20.0
+    assert overall_2022_regime.mae_incidence_per_100k == 20.0
 
 
 def test_write_model_diagnostics_outputs_writes_expected_columns(
