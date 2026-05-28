@@ -265,10 +265,15 @@ request/run manifests as those sources graduate into the modeling lane.
     - Summarizes comparison predictions and bootstrap intervals into research
       diagnostics for branch uncertainty, surveillance-regime checks, regional
       hotspot patterns, and capacity-sensitive error review.
-    - Also writes `forecast_update_audit.csv` and
-      `forecast_update_summary.csv`, which compare pre-update rolling-origin
-      forecasts with newly observed held-out outcomes using explicit as-of,
-      data-cutoff, source-vintage, and surveillance-regime fields.
+    - Also writes `forecast_update_audit.csv`,
+      `forecast_update_summary.csv`, and
+      `forecast_calibration_summary.csv`, which compare pre-update
+      rolling-origin forecasts with newly observed held-out outcomes using
+      explicit as-of, data-cutoff, source-vintage, and surveillance-regime
+      fields.
+    - The calibration summary records empirical observed-to-predicted case
+      ratios and additive incidence offsets for later Bayesian or hierarchical
+      update research; it is not a public score correction.
     - Writes diagnostics under the chosen model-diagnostics output directory.
 
 18. `tickbiterisk etl county-week-risk`

@@ -248,12 +248,19 @@ model_comparison_summary.csv
 
 The v0 comparison uses rolling-origin validation from the numeric design matrix and compares ten stdlib model profiles: prior-year incidence, trailing mean incidence, linear blend baseline, empirical-Bayes shrinkage, forecast-safe ridge over lag/history features, forecast-safe ridge with prior-year neighbor incidence, forecast-safe regional signal ridge, forecast-safe analog-year matching with bootstrap intervals, forecast-safe ridge with prior-season deer, prior-year mast, prior-year drought, prior-year population growth, the ecological pressure composite, static habitat, and prior/trailing construction ecology, and retrospective ridge with observed-year weather/contact/drought plus lagged ecology. Current cumulative tick-status features and source/caveat flags are excluded from the ridge profiles. Forecast-safe profiles do not use same-year observed weather, same-year USDM drought, same-year neighbor outcomes, current-year population growth, or same-year construction/contact pressure; these are retrospective reconstruction features unless a future forecast-time version is defined. Mast/acorn observations, prior-year drought, prior-year population growth, and neighbor incidence are joined only as observation year N to model year N+1. The 2026-05-28 2024-inclusive run ranked `prior_year_incidence` first by MAE, narrowly ahead of `linear_blend_baseline`; changing the public static branch remains a separate product release step.
 
-The forecast-update diagnostic layer writes `forecast_update_audit.csv` and
-`forecast_update_summary.csv` under `build/etl/model-diagnostics`. These
-artifacts replay held-out years as newly arrived data, preserving forecast
-origin, as-of date, data cutoff, source vintage, surveillance regime, interval
-coverage, and deterministic update interpretation. They are research artifacts
-for forecasting validation and public wording review, not raw surveillance data.
+The forecast-update diagnostic layer writes `forecast_update_audit.csv`,
+`forecast_update_summary.csv`, and `forecast_calibration_summary.csv` under
+`build/etl/model-diagnostics`. These artifacts replay held-out years as newly
+arrived data, preserving forecast origin, as-of date, data cutoff, source
+vintage, surveillance regime, interval coverage, deterministic update
+interpretation, empirical observed-to-predicted case ratios, and additive
+incidence offsets. The 2026-05-28 live smoke wrote 4,320 audit rows, 230 update
+summary rows, and 230 calibration rows. For `linear_blend_baseline`, 2024
+MDH probable-only outcomes were 1.609636x predicted cases with a +16.781366
+incidence/100k offset; for `prior_year_incidence`, 2024 was 1.277427x predicted
+cases with a +0.902192 incidence/100k offset. These are research artifacts for
+forecasting validation, future Bayesian update design, and public wording
+review, not raw surveillance data or public score corrections.
 
 The first baseline backtest artifact now materializes:
 

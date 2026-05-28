@@ -162,6 +162,30 @@ FORECAST_UPDATE_SUMMARY_COLUMNS = [
     "comparison_assumption_flags",
 ]
 
+FORECAST_CALIBRATION_SUMMARY_COLUMNS = [
+    "run_id",
+    "model_name",
+    "model_family",
+    "feature_profile",
+    "source_file_sha256",
+    "source_vintage",
+    "evaluation_mode",
+    "surveillance_regime",
+    "forecast_year",
+    "calibration_method",
+    "n_updates",
+    "total_actual_cases",
+    "total_predicted_cases",
+    "actual_to_predicted_case_ratio",
+    "mean_actual_incidence_per_100k",
+    "mean_predicted_incidence_per_100k",
+    "additive_residual_offset_incidence_per_100k",
+    "actual_to_predicted_incidence_ratio",
+    "mae_incidence_per_100k",
+    "recommended_update_use",
+    "comparison_assumption_flags",
+]
+
 
 @dataclass(frozen=True)
 class ModelDiagnosticsOutputPaths:
@@ -171,6 +195,7 @@ class ModelDiagnosticsOutputPaths:
     regional_capacity_intervals_path: Path
     forecast_update_audit_path: Path
     forecast_update_summary_path: Path
+    forecast_calibration_summary_path: Path
 
 
 def write_model_diagnostics_outputs(
@@ -184,6 +209,7 @@ def write_model_diagnostics_outputs(
     regional_capacity_intervals_path = output_dir / "regional_capacity_intervals.csv"
     forecast_update_audit_path = output_dir / "forecast_update_audit.csv"
     forecast_update_summary_path = output_dir / "forecast_update_summary.csv"
+    forecast_calibration_summary_path = output_dir / "forecast_calibration_summary.csv"
 
     _write_records(
         surveillance_residuals_path,
@@ -215,6 +241,11 @@ def write_model_diagnostics_outputs(
         [asdict(row) for row in result.forecast_update_summary],
         FORECAST_UPDATE_SUMMARY_COLUMNS,
     )
+    _write_records(
+        forecast_calibration_summary_path,
+        [asdict(row) for row in result.forecast_calibration_summary],
+        FORECAST_CALIBRATION_SUMMARY_COLUMNS,
+    )
     return ModelDiagnosticsOutputPaths(
         surveillance_residuals_path=surveillance_residuals_path,
         surveillance_summary_path=surveillance_summary_path,
@@ -222,6 +253,7 @@ def write_model_diagnostics_outputs(
         regional_capacity_intervals_path=regional_capacity_intervals_path,
         forecast_update_audit_path=forecast_update_audit_path,
         forecast_update_summary_path=forecast_update_summary_path,
+        forecast_calibration_summary_path=forecast_calibration_summary_path,
     )
 
 

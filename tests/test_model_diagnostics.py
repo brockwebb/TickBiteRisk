@@ -12,6 +12,7 @@ from tickbiterisk.modeling.model_diagnostics import (
     build_model_diagnostics,
 )
 from tickbiterisk.modeling.model_diagnostics_build import (
+    FORECAST_CALIBRATION_SUMMARY_COLUMNS,
     FORECAST_UPDATE_AUDIT_COLUMNS,
     FORECAST_UPDATE_SUMMARY_COLUMNS,
     REGIONAL_CAPACITY_INTERVAL_COLUMNS,
@@ -153,6 +154,7 @@ def test_model_diagnostics_writes_forecast_update_outputs(
 
     assert outputs.forecast_update_audit_path.exists()
     assert outputs.forecast_update_summary_path.exists()
+    assert outputs.forecast_calibration_summary_path.exists()
     with outputs.forecast_update_audit_path.open(
         newline="", encoding="utf-8"
     ) as handle:
@@ -178,6 +180,34 @@ def test_model_diagnostics_writes_forecast_update_outputs(
     assert analog_summary["covered_95_count"] == "2"
     assert analog_summary["ambiguous_signal_count"] == "2"
     assert analog_summary["ambiguous_signal_share"] == "1.0"
+    with outputs.forecast_calibration_summary_path.open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        reader = csv.DictReader(handle)
+        assert reader.fieldnames == FORECAST_CALIBRATION_SUMMARY_COLUMNS
+        calibration_rows = list(reader)
+
+    analog_calibration = next(
+        row
+        for row in calibration_rows
+        if row["model_name"] == "analog_year_forecast"
+        and row["surveillance_regime"] == "mdh_probable_only_2024"
+        and row["forecast_year"] == "2024"
+    )
+    assert analog_calibration["calibration_method"] == (
+        "empirical_observed_to_predicted_ratio"
+    )
+    assert analog_calibration["n_updates"] == "2"
+    assert analog_calibration["total_actual_cases"] == "50"
+    assert analog_calibration["total_predicted_cases"] == "45.0"
+    assert analog_calibration["actual_to_predicted_case_ratio"] == "1.111111"
+    assert analog_calibration["mean_actual_incidence_per_100k"] == "35.0"
+    assert analog_calibration["mean_predicted_incidence_per_100k"] == "32.5"
+    assert analog_calibration["additive_residual_offset_incidence_per_100k"] == "2.5"
+    assert analog_calibration["actual_to_predicted_incidence_ratio"] == "1.076923"
+    assert analog_calibration["recommended_update_use"] == (
+        "diagnostic_calibration_prior_only"
+    )
 
 
 def test_build_model_diagnostics_builds_forecast_update_audit_rows(

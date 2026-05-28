@@ -1845,6 +1845,10 @@ def model_diagnostics(
         f"Wrote {len(result.forecast_update_summary)} forecast update summary row(s) to "
         f"{outputs.forecast_update_summary_path}"
     )
+    typer.echo(
+        f"Wrote {len(result.forecast_calibration_summary)} forecast calibration "
+        f"summary row(s) to {outputs.forecast_calibration_summary_path}"
+    )
 
 
 @etl_app.command("county-week-risk")

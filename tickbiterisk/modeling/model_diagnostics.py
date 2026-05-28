@@ -182,6 +182,31 @@ class ForecastUpdateSummary:
 
 
 @dataclass(frozen=True)
+class ForecastCalibrationSummary:
+    run_id: str
+    model_name: str
+    model_family: str
+    feature_profile: str
+    source_file_sha256: str
+    source_vintage: str
+    evaluation_mode: str
+    surveillance_regime: str
+    forecast_year: int | None
+    calibration_method: str
+    n_updates: int
+    total_actual_cases: int
+    total_predicted_cases: float
+    actual_to_predicted_case_ratio: float | None
+    mean_actual_incidence_per_100k: float
+    mean_predicted_incidence_per_100k: float
+    additive_residual_offset_incidence_per_100k: float
+    actual_to_predicted_incidence_ratio: float | None
+    mae_incidence_per_100k: float
+    recommended_update_use: str
+    comparison_assumption_flags: str
+
+
+@dataclass(frozen=True)
 class ModelDiagnosticsResult:
     surveillance_residuals: list[SurveillanceRegimeResidual]
     surveillance_summary: list[SurveillanceRegimeSummary]
@@ -189,6 +214,7 @@ class ModelDiagnosticsResult:
     regional_capacity_intervals: list[RegionalCapacityInterval]
     forecast_update_audit: list[ForecastUpdateAudit]
     forecast_update_summary: list[ForecastUpdateSummary]
+    forecast_calibration_summary: list[ForecastCalibrationSummary]
 
 
 REQUIRED_PREDICTION_COLUMNS = [
@@ -273,6 +299,9 @@ def build_model_diagnostics(
         ),
         forecast_update_audit=forecast_update_audit,
         forecast_update_summary=_build_forecast_update_summary(forecast_update_audit),
+        forecast_calibration_summary=_build_forecast_calibration_summary(
+            forecast_update_audit
+        ),
     )
 
 
@@ -569,6 +598,125 @@ def _forecast_update_summary_row(
         insufficient_signal_share=_interpretation_share(rows, "insufficient_signal"),
         comparison_assumption_flags=",".join(assumption_flags),
     )
+
+
+def _build_forecast_calibration_summary(
+    audit_rows: list[ForecastUpdateAudit],
+) -> list[ForecastCalibrationSummary]:
+    grouped: dict[
+        tuple[str, str, str, str, str, str, str, str, int | None],
+        list[ForecastUpdateAudit],
+    ] = {}
+    for row in audit_rows:
+        yearly_key = (
+            row.run_id,
+            row.model_name,
+            row.model_family,
+            row.feature_profile,
+            row.source_file_sha256,
+            row.source_vintage,
+            row.evaluation_mode,
+            row.surveillance_regime,
+            row.forecast_year,
+        )
+        overall_key = (
+            row.run_id,
+            row.model_name,
+            row.model_family,
+            row.feature_profile,
+            row.source_file_sha256,
+            row.source_vintage,
+            row.evaluation_mode,
+            row.surveillance_regime,
+            None,
+        )
+        grouped.setdefault(yearly_key, []).append(row)
+        grouped.setdefault(overall_key, []).append(row)
+    return [
+        _forecast_calibration_summary_row(rows, key)
+        for key, rows in sorted(
+            grouped.items(),
+            key=lambda item: (
+                item[0][0],
+                item[0][1],
+                item[0][3],
+                item[0][4],
+                item[0][5],
+                item[0][6],
+                item[0][7],
+                item[0][8] is None,
+                item[0][8] or 0,
+            ),
+        )
+    ]
+
+
+def _forecast_calibration_summary_row(
+    rows: list[ForecastUpdateAudit],
+    key: tuple[str, str, str, str, str, str, str, str, int | None],
+) -> ForecastCalibrationSummary:
+    (
+        run_id,
+        model_name,
+        model_family,
+        feature_profile,
+        source_file_sha256,
+        source_vintage,
+        evaluation_mode,
+        surveillance_regime,
+        forecast_year,
+    ) = key
+    actual_cases = sum(row.actual_cases for row in rows)
+    predicted_cases = sum(row.predicted_cases for row in rows)
+    actual_incidence_values = [row.actual_incidence_per_100k for row in rows]
+    predicted_incidence_values = [row.predicted_incidence_per_100k for row in rows]
+    residual_incidence_values = [row.residual_incidence_per_100k for row in rows]
+    assumption_flags = sorted(
+        {
+            flag
+            for row in rows
+            for flag in _split_flags(row.comparison_assumption_flags)
+            if flag
+        }
+    )
+    mean_actual_incidence = _round(mean(actual_incidence_values))
+    mean_predicted_incidence = _round(mean(predicted_incidence_values))
+    return ForecastCalibrationSummary(
+        run_id=run_id,
+        model_name=model_name,
+        model_family=model_family,
+        feature_profile=feature_profile,
+        source_file_sha256=source_file_sha256,
+        source_vintage=source_vintage,
+        evaluation_mode=evaluation_mode,
+        surveillance_regime=surveillance_regime,
+        forecast_year=forecast_year,
+        calibration_method="empirical_observed_to_predicted_ratio",
+        n_updates=len(rows),
+        total_actual_cases=actual_cases,
+        total_predicted_cases=_round(predicted_cases),
+        actual_to_predicted_case_ratio=_safe_ratio(actual_cases, predicted_cases),
+        mean_actual_incidence_per_100k=mean_actual_incidence,
+        mean_predicted_incidence_per_100k=mean_predicted_incidence,
+        additive_residual_offset_incidence_per_100k=_round(
+            mean(residual_incidence_values)
+        ),
+        actual_to_predicted_incidence_ratio=_safe_ratio(
+            mean_actual_incidence,
+            mean_predicted_incidence,
+        ),
+        mae_incidence_per_100k=_round(
+            mean(abs(value) for value in residual_incidence_values)
+        ),
+        recommended_update_use="diagnostic_calibration_prior_only",
+        comparison_assumption_flags=",".join(assumption_flags),
+    )
+
+
+def _safe_ratio(numerator: float, denominator: float) -> float | None:
+    if abs(denominator) < 1e-12:
+        return None
+    return _round(numerator / denominator)
 
 
 def _interpretation_share(

@@ -181,6 +181,12 @@ reported cases into latent true disease burden. Known reporting-break regimes
 are kept separate from clean disease-pressure signals so future Bayesian or
 hierarchical models can assign reliability to incoming evidence.
 
+`forecast_calibration_summary.csv` is the bridge artifact for that future
+update model. It summarizes observed-to-predicted case ratios and additive
+incidence offsets by model branch, source vintage, surveillance regime, and
+forecast year. These factors are empirical calibration priors for research,
+not automatic public score corrections.
+
 ## Public score transform
 
 The selected annual predicted incidence is multiplied by the selected CDC

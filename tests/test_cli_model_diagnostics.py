@@ -66,11 +66,15 @@ def test_model_diagnostics_command_writes_forecast_update_outputs(
     assert "forecast_update_audit.csv" in result.stdout
     assert "Wrote 10 forecast update summary row(s)" in result.stdout
     assert "forecast_update_summary.csv" in result.stdout
+    assert "Wrote 10 forecast calibration summary row(s)" in result.stdout
+    assert "forecast_calibration_summary.csv" in result.stdout
 
     audit_path = output_dir / "forecast_update_audit.csv"
     summary_path = output_dir / "forecast_update_summary.csv"
+    calibration_path = output_dir / "forecast_calibration_summary.csv"
     assert audit_path.exists()
     assert summary_path.exists()
+    assert calibration_path.exists()
     audit_text = audit_path.read_text(encoding="utf-8")
     assert "2026-05-28" in audit_text
     assert "2024-12-31" in audit_text
