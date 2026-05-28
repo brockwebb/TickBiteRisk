@@ -20,6 +20,8 @@ Primary artifacts:
 - `build/etl/regional-incidence/midatlantic_lyme_incidence_summary.csv`
 - `build/etl/regional-outcome-stress/regional_outcome_stress_predictions.csv`
 - `build/etl/regional-outcome-stress/regional_outcome_stress_metrics.csv`
+- `build/etl/regional-incidence-stress/regional_incidence_stress_predictions.csv`
+- `build/etl/regional-incidence-stress/regional_incidence_stress_metrics.csv`
 - `build/etl/model-comparison/model_comparison_predictions.csv`
 - `build/etl/model-comparison/model_comparison_intervals.csv`
 - `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv`
@@ -129,6 +131,14 @@ capacity-share lanes, but prior-year county cases still ranked first on
 overall case MAE, so the capacity idea remains a useful stress test rather
 than an accepted public model assumption.
 
+The `regional-incidence-stress` diagnostic is the population-normalized
+companion to `regional-outcome-stress`. It uses the Mid-Atlantic reported
+incidence panel, preserves denominator gaps rather than filling them, and tests
+whether state or Mid-Atlantic shrinkage baselines improve county incidence
+forecasts. The first materialized run still ranked prior-year county incidence
+best on overall incidence MAE, so it remains a research diagnostic rather than
+a selected public Maryland branch or latent disease-burden estimate.
+
 Surveillance-regime diagnostics should remain separate from disease truth
 labels. They may flag case-definition eras, ED or inquiry coverage, reporting
 capacity, or other surveillance artifacts that help explain model error.
@@ -141,12 +151,12 @@ The Mid-Atlantic hotspot diagnostic uses only same-year reported case counts
 to classify county rank tiers and year-over-year movement. Its fields are
 intentionally named `diagnostic_*` because they can reveal regional movement or
 surveillance-regime disruptions, but they are not forecast-safe model features.
-Regional Census population denominators are now materialized so a later slice
-can convert those count-only diagnostics into incidence-rate diagnostics; the
-population table itself is denominator evidence, not exposure evidence.
-The first regional incidence diagnostic now performs that join while preserving
-missing denominator rows. It remains a diagnostic panel, not a public Maryland
-forecast branch.
+Regional Census population denominators and incidence-rate stress diagnostics
+are now materialized so the count-only regional diagnostics have a
+population-normalized companion; the population table itself is denominator
+evidence, not exposure evidence. The regional incidence diagnostic performs
+that join while preserving missing denominator rows. It remains a diagnostic
+panel, not a public Maryland forecast branch.
 
 ## Forecast Update Contract
 

@@ -68,6 +68,9 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `midatlantic_lyme_incidence_summary.csv` | `tickbiterisk etl regional-incidence` | Annual denominator coverage and incidence hotspot transition diagnostics |
 | `regional_outcome_stress_predictions.csv` | `tickbiterisk etl regional-outcome-stress` | Mid-Atlantic outcome-only capacity-share stress predictions |
 | `regional_outcome_stress_metrics.csv` | `tickbiterisk etl regional-outcome-stress` | Case-count MAE/RMSE metrics for regional historical-range baselines |
+| `regional_incidence_stress_runs.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate stress run manifest |
+| `regional_incidence_stress_predictions.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate shrinkage stress predictions |
+| `regional_incidence_stress_metrics.csv` | `tickbiterisk etl regional-incidence-stress` | Incidence MAE/RMSE metrics for regional historical-range baselines |
 | `model_comparison_predictions.csv` | `tickbiterisk etl model-compare` | Rolling-origin predictions from candidate model branches |
 | `model_comparison_intervals.csv` | `tickbiterisk etl model-compare` | Bootstrap prediction intervals companion artifact for comparison branches |
 | `noaa_cpc_oni_seasons.csv` | `tickbiterisk etl enso-oni` | NOAA CPC ONI seasonal anomalies and El Nino / La Nina phase labels |

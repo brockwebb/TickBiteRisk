@@ -113,6 +113,17 @@ request/run manifests as those sources graduate into the modeling lane.
      diagnostics over reported case counts, not population-normalized public
      forecasts or latent true disease estimates.
 
+1i. `tickbiterisk etl regional-incidence-stress`
+   - Runs rolling-origin, incidence-rate stress tests against the Mid-Atlantic
+     county incidence panel.
+   - Writes `regional_incidence_stress_runs.csv`,
+     `regional_incidence_stress_predictions.csv`, and
+     `regional_incidence_stress_metrics.csv`.
+   - Compares prior-year county incidence, trailing county incidence, and
+     state/Mid-Atlantic empirical-Bayes shrinkage baselines as transparent
+     historical-range tests. These are research diagnostics over reported
+     incidence per 100k, not public forecasts or latent true disease estimates.
+
 2. `tickbiterisk etl county-reference`
    - Builds Maryland county FIPS, names, area, and internal point reference.
    - Writes `county_reference.csv`.
