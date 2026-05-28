@@ -112,6 +112,8 @@ Initial normalized tables:
 - `county_population_year`
 - `midatlantic_age_demographics`
 - `midatlantic_acs_exposure`
+- `noaa_psl_mei_v2_monthly`
+- `noaa_psl_mei_v2_model_year_features`
 - `weather_locations`
 - `weather_daily`
 - `weather_features_weekly`

@@ -5,6 +5,8 @@ from dataclasses import asdict
 from pathlib import Path
 
 from tickbiterisk.etl.enso import (
+    MeiV2ModelYearFeatures,
+    MeiV2Month,
     ONI_SEASON_ORDER,
     OniModelYearFeatures,
     OniSeason,
@@ -30,6 +32,30 @@ ONI_MODEL_YEAR_COLUMNS = [
     "oni_prior_year_min_anomaly_c",
     "oni_prior_year_el_nino_season_count",
     "oni_prior_year_la_nina_season_count",
+    "source_ids",
+    "source_url_hashes",
+    "feature_quality_flags",
+]
+
+MEI_V2_MONTHLY_COLUMNS = [
+    "month_start_date",
+    "year",
+    "month",
+    "mei_v2_value",
+    "mei_v2_phase",
+    "source_id",
+    "source_url_hash",
+    "feature_quality_flags",
+]
+
+MEI_V2_MODEL_YEAR_COLUMNS = [
+    "model_year",
+    "mei_v2_prior_year_month_count",
+    "mei_v2_prior_year_mean",
+    "mei_v2_prior_year_max",
+    "mei_v2_prior_year_min",
+    "mei_v2_prior_year_positive_month_count",
+    "mei_v2_prior_year_negative_month_count",
     "source_ids",
     "source_url_hashes",
     "feature_quality_flags",
@@ -67,6 +93,40 @@ def write_oni_model_year_output(
         output_dir,
         "noaa_cpc_oni_model_year_features.csv",
         ONI_MODEL_YEAR_COLUMNS,
+        append=append,
+        key=lambda record: int(record["model_year"]),
+        sort_key=lambda record: int(record["model_year"]),
+    )
+
+
+def write_mei_v2_monthly_output(
+    rows: list[MeiV2Month],
+    output_dir: Path,
+    *,
+    append: bool = False,
+) -> Path:
+    return _write_records(
+        rows,
+        output_dir,
+        "noaa_psl_mei_v2_monthly.csv",
+        MEI_V2_MONTHLY_COLUMNS,
+        append=append,
+        key=lambda record: (int(record["year"]), int(record["month"])),
+        sort_key=lambda record: (int(record["year"]), int(record["month"])),
+    )
+
+
+def write_mei_v2_model_year_output(
+    rows: list[MeiV2ModelYearFeatures],
+    output_dir: Path,
+    *,
+    append: bool = False,
+) -> Path:
+    return _write_records(
+        rows,
+        output_dir,
+        "noaa_psl_mei_v2_model_year_features.csv",
+        MEI_V2_MODEL_YEAR_COLUMNS,
         append=append,
         key=lambda record: int(record["model_year"]),
         sort_key=lambda record: int(record["model_year"]),

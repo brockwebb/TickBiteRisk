@@ -89,12 +89,20 @@ from tickbiterisk.etl.enviroatlas import (
 from tickbiterisk.etl.enviroatlas_build import write_enviroatlas_county_habitat_output
 from tickbiterisk.etl.enso import (
     NOAA_CPC_ONI_URL,
+    NOAA_PSL_MEI_V2_CITATION_URL,
+    NOAA_PSL_MEI_V2_URL,
+    MeiV2InputError,
     OniInputError,
+    build_mei_v2_model_year_features,
     build_oni_model_year_features,
+    fetch_mei_v2_text,
     fetch_oni_text,
+    parse_mei_v2_csv_text,
     parse_oni_ascii_text,
 )
 from tickbiterisk.etl.enso_build import (
+    write_mei_v2_model_year_output,
+    write_mei_v2_monthly_output,
     write_oni_model_year_output,
     write_oni_season_output,
 )
@@ -1504,6 +1512,81 @@ def enso_oni(
     typer.echo(f"Wrote {len(rows)} NOAA CPC ONI season row(s) to {season_output}")
     typer.echo(
         f"Wrote {len(model_year_rows)} NOAA CPC ONI model-year feature row(s) "
+        f"to {model_year_output}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {manifest_output}")
+
+
+@etl_app.command("enso-mei-v2")
+def enso_mei_v2(
+    source_url: str = typer.Option(
+        NOAA_PSL_MEI_V2_URL,
+        help="NOAA PSL MEI.v2 CSV table URL.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/enso"),
+        help="Output directory for ENSO MEI.v2 ETL artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
+) -> None:
+    try:
+        rows = parse_mei_v2_csv_text(
+            fetch_mei_v2_text(source_url),
+            source_url=source_url,
+        )
+    except MeiV2InputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    monthly_output = write_mei_v2_monthly_output(rows, output_dir)
+    model_year_rows = build_mei_v2_model_year_features(rows)
+    model_year_output = write_mei_v2_model_year_output(model_year_rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_source_url = _sanitize_provenance_url(source_url)
+    manifest_output = _write_single_request_provenance_manifest(
+        manifest_path=resolved_manifest_path,
+        record=AcquisitionProvenanceRecord(
+            source_id="noaa_psl_mei_v2",
+            source_name="NOAA PSL Multivariate ENSO Index version 2",
+            source_url=provenance_source_url,
+            citation_url=NOAA_PSL_MEI_V2_CITATION_URL,
+            acquisition_command=_format_cli_command(
+                [
+                    "tickbiterisk",
+                    "etl",
+                    "enso-mei-v2",
+                    "--source-url",
+                    provenance_source_url,
+                    "--output-dir",
+                    str(output_dir),
+                    "--provenance-manifest-path",
+                    str(resolved_manifest_path),
+                ]
+            ),
+            acquisition_procedure=(
+                "Fetch the official NOAA PSL MEI.v2 CSV table and parse monthly "
+                "rows into complete prior-year global climate context features."
+            ),
+            request_method="GET",
+            request_description="NOAA PSL MEI.v2 CSV table request.",
+            derived_artifact_paths=[monthly_output, model_year_output],
+            row_count=len(rows),
+            parser_method="parse_mei_v2_csv_text",
+            extraction_quality="accepted",
+            access_notes="Public NOAA PSL endpoint; no API key required.",
+            modeling_caveats=(
+                "Global ocean-atmosphere ENSO context only; not Maryland-specific, "
+                "not an official CPC phase classification, and not a public-default "
+                "input without model evidence."
+            ),
+        ),
+    )
+    typer.echo(f"Wrote {len(rows)} NOAA PSL MEI.v2 monthly row(s) to {monthly_output}")
+    typer.echo(
+        f"Wrote {len(model_year_rows)} NOAA PSL MEI.v2 model-year feature row(s) "
         f"to {model_year_output}"
     )
     typer.echo(f"Wrote acquisition provenance manifest to {manifest_output}")
@@ -4492,6 +4575,8 @@ def _write_single_request_provenance_manifest(
     return write_acquisition_provenance_manifest(
         [record],
         manifest_path=manifest_path,
+        append=True,
+        replace_source_ids=True,
     )
 
 

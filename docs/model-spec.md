@@ -107,9 +107,11 @@ countywide or statewide mast production.
 The 2026-05-28 expanded feature comparison now includes prior-year population
 growth, USDM drought, EnviroAtlas habitat, construction-lag features, prior-year
 USDM drought, complete prior-year ONI, and a transparent ecological pressure
-composite in the timing-safe ecology/exposure lane. Held-out MAE still ranks
-`prior_year_incidence` first; these features remain available for research
-lanes but are not promoted into the public score.
+composite in the timing-safe ecology/exposure lane. MEI.v2 is now materialized
+as a separate complete prior-year ENSO companion artifact, but it is not joined
+into model features yet. Held-out MAE still ranks `prior_year_incidence` first;
+these features remain available for research lanes but are not promoted into
+the public score.
 
 The next spatial-lag comparison added county adjacency from public Census
 geometry and a `ridge_forecast_spatial` lane using only prior-year neighbor

@@ -155,6 +155,30 @@ CREATE TABLE IF NOT EXISTS midatlantic_acs_exposure (
     PRIMARY KEY (county_fips, year, source_id)
 );
 
+CREATE TABLE IF NOT EXISTS noaa_psl_mei_v2_monthly (
+    month_start_date date PRIMARY KEY,
+    year integer NOT NULL,
+    month integer NOT NULL CHECK (month BETWEEN 1 AND 12),
+    mei_v2_value double precision,
+    mei_v2_phase text NOT NULL,
+    source_id text NOT NULL,
+    source_url_hash text NOT NULL,
+    feature_quality_flags text DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS noaa_psl_mei_v2_model_year_features (
+    model_year integer PRIMARY KEY,
+    mei_v2_prior_year_month_count integer NOT NULL CHECK (mei_v2_prior_year_month_count >= 0),
+    mei_v2_prior_year_mean double precision,
+    mei_v2_prior_year_max double precision,
+    mei_v2_prior_year_min double precision,
+    mei_v2_prior_year_positive_month_count integer NOT NULL CHECK (mei_v2_prior_year_positive_month_count >= 0),
+    mei_v2_prior_year_negative_month_count integer NOT NULL CHECK (mei_v2_prior_year_negative_month_count >= 0),
+    source_ids text NOT NULL,
+    source_url_hashes text NOT NULL,
+    feature_quality_flags text DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS tick_vector_status (
     source_id text NOT NULL,
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),

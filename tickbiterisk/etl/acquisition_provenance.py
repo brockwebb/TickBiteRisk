@@ -52,12 +52,21 @@ def write_acquisition_provenance_manifest(
     manifest_path: Path,
     retrieved_at: str | None = None,
     append: bool = False,
+    replace_source_ids: bool = False,
 ) -> Path:
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     timestamp = retrieved_at or datetime.now(timezone.utc).isoformat()
     rows = [_record_to_row(record, timestamp) for record in records]
     if append and manifest_path.exists():
-        rows = [*_read_existing_rows(manifest_path), *rows]
+        existing_rows = _read_existing_rows(manifest_path)
+        if replace_source_ids:
+            replacement_ids = {str(row["source_id"]) for row in rows}
+            existing_rows = [
+                row
+                for row in existing_rows
+                if str(row["source_id"]) not in replacement_ids
+            ]
+        rows = [*existing_rows, *rows]
     keyed = {
         (str(row["source_id"]), str(row["source_url"])): row for row in rows
     }

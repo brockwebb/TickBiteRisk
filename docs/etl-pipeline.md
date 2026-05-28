@@ -244,7 +244,17 @@ artifacts.
     - Model-year rows use only complete 12-season prior years and remain
       optional; ONI is not Maryland-specific and is not a public-default input.
 
-11b. `tickbiterisk etl tick-status`
+11b. `tickbiterisk etl enso-mei-v2`
+    - Pulls the NOAA PSL MEI.v2 CSV table as a global ocean-atmosphere ENSO
+      climate context source.
+    - Writes `noaa_psl_mei_v2_monthly.csv` and
+      `noaa_psl_mei_v2_model_year_features.csv`.
+    - Monthly NOAA `-999` placeholders are retained as missing-value rows, but
+      model-year rows use only complete 12-month prior years. MEI.v2 is not
+      Maryland-specific, not an official CPC phase classification, and not a
+      public-default input.
+
+11c. `tickbiterisk etl tick-status`
     - Normalizes local CDC Ixodes, pathogen, and lone-star tick status
       workbooks into Maryland county status features. The current default
       metadata targets CDC May 2026 workbook files covering status through
@@ -254,7 +264,7 @@ artifacts.
       `acquisition_provenance.csv` with workbook checksums, parser methods,
       row counts, and status-only/not-prevalence caveats.
 
-11c. `tickbiterisk etl nssp-coverage`
+11d. `tickbiterisk etl nssp-coverage`
     - Downloads or reads the public CDC NSSP county coverage table and
       normalizes Maryland emergency-care participation status.
     - Writes `nssp_coverage_county_status.csv` and

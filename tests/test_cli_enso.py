@@ -105,3 +105,204 @@ def test_enso_oni_command_sanitizes_credential_like_source_url_in_manifest(
     assert "client_secret=%3Credacted%3E" in row["source_url"]
     assert "x-api-key=%3Credacted%3E" in row["source_url"]
     assert "year=2020" in row["source_url"]
+
+
+def test_enso_mei_v2_command_writes_monthly_and_model_year_outputs(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    mei_text = """Date, Multivariate ENSO Index Version 2 (MEI.v2)
+2020-01-01, 0.400
+2020-02-01, 0.600
+2020-03-01,-0.700
+2020-04-01, 0.000
+2020-05-01, 0.800
+2020-06-01,-0.500
+2020-07-01, 1.000
+2020-08-01,-0.200
+2020-09-01,-0.900
+2020-10-01, 0.200
+2020-11-01, 0.600
+2020-12-01,-1.100
+"""
+
+    monkeypatch.setattr("tickbiterisk.cli.fetch_mei_v2_text", lambda url: mei_text)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "enso-mei-v2",
+            "--source-url",
+            "https://example.test/meiv2.csv",
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 12 NOAA PSL MEI.v2 monthly row(s)" in result.stdout
+    assert "Wrote 1 NOAA PSL MEI.v2 model-year feature row(s)" in result.stdout
+    assert (tmp_path / "out" / "noaa_psl_mei_v2_monthly.csv").exists()
+    assert (tmp_path / "out" / "noaa_psl_mei_v2_model_year_features.csv").exists()
+    manifest_path = tmp_path / "out" / "acquisition_provenance.csv"
+    assert manifest_path.exists()
+    with manifest_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["source_id"] == "noaa_psl_mei_v2"
+    assert rows[0]["source_url"] == "https://example.test/meiv2.csv"
+    assert rows[0]["citation_url"] == "https://psl.noaa.gov/enso/mei/"
+    assert rows[0]["request_method"] == "GET"
+    assert rows[0]["parser_method"] == "parse_mei_v2_csv_text"
+    assert rows[0]["extraction_quality"] == "accepted"
+    assert rows[0]["row_count"] == "12"
+    assert "tickbiterisk etl enso-mei-v2" in rows[0]["acquisition_command"]
+    assert "noaa_psl_mei_v2_monthly.csv=" in rows[0]["derived_artifact_sha256s"]
+
+
+def test_enso_mei_v2_command_sanitizes_credential_like_source_url_in_manifest(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    mei_text = """Date, Multivariate ENSO Index Version 2 (MEI.v2)
+2020-01-01, 0.400
+"""
+
+    monkeypatch.setattr("tickbiterisk.cli.fetch_mei_v2_text", lambda url: mei_text)
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "enso-mei-v2",
+            "--source-url",
+            (
+                "https://example.test/meiv2.csv?"
+                "token=secret-token&client_secret=secret-client&"
+                "x-api-key=secret-api-key&year=2020"
+            ),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    manifest_path = tmp_path / "out" / "acquisition_provenance.csv"
+    with manifest_path.open(encoding="utf-8", newline="") as handle:
+        row = next(csv.DictReader(handle))
+
+    assert "secret-token" not in row["source_url"]
+    assert "secret-client" not in row["source_url"]
+    assert "secret-api-key" not in row["source_url"]
+    assert "secret-token" not in row["citation_url"]
+    assert "secret-client" not in row["citation_url"]
+    assert "secret-api-key" not in row["citation_url"]
+    assert "secret-token" not in row["acquisition_command"]
+    assert "secret-client" not in row["acquisition_command"]
+    assert "secret-api-key" not in row["acquisition_command"]
+    assert "token=%3Credacted%3E" in row["source_url"]
+    assert "client_secret=%3Credacted%3E" in row["source_url"]
+    assert "x-api-key=%3Credacted%3E" in row["source_url"]
+    assert "year=2020" in row["source_url"]
+
+
+def test_enso_commands_append_shared_provenance_manifest(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    oni_text = """ SEAS  YR   TOTAL   ANOM
+ DJF 2020  26.10   0.40
+"""
+    mei_text = """Date, Multivariate ENSO Index Version 2 (MEI.v2)
+2020-01-01, 0.400
+"""
+
+    monkeypatch.setattr("tickbiterisk.cli.fetch_oni_text", lambda url: oni_text)
+    monkeypatch.setattr("tickbiterisk.cli.fetch_mei_v2_text", lambda url: mei_text)
+
+    output_dir = tmp_path / "out"
+    oni_result = runner.invoke(
+        app,
+        [
+            "etl",
+            "enso-oni",
+            "--source-url",
+            "https://example.test/oni.ascii.txt",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+    mei_result = runner.invoke(
+        app,
+        [
+            "etl",
+            "enso-mei-v2",
+            "--source-url",
+            "https://example.test/meiv2.csv",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert oni_result.exit_code == 0
+    assert mei_result.exit_code == 0
+    with (output_dir / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        source_ids = {row["source_id"] for row in csv.DictReader(handle)}
+    assert source_ids == {"noaa_cpc_oni", "noaa_psl_mei_v2"}
+
+
+def test_enso_command_replaces_same_source_id_when_source_url_changes(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    oni_text = """ SEAS  YR   TOTAL   ANOM
+ DJF 2020  26.10   0.40
+"""
+    mei_text = """Date, Multivariate ENSO Index Version 2 (MEI.v2)
+2020-01-01, 0.400
+"""
+
+    monkeypatch.setattr("tickbiterisk.cli.fetch_oni_text", lambda url: oni_text)
+    monkeypatch.setattr("tickbiterisk.cli.fetch_mei_v2_text", lambda url: mei_text)
+
+    output_dir = tmp_path / "out"
+    for url in [
+        "https://example.test/mei-v2-old.csv",
+        "https://example.test/mei-v2-new.csv",
+    ]:
+        result = runner.invoke(
+            app,
+            [
+                "etl",
+                "enso-mei-v2",
+                "--source-url",
+                url,
+                "--output-dir",
+                str(output_dir),
+            ],
+        )
+        assert result.exit_code == 0
+    oni_result = runner.invoke(
+        app,
+        [
+            "etl",
+            "enso-oni",
+            "--source-url",
+            "https://example.test/oni.ascii.txt",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert oni_result.exit_code == 0
+    with (output_dir / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert [row["source_id"] for row in rows] == ["noaa_cpc_oni", "noaa_psl_mei_v2"]
+    mei_row = next(row for row in rows if row["source_id"] == "noaa_psl_mei_v2")
+    assert mei_row["source_url"] == "https://example.test/mei-v2-new.csv"
