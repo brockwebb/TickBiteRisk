@@ -25,11 +25,12 @@ def test_regional_population_dry_run_prints_sanitized_urls(tmp_path, monkeypatch
     )
 
     assert result.exit_code == 0
-    assert "Planned Mid-Atlantic Census population query(s): 8" in result.stdout
+    assert "Planned Mid-Atlantic Census population query(s): 9" in result.stdout
     assert "co-est00int-alldata-10.csv" in result.stdout
     assert "co-est00int-alldata-54.csv" in result.stdout
     assert "co-est2019-alldata.csv" in result.stdout
     assert "co-est2023-alldata.csv" in result.stdout
+    assert "co-est2025-alldata.csv" in result.stdout
     assert "secret-key" not in result.stdout
     assert not (tmp_path / "midatlantic_county_population_year.csv").exists()
 
@@ -83,9 +84,71 @@ def test_regional_population_command_writes_output_and_provenance(
     assert manifest_path.exists()
     with manifest_path.open(encoding="utf-8", newline="") as handle:
         manifest_rows = list(csv.DictReader(handle))
-    assert len(manifest_rows) == 8
+    assert len(manifest_rows) == 9
     assert all(row["source_id"].startswith("census_midatlantic_population_") for row in manifest_rows)
     assert all("secret-key" not in str(row) for row in manifest_rows)
     assert all("static CSV endpoint" in row["access_notes"] for row in manifest_rows)
     assert all("API endpoint" not in row["access_notes"] for row in manifest_rows)
     assert any(row["row_count"] == "1" for row in manifest_rows)
+
+
+def test_regional_population_command_records_projection_provenance(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    rows = [
+        RegionalCountyPopulation(
+            state_fips="42",
+            state_abbr="PA",
+            state_name="Pennsylvania",
+            county_fips="42001",
+            county_name="Adams County",
+            year=2026,
+            population=105500,
+            source_id="regional_population_linear_projection",
+            census_dataset=(
+                "derived_from_2020-2025/counties/totals/co-est2025-alldata.csv"
+            ),
+            vintage=2025,
+            source_url_hash="c" * 64,
+            feature_quality_flags=(
+                "regional_population_denominator,"
+                "simple_linear_population_projection,"
+                "no_official_2026_census_denominator"
+            ),
+        )
+    ]
+
+    monkeypatch.setattr("tickbiterisk.cli.get_census_api_key", lambda: "secret-key")
+    monkeypatch.setattr(
+        "tickbiterisk.cli.fetch_midatlantic_county_population_estimates",
+        lambda **kwargs: rows,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "regional-population",
+            "--output-dir",
+            str(tmp_path),
+        ],
+        env={"COLUMNS": "200"},
+    )
+
+    assert result.exit_code == 0
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        manifest_rows = list(csv.DictReader(handle))
+    projection_rows = [
+        row
+        for row in manifest_rows
+        if row["source_id"] == "census_midatlantic_population_projection_2026"
+    ]
+    assert len(projection_rows) == 1
+    assert projection_rows[0]["row_count"] == "1"
+    assert projection_rows[0]["parser_method"] == "project_county_population_linear_trend"
+    assert "co-est2025-alldata.csv" in projection_rows[0]["source_url"]
+    assert "no official 2026 Census county denominator" in projection_rows[0]["modeling_caveats"]

@@ -59,7 +59,7 @@ feature ideas to test in time-aware backtests before any public model claim.
 | --- | --- | --- |
 | `lyme_county_year_reconciled.csv` | `tickbiterisk etl lyme-outcomes` | Maryland Lyme outcome panel with source reconciliation flags |
 | `county_population_year.csv` | `tickbiterisk etl census-population` | County-year population denominators |
-| `midatlantic_county_population_year.csv` | `tickbiterisk etl regional-population` | DE/DC/MD/PA/VA/WV county-year population denominators for regional rate diagnostics |
+| `midatlantic_county_population_year.csv` | `tickbiterisk etl regional-population` | DE/DC/MD/PA/VA/WV county-year population denominators for regional rate diagnostics, with flagged 2026 forecast projections |
 | `midatlantic_age_demographics_county_year.csv` | `tickbiterisk etl regional-demographics` | DE/DC/MD/PA/VA/WV county-year age-structure context through 2024 |
 | `midatlantic_acs_exposure_county_year.csv` | `tickbiterisk etl acs-exposure` | DE/DC/MD/PA/VA/WV 2023-2024 ACS residential-form, tenure, age, and density exposure-context proxy |
 | `county_reference.csv` | `tickbiterisk etl county-reference` | County FIPS, names, land area, and internal points |

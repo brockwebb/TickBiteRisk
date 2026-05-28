@@ -64,12 +64,17 @@ artifacts.
 
 1c. `tickbiterisk etl regional-population`
    - Pulls keyless static Census county population CSVs for DE, DC, MD, PA,
-     VA, and WV.
+     VA, and WV, including the official Vintage 2025 county totals.
    - Writes `midatlantic_county_population_year.csv` and
      `acquisition_provenance.csv`.
    - These rows are denominator estimates for regional incidence/rate
      diagnostics, not exposure evidence. Boundary changes can create gaps; the
      first live run lacks Bedford city, VA denominators for 2010-2023.
+   - For 2026 forecasts, the ETL derives county denominators with a simple
+     trailing linear projection from official Census estimates. Rows are flagged
+     `simple_linear_population_projection` and
+     `no_official_2026_census_denominator` so they can be replaced when Census
+     publishes observed 2026 estimates.
 
 1c-2. `tickbiterisk etl regional-demographics`
    - Pulls keyless static Census PEP county age/sex CSVs for DE, DC, MD, PA,
@@ -405,6 +410,7 @@ probability or a treatment recommendation.
   population denominators and NOAA 2024 weather aggregates are now present.
 - The current population output mixes Census API-era 2020-2023 rows with
   Vintage 2025 CSV rows for 2024-2025; use source IDs and vintages when
-  comparing denominators across vintages.
+  comparing denominators across vintages. The regional population output also
+  includes forecast-only 2026 projected denominators.
 
 Last updated: 2026-05-28.

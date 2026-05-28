@@ -139,7 +139,9 @@ from tickbiterisk.etl.regional_incidence import build_midatlantic_incidence_pane
 from tickbiterisk.etl.regional_incidence_build import write_regional_incidence_outputs
 from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
 from tickbiterisk.etl.regional_population import (
+    REGIONAL_POPULATION_PROJECTION_SOURCE_ID,
     build_midatlantic_population_urls,
+    build_census_pep_2025_county_totals_url as build_midatlantic_census_pep_2025_county_totals_url,
     fetch_midatlantic_county_population_estimates,
 )
 from tickbiterisk.etl.regional_population_build import (
@@ -4849,7 +4851,149 @@ def _census_population_source_metadata(*, latest_only: bool = False) -> list[dic
     return metadata
 
 
-def _regional_population_provenance_records(
+def _regional_population_row_counts(rows: list[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        state_fips = str(getattr(row, "state_fips", ""))
+        source_id = str(getattr(row, "source_id", ""))
+        if source_id == "census_pep_intercensal_2000_2010_static":
+            key = f"{state_fips}_intercensal_2000_2010_static"
+        elif source_id == "census_pep_2019_county_totals":
+            key = "pep_2019_county_totals"
+        elif source_id == "census_pep_2023_county_totals":
+            key = "pep_2023_county_totals"
+        elif source_id == "census_pep_2025_county_totals":
+            key = "pep_2025_county_totals"
+        elif source_id == REGIONAL_POPULATION_PROJECTION_SOURCE_ID:
+            key = "population_projection_2026"
+        else:
+            key = f"{state_fips}_{source_id}"
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _regional_population_url_metadata(url: str) -> dict[str, str]:
+    if "co-est00int-alldata-" in url:
+        state_fips = (
+            Path(urlsplit(url).path)
+            .name.removeprefix("co-est00int-alldata-")
+            .removesuffix(".csv")
+            .zfill(2)
+        )
+        return {
+            "source_id": (
+                "census_midatlantic_population_intercensal_2000_2010_static_"
+                f"{state_fips}"
+            ),
+            "row_count_key": f"{state_fips}_intercensal_2000_2010_static",
+            "acquisition_procedure": (
+                "Fetch Census intercensal county population static CSV rows and "
+                "normalize Mid-Atlantic county denominators for 2001-2009."
+            ),
+            "request_description": (
+                f"Census intercensal 2000 population CSV request for state {state_fips}."
+            ),
+            "parser_method": "parse_census_intercensal_2000_county_totals",
+        }
+    if "co-est2019-alldata.csv" in url:
+        return {
+            "source_id": "census_midatlantic_population_pep_2019_county_totals",
+            "row_count_key": "pep_2019_county_totals",
+            "acquisition_procedure": (
+                "Fetch Census PEP 2019 county totals CSV rows and "
+                "normalize Mid-Atlantic county denominators for 2010-2019."
+            ),
+            "request_description": "Census PEP 2019 county totals CSV request.",
+            "parser_method": "parse_census_pep_2019_county_totals",
+        }
+    if "co-est2023-alldata.csv" in url:
+        return {
+            "source_id": "census_midatlantic_population_pep_2023_county_totals",
+            "row_count_key": "pep_2023_county_totals",
+            "acquisition_procedure": (
+                "Fetch Census PEP 2023 county totals CSV rows and normalize "
+                "Mid-Atlantic county denominators for 2020-2023."
+            ),
+            "request_description": "Census PEP 2023 county totals CSV request.",
+            "parser_method": "parse_census_pep_2023_county_totals",
+        }
+    return {
+        "source_id": "census_midatlantic_population_pep_2025_county_totals",
+        "row_count_key": "pep_2025_county_totals",
+        "acquisition_procedure": (
+            "Fetch Census PEP 2025 county totals CSV rows and normalize "
+            "Mid-Atlantic county denominators for 2020-2025."
+        ),
+        "request_description": "Census PEP 2025 county totals CSV request.",
+        "parser_method": "parse_census_pep_2025_county_totals",
+    }
+
+
+def _regional_population_projection_provenance_records(
+    *,
+    rows: list[object],
+    output_path: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    row_count = sum(
+        1
+        for row in rows
+        if str(getattr(row, "source_id", "")) == REGIONAL_POPULATION_PROJECTION_SOURCE_ID
+    )
+    if row_count == 0:
+        return []
+    command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "regional-population",
+            "--output-dir",
+            str(output_dir),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+    return [
+        AcquisitionProvenanceRecord(
+            source_id="census_midatlantic_population_projection_2026",
+            source_name=(
+                "Derived Mid-Atlantic county population projection from "
+                "U.S. Census Bureau county population estimates"
+            ),
+            source_url=sanitize_census_url(
+                build_midatlantic_census_pep_2025_county_totals_url()
+            ),
+            citation_url="https://www.census.gov/programs-surveys/popest.html",
+            acquisition_command=command,
+            acquisition_procedure=(
+                "Fetch the official Census PEP 2025 county totals CSV and derive "
+                "2026 county denominators with a simple trailing linear trend by "
+                "county."
+            ),
+            request_method="GET",
+            request_description=(
+                "Census PEP 2025 county totals CSV request used as the observed "
+                "base for 2026 population projection."
+            ),
+            derived_artifact_paths=[output_path],
+            row_count=row_count,
+            parser_method="project_county_population_linear_trend",
+            extraction_quality="derived_projection",
+            access_notes=(
+                "Projection is derived locally from public Census static CSV "
+                "estimates; no API key required."
+            ),
+            modeling_caveats=(
+                "Forecast denominator only: there is no official 2026 Census "
+                "county denominator in this source yet. Replace with observed "
+                "Census estimates when published."
+            ),
+        )
+    ]
+
+
+def _regional_population_observed_provenance_records(
     *,
     urls: list[str],
     rows: list[object],
@@ -4897,68 +5041,31 @@ def _regional_population_provenance_records(
     ]
 
 
-def _regional_population_row_counts(rows: list[object]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for row in rows:
-        state_fips = str(getattr(row, "state_fips", ""))
-        source_id = str(getattr(row, "source_id", ""))
-        if source_id == "census_pep_intercensal_2000_2010_static":
-            key = f"{state_fips}_intercensal_2000_2010_static"
-        elif source_id == "census_pep_2019_county_totals":
-            key = "pep_2019_county_totals"
-        elif source_id == "census_pep_2023_county_totals":
-            key = "pep_2023_county_totals"
-        else:
-            key = f"{state_fips}_{source_id}"
-        counts[key] = counts.get(key, 0) + 1
-    return counts
-
-
-def _regional_population_url_metadata(url: str) -> dict[str, str]:
-    if "co-est00int-alldata-" in url:
-        state_fips = (
-            Path(urlsplit(url).path)
-            .name.removeprefix("co-est00int-alldata-")
-            .removesuffix(".csv")
-            .zfill(2)
-        )
-        return {
-            "source_id": (
-                "census_midatlantic_population_intercensal_2000_2010_static_"
-                f"{state_fips}"
-            ),
-            "row_count_key": f"{state_fips}_intercensal_2000_2010_static",
-            "acquisition_procedure": (
-                "Fetch Census intercensal county population static CSV rows and "
-                "normalize Mid-Atlantic county denominators for 2001-2009."
-            ),
-            "request_description": (
-                f"Census intercensal 2000 population CSV request for state {state_fips}."
-            ),
-            "parser_method": "parse_census_intercensal_2000_county_totals",
-        }
-    if "co-est2019-alldata.csv" in url:
-        return {
-            "source_id": "census_midatlantic_population_pep_2019_county_totals",
-            "row_count_key": "pep_2019_county_totals",
-            "acquisition_procedure": (
-                "Fetch Census PEP 2019 county totals CSV rows and "
-                "normalize Mid-Atlantic county denominators for 2010-2019."
-            ),
-            "request_description": "Census PEP 2019 county totals CSV request.",
-            "parser_method": "parse_census_pep_2019_county_totals",
-        }
-    return {
-        "source_id": "census_midatlantic_population_pep_2023_county_totals",
-        "row_count_key": "pep_2023_county_totals",
-        "acquisition_procedure": (
-            "Fetch Census PEP 2023 county totals CSV rows and normalize "
-            "Mid-Atlantic county denominators for 2020-2023."
+def _regional_population_provenance_records(
+    *,
+    urls: list[str],
+    rows: list[object],
+    output_path: Path,
+    output_dir: Path,
+    manifest_path: Path,
+    api_key_present: bool,
+) -> list[AcquisitionProvenanceRecord]:
+    return [
+        *_regional_population_observed_provenance_records(
+            urls=urls,
+            rows=rows,
+            output_path=output_path,
+            output_dir=output_dir,
+            manifest_path=manifest_path,
+            api_key_present=api_key_present,
         ),
-        "request_description": "Census PEP 2023 county totals CSV request.",
-        "parser_method": "parse_census_pep_2023_county_totals",
-    }
-
+        *_regional_population_projection_provenance_records(
+            rows=rows,
+            output_path=output_path,
+            output_dir=output_dir,
+            manifest_path=manifest_path,
+        ),
+    ]
 
 def _regional_demographics_provenance_records(
     *,
