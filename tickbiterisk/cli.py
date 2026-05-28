@@ -114,6 +114,7 @@ from tickbiterisk.etl.noaa import (
 )
 from tickbiterisk.etl.noaa_backfill import (
     NoaaBackfillError,
+    NoaaCountyBackfillResult,
     audit_noaa_station_coverage,
     resolve_maryland_noaa_county_fips,
     run_noaa_county_backfill,
@@ -2199,6 +2200,10 @@ def noaa_backfill_county(
         14, help="Allowed station-reporting lag at the requested end date."
     ),
     dry_run: bool = typer.Option(False, help="Print planned query without fetching data."),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     parsed_start_date = _parse_iso_date(start_date, "start-date")
     parsed_end_date = _parse_iso_date(end_date, "end-date")
@@ -2235,6 +2240,30 @@ def noaa_backfill_county(
         f"Wrote {result.daily_observation_count} daily observation row(s) "
         f"to {result.daily_output_path}"
     )
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _noaa_backfill_provenance_records(
+            result=result,
+            source_id_prefix="county_backfill",
+            acquisition_command=_noaa_backfill_county_acquisition_command(
+                county_fips=county_fips,
+                start_date=start_date,
+                end_date=end_date,
+                output_dir=output_dir,
+                station_limit=station_limit,
+                min_data_coverage=min_data_coverage,
+                max_end_lag_days=max_end_lag_days,
+                manifest_path=resolved_manifest_path,
+            ),
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+        ),
+        manifest_path=resolved_manifest_path,
+        append=True,
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("noaa-backfill-maryland")
@@ -2267,6 +2296,10 @@ def noaa_backfill_maryland(
         help="Use nearest qualifying Maryland station when a county has no internal station.",
     ),
     dry_run: bool = typer.Option(False, help="Print planned queries without fetching data."),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     parsed_start_date = _parse_iso_date(start_date, "start-date")
     parsed_end_date = _parse_iso_date(end_date, "end-date")
@@ -2325,6 +2358,40 @@ def noaa_backfill_maryland(
             typer.echo(f"{failure.county_fips}: {failure.error}")
         if not allow_partial:
             raise typer.Exit(1)
+
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_records = [
+        record
+        for county_result in result.county_results
+        for record in _noaa_backfill_provenance_records(
+            result=county_result,
+            source_id_prefix="maryland_backfill",
+            acquisition_command=_noaa_backfill_maryland_acquisition_command(
+                start_date=start_date,
+                end_date=end_date,
+                output_dir=output_dir,
+                county_fips_values=county_fips_values,
+                station_limit=station_limit,
+                min_data_coverage=min_data_coverage,
+                max_end_lag_days=max_end_lag_days,
+                fail_fast=fail_fast,
+                allow_partial=allow_partial,
+                nearest_station_fallback=nearest_station_fallback,
+                manifest_path=resolved_manifest_path,
+            ),
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+        )
+    ]
+    if provenance_records:
+        provenance_output = write_acquisition_provenance_manifest(
+            provenance_records,
+            manifest_path=resolved_manifest_path,
+            append=True,
+        )
+        typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("noaa-audit-stations")
@@ -3029,6 +3096,151 @@ def _noaa_daily_acquisition_command(
             str(manifest_path),
         ]
     )
+
+
+def _noaa_backfill_county_acquisition_command(
+    *,
+    county_fips: str,
+    start_date: str,
+    end_date: str,
+    output_dir: Path,
+    station_limit: int,
+    min_data_coverage: float,
+    max_end_lag_days: int,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "noaa-backfill-county",
+            "--county-fips",
+            county_fips,
+            "--start-date",
+            start_date,
+            "--end-date",
+            end_date,
+            "--output-dir",
+            str(output_dir),
+            "--station-limit",
+            str(station_limit),
+            "--min-data-coverage",
+            str(min_data_coverage),
+            "--max-end-lag-days",
+            str(max_end_lag_days),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+
+
+def _noaa_backfill_maryland_acquisition_command(
+    *,
+    start_date: str,
+    end_date: str,
+    output_dir: Path,
+    county_fips_values: list[str],
+    station_limit: int,
+    min_data_coverage: float,
+    max_end_lag_days: int,
+    fail_fast: bool,
+    allow_partial: bool,
+    nearest_station_fallback: bool,
+    manifest_path: Path,
+) -> str:
+    command_parts = [
+        "tickbiterisk",
+        "etl",
+        "noaa-backfill-maryland",
+        "--start-date",
+        start_date,
+        "--end-date",
+        end_date,
+        "--output-dir",
+        str(output_dir),
+    ]
+    for county_fips in county_fips_values:
+        command_parts.extend(["--county-fips", county_fips])
+    command_parts.extend(
+        [
+            "--station-limit",
+            str(station_limit),
+            "--min-data-coverage",
+            str(min_data_coverage),
+            "--max-end-lag-days",
+            str(max_end_lag_days),
+        ]
+    )
+    if fail_fast:
+        command_parts.append("--fail-fast")
+    if allow_partial:
+        command_parts.append("--allow-partial")
+    if nearest_station_fallback:
+        command_parts.append("--nearest-station-fallback")
+    command_parts.extend(["--provenance-manifest-path", str(manifest_path)])
+    return _format_cli_command(command_parts)
+
+
+def _noaa_backfill_provenance_records(
+    *,
+    result: NoaaCountyBackfillResult,
+    source_id_prefix: str,
+    acquisition_command: str,
+    start_date: date,
+    end_date: date,
+) -> list[AcquisitionProvenanceRecord]:
+    records = [
+        _noaa_provenance_record(
+            source_id=(
+                f"noaa_cdo_ghcnd_stations_{source_id_prefix}_"
+                f"{result.county_fips}_{_date_slug(start_date)}_{_date_slug(end_date)}"
+            ),
+            source_name="NOAA CDO GHCND station discovery",
+            source_url=build_noaa_station_url(result.county_fips, start_date, end_date),
+            acquisition_command=acquisition_command,
+            request_description=(
+                "NOAA CDO GHCND station discovery request for "
+                f"Maryland county FIPS {result.county_fips} during backfill."
+            ),
+            output_path=result.stations_output_path,
+            row_count=result.station_count,
+            parser_method=(
+                "run_noaa_county_backfill;fetch_noaa_stations;"
+                "parse_noaa_station_response;select_long_coverage_stations"
+            ),
+        )
+    ]
+    for station_id in result.selected_station_ids:
+        station_row_count = result.daily_observation_count_by_station.get(
+            station_id,
+            result.daily_observation_count
+            if len(result.selected_station_ids) == 1
+            else 0,
+        )
+        records.append(
+            _noaa_provenance_record(
+                source_id=(
+                    f"noaa_cdo_ghcnd_daily_{source_id_prefix}_"
+                    f"{result.county_fips}_{_source_id_slug(station_id)}_"
+                    f"{_date_slug(start_date)}_{_date_slug(end_date)}"
+                ),
+                source_name="NOAA CDO GHCND daily observations",
+                source_url=build_noaa_daily_data_url(station_id, start_date, end_date),
+                acquisition_command=acquisition_command,
+                request_description=(
+                    "NOAA CDO daily observations request for selected backfill "
+                    f"station {station_id} mapped to Maryland county FIPS "
+                    f"{result.county_fips}."
+                ),
+                output_path=result.daily_output_path,
+                row_count=station_row_count,
+                parser_method=(
+                    "run_noaa_county_backfill;fetch_noaa_daily_observations;"
+                    "parse_noaa_daily_data_response"
+                ),
+            )
+        )
+    return records
 
 
 def _noaa_provenance_record(

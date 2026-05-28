@@ -582,6 +582,7 @@ def test_noaa_backfill_county_dry_run_prints_station_discovery_url(tmp_path) -> 
     assert "FIPS%3A24003" in result.stdout
     assert "daily URLs require station selection" in result.stdout
     assert not (tmp_path / "noaa_ghcnd_stations.csv").exists()
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
 
 
 def test_noaa_backfill_county_command_reports_result(
@@ -595,6 +596,11 @@ def test_noaa_backfill_county_command_reports_result(
         assert kwargs["token"] == "token-value"
         assert kwargs["station_limit"] == 1
         assert kwargs["output_dir"] == tmp_path
+        for filename in [
+            "noaa_ghcnd_stations.csv",
+            "noaa_ghcnd_daily_observations.csv",
+        ]:
+            (tmp_path / filename).write_text("placeholder\n", encoding="utf-8")
         return NoaaCountyBackfillResult(
             county_fips="24003",
             selected_station_ids=["GHCND:BWI"],
@@ -626,6 +632,27 @@ def test_noaa_backfill_county_command_reports_result(
     assert result.exit_code == 0
     assert "Selected 1 station(s): GHCND:BWI" in result.stdout
     assert "Wrote 2 daily observation row(s)" in result.stdout
+    assert "Wrote acquisition provenance manifest" in result.stdout
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert [row["source_id"] for row in rows] == [
+        "noaa_cdo_ghcnd_daily_county_backfill_24003_ghcnd_bwi_1992_05_01_1992_05_02",
+        "noaa_cdo_ghcnd_stations_county_backfill_24003_1992_05_01_1992_05_02",
+    ]
+    daily, stations = rows
+    assert daily["source_name"] == "NOAA CDO GHCND daily observations"
+    assert "stationid=GHCND%3ABWI" in daily["source_url"]
+    assert daily["row_count"] == "2"
+    assert stations["source_name"] == "NOAA CDO GHCND station discovery"
+    assert "FIPS%3A24003" in stations["source_url"]
+    assert stations["row_count"] == "1"
+    assert "token-value" not in "\n".join(value for row in rows for value in row.values())
+    assert all("--provenance-manifest-path" in row["acquisition_command"] for row in rows)
 
 
 def test_noaa_backfill_maryland_dry_run_prints_county_plan(tmp_path) -> None:
@@ -653,6 +680,7 @@ def test_noaa_backfill_maryland_dry_run_prints_county_plan(tmp_path) -> None:
     assert "FIPS%3A24003" in result.stdout
     assert "FIPS%3A24005" in result.stdout
     assert not (tmp_path / "noaa_ghcnd_daily_observations.csv").exists()
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
 
 
 def test_noaa_backfill_maryland_command_reports_summary(
@@ -666,6 +694,11 @@ def test_noaa_backfill_maryland_command_reports_summary(
         assert kwargs["county_fips_values"] == ["24003"]
         assert kwargs["output_dir"] == tmp_path
         assert kwargs["nearest_station_fallback"] is False
+        for filename in [
+            "noaa_ghcnd_stations.csv",
+            "noaa_ghcnd_daily_observations.csv",
+        ]:
+            (tmp_path / filename).write_text("placeholder\n", encoding="utf-8")
         return NoaaMarylandBackfillResult(
             county_results=[
                 NoaaCountyBackfillResult(
@@ -702,6 +735,25 @@ def test_noaa_backfill_maryland_command_reports_summary(
     assert result.exit_code == 0
     assert "Completed 1/1 Maryland county backfill(s)" in result.stdout
     assert "Wrote 2 daily observation row(s)" in result.stdout
+    assert "Wrote acquisition provenance manifest" in result.stdout
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert [row["source_id"] for row in rows] == [
+        "noaa_cdo_ghcnd_daily_maryland_backfill_24003_ghcnd_bwi_1992_05_01_1992_05_02",
+        "noaa_cdo_ghcnd_stations_maryland_backfill_24003_1992_05_01_1992_05_02",
+    ]
+    assert rows[0]["row_count"] == "2"
+    assert rows[1]["row_count"] == "1"
+    assert "stationid=GHCND%3ABWI" in rows[0]["source_url"]
+    assert "FIPS%3A24003" in rows[1]["source_url"]
+    assert "token-value" not in "\n".join(value for row in rows for value in row.values())
+    assert all("noaa-backfill-maryland" in row["acquisition_command"] for row in rows)
+    assert all("--county-fips 24003" in row["acquisition_command"] for row in rows)
 
 
 def test_noaa_backfill_maryland_command_passes_nearest_station_fallback(
@@ -773,6 +825,8 @@ def test_noaa_backfill_maryland_exits_nonzero_on_partial_failures(
     assert result.exit_code == 1
     assert "Failures: 1" in result.stdout
     assert "24003: No NOAA GHCND station covers county_fips=24003" in result.stdout
+    assert "Wrote acquisition provenance manifest" not in result.stdout
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
 
 
 def test_noaa_backfill_maryland_allow_partial_exits_zero(
@@ -808,6 +862,8 @@ def test_noaa_backfill_maryland_allow_partial_exits_zero(
 
     assert result.exit_code == 0
     assert "Failures: 1" in result.stdout
+    assert "Wrote acquisition provenance manifest" not in result.stdout
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
 
 
 def test_noaa_backfill_maryland_dry_run_rejects_non_maryland_fips(tmp_path) -> None:

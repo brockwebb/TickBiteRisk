@@ -196,6 +196,10 @@ def test_run_noaa_county_backfill_fetches_multiple_selected_stations(
 
     assert result.selected_station_ids == ["GHCND:FIRST", "GHCND:SECOND"]
     assert result.daily_observation_count == 2
+    assert result.daily_observation_count_by_station == {
+        "GHCND:FIRST": 1,
+        "GHCND:SECOND": 1,
+    }
     assert any("stationid=GHCND%3AFIRST" in call for call in calls)
     assert any("stationid=GHCND%3ASECOND" in call for call in calls)
 

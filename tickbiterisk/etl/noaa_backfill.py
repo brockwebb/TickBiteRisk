@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date
 from math import asin, cos, radians, sin, sqrt
 from pathlib import Path
@@ -49,6 +49,7 @@ class NoaaCountyBackfillResult:
     daily_observation_count: int
     stations_output_path: Path
     daily_output_path: Path
+    daily_observation_count_by_station: dict[str, int] = field(default_factory=dict)
     selection_method: str = "internal"
 
 
@@ -182,17 +183,20 @@ def run_noaa_county_backfill(
         )
 
     daily_rows = []
+    daily_observation_count_by_station = {}
     for station in selected:
-        daily_rows.extend(
-            fetch_noaa_daily_observations(
-                normalized_county_fips,
-                station.station_id,
-                start_date,
-                end_date,
-                token=token,
-                json_get=json_get,
-            )
+        station_daily_rows = fetch_noaa_daily_observations(
+            normalized_county_fips,
+            station.station_id,
+            start_date,
+            end_date,
+            token=token,
+            json_get=json_get,
         )
+        daily_observation_count_by_station[station.station_id] = len(
+            station_daily_rows
+        )
+        daily_rows.extend(station_daily_rows)
 
     stations_output_path = write_noaa_stations_output(
         selected,
@@ -212,6 +216,7 @@ def run_noaa_county_backfill(
         daily_observation_count=len(daily_rows),
         stations_output_path=stations_output_path,
         daily_output_path=daily_output_path,
+        daily_observation_count_by_station=daily_observation_count_by_station,
         selection_method=selection_method,
     )
 
