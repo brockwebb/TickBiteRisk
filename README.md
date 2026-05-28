@@ -121,7 +121,7 @@ stable truth.
 | NOAA GHCND daily observations | Historical weather feature candidates |
 | Census population and geography | Incidence denominators, county names, and land area |
 | Maryland DNR deer harvest | County-season host-pressure proxy |
-| CDC tick vector/pathogen status | Static surveillance status feature candidates |
+| CDC tick vector/pathogen status | Static surveillance status feature candidates through 2025 |
 | Census building permits | Contact/land-use pressure proxy |
 | NLCD/MRLC land cover | Habitat source acquired for deeper feature extraction |
 | Maryland DNR mast/acorn reports | Western Maryland study-plot ecology; prior-year model candidate |

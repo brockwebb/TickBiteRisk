@@ -17,8 +17,8 @@ boundary clearly allow redistribution.
 | `census_county_reference` | Census Gazetteer county file | County | County names, FIPS, land/water area, internal points | active_etl |
 | `census_population` | Census PEP/intercensal population APIs and county totals CSV | County-year | Incidence denominators and per-capita feature normalization through 2025 | active_etl |
 | `maryland_dnr_deer_harvest` | Maryland DNR deer harvest tables and annual reports | County-season | Host-pressure proxy; prior completed season maps into model year | active_etl |
-| `cdc_tick_vector_status` | CDC public tick vector county table | County/species/status | Vector presence/status feature candidates | active_etl |
-| `cdc_tick_pathogen_status` | CDC public Ixodes pathogen county table | County/pathogen/status | Pathogen detection feature candidates | active_etl |
+| `cdc_tick_vector_status` | CDC public tick vector county table through 2025 | County/species/status | Vector presence/status feature candidates | active_etl_latest_2025 |
+| `cdc_tick_pathogen_status` | CDC public Ixodes pathogen county table through 2025 | County/pathogen/status | Pathogen detection feature candidates | active_etl_latest_2025 |
 | `nlcd_mrlc` | MRLC/NLCD land cover files | Raster/county summary candidate | Habitat and forest/edge proxy source | acquired_needs_feature_depth |
 | `census_bps` | Census Building Permits Survey county files | County-year | Contact/land-use pressure proxy | active_etl |
 | `maryland_mast_reports` | Maryland DNR mast/acorn reports | Region/report | Ecological food pulse candidate | acquired_low_confidence |

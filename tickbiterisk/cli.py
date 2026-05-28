@@ -303,6 +303,26 @@ NOAA_CDO_WEBSERVICES_CITATION_URL = (
 CDC_LYME_SURVEILLANCE_CITATION_URL = (
     "https://www.cdc.gov/lyme/data-research/facts-stats/index.html"
 )
+CDC_TICK_SURVEILLANCE_DATASETS_URL = (
+    "https://www.cdc.gov/ticks/data-research/facts-stats/"
+    "tick-surveillance-data-sets.html"
+)
+CDC_LONE_STAR_SURVEILLANCE_URL = (
+    "https://www.cdc.gov/ticks/data-research/facts-stats/"
+    "lone-star-tick-surveillance.html"
+)
+CDC_IXODES_COUNTY_STATUS_2026_XLSX_URL = (
+    "https://www.cdc.gov/ticks/media/files/2026/04/"
+    "Public_Use_Ixodes_County_Table_2026_03252026.xlsx"
+)
+CDC_IXODES_PATHOGEN_STATUS_2026_XLSX_URL = (
+    "https://www.cdc.gov/ticks/media/files/2026/04/"
+    "Public_Use_Ixodes_Pathogens_County_Table_2026_04292026.xlsx"
+)
+CDC_LONE_STAR_STATUS_2025_XLSX_URL = (
+    "https://www.cdc.gov/ticks/media/files/2026/05/"
+    "2025-lone-star-tick-surveillance-map-data.xlsx"
+)
 MDH_LYME_2013_2024_PDF_URL = (
     "https://health.maryland.gov/phpa/OIDEOR/CZVBD/Shared%20Documents/"
     "Lyme%20Disease%20Data%202013%20to%202024.pdf"
@@ -415,31 +435,64 @@ SEASONALITY_SOURCE_METADATA = [
 ]
 TICK_STATUS_SOURCE_METADATA = [
     {
-        "filename": "cdc_ixodes_county_status_2025.xlsx",
-        "source_id": "cdc_ixodes_county_status_2025",
-        "source_name": "CDC ArboNET Ixodes county status workbook",
-        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
-        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "filename": "cdc_ixodes_county_status_2026.xlsx",
+        "source_id": "cdc_ixodes_county_status_2026",
+        "source_name": "CDC ArboNET Ixodes county status workbook through 2025",
+        "source_url": CDC_IXODES_COUNTY_STATUS_2026_XLSX_URL,
+        "citation_url": CDC_TICK_SURVEILLANCE_DATASETS_URL,
         "parser_method": "parse_ixodes_status",
         "output_kind": "vector",
+        "fallbacks": [
+            {
+                "filename": "cdc_ixodes_county_status_2025.xlsx",
+                "source_id": "cdc_ixodes_county_status_2025",
+                "source_name": "CDC ArboNET Ixodes county status workbook through 2025",
+                "source_url": CDC_IXODES_COUNTY_STATUS_2026_XLSX_URL,
+                "citation_url": CDC_TICK_SURVEILLANCE_DATASETS_URL,
+                "parser_method": "parse_ixodes_status",
+                "output_kind": "vector",
+            }
+        ],
     },
     {
-        "filename": "cdc_ixodes_pathogen_status_2025.xlsx",
-        "source_id": "cdc_ixodes_pathogen_status_2025",
-        "source_name": "CDC ArboNET Ixodes pathogen status workbook",
-        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
-        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "filename": "cdc_ixodes_pathogen_status_2026.xlsx",
+        "source_id": "cdc_ixodes_pathogen_status_2026",
+        "source_name": "CDC ArboNET Ixodes pathogen status workbook through 2025",
+        "source_url": CDC_IXODES_PATHOGEN_STATUS_2026_XLSX_URL,
+        "citation_url": CDC_TICK_SURVEILLANCE_DATASETS_URL,
         "parser_method": "parse_pathogen_status",
         "output_kind": "pathogen",
+        "fallbacks": [
+            {
+                "filename": "cdc_ixodes_pathogen_status_2025.xlsx",
+                "source_id": "cdc_ixodes_pathogen_status_2025",
+                "source_name": "CDC ArboNET Ixodes pathogen status workbook through 2025",
+                "source_url": CDC_IXODES_PATHOGEN_STATUS_2026_XLSX_URL,
+                "citation_url": CDC_TICK_SURVEILLANCE_DATASETS_URL,
+                "parser_method": "parse_pathogen_status",
+                "output_kind": "pathogen",
+            }
+        ],
     },
     {
-        "filename": "cdc_lone_star_status_2024.xlsx",
-        "source_id": "cdc_lone_star_status_2024",
-        "source_name": "CDC Amblyomma americanum county status workbook",
-        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
-        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "filename": "cdc_lone_star_status_2025.xlsx",
+        "source_id": "cdc_lone_star_status_2025",
+        "source_name": "CDC Amblyomma americanum county status workbook through 2025",
+        "source_url": CDC_LONE_STAR_STATUS_2025_XLSX_URL,
+        "citation_url": CDC_LONE_STAR_SURVEILLANCE_URL,
         "parser_method": "parse_lone_star_status",
         "output_kind": "lone_star",
+        "fallbacks": [
+            {
+                "filename": "cdc_lone_star_status_2024.xlsx",
+                "source_id": "cdc_lone_star_status_2024",
+                "source_name": "CDC Amblyomma americanum county status workbook through 2024",
+                "source_url": CDC_LONE_STAR_SURVEILLANCE_URL,
+                "citation_url": CDC_LONE_STAR_SURVEILLANCE_URL,
+                "parser_method": "parse_lone_star_status",
+                "output_kind": "lone_star",
+            }
+        ],
     },
 ]
 LYME_AGGREGATE_SOURCE_METADATA = [
@@ -1387,27 +1440,19 @@ def tick_status(
         help="Output CSV manifest for raw-source acquisition provenance.",
     ),
 ) -> None:
-    source_paths_by_id = {
-        metadata["source_id"]: raw_dir / str(metadata["filename"])
-        for metadata in TICK_STATUS_SOURCE_METADATA
-    }
-    for source_path in source_paths_by_id.values():
-        if not source_path.exists():
-            raise typer.BadParameter(
-                f"tick status source file not found: {source_path}"
-            )
+    source_metadata, source_paths_by_id = _resolve_tick_status_sources(raw_dir)
 
     ixodes_rows = parse_ixodes_status(
-        source_paths_by_id["cdc_ixodes_county_status_2025"],
-        source_id="cdc_ixodes_county_status_2025",
+        source_paths_by_id["vector"],
+        source_id=source_metadata["vector"]["source_id"],
     )
     pathogen_rows = parse_pathogen_status(
-        source_paths_by_id["cdc_ixodes_pathogen_status_2025"],
-        source_id="cdc_ixodes_pathogen_status_2025",
+        source_paths_by_id["pathogen"],
+        source_id=source_metadata["pathogen"]["source_id"],
     )
     lone_star_rows = parse_lone_star_status(
-        source_paths_by_id["cdc_lone_star_status_2024"],
-        source_id="cdc_lone_star_status_2024",
+        source_paths_by_id["lone_star"],
+        source_id=source_metadata["lone_star"]["source_id"],
     )
     feature_rows = build_tick_status_county_features(
         ixodes_rows=ixodes_rows,
@@ -1426,11 +1471,15 @@ def tick_status(
     )
     provenance_output = write_acquisition_provenance_manifest(
         _tick_status_provenance_records(
-            source_metadata=TICK_STATUS_SOURCE_METADATA,
+            source_metadata=[
+                source_metadata["vector"],
+                source_metadata["pathogen"],
+                source_metadata["lone_star"],
+            ],
             rows_by_source={
-                "cdc_ixodes_county_status_2025": ixodes_rows,
-                "cdc_ixodes_pathogen_status_2025": pathogen_rows,
-                "cdc_lone_star_status_2024": lone_star_rows,
+                source_metadata["vector"]["source_id"]: ixodes_rows,
+                source_metadata["pathogen"]["source_id"]: pathogen_rows,
+                source_metadata["lone_star"]["source_id"]: lone_star_rows,
             },
             source_paths_by_id=source_paths_by_id,
             outputs=outputs,
@@ -3926,6 +3975,45 @@ def _tick_status_provenance_records(
             )
         )
     return records
+
+
+def _resolve_tick_status_sources(
+    raw_dir: Path,
+) -> tuple[dict[str, dict[str, str]], dict[str, Path]]:
+    selected_by_kind: dict[str, dict[str, str]] = {}
+    paths_by_key: dict[str, Path] = {}
+    missing_messages = []
+    for metadata in TICK_STATUS_SOURCE_METADATA:
+        candidates = [
+            metadata,
+            *metadata.get("fallbacks", []),
+        ]
+        selected_metadata = None
+        selected_path = None
+        for candidate in candidates:
+            path = raw_dir / str(candidate["filename"])
+            if path.exists():
+                selected_metadata = {
+                    key: str(value)
+                    for key, value in candidate.items()
+                    if key != "fallbacks"
+                }
+                selected_path = path
+                break
+        if selected_metadata is None or selected_path is None:
+            expected = ", ".join(str(candidate["filename"]) for candidate in candidates)
+            missing_messages.append(f"{metadata['output_kind']}: {expected}")
+            continue
+        output_kind = selected_metadata["output_kind"]
+        source_id = selected_metadata["source_id"]
+        selected_by_kind[output_kind] = selected_metadata
+        paths_by_key[output_kind] = selected_path
+        paths_by_key[source_id] = selected_path
+    if missing_messages:
+        raise typer.BadParameter(
+            "tick status source file not found: " + "; ".join(missing_messages)
+        )
+    return selected_by_kind, paths_by_key
 
 
 def _tick_status_acquisition_command(

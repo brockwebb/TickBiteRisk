@@ -98,8 +98,10 @@ def test_parse_pathogen_status_preserves_no_records_language(tmp_path: Path) -> 
                 "State": "MD",
                 "County": "Anne Arundel County",
                 "Borrelia_burgdorferi_sensu_stricto_County_Status": "No records",
+                "Borrelia_mayonii_County_Status": "Present",
                 "Borrelia_miyamotoi_County_Status": "Present",
                 "Anaplasma_phagocytophilum_human_active_variant_County_Status": "No records",
+                "Ehrlichia_muris_eauclairensis_County_Status": "No records",
                 "Babesia_microti_County_Status": "No records",
                 "Powassan_virus_County_Status": "No records",
             }
@@ -107,7 +109,9 @@ def test_parse_pathogen_status_preserves_no_records_language(tmp_path: Path) -> 
     )
     rows = parse_pathogen_status(path, source_id="cdc_ixodes_pathogen_status_2025")
     assert rows[0]["borrelia_burgdorferi_status"] == "no_records"
+    assert rows[0]["borrelia_mayonii_status"] == "present"
     assert rows[0]["borrelia_miyamotoi_status"] == "present"
+    assert rows[0]["ehrlichia_muris_eauclairensis_status"] == "no_records"
 
 
 def test_parse_pathogen_status_supports_header_on_second_row(tmp_path: Path) -> None:
@@ -154,6 +158,27 @@ def test_parse_lone_star_status(tmp_path: Path) -> None:
     assert rows[0]["source_comments"] == ""
 
 
+def test_parse_lone_star_status_supports_2025_workbook_shape(tmp_path: Path) -> None:
+    path = tmp_path / "lone-star-2025.xlsx"
+    _write_excel(
+        path,
+        "A. americanum Records 2025",
+        [
+            {
+                "FIPS": "24003",
+                "State": "MD",
+                "County": "Anne Arundel County",
+                "2025 County Status of A. americanum": "Established",
+                "Source": "CDC map",
+                "Source Comments": "",
+            }
+        ],
+    )
+    rows = parse_lone_star_status(path, source_id="cdc_lone_star_status_2025")
+    assert rows[0]["county_fips"] == "24003"
+    assert rows[0]["amblyomma_americanum_status"] == "established"
+
+
 def test_build_tick_status_county_features_combines_sources_and_flags_limits() -> None:
     rows = build_tick_status_county_features(
         ixodes_rows=[
@@ -173,8 +198,10 @@ def test_build_tick_status_county_features_combines_sources_and_flags_limits() -
                 "county_fips": "24003",
                 "county_name": "Anne Arundel County",
                 "borrelia_burgdorferi_status": "present",
+                "borrelia_mayonii_status": "no_records",
                 "borrelia_miyamotoi_status": "no_records",
                 "anaplasma_phagocytophilum_status": "present",
+                "ehrlichia_muris_eauclairensis_status": "no_records",
                 "babesia_microti_status": "no_records",
                 "powassan_virus_status": "no_records",
             }
@@ -196,6 +223,8 @@ def test_build_tick_status_county_features_combines_sources_and_flags_limits() -
     assert row.county_fips == "24003"
     assert row.ixodes_scapularis_status == "established"
     assert row.borrelia_burgdorferi_status == "present"
+    assert row.borrelia_mayonii_status == "no_records"
+    assert row.ehrlichia_muris_eauclairensis_status == "no_records"
     assert row.amblyomma_americanum_status == "established"
     assert row.tick_status_source_ids == (
         "cdc_ixodes_county_status_2025,"
@@ -229,8 +258,10 @@ def test_write_tick_status_outputs_writes_source_tables_and_feature_table(
             "county_fips": "24003",
             "county_name": "Anne Arundel County",
             "borrelia_burgdorferi_status": "present",
+            "borrelia_mayonii_status": "no_records",
             "borrelia_miyamotoi_status": "no_records",
             "anaplasma_phagocytophilum_status": "present",
+            "ehrlichia_muris_eauclairensis_status": "no_records",
             "babesia_microti_status": "no_records",
             "powassan_virus_status": "no_records",
         }
