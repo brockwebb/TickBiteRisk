@@ -125,7 +125,9 @@ from tickbiterisk.etl.open_meteo import (
     fetch_open_meteo_archive,
 )
 from tickbiterisk.etl.open_meteo_backfill import (
+    OpenMeteoArchiveRequestPlan,
     OpenMeteoBackfillError,
+    OpenMeteoCountyBackfillResult,
     plan_open_meteo_archive_requests,
     read_open_meteo_weather_daily_rows,
     resolve_maryland_open_meteo_county_fips,
@@ -225,6 +227,10 @@ dashboard_app = typer.Typer(help="Static dashboard asset commands")
 app.add_typer(etl_app, name="etl")
 app.add_typer(risk_app, name="risk")
 app.add_typer(dashboard_app, name="dashboard")
+
+OPEN_METEO_HISTORICAL_WEATHER_CITATION_URL = (
+    "https://open-meteo.com/en/docs/historical-weather-api"
+)
 
 
 @etl_app.command("check")
@@ -1765,6 +1771,10 @@ def weather_backfill_open_meteo(
         Path("build/etl"), help="Output directory for ETL artifacts."
     ),
     dry_run: bool = typer.Option(False, help="Print URL without fetching data."),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     locations = load_maryland_weather_locations()
     location = next(
@@ -1795,9 +1805,37 @@ def weather_backfill_open_meteo(
     monthly_output = write_weather_features_monthly_output(
         monthly_features, output_dir, append=True
     )
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        [
+            _open_meteo_provenance_record(
+                county_fips=location.county_fips,
+                county_name=location.county_name,
+                start_date=parsed_start_date,
+                end_date=parsed_end_date,
+                source_urls=[url],
+                acquisition_command=_open_meteo_single_acquisition_command(
+                    county_fips=county_fips,
+                    start_date=start_date,
+                    end_date=end_date,
+                    output_dir=output_dir,
+                    manifest_path=resolved_manifest_path,
+                ),
+                output_paths=[daily_output, weekly_output, monthly_output],
+                row_count=len(rows),
+                chunk_count=1,
+                weather_model="open_meteo_archive",
+            )
+        ],
+        manifest_path=resolved_manifest_path,
+        append=True,
+    )
     typer.echo(f"Wrote {daily_output}")
     typer.echo(f"Wrote {weekly_output}")
     typer.echo(f"Wrote {monthly_output}")
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("weather-backfill-open-meteo-maryland")
@@ -1833,6 +1871,10 @@ def weather_backfill_open_meteo_maryland(
         False, help="Exit successfully even when one or more counties fail."
     ),
     dry_run: bool = typer.Option(False, help="Print planned queries without fetching data."),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     parsed_start_date = _parse_iso_date(start_date, "start-date")
     parsed_end_date = _parse_iso_date(end_date, "end-date")
@@ -1846,14 +1888,14 @@ def weather_backfill_open_meteo_maryland(
     except OpenMeteoBackfillError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
+    plans = plan_open_meteo_archive_requests(
+        start_date=parsed_start_date,
+        end_date=parsed_end_date,
+        county_fips_values=county_fips_values,
+        max_chunk_days=max_chunk_days,
+        weather_model=weather_model,
+    )
     if dry_run:
-        plans = plan_open_meteo_archive_requests(
-            start_date=parsed_start_date,
-            end_date=parsed_end_date,
-            county_fips_values=county_fips_values,
-            max_chunk_days=max_chunk_days,
-            weather_model=weather_model,
-        )
         typer.echo(f"Planned {len(plans)} Open-Meteo archive request(s)")
         for plan in plans:
             typer.echo(
@@ -1885,6 +1927,36 @@ def weather_backfill_open_meteo_maryland(
     )
     typer.echo(f"Fetched {result.chunk_count} archive request chunk(s)")
     typer.echo(f"Wrote {result.daily_observation_count} daily observation row(s)")
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _open_meteo_maryland_provenance_records(
+            plans=plans,
+            county_results=result.county_results,
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            acquisition_command=_open_meteo_maryland_acquisition_command(
+                start_date=start_date,
+                end_date=end_date,
+                output_dir=output_dir,
+                county_fips_values=county_fips_values,
+                max_chunk_days=max_chunk_days,
+                weather_model=weather_model,
+                max_attempts=max_attempts,
+                retry_sleep_seconds=retry_sleep_seconds,
+                inter_chunk_sleep_seconds=inter_chunk_sleep_seconds,
+                inter_county_sleep_seconds=inter_county_sleep_seconds,
+                fail_fast=fail_fast,
+                allow_partial=allow_partial,
+                manifest_path=resolved_manifest_path,
+            ),
+            weather_model=weather_model,
+        ),
+        manifest_path=resolved_manifest_path,
+        append=True,
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
     if result.failure_count:
         typer.echo(f"Failures: {result.failure_count}")
         for failure in result.failures:
@@ -2644,6 +2716,182 @@ def _deer_harvest_pdf_provenance_record(
             "direct deer abundance, tick exposure, or disease observation."
         ),
     )
+
+
+def _open_meteo_single_acquisition_command(
+    *,
+    county_fips: str,
+    start_date: str,
+    end_date: str,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "weather-backfill-open-meteo",
+            "--county-fips",
+            county_fips,
+            "--start-date",
+            start_date,
+            "--end-date",
+            end_date,
+            "--output-dir",
+            str(output_dir),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+
+
+def _open_meteo_maryland_acquisition_command(
+    *,
+    start_date: str,
+    end_date: str,
+    output_dir: Path,
+    county_fips_values: list[str],
+    max_chunk_days: int,
+    weather_model: str,
+    max_attempts: int,
+    retry_sleep_seconds: float,
+    inter_chunk_sleep_seconds: float,
+    inter_county_sleep_seconds: float,
+    fail_fast: bool,
+    allow_partial: bool,
+    manifest_path: Path,
+) -> str:
+    command_parts = [
+        "tickbiterisk",
+        "etl",
+        "weather-backfill-open-meteo-maryland",
+        "--start-date",
+        start_date,
+        "--end-date",
+        end_date,
+        "--output-dir",
+        str(output_dir),
+    ]
+    for county_fips in county_fips_values:
+        command_parts.extend(["--county-fips", county_fips])
+    command_parts.extend(
+        [
+            "--max-chunk-days",
+            str(max_chunk_days),
+            "--weather-model",
+            weather_model,
+            "--max-attempts",
+            str(max_attempts),
+            "--retry-sleep-seconds",
+            str(retry_sleep_seconds),
+            "--inter-chunk-sleep-seconds",
+            str(inter_chunk_sleep_seconds),
+            "--inter-county-sleep-seconds",
+            str(inter_county_sleep_seconds),
+        ]
+    )
+    if fail_fast:
+        command_parts.append("--fail-fast")
+    if allow_partial:
+        command_parts.append("--allow-partial")
+    command_parts.extend(["--provenance-manifest-path", str(manifest_path)])
+    return _format_cli_command(command_parts)
+
+
+def _open_meteo_maryland_provenance_records(
+    *,
+    plans: list[OpenMeteoArchiveRequestPlan],
+    county_results: list[OpenMeteoCountyBackfillResult],
+    start_date: date,
+    end_date: date,
+    acquisition_command: str,
+    weather_model: str,
+) -> list[AcquisitionProvenanceRecord]:
+    plans_by_county: dict[str, list[OpenMeteoArchiveRequestPlan]] = {}
+    county_names: dict[str, str] = {}
+    for plan in plans:
+        plans_by_county.setdefault(plan.county_fips, []).append(plan)
+        county_names[plan.county_fips] = plan.county_name
+
+    return [
+        _open_meteo_provenance_record(
+            county_fips=result.county_fips,
+            county_name=county_names.get(result.county_fips, result.county_fips),
+            start_date=start_date,
+            end_date=end_date,
+            source_urls=[plan.url for plan in plans_by_county.get(result.county_fips, [])],
+            acquisition_command=acquisition_command,
+            output_paths=[
+                result.daily_output_path,
+                result.weekly_output_path,
+                result.monthly_output_path,
+            ],
+            row_count=result.daily_observation_count,
+            chunk_count=result.chunk_count,
+            weather_model=weather_model,
+        )
+        for result in county_results
+    ]
+
+
+def _open_meteo_provenance_record(
+    *,
+    county_fips: str,
+    county_name: str,
+    start_date: date,
+    end_date: date,
+    source_urls: list[str],
+    acquisition_command: str,
+    output_paths: list[Path],
+    row_count: int,
+    chunk_count: int,
+    weather_model: str,
+) -> AcquisitionProvenanceRecord:
+    return AcquisitionProvenanceRecord(
+        source_id=(
+            f"{_open_meteo_source_slug(weather_model)}_{county_fips}_"
+            f"{_date_slug(start_date)}_{_date_slug(end_date)}"
+        ),
+        source_name="Open-Meteo Historical Weather API",
+        source_url=" ".join(source_urls),
+        citation_url=OPEN_METEO_HISTORICAL_WEATHER_CITATION_URL,
+        acquisition_command=acquisition_command,
+        acquisition_procedure=(
+            "Fetch Open-Meteo archive API JSON for a Maryland county internal "
+            "point, normalize daily weather observations, and compute weekly "
+            "and monthly weather features."
+        ),
+        request_method="GET",
+        request_description=(
+            "Open-Meteo Historical Weather API archive request"
+            f"{'s' if chunk_count != 1 else ''} for {county_name} "
+            f"({county_fips}) from {start_date.isoformat()} through "
+            f"{end_date.isoformat()} using {weather_model}."
+        ),
+        derived_artifact_paths=output_paths,
+        row_count=row_count,
+        parser_method="fetch_open_meteo_archive;parse_open_meteo_archive_response",
+        extraction_quality="accepted",
+        access_notes=(
+            "Public Open-Meteo archive API; no API key required. Use throttling "
+            "for larger backfills to respect rate limits."
+        ),
+        modeling_caveats=(
+            "County internal-point reanalysis/gap-fill weather proxy; not a "
+            "direct tick exposure or disease observation."
+        ),
+    )
+
+
+def _open_meteo_source_slug(weather_model: str) -> str:
+    return "".join(
+        character if character.isalnum() else "_"
+        for character in weather_model.lower()
+    ).strip("_")
+
+
+def _date_slug(value: date) -> str:
+    return value.isoformat().replace("-", "_")
 
 
 def _format_cli_command(parts: list[str]) -> str:

@@ -50,15 +50,24 @@ def write_acquisition_provenance_manifest(
     *,
     manifest_path: Path,
     retrieved_at: str | None = None,
+    append: bool = False,
 ) -> Path:
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     timestamp = retrieved_at or datetime.now(timezone.utc).isoformat()
     rows = [_record_to_row(record, timestamp) for record in records]
+    if append and manifest_path.exists():
+        rows = [*_read_existing_rows(manifest_path), *rows]
+    keyed = {
+        (str(row["source_id"]), str(row["source_url"])): row for row in rows
+    }
     with manifest_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=ACQUISITION_PROVENANCE_COLUMNS)
         writer.writeheader()
         writer.writerows(
-            sorted(rows, key=lambda row: (row["source_id"], row["source_url"]))
+            sorted(
+                keyed.values(),
+                key=lambda row: (str(row["source_id"]), str(row["source_url"])),
+            )
         )
     return manifest_path
 
@@ -96,3 +105,8 @@ def _compute_sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _read_existing_rows(manifest_path: Path) -> list[dict[str, str]]:
+    with manifest_path.open("r", encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))

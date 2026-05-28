@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. The direct API ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, and deer harvest
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, and Open-Meteo weather backfill
 are the first commands wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -65,6 +65,8 @@ request/run manifests as those sources graduate into the modeling lane.
    - Writes `weather_daily.csv`, `weather_features_weekly.csv`, and
      `weather_features_monthly.csv` under the chosen Open-Meteo output
      directory.
+   - Writes `acquisition_provenance.csv` with saved chunk request URLs and
+     artifact checksums.
    - `tickbiterisk etl open-meteo-weather-features` can rebuild weekly/monthly
      features from an existing Open-Meteo daily CSV without another API call.
 

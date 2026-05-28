@@ -104,3 +104,64 @@ def test_write_acquisition_provenance_manifest_sorts_by_source_id_and_url(
         rows = list(csv.DictReader(handle))
 
     assert [row["source_id"] for row in rows] == ["a_source", "b_source"]
+
+
+def test_write_acquisition_provenance_manifest_appends_and_dedupes_records(
+    tmp_path,
+) -> None:
+    manifest_path = tmp_path / "manifest.csv"
+
+    write_acquisition_provenance_manifest(
+        [
+            AcquisitionProvenanceRecord(
+                source_id="example_a",
+                source_name="Example A",
+                source_url="https://example.test/a",
+                citation_url="https://example.test/a",
+                acquisition_command="tickbiterisk etl a",
+                acquisition_procedure="Fetch A.",
+                request_method="GET",
+                request_description="A request.",
+                row_count=1,
+            )
+        ],
+        manifest_path=manifest_path,
+        retrieved_at="2026-05-28T12:00:00+00:00",
+    )
+    write_acquisition_provenance_manifest(
+        [
+            AcquisitionProvenanceRecord(
+                source_id="example_b",
+                source_name="Example B",
+                source_url="https://example.test/b",
+                citation_url="https://example.test/b",
+                acquisition_command="tickbiterisk etl b",
+                acquisition_procedure="Fetch B.",
+                request_method="GET",
+                request_description="B request.",
+                row_count=2,
+            ),
+            AcquisitionProvenanceRecord(
+                source_id="example_a",
+                source_name="Example A replacement",
+                source_url="https://example.test/a",
+                citation_url="https://example.test/a",
+                acquisition_command="tickbiterisk etl a --rerun",
+                acquisition_procedure="Fetch A again.",
+                request_method="GET",
+                request_description="A request rerun.",
+                row_count=3,
+            ),
+        ],
+        manifest_path=manifest_path,
+        retrieved_at="2026-05-28T13:00:00+00:00",
+        append=True,
+    )
+
+    with manifest_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert [row["source_id"] for row in rows] == ["example_a", "example_b"]
+    assert rows[0]["source_name"] == "Example A replacement"
+    assert rows[0]["row_count"] == "3"
+    assert rows[0]["retrieved_at"] == "2026-05-28T13:00:00+00:00"

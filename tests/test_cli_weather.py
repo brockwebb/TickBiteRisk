@@ -1,3 +1,4 @@
+import csv
 from datetime import date
 
 import pandas as pd
@@ -54,6 +55,7 @@ def test_weather_backfill_dry_run_prints_open_meteo_url(tmp_path) -> None:
     assert "archive-api.open-meteo.com" in result.stdout
     assert "24003" in result.stdout
     assert not (tmp_path / "weather_daily.csv").exists()
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
 
 
 def test_weather_backfill_writes_weekly_and_monthly_features(
@@ -88,6 +90,80 @@ def test_weather_backfill_writes_weekly_and_monthly_features(
     assert (tmp_path / "weather_features_monthly.csv").exists()
     assert "weather_features_weekly.csv" in result.stdout
     assert "weather_features_monthly.csv" in result.stdout
+    assert "Wrote acquisition provenance manifest" in result.stdout
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        provenance_rows = list(csv.DictReader(handle))
+
+    assert len(provenance_rows) == 1
+    provenance = provenance_rows[0]
+    assert provenance["source_id"] == "open_meteo_archive_24003_2020_05_01_2020_05_02"
+    assert provenance["source_name"] == "Open-Meteo Historical Weather API"
+    assert "archive-api.open-meteo.com" in provenance["source_url"]
+    assert "start_date=2020-05-01" in provenance["source_url"]
+    assert "end_date=2020-05-02" in provenance["source_url"]
+    assert (
+        provenance["citation_url"]
+        == "https://open-meteo.com/en/docs/historical-weather-api"
+    )
+    assert provenance["request_method"] == "GET"
+    assert provenance["row_count"] == "2"
+    assert (
+        provenance["parser_method"]
+        == "fetch_open_meteo_archive;parse_open_meteo_archive_response"
+    )
+    assert provenance["extraction_quality"] == "accepted"
+    assert "tickbiterisk etl weather-backfill-open-meteo" in provenance[
+        "acquisition_command"
+    ]
+    assert "--provenance-manifest-path" in provenance["acquisition_command"]
+    assert "weather_daily.csv=" in provenance["derived_artifact_sha256s"]
+
+
+def test_weather_backfill_appends_acquisition_provenance_manifest(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_fetch(location, start_date, end_date):
+        del location
+        return [_weather_row(start_date), _weather_row(end_date)]
+
+    monkeypatch.setattr("tickbiterisk.cli.fetch_open_meteo_archive", fake_fetch)
+
+    for start, end in [
+        ("2020-05-01", "2020-05-02"),
+        ("2020-05-03", "2020-05-04"),
+    ]:
+        result = runner.invoke(
+            app,
+            [
+                "etl",
+                "weather-backfill-open-meteo",
+                "--county-fips",
+                "24003",
+                "--start-date",
+                start,
+                "--end-date",
+                end,
+                "--output-dir",
+                str(tmp_path),
+            ],
+        )
+        assert result.exit_code == 0
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert [row["source_id"] for row in rows] == [
+        "open_meteo_archive_24003_2020_05_01_2020_05_02",
+        "open_meteo_archive_24003_2020_05_03_2020_05_04",
+    ]
+    assert [row["row_count"] for row in rows] == ["2", "2"]
 
 
 def test_weather_backfill_open_meteo_maryland_dry_run_prints_chunk_plan(
@@ -120,6 +196,7 @@ def test_weather_backfill_open_meteo_maryland_dry_run_prints_chunk_plan(
     assert "24005" in result.stdout
     assert "archive-api.open-meteo.com" in result.stdout
     assert not (tmp_path / "weather_daily.csv").exists()
+    assert not (tmp_path / "acquisition_provenance.csv").exists()
 
 
 def test_weather_backfill_open_meteo_maryland_command_reports_summary(
@@ -133,6 +210,12 @@ def test_weather_backfill_open_meteo_maryland_command_reports_summary(
         assert kwargs["sleep_seconds"] == 3.0
         assert kwargs["inter_chunk_sleep_seconds"] == 0.25
         assert kwargs["inter_county_sleep_seconds"] == 0.5
+        for filename in [
+            "weather_daily.csv",
+            "weather_features_weekly.csv",
+            "weather_features_monthly.csv",
+        ]:
+            (tmp_path / filename).write_text("placeholder\n", encoding="utf-8")
         return OpenMeteoMarylandBackfillResult(
             county_results=[
                 OpenMeteoCountyBackfillResult(
@@ -180,6 +263,27 @@ def test_weather_backfill_open_meteo_maryland_command_reports_summary(
     assert result.exit_code == 0
     assert "Completed 1/1 Maryland Open-Meteo county backfill(s)" in result.stdout
     assert "Wrote 3 daily observation row(s)" in result.stdout
+    assert "Wrote acquisition provenance manifest" in result.stdout
+
+    with (tmp_path / "acquisition_provenance.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        provenance_rows = list(csv.DictReader(handle))
+
+    assert len(provenance_rows) == 1
+    provenance = provenance_rows[0]
+    assert provenance["source_id"] == "open_meteo_archive_24003_2020_01_01_2020_01_03"
+    assert provenance["row_count"] == "3"
+    assert provenance["source_url"].count("archive-api.open-meteo.com") == 2
+    assert "start_date=2020-01-01" in provenance["source_url"]
+    assert "end_date=2020-01-02" in provenance["source_url"]
+    assert "start_date=2020-01-03" in provenance["source_url"]
+    assert "end_date=2020-01-03" in provenance["source_url"]
+    assert "weather-backfill-open-meteo-maryland" in provenance["acquisition_command"]
+    assert "--county-fips 24003" in provenance["acquisition_command"]
+    assert "--max-chunk-days 2" in provenance["acquisition_command"]
+    assert "weather_features_monthly.csv=" in provenance["derived_artifact_sha256s"]
 
 
 def test_noaa_stations_dry_run_prints_noaa_url(tmp_path) -> None:
