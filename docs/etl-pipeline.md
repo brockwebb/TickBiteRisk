@@ -112,15 +112,22 @@ candidates until backtesting shows they improve the public score.
     - Runs rolling-origin comparisons across transparent baseline and ridge
       branches, including the forecast spatial diagnostic lane.
     - Writes `model_comparison_runs.csv`,
-      `model_comparison_predictions.csv`, `model_comparison_metrics.csv`, and
+      `model_comparison_predictions.csv`,
+      `model_comparison_intervals.csv`, `model_comparison_metrics.csv`, and
       `model_comparison_summary.csv`.
 
-17. `tickbiterisk etl county-week-risk`
+17. `tickbiterisk etl model-diagnostics`
+    - Summarizes comparison predictions and bootstrap intervals into research
+      diagnostics for branch uncertainty, surveillance-regime checks, regional
+      hotspot patterns, and capacity-sensitive error review.
+    - Writes diagnostics under the chosen model-diagnostics output directory.
+
+18. `tickbiterisk etl county-week-risk`
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.
     - Writes `county_week_seasonal_risk_baseline.csv` and
       `risk_score_scale.csv`.
 
-18. `tickbiterisk risk export-static`
+19. `tickbiterisk risk export-static`
     - Selects one unambiguous model/source/scale branch for public use.
     - Writes dashboard JSON files under `public/data`.
 

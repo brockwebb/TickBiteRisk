@@ -69,8 +69,15 @@ def test_project_manifest_tracks_remaining_candidate_sources() -> None:
     for source_id in [
         "noaa_cpc_enso_index",
         "noaa_psl_mei_v2",
+        "cdc_tick_bite_tracker",
+        "nssp_tick_bite_ed",
+        "poison_center_tick_bite_inquiries",
         "inaturalist_tick_observations",
         "gbif_tick_occurrences",
+        "park_attendance_county_year",
+        "dog_license_pet_ownership_proxy",
+        "parcel_low_density_residential_proxy",
+        "surveillance_regime_calibration",
         "ecological_pressure_index",
     ]:
         assert source_id in source_ids

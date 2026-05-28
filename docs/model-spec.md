@@ -14,6 +14,7 @@ Primary artifacts:
 - `build/etl/model/model_design_matrix_county_year.csv`
 - `build/etl/model/model_design_matrix_schema.json`
 - `build/etl/model-comparison/model_comparison_predictions.csv`
+- `build/etl/model-comparison/model_comparison_intervals.csv`
 - `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv`
 - `public/data/md_county_risk_weekly.json`
 
@@ -93,6 +94,23 @@ The next spatial-lag comparison added county adjacency from public Census
 geometry and a `ridge_forecast_spatial` lane using only prior-year neighbor
 incidence. It ranked behind the simple blend and conservative safe ridge, with
 MAE 19.222024 per 100k, so it remains a diagnostic research lane.
+
+## Research lanes and diagnostics
+
+The comparison layer may carry research-only lanes that do not change the
+public dashboard branch. The `analog_year_forecast` lane is intended to match
+county-years to historically similar lagged conditions and report transparent
+nearest-analog behavior alongside the simpler baselines. Bootstrap intervals
+are written as `model_comparison_intervals.csv` so each branch can expose
+empirical uncertainty without implying clinical precision.
+
+Surveillance-regime diagnostics should remain separate from disease truth
+labels. They may flag case-definition eras, ED or inquiry coverage, reporting
+capacity, or other surveillance artifacts that help explain model error.
+Regional hotspot and capacity diagnostics may summarize where errors cluster
+or where public-health reporting changes appear to dominate signal, but those
+diagnostics are research context. They do not promote exposure candidates or
+calibration indicators into the selected public dashboard branch.
 
 ## Public score transform
 

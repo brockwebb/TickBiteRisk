@@ -39,10 +39,15 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `usda_nass_maryland_cdl` | USDA NASS Cropland Data Layer / CropScape | Raster/county summary candidate | Annual crop, pasture, hay, and open-land change context around land-use and edge habitat | source_manifested_needs_feature_extraction |
 | `noaa_cpc_enso_index` | NOAA CPC ENSO index, ONI/RONI | Global seasonal climate index | ONI is now materialized; RONI remains a candidate companion index to test as a lagged climate-regime overtone | oni_active_roni_candidate_needs_etl |
 | `noaa_psl_mei_v2` | NOAA PSL Multivariate ENSO Index v2 | Global monthly climate index | Ocean-atmosphere ENSO strength companion to ONI/RONI, useful only as lagged broad climate context | candidate_needs_etl |
-| `cdc_tick_bite_tracker` | CDC Tick Bite Data Tracker | HHS region/week dashboard | Activity overlay if backing data becomes available; current public dashboard grain is not county-year | candidate_missing_bulk_data |
+| `cdc_tick_bite_tracker` | CDC Tick Bite Data Tracker | HHS region/week dashboard | Human tick-bite exposure pressure overlay if backing data becomes available; current public dashboard grain is not county-year and is not a disease truth label | candidate_missing_bulk_data |
+| `nssp_tick_bite_ed` | NSSP tick-bite emergency department visits | Facility/county/region-week likely | Privacy-sensitive human exposure pressure feed candidate; useful only after acquisition, suppression, coverage, and privacy review, and not a confirmed disease truth label | candidate_needs_acquisition_privacy_review_not_public_default |
+| `poison_center_tick_bite_inquiries` | Poison center tick-bite inquiries | Call center region/county-week likely | Privacy-sensitive exposure pressure feed candidate that could capture tick-bite concern or advice-seeking behavior, not confirmed Lyme disease outcomes | candidate_needs_acquisition_privacy_review_not_public_default |
 | `inaturalist_tick_observations` | iNaturalist tick observations | Point observation | Experimental tick-observation activity proxy if normalized by observer effort and license terms | candidate_bias_sensitive |
 | `gbif_tick_occurrences` | GBIF tick occurrence records | Point occurrence | Comparator for public tick observations and museum/citizen-science records, with per-record license review | candidate_bias_sensitive |
-| `park_attendance_county_year` | Park attendance or trail-use records | Park/county/agency-year | Outdoor exposure denominator proxy if a reliable Maryland source can be found | candidate_needs_source_selection |
+| `park_attendance_county_year` | Park attendance or trail-use records | Park/county/agency-year | Outdoor recreation exposure pressure proxy if reliable Maryland aggregate sources can be found; visits do not confirm tick exposure or Lyme infection | candidate_needs_source_selection |
+| `dog_license_pet_ownership_proxy` | Dog license or pet ownership aggregate proxy | County-year likely | Public aggregate pet/outdoor-contact exposure proxy candidate, not a confirmed disease truth label | candidate_needs_acquisition_not_public_default |
+| `parcel_low_density_residential_proxy` | Parcel or land-use low-density residential proxy | Parcel to county-year summary likely | Public aggregate residential edge/contact exposure proxy candidate, not a confirmed disease truth label | candidate_needs_acquisition_not_public_default |
+| `surveillance_regime_calibration` | Surveillance regime calibration indicators | County-year or region-year | Calibration diagnostics for reporting-regime shifts, coverage, and capacity artifacts; not a disease truth label or public dashboard branch input | candidate_needs_acquisition_privacy_review_not_public_default |
 | `ecological_pressure_index` | Composite ecological pressure index | County-year derived feature | derived feature candidate, not a raw feed; would combine lagged host, habitat, climate stress, contact pressure, spatial disease pressure, and optional ENSO/Open-Meteo/FIA inputs | candidate_needs_design_and_backtest |
 
 ## Current v0 derived artifacts
@@ -57,6 +62,7 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `model_design_matrix_county_year.csv` | `tickbiterisk etl model-design-matrix` | Numeric feature matrix |
 | `model_design_matrix_schema.json` | `tickbiterisk etl model-design-matrix` | Design-matrix schema sidecar |
 | `model_comparison_predictions.csv` | `tickbiterisk etl model-compare` | Rolling-origin predictions from candidate model branches |
+| `model_comparison_intervals.csv` | `tickbiterisk etl model-compare` | Bootstrap prediction intervals companion artifact for comparison branches |
 | `noaa_cpc_oni_seasons.csv` | `tickbiterisk etl enso-oni` | NOAA CPC ONI seasonal anomalies and El Nino / La Nina phase labels |
 | `noaa_cpc_oni_model_year_features.csv` | `tickbiterisk etl enso-oni` | Complete prior-year ONI model-year climate context features |
 | `seasonality_baseline.csv` | `tickbiterisk etl seasonality-baseline` | CDC weekly/monthly Lyme onset share baseline |
