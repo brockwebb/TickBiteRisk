@@ -2,6 +2,7 @@ import csv
 import json
 from pathlib import Path
 
+from tickbiterisk.modeling import design_matrix
 from tickbiterisk.modeling.design_matrix import build_model_design_matrix
 from tickbiterisk.modeling.design_matrix_build import (
     write_model_design_matrix_outputs,
@@ -195,6 +196,70 @@ def test_build_model_design_matrix_flags_empty_adjacency_as_missing(
     assert row["feature_neighbor_prior_year_lyme_incidence_mean"] == "0.0"
     assert row["feature_neighbor_prior_year_count"] == "0"
     assert row["feature_missing_neighbor_prior_year_lyme_incidence"] == "1"
+
+
+def test_build_model_design_matrix_adds_forecast_safe_regional_signal_features(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+    regional_signals = _write_regional_signals(tmp_path / "regional_signals.csv")
+
+    result = build_model_design_matrix(
+        model_features_path=feature_matrix,
+        lookback_years=2,
+        regional_signals_path=regional_signals,
+    )
+
+    anne_2020 = next(
+        row
+        for row in result.rows
+        if row["county_fips"] == "24003" and row["year"] == "2020"
+    )
+    assert anne_2020["feature_regional_prior_year_total_cases"] == "20.0"
+    assert (
+        anne_2020["feature_regional_prior_year_county_share_of_midatlantic_cases"]
+        == "0.25"
+    )
+    assert anne_2020["feature_regional_prior_year_midatlantic_total_cases"] == "80.0"
+    assert (
+        anne_2020["feature_regional_trailing_5yr_midatlantic_total_mean"]
+        == "75.0"
+    )
+    assert anne_2020["feature_missing_regional_prior_year_total_cases"] == "0"
+    assert (
+        anne_2020["feature_missing_regional_trailing_5yr_midatlantic_total_mean"]
+        == "0"
+    )
+    assert "regional_signal_candidate" in anne_2020["model_feature_quality_flags"]
+    assert anne_2020["feature_flag_regional_signal_candidate"] == "1"
+    assert "feature_regional_prior_year_midatlantic_total_cases" in (
+        result.schema.feature_columns
+    )
+    assert "feature_missing_regional_prior_year_total_cases" in (
+        result.schema.feature_columns
+    )
+    assert "diagnostic_midatlantic_total_cases" not in result.schema.feature_columns
+    assert result.schema.regional_signal_source_path == str(regional_signals)
+    assert len(result.schema.regional_signal_source_sha256 or "") == 64
+    assert "regional_signal" in result.schema.missing_value_strategy
+
+
+def test_read_regional_signals_discards_same_year_diagnostic_fields(
+    tmp_path: Path,
+) -> None:
+    regional_signals = _write_regional_signals(tmp_path / "regional_signals.csv")
+
+    rows = design_matrix._read_regional_signals(regional_signals)
+
+    row = rows[("24003", 2020)]
+    assert "diagnostic_midatlantic_total_cases" not in row
+    assert "diagnostic_county_share_of_midatlantic_cases" not in row
+    assert set(row) == {
+        "county_fips",
+        "year",
+        "feature_quality_flags",
+        *design_matrix.REGIONAL_SIGNAL_SOURCE_COLUMNS,
+    }
 
 
 def _write_feature_matrix(path: Path) -> Path:
@@ -471,6 +536,49 @@ def _write_empty_adjacency(path: Path) -> Path:
             "feature_quality_flags": "self_row_ignored",
         }
     ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_regional_signals(path: Path) -> Path:
+    rows = []
+    for county_fips, county_name, prior_cases in [
+        ("24003", "Anne Arundel County", "20"),
+        ("24005", "Baltimore County", "40"),
+    ]:
+        for year in [2019, 2020]:
+            rows.append(
+                {
+                    "state_fips": "24",
+                    "state_abbr": "MD",
+                    "state_name": "Maryland",
+                    "county_fips": county_fips,
+                    "county_name": county_name,
+                    "year": str(year),
+                    "total_cases": prior_cases,
+                    "diagnostic_state_total_cases": "60",
+                    "diagnostic_midatlantic_total_cases": "100",
+                    "diagnostic_county_share_of_state_cases": "0.25",
+                    "diagnostic_county_share_of_midatlantic_cases": "0.2",
+                    "feature_prior_year_total_cases": prior_cases,
+                    "feature_prior_year_county_share_of_state_cases": "0.333333",
+                    "feature_prior_year_county_share_of_midatlantic_cases": "0.25",
+                    "feature_prior_year_state_total_cases": "60",
+                    "feature_prior_year_midatlantic_total_cases": "80",
+                    "feature_trailing_5yr_midatlantic_total_min": "70",
+                    "feature_trailing_5yr_midatlantic_total_mean": "75",
+                    "feature_trailing_5yr_midatlantic_total_max": "80",
+                    "diagnostic_midatlantic_total_within_trailing_5yr_band": "False",
+                    "source_panel_sha256": "abc123",
+                    "feature_quality_flags": (
+                        "regional_signal_candidate,"
+                        "same_year_diagnostics_not_forecast_features"
+                    ),
+                }
+            )
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()

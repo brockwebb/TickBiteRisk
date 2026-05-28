@@ -83,6 +83,70 @@ def test_model_design_matrix_command_accepts_county_adjacency_path(
     assert schema["spatial_neighbor_source_path"] == str(adjacency)
 
 
+def test_model_design_matrix_command_accepts_regional_signals_path(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_two_county_feature_matrix(tmp_path / "model_features.csv")
+    regional_signals = _write_regional_signals(tmp_path / "regional_signals.csv")
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-design-matrix",
+            "--model-features-path",
+            str(feature_matrix),
+            "--regional-signals-path",
+            str(regional_signals),
+            "--lookback-years",
+            "1",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    with (output_dir / "model_design_matrix_county_year.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    anne_2020 = next(row for row in rows if row["county_fips"] == "24003")
+    assert anne_2020["feature_regional_prior_year_midatlantic_total_cases"] == "80.0"
+    assert anne_2020["feature_flag_regional_signal_candidate"] == "1"
+
+    schema = json.loads(
+        (output_dir / "model_design_matrix_schema.json").read_text(encoding="utf-8")
+    )
+    assert schema["regional_signal_source_path"] == str(regional_signals)
+
+
+def test_model_design_matrix_command_fails_cleanly_when_regional_signals_missing(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-design-matrix",
+            "--model-features-path",
+            str(feature_matrix),
+            "--regional-signals-path",
+            str(tmp_path / "missing-regional-signals.csv"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Regional signals file not found" in result.output
+    assert "Traceback" not in result.output
+    assert not (tmp_path / "out" / "model_design_matrix_county_year.csv").exists()
+
+
 def test_model_design_matrix_command_fails_cleanly_when_input_missing(
     tmp_path: Path,
 ) -> None:
@@ -194,6 +258,42 @@ def _write_adjacency(path: Path) -> Path:
             "neighbor_county_fips": "24003",
         },
     ]
+    return _write_rows(path, rows)
+
+
+def _write_regional_signals(path: Path) -> Path:
+    rows = []
+    for county_fips, county_name in [
+        ("24003", "Anne Arundel County"),
+        ("24005", "Baltimore County"),
+    ]:
+        for year in [2019, 2020]:
+            rows.append(
+                {
+                    "state_fips": "24",
+                    "state_abbr": "MD",
+                    "state_name": "Maryland",
+                    "county_fips": county_fips,
+                    "county_name": county_name,
+                    "year": str(year),
+                    "total_cases": "20",
+                    "diagnostic_state_total_cases": "60",
+                    "diagnostic_midatlantic_total_cases": "100",
+                    "diagnostic_county_share_of_state_cases": "0.25",
+                    "diagnostic_county_share_of_midatlantic_cases": "0.2",
+                    "feature_prior_year_total_cases": "20",
+                    "feature_prior_year_county_share_of_state_cases": "0.333333",
+                    "feature_prior_year_county_share_of_midatlantic_cases": "0.25",
+                    "feature_prior_year_state_total_cases": "60",
+                    "feature_prior_year_midatlantic_total_cases": "80",
+                    "feature_trailing_5yr_midatlantic_total_min": "70",
+                    "feature_trailing_5yr_midatlantic_total_mean": "75",
+                    "feature_trailing_5yr_midatlantic_total_max": "80",
+                    "diagnostic_midatlantic_total_within_trailing_5yr_band": "False",
+                    "source_panel_sha256": "abc123",
+                    "feature_quality_flags": "regional_signal_candidate",
+                }
+            )
     return _write_rows(path, rows)
 
 

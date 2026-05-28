@@ -185,14 +185,15 @@ request/run manifests as those sources graduate into the modeling lane.
 
 15. `tickbiterisk etl model-design-matrix`
     - Converts the feature panel into numeric model inputs with missingness
-      indicators, optional prior-year neighbor incidence features, and a schema
-      sidecar.
+      indicators, optional prior-year neighbor incidence features, optional
+      regional signal features, and a schema sidecar.
     - Writes `model_design_matrix_county_year.csv` and
       `model_design_matrix_schema.json`.
 
 16. `tickbiterisk etl model-compare`
     - Runs rolling-origin comparisons across transparent baseline and ridge
-      branches, including the forecast spatial diagnostic lane.
+      branches, including forecast spatial and forecast-safe regional signal
+      lanes when those optional feature columns are present.
     - Writes `model_comparison_runs.csv`,
       `model_comparison_predictions.csv`,
       `model_comparison_intervals.csv`, `model_comparison_metrics.csv`, and

@@ -163,6 +163,24 @@ SPATIAL_NEIGHBOR_FEATURE_COLUMNS = [
     "feature_neighbor_prior_year_count",
     "feature_missing_neighbor_prior_year_lyme_incidence",
 ]
+REGIONAL_SIGNAL_SOURCE_COLUMNS = [
+    "feature_prior_year_total_cases",
+    "feature_prior_year_county_share_of_state_cases",
+    "feature_prior_year_county_share_of_midatlantic_cases",
+    "feature_prior_year_state_total_cases",
+    "feature_prior_year_midatlantic_total_cases",
+    "feature_trailing_5yr_midatlantic_total_min",
+    "feature_trailing_5yr_midatlantic_total_mean",
+    "feature_trailing_5yr_midatlantic_total_max",
+]
+REGIONAL_SIGNAL_FEATURE_COLUMNS = [
+    f"feature_regional_{column.removeprefix('feature_')}"
+    for column in REGIONAL_SIGNAL_SOURCE_COLUMNS
+]
+REGIONAL_SIGNAL_MISSING_COLUMNS = [
+    f"feature_missing_regional_{column.removeprefix('feature_')}"
+    for column in REGIONAL_SIGNAL_SOURCE_COLUMNS
+]
 REQUIRED_MODEL_FEATURE_COLUMNS = [
     "county_fips",
     "year",
@@ -182,6 +200,8 @@ class ModelDesignMatrixSchema:
     input_sha256: str
     spatial_neighbor_source_path: str | None
     spatial_neighbor_source_sha256: str | None
+    regional_signal_source_path: str | None
+    regional_signal_source_sha256: str | None
     row_count: int
     lookback_years: int
     id_columns: list[str]
@@ -203,6 +223,7 @@ def build_model_design_matrix(
     model_features_path: Path,
     lookback_years: int = 5,
     county_adjacency_path: Path | None = None,
+    regional_signals_path: Path | None = None,
 ) -> ModelDesignMatrixResult:
     if lookback_years < 1:
         raise ModelDesignMatrixInputError("lookback_years must be at least 1")
@@ -211,13 +232,19 @@ def build_model_design_matrix(
     rows_by_county = _rows_by_county(source_rows)
     rows_by_year = _rows_by_year(source_rows)
     county_neighbors = _read_county_adjacency(county_adjacency_path)
+    regional_signals = _read_regional_signals(regional_signals_path)
     categorical_mappings = _categorical_mappings(source_rows)
-    quality_flags = _quality_flags(source_rows)
+    quality_flags = _quality_flags(
+        source_rows,
+        regional_signals=regional_signals,
+        include_regional_signals=regional_signals_path is not None,
+    )
     feature_columns = _feature_columns(
         lookback_years=lookback_years,
         categorical_mappings=categorical_mappings,
         quality_flags=quality_flags,
         include_spatial_neighbors=county_adjacency_path is not None,
+        include_regional_signals=regional_signals_path is not None,
     )
 
     output_rows = []
@@ -237,6 +264,8 @@ def build_model_design_matrix(
                 history=history,
                 rows_by_year=rows_by_year,
                 county_neighbors=county_neighbors,
+                regional_signals=regional_signals,
+                include_regional_signals=regional_signals_path is not None,
                 lookback_years=lookback_years,
                 categorical_mappings=categorical_mappings,
                 quality_flags=quality_flags,
@@ -253,6 +282,12 @@ def build_model_design_matrix(
         spatial_neighbor_source_sha256=(
             None if county_adjacency_path is None else _sha256_file(county_adjacency_path)
         ),
+        regional_signal_source_path=(
+            None if regional_signals_path is None else str(regional_signals_path)
+        ),
+        regional_signal_source_sha256=(
+            None if regional_signals_path is None else _sha256_file(regional_signals_path)
+        ),
         row_count=len(output_rows),
         lookback_years=lookback_years,
         id_columns=ID_COLUMNS,
@@ -268,6 +303,7 @@ def build_model_design_matrix(
             "categorical": "observed status values are one-hot encoded; empty statuses produce all-zero indicators",
             "lagged_outcome": "rows with no prior county history are excluded; missing exact prior-year incidence is imputed to 0.0 with feature_missing_prior_year_lyme_incidence",
             "spatial_neighbor": "prior-year neighbor incidence features use only county-adjacent rows from year Y-1; unavailable neighbor priors are imputed to 0.0 with a missing indicator",
+            "regional_signal": "regional signal features use only prior-year and trailing-history fields from the Mid-Atlantic signal artifact; same-year diagnostic fields are not joined",
         },
     )
     return ModelDesignMatrixResult(rows=output_rows, schema=schema)
@@ -341,6 +377,45 @@ def _read_county_adjacency(path: Path | None) -> dict[str, list[str]]:
     }
 
 
+def _read_regional_signals(path: Path | None) -> dict[tuple[str, int], dict[str, str]]:
+    if path is None:
+        return {}
+    required_columns = {
+        "county_fips",
+        "year",
+        "feature_quality_flags",
+        *REGIONAL_SIGNAL_SOURCE_COLUMNS,
+    }
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = set(reader.fieldnames or [])
+        missing_columns = required_columns - fieldnames
+        if missing_columns:
+            raise ModelDesignMatrixInputError(
+                "missing required regional signal column(s): "
+                f"{', '.join(sorted(missing_columns))}"
+            )
+        return {
+            (
+                str(row["county_fips"]).zfill(5),
+                int(row["year"]),
+            ): _regional_signal_row(row)
+            for row in reader
+        }
+
+
+def _regional_signal_row(row: dict[str, str]) -> dict[str, str]:
+    return {
+        "county_fips": str(row["county_fips"]).zfill(5),
+        "year": str(row["year"]),
+        "feature_quality_flags": row.get("feature_quality_flags", ""),
+        **{
+            column: row.get(column, "")
+            for column in REGIONAL_SIGNAL_SOURCE_COLUMNS
+        },
+    }
+
+
 def _categorical_mappings(rows: list[dict[str, str]]) -> dict[str, list[str]]:
     mappings: dict[str, list[str]] = {}
     for column in STATUS_COLUMNS:
@@ -356,14 +431,25 @@ def _categorical_mappings(rows: list[dict[str, str]]) -> dict[str, list[str]]:
     return mappings
 
 
-def _quality_flags(rows: list[dict[str, str]]) -> list[str]:
-    return sorted(
-        {
+def _quality_flags(
+    rows: list[dict[str, str]],
+    *,
+    regional_signals: dict[tuple[str, int], dict[str, str]],
+    include_regional_signals: bool,
+) -> list[str]:
+    flags = {
+        flag
+        for row in rows
+        for flag in _split_flags(row.get("model_feature_quality_flags", ""))
+    }
+    if include_regional_signals:
+        flags.add("missing_regional_signal")
+        flags.update(
             flag
-            for row in rows
-            for flag in _split_flags(row.get("model_feature_quality_flags", ""))
-        }
-    )
+            for row in regional_signals.values()
+            for flag in _split_flags(row.get("feature_quality_flags", ""))
+        )
+    return sorted(flags)
 
 
 def _feature_columns(
@@ -372,6 +458,7 @@ def _feature_columns(
     categorical_mappings: dict[str, list[str]],
     quality_flags: list[str],
     include_spatial_neighbors: bool,
+    include_regional_signals: bool,
 ) -> list[str]:
     columns = [
         "feature_year",
@@ -392,6 +479,9 @@ def _feature_columns(
     columns.extend(f"feature_missing_{column}" for column in OPTIONAL_NUMERIC_COLUMNS)
     if include_spatial_neighbors:
         columns.extend(SPATIAL_NEIGHBOR_FEATURE_COLUMNS)
+    if include_regional_signals:
+        columns.extend(REGIONAL_SIGNAL_FEATURE_COLUMNS)
+        columns.extend(REGIONAL_SIGNAL_MISSING_COLUMNS)
     columns.append("feature_deer_is_derived_total")
     columns.append("feature_missing_deer_is_derived_total")
     for source_column, values in categorical_mappings.items():
@@ -407,6 +497,8 @@ def _design_row(
     history: list[dict[str, str]],
     rows_by_year: dict[int, list[dict[str, str]]],
     county_neighbors: dict[str, list[str]],
+    regional_signals: dict[tuple[str, int], dict[str, str]],
+    include_regional_signals: bool,
     lookback_years: int,
     categorical_mappings: dict[str, list[str]],
     quality_flags: list[str],
@@ -423,6 +515,17 @@ def _design_row(
         rows_by_year=rows_by_year,
         county_neighbors=county_neighbors,
     )
+    regional_signal = regional_signals.get((row["county_fips"], year))
+    observed_quality_flags = _combined_flags(
+        row.get("model_feature_quality_flags", ""),
+        (
+            regional_signal.get("feature_quality_flags", "")
+            if regional_signal is not None
+            else "missing_regional_signal"
+            if include_regional_signals
+            else ""
+        ),
+    )
     record = {
         "county_fips": row["county_fips"],
         "county_name": row.get("county_name", ""),
@@ -432,7 +535,7 @@ def _design_row(
             row.get("lyme_incidence_per_100k", "")
         ),
         "target_population": _format_int(row.get("population", "")),
-        "model_feature_quality_flags": row.get("model_feature_quality_flags", ""),
+        "model_feature_quality_flags": observed_quality_flags,
     }
     feature_values = {
         "feature_year": str(year),
@@ -458,6 +561,7 @@ def _design_row(
             "1" if _is_blank(row.get(column, "")) else "0"
         )
     feature_values.update(spatial_features)
+    feature_values.update(_regional_signal_features(regional_signal))
     feature_values["feature_missing_contact_pressure"] = (
         "1" if _is_blank(row.get("residential_units_authorized", "")) else "0"
     )
@@ -474,7 +578,7 @@ def _design_row(
         base = _status_feature_base(source_column)
         for value in values:
             feature_values[f"{base}_{_slug(value)}"] = "1" if observed == value else "0"
-    observed_flags = set(_split_flags(row.get("model_feature_quality_flags", "")))
+    observed_flags = set(_split_flags(observed_quality_flags))
     for flag in quality_flags:
         feature_values[f"feature_flag_{_slug(flag)}"] = (
             "1" if flag in observed_flags else "0"
@@ -520,6 +624,22 @@ def _spatial_neighbor_features(
     }
 
 
+def _regional_signal_features(
+    regional_signal: dict[str, str] | None,
+) -> dict[str, str]:
+    values = {}
+    for source_column, feature_column, missing_column in zip(
+        REGIONAL_SIGNAL_SOURCE_COLUMNS,
+        REGIONAL_SIGNAL_FEATURE_COLUMNS,
+        REGIONAL_SIGNAL_MISSING_COLUMNS,
+        strict=True,
+    ):
+        source_value = "" if regional_signal is None else regional_signal.get(source_column, "")
+        values[feature_column] = _format_float(source_value)
+        values[missing_column] = "1" if _is_blank(source_value) else "0"
+    return values
+
+
 def _state_incidence(rows: list[dict[str, str]]) -> float | None:
     if not rows:
         return None
@@ -543,6 +663,17 @@ def _split_flags(value: str | None) -> list[str]:
         for item in normalized.split(",")
         if item.strip()
     ]
+
+
+def _combined_flags(*values: str) -> str:
+    flags = []
+    seen = set()
+    for value in values:
+        for flag in _split_flags(value):
+            if flag not in seen:
+                flags.append(flag)
+                seen.add(flag)
+    return ",".join(flags)
 
 
 def _format_int(value: str) -> str:

@@ -147,6 +147,112 @@ def test_run_model_comparison_omits_spatial_lane_without_spatial_features(
     assert "ridge_forecast_safe" in model_names
 
 
+def test_run_model_comparison_adds_regional_lane_for_regional_features(
+    tmp_path: Path,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv", include_regional=True)
+
+    result = run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+    )
+
+    regional_ridge = next(
+        row for row in result.predictions if row.model_name == "ridge_forecast_regional"
+    )
+    assert regional_ridge.model_family == "regularized_linear"
+    assert regional_ridge.feature_profile == "forecast_safe_lagged_regional"
+    assert regional_ridge.weather_mode == "not_used_by_forecast_safe_model"
+
+
+def test_run_model_comparison_reuses_ridge_fits_by_training_window(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv", include_regional=True)
+    solve_count = 0
+    original_solve = model_compare._solve_ridge
+
+    def counting_solve(*args, **kwargs):
+        nonlocal solve_count
+        solve_count += 1
+        return original_solve(*args, **kwargs)
+
+    monkeypatch.setattr(model_compare, "_solve_ridge", counting_solve)
+
+    run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+    )
+
+    assert solve_count <= 10
+
+
+def test_run_model_comparison_excludes_regional_diagnostics_from_ridge_inputs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv", include_regional=True)
+    captured_columns = []
+    original_ridge_prediction = model_compare._ridge_prediction
+
+    def capturing_ridge_prediction(*args, **kwargs):
+        captured_columns.append(tuple(kwargs["feature_columns"]))
+        return original_ridge_prediction(*args, **kwargs)
+
+    monkeypatch.setattr(
+        model_compare,
+        "_ridge_prediction",
+        capturing_ridge_prediction,
+    )
+
+    run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+    )
+
+    assert captured_columns
+    assert any(
+        "feature_regional_prior_year_midatlantic_total_cases" in columns
+        for columns in captured_columns
+    )
+    assert all(
+        not any(column.startswith("feature_regional_diagnostic_") for column in columns)
+        for columns in captured_columns
+    )
+
+
+def test_ridge_cache_preserves_uncached_predictions(tmp_path: Path) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv", include_regional=True)
+    rows, feature_columns = model_compare._read_design_rows(matrix)
+    train_rows = [row for row in rows if row.year < 2021]
+    test_row = next(row for row in rows if row.county_fips == "24001" and row.year == 2021)
+    regional_columns = [
+        column
+        for column in feature_columns
+        if model_compare._is_forecast_regional_feature_column(column)
+    ]
+
+    uncached = model_compare._ridge_prediction(
+        row=test_row,
+        train_rows=train_rows,
+        feature_columns=regional_columns,
+        ridge_alpha=1.0,
+    )
+    cached = model_compare._ridge_prediction(
+        row=test_row,
+        train_rows=train_rows,
+        feature_columns=regional_columns,
+        ridge_alpha=1.0,
+        ridge_cache={},
+    )
+
+    assert cached == uncached
+
+
 def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     assert model_compare._is_forecast_safe_feature_column(
         "feature_trailing_3yr_mean_lyme_incidence_per_100k"
@@ -220,6 +326,36 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     )
     assert model_compare._is_forecast_spatial_feature_column(
         "feature_missing_neighbor_prior_year_lyme_incidence"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_regional_prior_year_midatlantic_total_cases"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_regional_prior_year_county_share_of_midatlantic_cases"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_regional_trailing_5yr_midatlantic_total_mean"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_missing_regional_prior_year_midatlantic_total_cases"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_regional_prior_year_midatlantic_total_cases"
+    )
+    assert not model_compare._is_forecast_ecology_feature_column(
+        "feature_regional_prior_year_midatlantic_total_cases"
+    )
+    assert not model_compare._is_forecast_spatial_feature_column(
+        "feature_regional_prior_year_midatlantic_total_cases"
+    )
+    assert not model_compare._is_forecast_regional_feature_column(
+        "feature_regional_diagnostic_midatlantic_total_cases"
+    )
+    assert not model_compare._is_forecast_regional_feature_column(
+        "feature_regional_diagnostic_county_share_of_midatlantic_cases"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_regional_diagnostic_midatlantic_total_cases"
     )
     assert not model_compare._is_forecast_safe_feature_column(
         "feature_neighbor_prior_year_lyme_incidence_mean"
@@ -408,7 +544,12 @@ def test_write_model_comparison_outputs_writes_interval_artifact(
     assert {row["model_name"] for row in intervals} == {"analog_year_forecast"}
 
 
-def _write_design_matrix(path: Path, *, include_spatial: bool = True) -> Path:
+def _write_design_matrix(
+    path: Path,
+    *,
+    include_spatial: bool = True,
+    include_regional: bool = False,
+) -> Path:
     rows = []
     values = {
         "24001": [10, 20, 30, 40],
@@ -461,6 +602,35 @@ def _write_design_matrix(path: Path, *, include_spatial: bool = True) -> Path:
                         "feature_neighbor_prior_year_count": "1" if offset else "0",
                         "feature_missing_neighbor_prior_year_lyme_incidence": (
                             "0" if offset else "1"
+                        ),
+                    }
+                )
+            if include_regional:
+                row.update(
+                    {
+                        "feature_regional_prior_year_total_cases": str(
+                            float(prior_cases)
+                        ),
+                        "feature_regional_prior_year_county_share_of_midatlantic_cases": str(
+                            0.2 + offset * 0.01
+                        ),
+                        "feature_regional_prior_year_midatlantic_total_cases": str(
+                            100 + offset * 10
+                        ),
+                        "feature_regional_trailing_5yr_midatlantic_total_mean": str(
+                            90 + offset * 5
+                        ),
+                        "feature_missing_regional_prior_year_total_cases": (
+                            "1" if offset == 0 else "0"
+                        ),
+                        "feature_missing_regional_prior_year_midatlantic_total_cases": (
+                            "1" if offset == 0 else "0"
+                        ),
+                        "feature_missing_regional_trailing_5yr_midatlantic_total_mean": (
+                            "1" if offset == 0 else "0"
+                        ),
+                        "feature_regional_diagnostic_midatlantic_total_cases": str(
+                            9999 + offset
                         ),
                     }
                 )

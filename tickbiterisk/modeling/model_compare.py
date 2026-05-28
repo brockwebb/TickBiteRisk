@@ -26,7 +26,10 @@ ANALOG_BOOTSTRAP_ITERATIONS = 200
 ANALOG_NEIGHBOR_COUNT = 5
 ANALOG_FEATURE_PROFILE = "forecast_safe_analog_years"
 ANALOG_INTERVAL_METHOD = "weighted_analog_bootstrap"
-EXCLUDED_FEATURE_PREFIXES = ("feature_tick_",)
+EXCLUDED_FEATURE_PREFIXES = (
+    "feature_tick_",
+    "feature_regional_diagnostic_",
+)
 REQUIRED_MODEL_COMPARISON_COLUMNS = [
     "county_fips",
     "year",
@@ -135,6 +138,24 @@ FORECAST_SPATIAL_EXACT_FEATURES = {
     "feature_neighbor_prior_year_lyme_incidence_max",
     "feature_neighbor_prior_year_count",
     "feature_missing_neighbor_prior_year_lyme_incidence",
+}
+FORECAST_REGIONAL_EXACT_FEATURES = {
+    "feature_regional_prior_year_total_cases",
+    "feature_regional_prior_year_county_share_of_state_cases",
+    "feature_regional_prior_year_county_share_of_midatlantic_cases",
+    "feature_regional_prior_year_state_total_cases",
+    "feature_regional_prior_year_midatlantic_total_cases",
+    "feature_regional_trailing_5yr_midatlantic_total_min",
+    "feature_regional_trailing_5yr_midatlantic_total_mean",
+    "feature_regional_trailing_5yr_midatlantic_total_max",
+    "feature_missing_regional_prior_year_total_cases",
+    "feature_missing_regional_prior_year_county_share_of_state_cases",
+    "feature_missing_regional_prior_year_county_share_of_midatlantic_cases",
+    "feature_missing_regional_prior_year_state_total_cases",
+    "feature_missing_regional_prior_year_midatlantic_total_cases",
+    "feature_missing_regional_trailing_5yr_midatlantic_total_min",
+    "feature_missing_regional_trailing_5yr_midatlantic_total_mean",
+    "feature_missing_regional_trailing_5yr_midatlantic_total_max",
 }
 
 
@@ -286,6 +307,15 @@ class _DesignRow:
     model_feature_quality_flags: str
 
 
+@dataclass(frozen=True)
+class _FittedRidgeModel:
+    columns: list[str]
+    means: dict[str, float]
+    scales: dict[str, float]
+    coefficients: list[float]
+    train_state_mean: float
+
+
 def run_model_comparison(
     *,
     design_matrix_path: Path,
@@ -339,6 +369,9 @@ def run_model_comparison(
         train_start_year = min(row.year for row in train_rows)
         train_end_year = max(row.year for row in train_rows)
         train_county_count = len({row.county_fips for row in train_rows})
+        ridge_cache: dict[
+            tuple[float, tuple[str, ...]], _FittedRidgeModel
+        ] = {}
         for row in test_rows:
             for model_name, model_family, profile, predicted in _predict_models(
                 row=row,
@@ -346,6 +379,7 @@ def run_model_comparison(
                 feature_columns=feature_columns,
                 ridge_alpha=ridge_alpha,
                 shrinkage_strength=shrinkage_strength,
+                ridge_cache=ridge_cache,
             ):
                 predictions.append(
                     _prediction_row(
@@ -490,6 +524,13 @@ def _is_forecast_spatial_feature_column(column: str) -> bool:
     )
 
 
+def _is_forecast_regional_feature_column(column: str) -> bool:
+    return (
+        _is_forecast_safe_feature_column(column)
+        or column in FORECAST_REGIONAL_EXACT_FEATURES
+    )
+
+
 def _has_training_depth(
     rows: list[_DesignRow],
     *,
@@ -508,6 +549,7 @@ def _predict_models(
     feature_columns: list[str],
     ridge_alpha: float,
     shrinkage_strength: float,
+    ridge_cache: dict[tuple[float, tuple[str, ...]], _FittedRidgeModel],
 ) -> list[tuple[str, str, str, float]]:
     prior_prediction = row.features.get(
         "feature_prior_year_lyme_incidence_per_100k", 0.0
@@ -555,6 +597,7 @@ def _predict_models(
         train_rows=train_rows,
         feature_columns=forecast_columns,
         ridge_alpha=ridge_alpha,
+        ridge_cache=ridge_cache,
     )
     predictions.append(
         (
@@ -575,6 +618,7 @@ def _predict_models(
             train_rows=train_rows,
             feature_columns=spatial_columns,
             ridge_alpha=ridge_alpha,
+            ridge_cache=ridge_cache,
         )
         predictions.append(
             (
@@ -582,6 +626,27 @@ def _predict_models(
                 "regularized_linear",
                 "forecast_safe_lagged_spatial",
                 spatial_ridge_prediction,
+            )
+        )
+    if any(column in FORECAST_REGIONAL_EXACT_FEATURES for column in feature_columns):
+        regional_columns = [
+            column
+            for column in feature_columns
+            if _is_forecast_regional_feature_column(column)
+        ]
+        regional_ridge_prediction = _ridge_prediction(
+            row=row,
+            train_rows=train_rows,
+            feature_columns=regional_columns,
+            ridge_alpha=ridge_alpha,
+            ridge_cache=ridge_cache,
+        )
+        predictions.append(
+            (
+                "ridge_forecast_regional",
+                "regularized_linear",
+                "forecast_safe_lagged_regional",
+                regional_ridge_prediction,
             )
         )
     ecology_columns = [
@@ -592,6 +657,7 @@ def _predict_models(
         train_rows=train_rows,
         feature_columns=ecology_columns,
         ridge_alpha=ridge_alpha,
+        ridge_cache=ridge_cache,
     )
     predictions.append(
         (
@@ -606,6 +672,7 @@ def _predict_models(
         train_rows=train_rows,
         feature_columns=feature_columns,
         ridge_alpha=ridge_alpha,
+        ridge_cache=ridge_cache,
     )
     predictions.append(
         (
@@ -638,6 +705,7 @@ def _analog_forecast(
         if (
             _is_forecast_spatial_feature_column(column)
             or _is_forecast_ecology_feature_column(column)
+            or _is_forecast_regional_feature_column(column)
         )
     ]
     if not train_rows or not columns:
@@ -826,12 +894,48 @@ def _ridge_prediction(
     train_rows: list[_DesignRow],
     feature_columns: list[str],
     ridge_alpha: float,
+    ridge_cache: dict[tuple[float, tuple[str, ...]], _FittedRidgeModel] | None = None,
 ) -> float:
     if not train_rows or not feature_columns:
         return _county_trailing_mean(row, train_rows)
+    cache_key = (ridge_alpha, tuple(feature_columns))
+    model = ridge_cache.get(cache_key) if ridge_cache is not None else None
+    if model is None:
+        model = _fit_ridge_model(
+            train_rows=train_rows,
+            feature_columns=feature_columns,
+            ridge_alpha=ridge_alpha,
+        )
+        if ridge_cache is not None:
+            ridge_cache[cache_key] = model
+    if not model.columns:
+        return model.train_state_mean
+    x = [
+        1.0,
+        *[
+            _standardized(row.features.get(column, 0.0), model.means[column], model.scales[column])
+            for column in model.columns
+        ],
+    ]
+    return max(_dot(model.coefficients, x), 0.0)
+
+
+def _fit_ridge_model(
+    *,
+    train_rows: list[_DesignRow],
+    feature_columns: list[str],
+    ridge_alpha: float,
+) -> _FittedRidgeModel:
     columns = _select_varying_columns(train_rows, feature_columns)
+    train_state_mean = _state_mean(train_rows)
     if not columns:
-        return _state_mean(train_rows)
+        return _FittedRidgeModel(
+            columns=[],
+            means={},
+            scales={},
+            coefficients=[],
+            train_state_mean=train_state_mean,
+        )
     means = {
         column: mean(train_row.features.get(column, 0.0) for train_row in train_rows)
         for column in columns
@@ -848,8 +952,13 @@ def _ridge_prediction(
     ]
     y_train = [train_row.incidence_per_100k for train_row in train_rows]
     coefficients = _solve_ridge(x_train, y_train, ridge_alpha=ridge_alpha)
-    x = [1.0, *[_standardized(row.features.get(column, 0.0), means[column], scales[column]) for column in columns]]
-    return max(_dot(coefficients, x), 0.0)
+    return _FittedRidgeModel(
+        columns=columns,
+        means=means,
+        scales=scales,
+        coefficients=coefficients,
+        train_state_mean=train_state_mean,
+    )
 
 
 def _select_varying_columns(
