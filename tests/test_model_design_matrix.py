@@ -86,6 +86,9 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_population_change_prior_year"] == "1200.0"
     assert mast_row["feature_population_pct_change_prior_year"] == "1.23"
     assert mast_row["feature_population_pct_change_trailing_3yr_mean"] == "0.9"
+    assert mast_row["feature_ecological_pressure_prior_year_index"] == "29.87"
+    assert mast_row["feature_ecological_pressure_component_count"] == "6"
+    assert mast_row["feature_missing_ecological_pressure_prior_year_index"] == "0"
     assert mast_row["feature_oni_prior_year_mean_anomaly_c"] == "-0.42"
     assert mast_row["feature_oni_prior_year_la_nina_season_count"] == "5.0"
     assert mast_row["feature_missing_usdm_dsci_mean"] == "0"
@@ -105,6 +108,14 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
         "feature_missing_population_pct_change_prior_year"
         in result.schema.feature_columns
     )
+    assert (
+        "feature_ecological_pressure_prior_year_index"
+        in result.schema.feature_columns
+    )
+    assert (
+        "feature_missing_ecological_pressure_prior_year_index"
+        in result.schema.feature_columns
+    )
 
     missing_new_row = next(
         item
@@ -119,6 +130,12 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert missing_new_row["feature_missing_forest_pct"] == "1"
     assert missing_new_row["feature_oni_prior_year_mean_anomaly_c"] == "0.0"
     assert missing_new_row["feature_missing_oni_prior_year_mean_anomaly_c"] == "1"
+    assert missing_new_row["feature_ecological_pressure_prior_year_index"] == "0.0"
+    assert missing_new_row["feature_ecological_pressure_component_count"] == "0"
+    assert (
+        missing_new_row["feature_missing_ecological_pressure_prior_year_index"]
+        == "1"
+    )
 
 
 def test_write_model_design_matrix_outputs_writes_csv_and_schema_json(
@@ -255,6 +272,50 @@ def test_build_model_design_matrix_adds_forecast_safe_regional_signal_features(
     assert "regional_signal" in result.schema.missing_value_strategy
 
 
+def test_build_model_design_matrix_preserves_partial_ecological_pressure_components(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_csv(
+        tmp_path / "model_features.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2019",
+                "total_cases": "10",
+                "population": "100000",
+                "lyme_incidence_per_100k": "10.0",
+                "model_feature_quality_flags": "",
+            },
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2020",
+                "total_cases": "20",
+                "population": "101000",
+                "lyme_incidence_per_100k": "19.80198",
+                "population_pct_change_prior_year": "1.5",
+                "natural_land_cover_index": "50",
+                "model_feature_quality_flags": "",
+            },
+        ],
+    )
+
+    result = build_model_design_matrix(
+        model_features_path=feature_matrix,
+        lookback_years=2,
+    )
+
+    row = result.rows[0]
+    assert row["county_fips"] == "24003"
+    assert row["year"] == "2020"
+    assert row["feature_population_pct_change_prior_year"] == "1.5"
+    assert row["feature_natural_land_cover_index"] == "50.0"
+    assert row["feature_ecological_pressure_component_count"] == "2"
+    assert row["feature_ecological_pressure_prior_year_index"] == "50.0"
+    assert row["feature_missing_ecological_pressure_prior_year_index"] == "0"
+
+
 def test_read_regional_signals_discards_same_year_diagnostic_fields(
     tmp_path: Path,
 ) -> None:
@@ -271,6 +332,19 @@ def test_read_regional_signals_discards_same_year_diagnostic_fields(
         "feature_quality_flags",
         *design_matrix.REGIONAL_SIGNAL_SOURCE_COLUMNS,
     }
+
+
+def _write_csv(path: Path, rows: list[dict[str, str]]) -> Path:
+    fieldnames = []
+    for row in rows:
+        for column in row:
+            if column not in fieldnames:
+                fieldnames.append(column)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
 
 
 def _write_feature_matrix(path: Path) -> Path:

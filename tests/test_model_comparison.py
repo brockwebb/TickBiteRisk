@@ -225,6 +225,47 @@ def test_run_model_comparison_excludes_regional_diagnostics_from_ridge_inputs(
     )
 
 
+def test_run_model_comparison_keeps_composite_pressure_out_of_safe_ridge(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    matrix = _write_design_matrix(
+        tmp_path / "design_matrix.csv",
+        include_spatial=False,
+        include_composite=True,
+    )
+    captured_columns = []
+    original_ridge_prediction = model_compare._ridge_prediction
+
+    def capturing_ridge_prediction(*args, **kwargs):
+        captured_columns.append(tuple(kwargs["feature_columns"]))
+        return original_ridge_prediction(*args, **kwargs)
+
+    monkeypatch.setattr(
+        model_compare,
+        "_ridge_prediction",
+        capturing_ridge_prediction,
+    )
+
+    run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        end_year=2021,
+        min_train_years=1,
+    )
+
+    safe_columns = [captured_columns[0], captured_columns[3]]
+    ecology_columns = [captured_columns[1], captured_columns[4]]
+    assert all(
+        "feature_ecological_pressure_prior_year_index" not in columns
+        for columns in safe_columns
+    )
+    assert all(
+        "feature_ecological_pressure_prior_year_index" in columns
+        for columns in ecology_columns
+    )
+
+
 def test_ridge_cache_preserves_uncached_predictions(tmp_path: Path) -> None:
     matrix = _write_design_matrix(tmp_path / "design_matrix.csv", include_regional=True)
     rows, feature_columns = model_compare._read_design_rows(matrix)
@@ -307,6 +348,18 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     )
     assert not model_compare._is_forecast_ecology_feature_column(
         "feature_population_pct_change_current_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_ecological_pressure_prior_year_index"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_ecological_pressure_component_count"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_missing_ecological_pressure_prior_year_index"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_ecological_pressure_prior_year_index"
     )
     assert model_compare._is_forecast_ecology_feature_column("feature_forest_pct")
     assert model_compare._is_forecast_ecology_feature_column(
@@ -576,6 +629,7 @@ def _write_design_matrix(
     *,
     include_spatial: bool = True,
     include_regional: bool = False,
+    include_composite: bool = False,
 ) -> Path:
     rows = []
     values = {
@@ -658,6 +712,20 @@ def _write_design_matrix(
                         ),
                         "feature_regional_diagnostic_midatlantic_total_cases": str(
                             9999 + offset
+                        ),
+                    }
+                )
+            if include_composite:
+                row.update(
+                    {
+                        "feature_ecological_pressure_prior_year_index": str(
+                            25 + offset
+                        ),
+                        "feature_ecological_pressure_component_count": (
+                            "1" if offset else "0"
+                        ),
+                        "feature_missing_ecological_pressure_prior_year_index": (
+                            "0" if offset else "1"
                         ),
                     }
                 )

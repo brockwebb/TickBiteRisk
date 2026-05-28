@@ -171,6 +171,11 @@ SPATIAL_NEIGHBOR_FEATURE_COLUMNS = [
     "feature_neighbor_prior_year_count",
     "feature_missing_neighbor_prior_year_lyme_incidence",
 ]
+ECOLOGICAL_PRESSURE_FEATURE_COLUMNS = [
+    "feature_ecological_pressure_prior_year_index",
+    "feature_ecological_pressure_component_count",
+    "feature_missing_ecological_pressure_prior_year_index",
+]
 REGIONAL_SIGNAL_SOURCE_COLUMNS = [
     "feature_prior_year_total_cases",
     "feature_prior_year_county_share_of_state_cases",
@@ -487,6 +492,7 @@ def _feature_columns(
     columns.extend(f"feature_missing_{column}" for column in OPTIONAL_NUMERIC_COLUMNS)
     if include_spatial_neighbors:
         columns.extend(SPATIAL_NEIGHBOR_FEATURE_COLUMNS)
+    columns.extend(ECOLOGICAL_PRESSURE_FEATURE_COLUMNS)
     if include_regional_signals:
         columns.extend(REGIONAL_SIGNAL_FEATURE_COLUMNS)
         columns.extend(REGIONAL_SIGNAL_MISSING_COLUMNS)
@@ -569,6 +575,7 @@ def _design_row(
             "1" if _is_blank(row.get(column, "")) else "0"
         )
     feature_values.update(spatial_features)
+    feature_values.update(_ecological_pressure_features(row))
     feature_values.update(_regional_signal_features(regional_signal))
     feature_values["feature_missing_contact_pressure"] = (
         "1" if _is_blank(row.get("residential_units_authorized", "")) else "0"
@@ -646,6 +653,44 @@ def _regional_signal_features(
         values[feature_column] = _format_float(source_value)
         values[missing_column] = "1" if _is_blank(source_value) else "0"
     return values
+
+
+def _ecological_pressure_features(row: dict[str, str]) -> dict[str, str]:
+    components = [
+        _scaled_component(row.get("acorn_index_prior_year", ""), 50.0),
+        _scaled_component(row.get("deer_harvest_per_sqmi_prior_season", ""), 10.0),
+        _scaled_component(row.get("natural_land_cover_index", ""), 100.0),
+        _scaled_component(row.get("usdm_prior_year_dsci_mean", ""), 500.0),
+        _scaled_component(row.get("units_authorized_per_sqmi_prior_year", ""), 5.0),
+        _scaled_component(row.get("population_pct_change_prior_year", ""), 3.0),
+    ]
+    observed_components = [
+        value
+        for value in components
+        if value is not None
+    ]
+    if not observed_components:
+        return {
+            "feature_ecological_pressure_prior_year_index": "0.0",
+            "feature_ecological_pressure_component_count": "0",
+            "feature_missing_ecological_pressure_prior_year_index": "1",
+        }
+    return {
+        "feature_ecological_pressure_prior_year_index": _format_number(
+            mean(observed_components) * 100
+        ),
+        "feature_ecological_pressure_component_count": str(len(observed_components)),
+        "feature_missing_ecological_pressure_prior_year_index": "0",
+    }
+
+
+def _scaled_component(value: str | None, high_value: float) -> float | None:
+    if _is_blank(value):
+        return None
+    if high_value <= 0:
+        return None
+    scaled = _parse_float(value) / high_value
+    return min(max(scaled, 0.0), 1.0)
 
 
 def _state_incidence(rows: list[dict[str, str]]) -> float | None:

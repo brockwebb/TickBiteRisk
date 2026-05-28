@@ -88,9 +88,10 @@ countywide or statewide mast production.
 
 The 2026-05-28 expanded feature comparison now includes prior-year population
 growth, USDM drought, EnviroAtlas habitat, construction-lag features, prior-year
-USDM drought, and complete prior-year ONI in the timing-safe ecology/exposure
-lane. Held-out MAE still ranks `prior_year_incidence` first; these features
-remain available for research lanes but are not promoted into the public score.
+USDM drought, complete prior-year ONI, and a transparent ecological pressure
+composite in the timing-safe ecology/exposure lane. Held-out MAE still ranks
+`prior_year_incidence` first; these features remain available for research
+lanes but are not promoted into the public score.
 
 The next spatial-lag comparison added county adjacency from public Census
 geometry and a `ridge_forecast_spatial` lane using only prior-year neighbor
@@ -98,6 +99,9 @@ incidence. It ranked behind the simple blend and conservative safe ridge, with
 MAE 19.005867 per 100k in the current 2024-inclusive run, so it remains a
 diagnostic research lane. The regional and population-growth additions also
 remain research lanes unless a future validation slice shows stable improvement.
+The ecological pressure composite nudged `ridge_forecast_ecology` to 21.946949
+MAE per 100k in the same run, which is useful as a research signal but still
+behind simpler lagged baselines.
 
 ## Research lanes and diagnostics
 

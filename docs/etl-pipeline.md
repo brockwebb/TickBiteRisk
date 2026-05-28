@@ -186,7 +186,8 @@ request/run manifests as those sources graduate into the modeling lane.
 15. `tickbiterisk etl model-design-matrix`
     - Converts the feature panel into numeric model inputs with missingness
       indicators, optional prior-year neighbor incidence features, optional
-      regional signal features, and a schema sidecar.
+      regional signal features, a fixed-scale ecological pressure composite,
+      and a schema sidecar.
     - Writes `model_design_matrix_county_year.csv` and
       `model_design_matrix_schema.json`.
 
@@ -246,6 +247,9 @@ probability or a treatment recommendation.
   migration or exposure.
 - Prior-year population growth is a demographic/contact-pressure proxy derived
   from Census denominators, not proof of exposure or new construction.
+- The ecological pressure composite is a transparent fixed-scale average of
+  timing-safe component proxies; component columns stay visible and should be
+  reviewed alongside the index.
 - Mast/acorn values are Western Maryland study-plot observations, not statewide
   countywide mast production; model joins use only prior-year values.
 - USDM drought values are same-year retrospective observed conditions in the
