@@ -37,6 +37,12 @@ test("static dashboard renders map, bite score, validation, and sources", async 
 
   await expect(page.locator("#validation-summary")).toContainText("rank_by_mae");
   await expect(page.locator("#validation-summary")).toContainText("18.24 per 100k");
+  await expect(page.locator("#forecast-explainer")).toContainText(
+    "Why this is a forecast"
+  );
+  await expect(page.locator("#forecast-explainer")).toContainText(
+    "How new data updates the model"
+  );
 
   await expect(page.locator("#source-content")).toContainText("Public source chain");
   await expect(page.locator("#source-content")).toContainText(

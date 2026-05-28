@@ -372,6 +372,17 @@ def _model_card_payload(
             "Selected annual model-comparison prediction rows apportioned by "
             "CDC national MMWR-week Lyme onset seasonality."
         ),
+        "forecasting_status": {
+            "status": "forecasting_transition_research",
+            "public_score_role": (
+                "relative county-week seasonal baseline with "
+                "forecast-transition diagnostics"
+            ),
+            "update_policy": (
+                "New surveillance and exposure signals are reconciled against prior "
+                "forecasts before they are considered for future reviewed estimates."
+            ),
+        },
         "annual_prediction_source": _annual_prediction_source(first),
         "quality_flags": [
             "relative_seasonal_baseline",
@@ -442,6 +453,21 @@ def _source_catalog_payload(
         "source_seasonality_sha256": first.source_seasonality_sha256,
         "input_artifact_sha256": input_sha256,
         "guidance_links": GUIDANCE_LINKS,
+        "data_lag_and_update_policy": {
+            "summary": (
+                "Official Lyme surveillance data lag real-world exposure conditions, "
+                "so TickBiteRisk treats forecasts as provisional informational "
+                "estimates that improve as new validated data arrive."
+            ),
+            "forecast_boundary": (
+                "Forecast-safe branches use prior-year and trailing data; nowcast or "
+                "retrospective branches must be labeled separately."
+            ),
+            "medical_boundary": (
+                "Forecasts do not diagnose disease, decide treatment, or determine "
+                "whether an individual bite caused infection."
+            ),
+        },
         "sources": [
             {
                 "source_id": "county_week_seasonal_risk_baseline",

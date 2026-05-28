@@ -77,6 +77,7 @@ async function init() {
     renderCountyList();
     renderSources();
     renderValidationSummary();
+    renderForecastExplainer();
     selectCounty(state.selectedCounty);
   } catch (error) {
     renderLoadError(error);
@@ -697,6 +698,39 @@ function renderValidationSummary() {
     </section>
   </div>
   <p class="validation-note">Validation and limits are part of the public score, not hidden operator notes.</p>`;
+}
+
+function renderForecastExplainer() {
+  const container = document.getElementById("forecast-content");
+  if (!container) return;
+  const status = state.modelCard && state.modelCard.forecasting_status;
+  const policy =
+    state.sourceCatalog && state.sourceCatalog.data_lag_and_update_policy;
+  const statusText =
+    status && status.public_score_role
+      ? status.public_score_role
+      : "relative county-week seasonal baseline with forecast-transition diagnostics";
+  const policyText =
+    policy && policy.summary
+      ? policy.summary
+      : "Official Lyme surveillance data lag real-world exposure conditions.";
+  const updatePolicyText =
+    status && status.update_policy
+      ? status.update_policy
+      : "New surveillance and exposure signals are reconciled against prior forecasts before they are considered for future reviewed estimates.";
+  const boundaryText =
+    policy && policy.forecast_boundary
+      ? policy.forecast_boundary
+      : "Forecast-safe branches use prior-year and trailing data.";
+
+  container.innerHTML = `
+    <p>${escapeHtml(policyText)}</p>
+    <p>${escapeHtml(statusText)}.</p>
+    <h3>How new data updates the model</h3>
+    <p>${escapeHtml(updatePolicyText)}</p>
+    <p>${escapeHtml(boundaryText)}</p>
+    <p>Forecasts are informational estimates, not diagnosis, treatment advice, or certainty about an individual bite.</p>
+  `;
 }
 
 function validationOutcomeItems(selectedModel, evaluationMode, validation) {

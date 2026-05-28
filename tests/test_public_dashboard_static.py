@@ -145,6 +145,30 @@ def test_dashboard_javascript_renders_validation_and_limits_summary() -> None:
         assert token in js
 
 
+def test_dashboard_explains_forecasting_and_update_policy() -> None:
+    html = (PUBLIC_DIR / "index.html").read_text(encoding="utf-8")
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "Why this is a forecast",
+        "Official Lyme surveillance data lag",
+        "How new data updates the model",
+        "future reviewed estimates",
+    ]:
+        assert token in html
+
+    for token in [
+        "function renderForecastExplainer",
+        "forecasting_status",
+        "update_policy",
+        "data_lag_and_update_policy",
+        "Forecast-safe branches",
+        "future reviewed estimates",
+        "not diagnosis, treatment advice, or certainty about an individual bite",
+    ]:
+        assert token in js
+
+
 def test_dashboard_javascript_mmwr_logic_handles_year_boundaries() -> None:
     js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
 

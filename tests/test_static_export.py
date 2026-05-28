@@ -95,12 +95,29 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         ],
     }
     assert "model-comparison" in model_card["method_summary"]
+    assert model_card["forecasting_status"] == {
+        "status": "forecasting_transition_research",
+        "public_score_role": (
+            "relative county-week seasonal baseline with forecast-transition diagnostics"
+        ),
+        "update_policy": (
+            "New surveillance and exposure signals are reconciled against prior "
+            "forecasts before they are considered for future reviewed estimates."
+        ),
+    }
     assert source_catalog["sources"][0]["artifact_type"] == "derived"
     assert "model-comparison annual predictions" in source_catalog["sources"][0]["notes"]
     assert source_catalog["sources"][1]["source_id"] == "annual_prediction_branch"
     assert source_catalog["sources"][1]["run_id"] == "run1"
     assert source_catalog["sources"][1]["sha256"] == "a" * 64
     assert source_catalog["sources"][1]["model_name"] == "linear_blend_baseline"
+    assert source_catalog["data_lag_and_update_policy"]["summary"].startswith(
+        "Official Lyme surveillance data lag"
+    )
+    assert source_catalog["data_lag_and_update_policy"]["forecast_boundary"] == (
+        "Forecast-safe branches use prior-year and trailing data; nowcast or "
+        "retrospective branches must be labeled separately."
+    )
     assert any("CDC" in link["title"] for link in source_catalog["guidance_links"])
     assert manifest["files"] == [
         "md_county_risk_weekly.json",
