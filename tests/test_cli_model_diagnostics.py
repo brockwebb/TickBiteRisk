@@ -81,3 +81,29 @@ def test_model_diagnostics_command_fails_cleanly_when_intervals_missing(
     )
     assert "Traceback" not in result.output
     assert not (tmp_path / "out" / "surveillance_regime_residuals.csv").exists()
+
+
+def test_model_diagnostics_command_fails_cleanly_for_blank_numeric_input(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    text = predictions.read_text(encoding="utf-8")
+    predictions.write_text(text.replace(",10,100000,", ",,100000,", 1), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-diagnostics",
+            "--predictions-path",
+            str(predictions),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+        env={"COLUMNS": "200"},
+    )
+
+    assert result.exit_code != 0
+    assert "missing required numeric value in actual_cases" in result.output
+    assert "Traceback" not in result.output
+    assert not (tmp_path / "out" / "surveillance_regime_residuals.csv").exists()

@@ -8,8 +8,12 @@ from tickbiterisk.modeling.model_diagnostics import ModelDiagnosticsResult
 
 
 SURVEILLANCE_REGIME_RESIDUAL_COLUMNS = [
+    "run_id",
     "model_name",
     "model_family",
+    "feature_profile",
+    "evaluation_mode",
+    "source_file_sha256",
     "test_year",
     "county_fips",
     "county_name",
@@ -27,8 +31,12 @@ SURVEILLANCE_REGIME_RESIDUAL_COLUMNS = [
 ]
 
 SURVEILLANCE_REGIME_SUMMARY_COLUMNS = [
+    "run_id",
     "model_name",
     "model_family",
+    "feature_profile",
+    "evaluation_mode",
+    "source_file_sha256",
     "surveillance_regime",
     "test_year",
     "n_predictions",

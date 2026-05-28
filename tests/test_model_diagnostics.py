@@ -1,10 +1,15 @@
 import csv
 from pathlib import Path
 
+import pytest
+
 from tickbiterisk.modeling.model_compare_build import (
     MODEL_COMPARISON_PREDICTION_COLUMNS,
 )
-from tickbiterisk.modeling.model_diagnostics import build_model_diagnostics
+from tickbiterisk.modeling.model_diagnostics import (
+    ModelDiagnosticsInputError,
+    build_model_diagnostics,
+)
 from tickbiterisk.modeling.model_diagnostics_build import (
     SURVEILLANCE_REGIME_RESIDUAL_COLUMNS,
     SURVEILLANCE_REGIME_SUMMARY_COLUMNS,
@@ -56,6 +61,87 @@ def test_write_model_diagnostics_outputs_writes_expected_columns(
     assert outputs.regional_capacity_intervals_path.exists()
 
 
+def test_build_model_diagnostics_keeps_runs_in_separate_summary_groups(
+    tmp_path: Path,
+) -> None:
+    predictions = tmp_path / "predictions.csv"
+    row_one = _prediction_row(
+        county_fips="24005",
+        county_name="County 24005",
+        test_year=2022,
+        actual_cases=40,
+        predicted_cases=20,
+        actual_incidence=60.0,
+        predicted_incidence=40.0,
+        quality_flags="lyme_case_definition_change",
+        run_id="run-1",
+        source_file_sha256="sha-run-1",
+    )
+    row_two = {
+        **row_one,
+        "run_id": "run-2",
+        "source_file_sha256": "sha-run-2",
+        "predicted_cases": "30",
+        "predicted_incidence_per_100k": "50.0",
+        "residual_cases": "10",
+        "absolute_error_cases": "10",
+        "residual_incidence_per_100k": "10.0",
+        "absolute_error_incidence_per_100k": "10.0",
+    }
+    _write_rows(predictions, [row_one, row_two])
+
+    result = build_model_diagnostics(predictions)
+
+    overall_summaries = [
+        row
+        for row in result.surveillance_summary
+        if row.model_name == "linear_blend_baseline"
+        and row.surveillance_regime == "case_definition_change_2022_plus"
+        and row.test_year is None
+    ]
+    assert {row.run_id for row in overall_summaries} == {"run-1", "run-2"}
+    assert {row.source_file_sha256 for row in overall_summaries} == {
+        "sha-run-1",
+        "sha-run-2",
+    }
+    assert all(row.n_predictions == 1 for row in overall_summaries)
+
+
+def test_build_model_diagnostics_rejects_headerless_csv(tmp_path: Path) -> None:
+    predictions = tmp_path / "predictions.csv"
+    predictions.write_text("", encoding="utf-8")
+
+    with pytest.raises(
+        ModelDiagnosticsInputError,
+        match="model comparison predictions CSV has no header",
+    ):
+        build_model_diagnostics(predictions)
+
+
+def test_build_model_diagnostics_rejects_blank_required_numeric(
+    tmp_path: Path,
+) -> None:
+    predictions = tmp_path / "predictions.csv"
+    row = _prediction_row(
+        county_fips="24005",
+        county_name="County 24005",
+        test_year=2022,
+        actual_cases=40,
+        predicted_cases=20,
+        actual_incidence=60.0,
+        predicted_incidence=40.0,
+        quality_flags="lyme_case_definition_change",
+    )
+    row["actual_cases"] = ""
+    _write_rows(predictions, [row])
+
+    with pytest.raises(
+        ModelDiagnosticsInputError,
+        match="missing required numeric value in actual_cases",
+    ):
+        build_model_diagnostics(predictions)
+
+
 def _write_predictions(path: Path) -> Path:
     rows = [
         _prediction_row(
@@ -103,6 +189,10 @@ def _write_predictions(path: Path) -> Path:
             ),
         ),
     ]
+    return _write_rows(path, rows)
+
+
+def _write_rows(path: Path, rows: list[dict[str, str]]) -> Path:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
             handle,
@@ -123,19 +213,23 @@ def _prediction_row(
     actual_incidence: float,
     predicted_incidence: float,
     quality_flags: str,
+    run_id: str = "run-1",
+    feature_profile: str = "linear_blend",
+    evaluation_mode: str = "rolling_origin_prior_years",
+    source_file_sha256: str = "abc123",
 ) -> dict[str, str]:
     residual_incidence = actual_incidence - predicted_incidence
     residual_cases = actual_cases - predicted_cases
     return {
-        "run_id": "run-1",
+        "run_id": run_id,
         "model_name": "linear_blend_baseline",
         "model_family": "ensemble",
         "target_definition": "lyme_incidence_per_100k",
         "feature_set": "synthetic",
-        "feature_profile": "linear_blend",
-        "evaluation_mode": "rolling_origin_prior_years",
+        "feature_profile": feature_profile,
+        "evaluation_mode": evaluation_mode,
         "weather_mode": "mixed_model_specific",
-        "source_file_sha256": "abc123",
+        "source_file_sha256": source_file_sha256,
         "county_fips": county_fips,
         "county_name": county_name,
         "test_year": str(test_year),

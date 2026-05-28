@@ -13,8 +13,12 @@ class ModelDiagnosticsInputError(ValueError):
 
 @dataclass(frozen=True)
 class SurveillanceRegimeResidual:
+    run_id: str
     model_name: str
     model_family: str
+    feature_profile: str
+    evaluation_mode: str
+    source_file_sha256: str
     test_year: int
     county_fips: str
     county_name: str
@@ -33,8 +37,12 @@ class SurveillanceRegimeResidual:
 
 @dataclass(frozen=True)
 class SurveillanceRegimeSummary:
+    run_id: str
     model_name: str
     model_family: str
+    feature_profile: str
+    evaluation_mode: str
+    source_file_sha256: str
     surveillance_regime: str
     test_year: int | None
     n_predictions: int
@@ -55,8 +63,12 @@ class ModelDiagnosticsResult:
 
 
 REQUIRED_PREDICTION_COLUMNS = [
+    "run_id",
     "model_name",
     "model_family",
+    "feature_profile",
+    "evaluation_mode",
+    "source_file_sha256",
     "test_year",
     "county_fips",
     "county_name",
@@ -80,7 +92,11 @@ def build_model_diagnostics(
         surveillance_residuals=sorted(
             residuals,
             key=lambda row: (
+                row.run_id,
                 row.model_name,
+                row.feature_profile,
+                row.evaluation_mode,
+                row.source_file_sha256,
                 row.surveillance_regime,
                 row.test_year,
                 row.county_fips,
@@ -95,6 +111,10 @@ def build_model_diagnostics(
 def _read_prediction_rows(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ModelDiagnosticsInputError(
+                "model comparison predictions CSV has no header"
+            )
         missing_columns = [
             column for column in REQUIRED_PREDICTION_COLUMNS if column not in reader.fieldnames
         ]
@@ -122,8 +142,12 @@ def _build_residual(row: dict[str, str]) -> SurveillanceRegimeResidual:
     residual_cases = _round(actual_cases - predicted_cases)
     quality_flags = row.get("model_feature_quality_flags", "")
     return SurveillanceRegimeResidual(
+        run_id=row["run_id"],
         model_name=row["model_name"],
         model_family=row["model_family"],
+        feature_profile=row["feature_profile"],
+        evaluation_mode=row["evaluation_mode"],
+        source_file_sha256=row["source_file_sha256"],
         test_year=test_year,
         county_fips=row["county_fips"].zfill(5),
         county_name=row["county_name"],
@@ -158,19 +182,27 @@ def _build_summary(
     residuals: list[SurveillanceRegimeResidual],
 ) -> list[SurveillanceRegimeSummary]:
     grouped: dict[
-        tuple[str, str, str, int | None],
+        tuple[str, str, str, str, str, str, str, int | None],
         list[SurveillanceRegimeResidual],
     ] = {}
     for row in residuals:
         yearly_key = (
+            row.run_id,
             row.model_name,
             row.model_family,
+            row.feature_profile,
+            row.evaluation_mode,
+            row.source_file_sha256,
             row.surveillance_regime,
             row.test_year,
         )
         overall_key = (
+            row.run_id,
             row.model_name,
             row.model_family,
+            row.feature_profile,
+            row.evaluation_mode,
+            row.source_file_sha256,
             row.surveillance_regime,
             None,
         )
@@ -183,9 +215,13 @@ def _build_summary(
             grouped.items(),
             key=lambda item: (
                 item[0][0],
-                item[0][2],
-                item[0][3] is None,
-                item[0][3] or 0,
+                item[0][1],
+                item[0][3],
+                item[0][4],
+                item[0][5],
+                item[0][6],
+                item[0][7] is None,
+                item[0][7] or 0,
             ),
         )
     ]
@@ -193,9 +229,18 @@ def _build_summary(
 
 def _summarize_group(
     rows: list[SurveillanceRegimeResidual],
-    key: tuple[str, str, str, int | None],
+    key: tuple[str, str, str, str, str, str, str, int | None],
 ) -> SurveillanceRegimeSummary:
-    model_name, model_family, surveillance_regime, test_year = key
+    (
+        run_id,
+        model_name,
+        model_family,
+        feature_profile,
+        evaluation_mode,
+        source_file_sha256,
+        surveillance_regime,
+        test_year,
+    ) = key
     residual_incidence = [row.residual_incidence_per_100k for row in rows]
     residual_cases = [row.residual_cases for row in rows]
     assumption_flags = sorted(
@@ -207,8 +252,12 @@ def _summarize_group(
         }
     )
     return SurveillanceRegimeSummary(
+        run_id=run_id,
         model_name=model_name,
         model_family=model_family,
+        feature_profile=feature_profile,
+        evaluation_mode=evaluation_mode,
+        source_file_sha256=source_file_sha256,
         surveillance_regime=surveillance_regime,
         test_year=test_year,
         n_predictions=len(rows),
@@ -227,18 +276,28 @@ def _split_flags(value: str) -> set[str]:
     return {flag.strip() for flag in value.split(",") if flag.strip()}
 
 
-def _parse_int(value: str, column: str) -> int:
+def _parse_int(value: str | None, column: str) -> int:
+    value = _require_numeric_value(value, column)
     try:
         return int(float(value))
     except ValueError as exc:
         raise ModelDiagnosticsInputError(f"invalid integer in {column}: {value}") from exc
 
 
-def _parse_float(value: str, column: str) -> float:
+def _parse_float(value: str | None, column: str) -> float:
+    value = _require_numeric_value(value, column)
     try:
         return float(value)
     except ValueError as exc:
         raise ModelDiagnosticsInputError(f"invalid number in {column}: {value}") from exc
+
+
+def _require_numeric_value(value: str | None, column: str) -> str:
+    if value is None or not value.strip():
+        raise ModelDiagnosticsInputError(
+            f"missing required numeric value in {column}"
+        )
+    return value
 
 
 def _round(value: float) -> float:
