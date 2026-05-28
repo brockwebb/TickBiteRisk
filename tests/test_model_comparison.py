@@ -281,6 +281,33 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     assert not model_compare._is_forecast_ecology_feature_column(
         "feature_units_authorized_per_sqmi_yoy_change"
     )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_population_pct_change_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_population_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_population_change_prior_year"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_population_pct_change_trailing_3yr_mean"
+    )
+    assert model_compare._is_forecast_ecology_feature_column(
+        "feature_missing_population_pct_change_prior_year"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_population_pct_change_prior_year"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_population_prior_year"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_missing_population_prior_year"
+    )
+    assert not model_compare._is_forecast_ecology_feature_column(
+        "feature_population_pct_change_current_year"
+    )
     assert model_compare._is_forecast_ecology_feature_column("feature_forest_pct")
     assert model_compare._is_forecast_ecology_feature_column(
         "feature_natural_land_cover_index"

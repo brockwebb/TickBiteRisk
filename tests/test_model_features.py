@@ -209,6 +209,64 @@ def test_build_model_feature_matrix_aggregates_required_and_optional_inputs(
     )
 
 
+def test_build_model_feature_matrix_adds_prior_year_population_growth_features(
+    tmp_path: Path,
+) -> None:
+    lyme = _write_csv(tmp_path / "lyme.csv", [_lyme_row("24003", 2022, 15)])
+    population = _write_csv(
+        tmp_path / "population.csv",
+        [
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2018",
+                "population": "100000",
+            },
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2019",
+                "population": "101000",
+            },
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2020",
+                "population": "103020",
+            },
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2021",
+                "population": "106110",
+            },
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": "2022",
+                "population": "110000",
+            },
+        ],
+    )
+    weather = _write_csv(
+        tmp_path / "weather.csv",
+        [_weather_row(county_fips="24003", iso_year="2022")],
+    )
+
+    rows = build_model_feature_matrix(
+        lyme_outcomes_path=lyme,
+        population_path=population,
+        weather_weekly_path=weather,
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.population_prior_year == 106110
+    assert row.population_change_prior_year == 3090
+    assert row.population_pct_change_prior_year == 2.999418
+    assert row.population_pct_change_trailing_3yr_mean == 1.999806
+
+
 def test_build_model_feature_matrix_preserves_rows_when_optional_inputs_missing(
     tmp_path: Path,
 ) -> None:
@@ -260,6 +318,10 @@ def test_build_model_feature_matrix_preserves_rows_when_optional_inputs_missing(
 
     assert len(rows) == 1
     row = rows[0]
+    assert row.population_prior_year is None
+    assert row.population_change_prior_year is None
+    assert row.population_pct_change_prior_year is None
+    assert row.population_pct_change_trailing_3yr_mean is None
     assert row.residential_units_authorized is None
     assert row.deer_total_harvest_prior_season is None
     assert row.model_feature_quality_flags == (

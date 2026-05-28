@@ -47,6 +47,8 @@ is transparent, stable, and defensible for a first public baseline.
 Current model-ready feature groups include:
 
 - Historical Lyme incidence and population-normalized rates.
+- Census denominator-derived prior-year population growth, used only as a
+  timing-safe demographic/contact-pressure proxy.
 - NOAA weekly weather aggregates rolled to county-year predictors.
 - CDC Lyme seasonality shares by week and month of onset.
 - Prior-year Lyme incidence in counties sharing a land boundary.
@@ -84,17 +86,18 @@ included in ecology comparison lanes, not in the conservative forecast-safe
 baseline, and should be read as localized ecological context rather than
 countywide or statewide mast production.
 
-The 2026-05-27 expanded feature comparison added USDM drought, EnviroAtlas
-habitat, and construction-lag features, then added prior-year USDM drought to
-the timing-safe ecology lane. Held-out MAE still ranked
-`linear_blend_baseline` first; `ridge_forecast_ecology` worsened to 21.782782
-MAE per 100k after the prior-year drought addition. These features remain
-available for research lanes but are not promoted into the public score.
+The 2026-05-28 expanded feature comparison now includes prior-year population
+growth, USDM drought, EnviroAtlas habitat, construction-lag features, prior-year
+USDM drought, and complete prior-year ONI in the timing-safe ecology/exposure
+lane. Held-out MAE still ranks `prior_year_incidence` first; these features
+remain available for research lanes but are not promoted into the public score.
 
 The next spatial-lag comparison added county adjacency from public Census
 geometry and a `ridge_forecast_spatial` lane using only prior-year neighbor
 incidence. It ranked behind the simple blend and conservative safe ridge, with
-MAE 19.222024 per 100k, so it remains a diagnostic research lane.
+MAE 19.005867 per 100k in the current 2024-inclusive run, so it remains a
+diagnostic research lane. The regional and population-growth additions also
+remain research lanes unless a future validation slice shows stable improvement.
 
 ## Research lanes and diagnostics
 

@@ -172,10 +172,10 @@ request/run manifests as those sources graduate into the modeling lane.
       checksums, parser method, row counts, and national-curve caveats.
 
 13. `tickbiterisk etl model-features`
-    - Joins Lyme outcomes, population, weather, deer, contact-pressure,
-      construction lags, prior-year mast/acorn, USDM drought, EnviroAtlas
-      habitat, complete prior-year ONI, and optional surveillance features into
-      the county-year feature matrix.
+    - Joins Lyme outcomes, population, timing-safe prior-year population
+      growth, weather, deer, contact-pressure, construction lags, prior-year
+      mast/acorn, USDM drought, EnviroAtlas habitat, complete prior-year ONI,
+      and optional surveillance features into the county-year feature matrix.
     - Writes `model_features_county_year.csv`.
 
 14. `tickbiterisk etl county-adjacency`
@@ -244,6 +244,8 @@ probability or a treatment recommendation.
 - Deer harvest is a host-pressure proxy, not direct deer population.
 - Building permits are a contact/land-use pressure proxy, not proof of
   migration or exposure.
+- Prior-year population growth is a demographic/contact-pressure proxy derived
+  from Census denominators, not proof of exposure or new construction.
 - Mast/acorn values are Western Maryland study-plot observations, not statewide
   countywide mast production; model joins use only prior-year values.
 - USDM drought values are same-year retrospective observed conditions in the

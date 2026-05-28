@@ -27,6 +27,10 @@ STATUS_COLUMNS = [
 ]
 NUMERIC_SOURCE_COLUMNS = [
     "log_population_offset",
+    "population_prior_year",
+    "population_change_prior_year",
+    "population_pct_change_prior_year",
+    "population_pct_change_trailing_3yr_mean",
     "weather_weeks_observed",
     "weather_complete_week_count",
     "weather_days_observed",
@@ -104,6 +108,10 @@ NUMERIC_SOURCE_COLUMNS = [
     "oni_prior_year_la_nina_season_count",
 ]
 OPTIONAL_NUMERIC_COLUMNS = [
+    "population_prior_year",
+    "population_change_prior_year",
+    "population_pct_change_prior_year",
+    "population_pct_change_trailing_3yr_mean",
     "residential_units_authorized",
     "units_authorized_per_sqmi",
     "units_authorized_per_100k",

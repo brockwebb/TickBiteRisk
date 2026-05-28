@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from statistics import mean
 from typing import Any
 
 
@@ -132,6 +133,10 @@ class ModelCountyYearFeature:
     enso_source_ids: str | None = None
     enso_source_url_hashes: str | None = None
     enso_feature_quality_flags: str | None = None
+    population_prior_year: int | None = None
+    population_change_prior_year: int | None = None
+    population_pct_change_prior_year: float | None = None
+    population_pct_change_trailing_3yr_mean: float | None = None
 
 
 def build_model_feature_matrix(
@@ -173,6 +178,11 @@ def build_model_feature_matrix(
         pop = population_row["population"]
         if pop is None or pop <= 0:
             continue
+        population_growth = _population_growth_features(
+            population,
+            county_fips=county_fips,
+            year=year,
+        )
 
         contact_row = contact.get((county_fips, year))
         deer_row = deer.get((county_fips, year))
@@ -220,6 +230,7 @@ def build_model_feature_matrix(
                 population=pop,
                 lyme_incidence_per_100k=round(total_cases / pop * 100000, 6),
                 log_population_offset=round(math.log(pop), 6),
+                **population_growth,
                 lyme_canonical_source_id=str(lyme.get("canonical_source_id", "")),
                 lyme_reconciliation_status=str(
                     lyme.get("reconciliation_status", "")
@@ -460,6 +471,74 @@ def _read_population(path: Path) -> dict[tuple[str, int], dict[str, Any]]:
             "population": _parse_int_or_none(row["population"]),
         }
     return rows
+
+
+def _population_growth_features(
+    population: dict[tuple[str, int], dict[str, Any]],
+    *,
+    county_fips: str,
+    year: int,
+) -> dict[str, int | float | None]:
+    prior_population = _population_value(population, county_fips, year - 1)
+    two_year_prior_population = _population_value(population, county_fips, year - 2)
+    prior_change = _population_change(
+        prior_population,
+        two_year_prior_population,
+    )
+    trailing_pct_changes = [
+        pct_change
+        for end_year in range(year - 3, year)
+        if (
+            pct_change := _population_pct_change(
+                _population_value(population, county_fips, end_year),
+                _population_value(population, county_fips, end_year - 1),
+            )
+        )
+        is not None
+    ]
+    return {
+        "population_prior_year": prior_population,
+        "population_change_prior_year": prior_change,
+        "population_pct_change_prior_year": _population_pct_change(
+            prior_population,
+            two_year_prior_population,
+        ),
+        "population_pct_change_trailing_3yr_mean": (
+            round(mean(trailing_pct_changes), 6)
+            if len(trailing_pct_changes) == 3
+            else None
+        ),
+    }
+
+
+def _population_value(
+    population: dict[tuple[str, int], dict[str, Any]],
+    county_fips: str,
+    year: int,
+) -> int | None:
+    row = population.get((county_fips, year))
+    if row is None:
+        return None
+    value = row["population"]
+    return value if value is not None and value > 0 else None
+
+
+def _population_change(
+    current_population: int | None,
+    prior_population: int | None,
+) -> int | None:
+    if current_population is None or prior_population is None:
+        return None
+    return current_population - prior_population
+
+
+def _population_pct_change(
+    current_population: int | None,
+    prior_population: int | None,
+) -> float | None:
+    if current_population is None or prior_population is None or prior_population <= 0:
+        return None
+    return round((current_population - prior_population) / prior_population * 100, 6)
 
 
 def _aggregate_weather_weekly(path: Path) -> dict[tuple[str, int], dict[str, Any]]:

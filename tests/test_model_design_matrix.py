@@ -31,6 +31,8 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert row["feature_trailing_2yr_mean_lyme_incidence_per_100k"] == "15.0"
     assert row["feature_trailing_history_years"] == "2"
     assert row["feature_missing_prior_year_lyme_incidence"] == "0"
+    assert row["feature_population_pct_change_prior_year"] == "0.0"
+    assert row["feature_missing_population_pct_change_prior_year"] == "1"
     assert row["feature_weather_temp_mean_f"] == "52.0"
     assert row["feature_missing_deer_harvest_prior_season"] == "1"
     assert row["feature_deer_harvest_per_sqmi_prior_season"] == "0.0"
@@ -80,6 +82,10 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert mast_row["feature_impervious_pct"] == "9.7"
     assert mast_row["feature_units_authorized_per_sqmi_prior_year"] == "1.5"
     assert mast_row["feature_units_authorized_per_100k_trailing_3yr_mean"] == "30.0"
+    assert mast_row["feature_population_prior_year"] == "99000.0"
+    assert mast_row["feature_population_change_prior_year"] == "1200.0"
+    assert mast_row["feature_population_pct_change_prior_year"] == "1.23"
+    assert mast_row["feature_population_pct_change_trailing_3yr_mean"] == "0.9"
     assert mast_row["feature_oni_prior_year_mean_anomaly_c"] == "-0.42"
     assert mast_row["feature_oni_prior_year_la_nina_season_count"] == "5.0"
     assert mast_row["feature_missing_usdm_dsci_mean"] == "0"
@@ -92,6 +98,11 @@ def test_build_model_design_matrix_writes_numeric_features_and_missing_indicator
     assert "feature_oni_prior_year_mean_anomaly_c" in result.schema.feature_columns
     assert (
         "feature_units_authorized_per_sqmi_prior_year"
+        in result.schema.feature_columns
+    )
+    assert "feature_population_pct_change_prior_year" in result.schema.feature_columns
+    assert (
+        "feature_missing_population_pct_change_prior_year"
         in result.schema.feature_columns
     )
 
@@ -284,6 +295,14 @@ def _write_feature_matrix(path: Path) -> Path:
                     "population": "100000",
                     "lyme_incidence_per_100k": str(float(cases)),
                     "log_population_offset": "11.512925",
+                    "population_prior_year": "99000" if has_new_features else "",
+                    "population_change_prior_year": "1200" if has_new_features else "",
+                    "population_pct_change_prior_year": (
+                        "1.23" if has_new_features else ""
+                    ),
+                    "population_pct_change_trailing_3yr_mean": (
+                        "0.9" if has_new_features else ""
+                    ),
                     "lyme_canonical_source_id": "cdc_lyme_public_2008_2021",
                     "lyme_reconciliation_status": "matched",
                     "lyme_data_quality_flags": "",
