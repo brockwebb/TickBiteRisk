@@ -30,6 +30,9 @@ EXCLUDED_FEATURE_PREFIXES = (
     "feature_tick_",
     "feature_regional_diagnostic_",
 )
+EXCLUDED_FEATURE_NAMES = {
+    "feature_regional_incidence_cluster_cluster_id",
+}
 REQUIRED_MODEL_COMPARISON_COLUMNS = [
     "county_fips",
     "year",
@@ -160,7 +163,7 @@ FORECAST_SPATIAL_EXACT_FEATURES = {
     "feature_neighbor_prior_year_count",
     "feature_missing_neighbor_prior_year_lyme_incidence",
 }
-FORECAST_REGIONAL_EXACT_FEATURES = {
+FORECAST_REGIONAL_SIGNAL_EXACT_FEATURES = {
     "feature_regional_prior_year_total_cases",
     "feature_regional_prior_year_county_share_of_state_cases",
     "feature_regional_prior_year_county_share_of_midatlantic_cases",
@@ -178,6 +181,25 @@ FORECAST_REGIONAL_EXACT_FEATURES = {
     "feature_missing_regional_trailing_5yr_midatlantic_total_mean",
     "feature_missing_regional_trailing_5yr_midatlantic_total_max",
 }
+REGIONAL_INCIDENCE_CLUSTER_EXACT_FEATURES = {
+    "feature_regional_incidence_cluster_rank",
+    "feature_regional_incidence_cluster_centroid_prior_mean_incidence_per_100k",
+    "feature_regional_incidence_cluster_prior_mean_incidence_per_100k",
+    "feature_regional_incidence_cluster_prior_min_incidence_per_100k",
+    "feature_regional_incidence_cluster_prior_max_incidence_per_100k",
+    "feature_regional_incidence_cluster_prior_sd_incidence_per_100k",
+    "feature_regional_incidence_cluster_prior_year_incidence_per_100k",
+    "feature_regional_incidence_cluster_train_year_count",
+    "feature_regional_incidence_cluster_band_low",
+    "feature_regional_incidence_cluster_band_moderate",
+    "feature_regional_incidence_cluster_band_high",
+    "feature_regional_incidence_cluster_band_very_high",
+    "feature_missing_regional_incidence_cluster",
+}
+FORECAST_REGIONAL_EXACT_FEATURES = (
+    FORECAST_REGIONAL_SIGNAL_EXACT_FEATURES
+    | REGIONAL_INCIDENCE_CLUSTER_EXACT_FEATURES
+)
 
 
 class ModelComparisonInputError(ValueError):
@@ -507,8 +529,10 @@ def _read_design_rows(path: Path) -> tuple[list[_DesignRow], list[str]]:
 def _is_safe_feature_column(column: str) -> bool:
     return (
         column.startswith("feature_")
+        and column not in EXCLUDED_FEATURE_NAMES
         and not column.startswith(EXCLUDED_FEATURE_PREFIXES)
         and not column.startswith("feature_flag_")
+        and "_actual_" not in column
     )
 
 
@@ -550,6 +574,29 @@ def _is_forecast_regional_feature_column(column: str) -> bool:
         _is_forecast_safe_feature_column(column)
         or column in FORECAST_REGIONAL_EXACT_FEATURES
     )
+
+
+def _is_forecast_regional_signal_feature_column(column: str) -> bool:
+    return (
+        _is_forecast_safe_feature_column(column)
+        or column in FORECAST_REGIONAL_SIGNAL_EXACT_FEATURES
+    )
+
+
+def _is_regional_incidence_cluster_feature_column(column: str) -> bool:
+    return column in REGIONAL_INCIDENCE_CLUSTER_EXACT_FEATURES
+
+
+def _is_analog_feature_column(column: str) -> bool:
+    return (
+        _is_forecast_spatial_feature_column(column)
+        or _is_forecast_ecology_feature_column(column)
+        or _is_forecast_regional_signal_feature_column(column)
+    )
+
+
+def _is_retrospective_weather_ecology_feature_column(column: str) -> bool:
+    return not _is_regional_incidence_cluster_feature_column(column)
 
 
 def _has_training_depth(
@@ -688,10 +735,15 @@ def _predict_models(
             ecology_ridge_prediction,
         )
     )
+    retrospective_columns = [
+        column
+        for column in feature_columns
+        if _is_retrospective_weather_ecology_feature_column(column)
+    ]
     ridge_prediction = _ridge_prediction(
         row=row,
         train_rows=train_rows,
-        feature_columns=feature_columns,
+        feature_columns=retrospective_columns,
         ridge_alpha=ridge_alpha,
         ridge_cache=ridge_cache,
     )
@@ -723,11 +775,7 @@ def _analog_forecast(
     columns = [
         column
         for column in feature_columns
-        if (
-            _is_forecast_spatial_feature_column(column)
-            or _is_forecast_ecology_feature_column(column)
-            or _is_forecast_regional_feature_column(column)
-        )
+        if _is_analog_feature_column(column)
     ]
     if not train_rows or not columns:
         return _county_trailing_mean(row, train_rows), []

@@ -122,6 +122,48 @@ def test_model_design_matrix_command_accepts_regional_signals_path(
     assert schema["regional_signal_source_path"] == str(regional_signals)
 
 
+def test_model_design_matrix_command_accepts_regional_incidence_clusters_path(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_two_county_feature_matrix(tmp_path / "model_features.csv")
+    regional_clusters = _write_regional_incidence_clusters(
+        tmp_path / "regional_incidence_clusters.csv"
+    )
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-design-matrix",
+            "--model-features-path",
+            str(feature_matrix),
+            "--regional-incidence-clusters-path",
+            str(regional_clusters),
+            "--lookback-years",
+            "1",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    with (output_dir / "model_design_matrix_county_year.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    anne_2020 = next(row for row in rows if row["county_fips"] == "24003")
+    assert anne_2020["feature_regional_incidence_cluster_rank"] == "2.0"
+    assert anne_2020["feature_regional_incidence_cluster_band_moderate"] == "1"
+    assert anne_2020["feature_missing_regional_incidence_cluster"] == "0"
+
+    schema = json.loads(
+        (output_dir / "model_design_matrix_schema.json").read_text(encoding="utf-8")
+    )
+    assert schema["regional_incidence_cluster_source_path"] == str(regional_clusters)
+
+
 def test_model_design_matrix_command_fails_cleanly_when_regional_signals_missing(
     tmp_path: Path,
 ) -> None:
@@ -143,6 +185,31 @@ def test_model_design_matrix_command_fails_cleanly_when_regional_signals_missing
 
     assert result.exit_code != 0
     assert "Regional signals file not found" in result.output
+    assert "Traceback" not in result.output
+    assert not (tmp_path / "out" / "model_design_matrix_county_year.csv").exists()
+
+
+def test_model_design_matrix_command_fails_cleanly_when_regional_clusters_missing(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-design-matrix",
+            "--model-features-path",
+            str(feature_matrix),
+            "--regional-incidence-clusters-path",
+            str(tmp_path / "missing-regional-clusters.csv"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Regional incidence clusters file not found" in result.output
     assert "Traceback" not in result.output
     assert not (tmp_path / "out" / "model_design_matrix_county_year.csv").exists()
 
@@ -294,6 +361,36 @@ def _write_regional_signals(path: Path) -> Path:
                     "feature_quality_flags": "regional_signal_candidate",
                 }
             )
+    return _write_rows(path, rows)
+
+
+def _write_regional_incidence_clusters(path: Path) -> Path:
+    rows = []
+    for year in [2019, 2020]:
+        rows.append(
+            {
+                "county_fips": "24003",
+                "year": str(year),
+                "cluster_rank": "2",
+                "cluster_label": "moderate",
+                "cluster_centroid_prior_mean_incidence_per_100k": "12.5",
+                "feature_prior_mean_incidence_per_100k": "10.0",
+                "feature_prior_min_incidence_per_100k": "5.0",
+                "feature_prior_max_incidence_per_100k": "20.0",
+                "feature_prior_sd_incidence_per_100k": "4.5",
+                "feature_prior_year_incidence_per_100k": "10.0",
+                "train_start_year": "2015",
+                "train_end_year": "2019",
+                "train_year_count": "5",
+                "actual_incidence_per_100k": "999.0",
+                "actual_cases": "999",
+                "actual_population": "100000",
+                "model_feature_quality_flags": (
+                    "regional_incidence_cluster_candidate,"
+                    "diagnostic_same_year_not_forecast_feature"
+                ),
+            }
+        )
     return _write_rows(path, rows)
 
 

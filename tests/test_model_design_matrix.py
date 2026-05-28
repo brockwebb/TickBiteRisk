@@ -2,8 +2,11 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
+
 from tickbiterisk.modeling import design_matrix
 from tickbiterisk.modeling.design_matrix import build_model_design_matrix
+from tickbiterisk.modeling.design_matrix import ModelDesignMatrixInputError
 from tickbiterisk.modeling.design_matrix_build import (
     write_model_design_matrix_outputs,
 )
@@ -278,6 +281,84 @@ def test_build_model_design_matrix_adds_forecast_safe_regional_signal_features(
     assert "regional_signal" in result.schema.missing_value_strategy
 
 
+def test_build_model_design_matrix_adds_regional_incidence_cluster_features(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+    regional_clusters = _write_regional_incidence_clusters(
+        tmp_path / "regional_incidence_clusters.csv"
+    )
+
+    result = build_model_design_matrix(
+        model_features_path=feature_matrix,
+        lookback_years=2,
+        regional_incidence_clusters_path=regional_clusters,
+    )
+
+    anne_2020 = next(
+        row
+        for row in result.rows
+        if row["county_fips"] == "24003" and row["year"] == "2020"
+    )
+    assert anne_2020["feature_regional_incidence_cluster_rank"] == "3.0"
+    assert (
+        anne_2020[
+            "feature_regional_incidence_cluster_centroid_prior_mean_incidence_per_100k"
+        ]
+        == "32.5"
+    )
+    assert (
+        anne_2020[
+            "feature_regional_incidence_cluster_prior_mean_incidence_per_100k"
+        ]
+        == "30.0"
+    )
+    assert (
+        anne_2020[
+            "feature_regional_incidence_cluster_prior_year_incidence_per_100k"
+        ]
+        == "20.0"
+    )
+    assert anne_2020["feature_regional_incidence_cluster_train_year_count"] == "5.0"
+    assert anne_2020["feature_regional_incidence_cluster_band_high"] == "1"
+    assert anne_2020["feature_regional_incidence_cluster_band_low"] == "0"
+    assert anne_2020["feature_missing_regional_incidence_cluster"] == "0"
+    assert "regional_incidence_cluster_candidate" in (
+        anne_2020["model_feature_quality_flags"]
+    )
+    assert "feature_regional_incidence_cluster_rank" in result.schema.feature_columns
+    assert (
+        "feature_regional_incidence_cluster_band_very_high"
+        in result.schema.feature_columns
+    )
+    assert (
+        "feature_flag_regional_incidence_cluster_candidate"
+        not in result.schema.feature_columns
+    )
+    assert "actual_incidence_per_100k" not in result.schema.feature_columns
+    assert "actual_cases" not in result.schema.feature_columns
+    assert "actual_population" not in result.schema.feature_columns
+    assert "cluster_id" not in result.schema.feature_columns
+    assert "comparison_assumption_flags" not in result.schema.feature_columns
+    assert result.schema.regional_incidence_cluster_source_path == str(
+        regional_clusters
+    )
+    assert len(result.schema.regional_incidence_cluster_source_sha256 or "") == 64
+    assert "regional_incidence_cluster" in result.schema.missing_value_strategy
+
+    baltimore_2020 = next(
+        row
+        for row in result.rows
+        if row["county_fips"] == "24005" and row["year"] == "2020"
+    )
+    assert baltimore_2020["feature_regional_incidence_cluster_rank"] == "0.0"
+    assert baltimore_2020["feature_regional_incidence_cluster_band_high"] == "0"
+    assert baltimore_2020["feature_missing_regional_incidence_cluster"] == "1"
+    assert "missing_regional_incidence_cluster" in (
+        baltimore_2020["model_feature_quality_flags"]
+    )
+
+
 def test_build_model_design_matrix_preserves_partial_ecological_pressure_components(
     tmp_path: Path,
 ) -> None:
@@ -338,6 +419,46 @@ def test_read_regional_signals_discards_same_year_diagnostic_fields(
         "feature_quality_flags",
         *design_matrix.REGIONAL_SIGNAL_SOURCE_COLUMNS,
     }
+
+
+def test_read_regional_incidence_clusters_discards_same_year_actual_fields(
+    tmp_path: Path,
+) -> None:
+    regional_clusters = _write_regional_incidence_clusters(
+        tmp_path / "regional_incidence_clusters.csv"
+    )
+
+    rows = design_matrix._read_regional_incidence_clusters(regional_clusters)
+
+    row = rows[("24003", 2020)]
+    assert "actual_incidence_per_100k" not in row
+    assert "actual_cases" not in row
+    assert "actual_population" not in row
+    assert set(row) == {
+        "county_fips",
+        "year",
+        "cluster_label",
+        "model_feature_quality_flags",
+        *design_matrix.REGIONAL_INCIDENCE_CLUSTER_SOURCE_COLUMNS,
+    }
+
+
+def test_read_regional_incidence_clusters_requires_safe_assignment_columns(
+    tmp_path: Path,
+) -> None:
+    malformed = _write_csv(
+        tmp_path / "malformed_regional_clusters.csv",
+        [
+            {
+                "county_fips": "24003",
+                "year": "2020",
+                "cluster_label": "high",
+            }
+        ],
+    )
+
+    with pytest.raises(ModelDesignMatrixInputError, match="regional incidence cluster"):
+        design_matrix._read_regional_incidence_clusters(malformed)
 
 
 def _write_csv(path: Path, rows: list[dict[str, str]]) -> Path:
@@ -704,6 +825,50 @@ def _write_regional_signals(path: Path) -> Path:
                     ),
                 }
             )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_regional_incidence_clusters(path: Path) -> Path:
+    rows = []
+    for year in [2019, 2020]:
+        rows.append(
+            {
+                "run_id": "regional_incidence_clusters_fixture",
+                "source_file_sha256": "abc123",
+                "state_fips": "24",
+                "state_abbr": "MD",
+                "state_name": "Maryland",
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": str(year),
+                "cluster_id": f"{year}_cluster_3",
+                "cluster_rank": "3",
+                "cluster_label": "high",
+                "cluster_centroid_prior_mean_incidence_per_100k": "32.5",
+                "feature_prior_mean_incidence_per_100k": "30.0",
+                "feature_prior_min_incidence_per_100k": "20.0",
+                "feature_prior_max_incidence_per_100k": "40.0",
+                "feature_prior_sd_incidence_per_100k": "8.25",
+                "feature_prior_year_incidence_per_100k": "20.0",
+                "train_start_year": "2015",
+                "train_end_year": "2019",
+                "train_year_count": "5",
+                "actual_incidence_per_100k": "999.0",
+                "actual_cases": "999",
+                "actual_population": "100000",
+                "model_feature_quality_flags": (
+                    "regional_incidence_cluster_candidate,"
+                    "diagnostic_same_year_not_forecast_feature"
+                ),
+                "comparison_assumption_flags": (
+                    "observational_not_causal,cluster_diagnostic_not_public_default"
+                ),
+            }
+        )
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()

@@ -211,6 +211,7 @@ def test_run_model_comparison_excludes_regional_diagnostics_from_ridge_inputs(
     run_model_comparison(
         design_matrix_path=matrix,
         start_year=2021,
+        end_year=2021,
         min_train_years=1,
     )
 
@@ -219,8 +220,69 @@ def test_run_model_comparison_excludes_regional_diagnostics_from_ridge_inputs(
         "feature_regional_prior_year_midatlantic_total_cases" in columns
         for columns in captured_columns
     )
+    cluster_columns = {
+        "feature_regional_incidence_cluster_rank",
+        "feature_regional_incidence_cluster_prior_mean_incidence_per_100k",
+        "feature_regional_incidence_cluster_prior_year_incidence_per_100k",
+        "feature_regional_incidence_cluster_band_high",
+        "feature_missing_regional_incidence_cluster",
+    }
+    assert any(
+        cluster_columns.issubset(set(columns))
+        for columns in captured_columns
+    )
+    assert sum(
+        1
+        for columns in captured_columns
+        if "feature_regional_incidence_cluster_rank" in columns
+    ) == 2
     assert all(
         not any(column.startswith("feature_regional_diagnostic_") for column in columns)
+        for columns in captured_columns
+    )
+    assert all(
+        "feature_regional_incidence_cluster_cluster_id" not in columns
+        for columns in captured_columns
+    )
+    assert all(
+        "feature_regional_incidence_cluster_actual_incidence_per_100k" not in columns
+        for columns in captured_columns
+    )
+
+
+def test_analog_forecast_excludes_regional_incidence_cluster_features(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv", include_regional=True)
+    captured_columns = []
+    original_analog_forecast = model_compare._analog_forecast
+
+    def capturing_analog_forecast(row, train_rows, feature_columns):
+        columns = [
+            column
+            for column in feature_columns
+            if model_compare._is_analog_feature_column(column)
+        ]
+        captured_columns.append(tuple(columns))
+        return original_analog_forecast(row, train_rows, feature_columns)
+
+    monkeypatch.setattr(model_compare, "_analog_forecast", capturing_analog_forecast)
+
+    run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        end_year=2021,
+        min_train_years=1,
+    )
+
+    assert captured_columns
+    assert all(
+        "feature_regional_incidence_cluster_rank" not in columns
+        for columns in captured_columns
+    )
+    assert any(
+        "feature_regional_prior_year_midatlantic_total_cases" in columns
         for columns in captured_columns
     )
 
@@ -430,6 +492,45 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     )
     assert model_compare._is_forecast_regional_feature_column(
         "feature_missing_regional_prior_year_midatlantic_total_cases"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_regional_incidence_cluster_rank"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_regional_incidence_cluster_prior_mean_incidence_per_100k"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_regional_incidence_cluster_prior_year_incidence_per_100k"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_regional_incidence_cluster_band_very_high"
+    )
+    assert model_compare._is_forecast_regional_feature_column(
+        "feature_missing_regional_incidence_cluster"
+    )
+    assert not model_compare._is_forecast_safe_feature_column(
+        "feature_regional_incidence_cluster_prior_mean_incidence_per_100k"
+    )
+    assert not model_compare._is_forecast_ecology_feature_column(
+        "feature_regional_incidence_cluster_prior_mean_incidence_per_100k"
+    )
+    assert not model_compare._is_forecast_spatial_feature_column(
+        "feature_regional_incidence_cluster_prior_mean_incidence_per_100k"
+    )
+    assert not model_compare._is_forecast_regional_feature_column(
+        "feature_regional_incidence_cluster_actual_incidence_per_100k"
+    )
+    assert not model_compare._is_analog_feature_column(
+        "feature_regional_incidence_cluster_prior_mean_incidence_per_100k"
+    )
+    assert model_compare._is_analog_feature_column(
+        "feature_regional_prior_year_midatlantic_total_cases"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_regional_incidence_cluster_cluster_id"
+    )
+    assert not model_compare._is_safe_feature_column(
+        "feature_regional_incidence_cluster_actual_incidence_per_100k"
     )
     assert not model_compare._is_forecast_safe_feature_column(
         "feature_regional_prior_year_midatlantic_total_cases"
@@ -724,6 +825,27 @@ def _write_design_matrix(
                         ),
                         "feature_regional_diagnostic_midatlantic_total_cases": str(
                             9999 + offset
+                        ),
+                        "feature_regional_incidence_cluster_rank": str(
+                            1 + offset
+                        ),
+                        "feature_regional_incidence_cluster_prior_mean_incidence_per_100k": str(
+                            15 + offset
+                        ),
+                        "feature_regional_incidence_cluster_prior_year_incidence_per_100k": str(
+                            float(prior_cases)
+                        ),
+                        "feature_regional_incidence_cluster_band_high": (
+                            "1" if offset else "0"
+                        ),
+                        "feature_missing_regional_incidence_cluster": (
+                            "0" if offset else "1"
+                        ),
+                        "feature_regional_incidence_cluster_actual_incidence_per_100k": str(
+                            999 + offset
+                        ),
+                        "feature_regional_incidence_cluster_cluster_id": str(
+                            f"{year}_cluster_1"
                         ),
                     }
                 )

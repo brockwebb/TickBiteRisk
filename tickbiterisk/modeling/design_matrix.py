@@ -204,6 +204,49 @@ REGIONAL_SIGNAL_MISSING_COLUMNS = [
     f"feature_missing_regional_{column.removeprefix('feature_')}"
     for column in REGIONAL_SIGNAL_SOURCE_COLUMNS
 ]
+REGIONAL_INCIDENCE_CLUSTER_SOURCE_COLUMNS = [
+    "cluster_rank",
+    "cluster_centroid_prior_mean_incidence_per_100k",
+    "feature_prior_mean_incidence_per_100k",
+    "feature_prior_min_incidence_per_100k",
+    "feature_prior_max_incidence_per_100k",
+    "feature_prior_sd_incidence_per_100k",
+    "feature_prior_year_incidence_per_100k",
+    "train_year_count",
+]
+REGIONAL_INCIDENCE_CLUSTER_FEATURE_COLUMN_MAP = {
+    "cluster_rank": "feature_regional_incidence_cluster_rank",
+    "cluster_centroid_prior_mean_incidence_per_100k": (
+        "feature_regional_incidence_cluster_centroid_prior_mean_incidence_per_100k"
+    ),
+    "feature_prior_mean_incidence_per_100k": (
+        "feature_regional_incidence_cluster_prior_mean_incidence_per_100k"
+    ),
+    "feature_prior_min_incidence_per_100k": (
+        "feature_regional_incidence_cluster_prior_min_incidence_per_100k"
+    ),
+    "feature_prior_max_incidence_per_100k": (
+        "feature_regional_incidence_cluster_prior_max_incidence_per_100k"
+    ),
+    "feature_prior_sd_incidence_per_100k": (
+        "feature_regional_incidence_cluster_prior_sd_incidence_per_100k"
+    ),
+    "feature_prior_year_incidence_per_100k": (
+        "feature_regional_incidence_cluster_prior_year_incidence_per_100k"
+    ),
+    "train_year_count": "feature_regional_incidence_cluster_train_year_count",
+}
+REGIONAL_INCIDENCE_CLUSTER_BAND_COLUMNS = [
+    "feature_regional_incidence_cluster_band_low",
+    "feature_regional_incidence_cluster_band_moderate",
+    "feature_regional_incidence_cluster_band_high",
+    "feature_regional_incidence_cluster_band_very_high",
+]
+REGIONAL_INCIDENCE_CLUSTER_FEATURE_COLUMNS = [
+    *REGIONAL_INCIDENCE_CLUSTER_FEATURE_COLUMN_MAP.values(),
+    *REGIONAL_INCIDENCE_CLUSTER_BAND_COLUMNS,
+    "feature_missing_regional_incidence_cluster",
+]
 REQUIRED_MODEL_FEATURE_COLUMNS = [
     "county_fips",
     "year",
@@ -225,6 +268,8 @@ class ModelDesignMatrixSchema:
     spatial_neighbor_source_sha256: str | None
     regional_signal_source_path: str | None
     regional_signal_source_sha256: str | None
+    regional_incidence_cluster_source_path: str | None
+    regional_incidence_cluster_source_sha256: str | None
     row_count: int
     lookback_years: int
     id_columns: list[str]
@@ -247,6 +292,7 @@ def build_model_design_matrix(
     lookback_years: int = 5,
     county_adjacency_path: Path | None = None,
     regional_signals_path: Path | None = None,
+    regional_incidence_clusters_path: Path | None = None,
 ) -> ModelDesignMatrixResult:
     if lookback_years < 1:
         raise ModelDesignMatrixInputError("lookback_years must be at least 1")
@@ -256,6 +302,9 @@ def build_model_design_matrix(
     rows_by_year = _rows_by_year(source_rows)
     county_neighbors = _read_county_adjacency(county_adjacency_path)
     regional_signals = _read_regional_signals(regional_signals_path)
+    regional_incidence_clusters = _read_regional_incidence_clusters(
+        regional_incidence_clusters_path
+    )
     categorical_mappings = _categorical_mappings(source_rows)
     quality_flags = _quality_flags(
         source_rows,
@@ -268,6 +317,9 @@ def build_model_design_matrix(
         quality_flags=quality_flags,
         include_spatial_neighbors=county_adjacency_path is not None,
         include_regional_signals=regional_signals_path is not None,
+        include_regional_incidence_clusters=(
+            regional_incidence_clusters_path is not None
+        ),
     )
 
     output_rows = []
@@ -289,6 +341,10 @@ def build_model_design_matrix(
                 county_neighbors=county_neighbors,
                 regional_signals=regional_signals,
                 include_regional_signals=regional_signals_path is not None,
+                regional_incidence_clusters=regional_incidence_clusters,
+                include_regional_incidence_clusters=(
+                    regional_incidence_clusters_path is not None
+                ),
                 lookback_years=lookback_years,
                 categorical_mappings=categorical_mappings,
                 quality_flags=quality_flags,
@@ -311,6 +367,16 @@ def build_model_design_matrix(
         regional_signal_source_sha256=(
             None if regional_signals_path is None else _sha256_file(regional_signals_path)
         ),
+        regional_incidence_cluster_source_path=(
+            None
+            if regional_incidence_clusters_path is None
+            else str(regional_incidence_clusters_path)
+        ),
+        regional_incidence_cluster_source_sha256=(
+            None
+            if regional_incidence_clusters_path is None
+            else _sha256_file(regional_incidence_clusters_path)
+        ),
         row_count=len(output_rows),
         lookback_years=lookback_years,
         id_columns=ID_COLUMNS,
@@ -327,6 +393,7 @@ def build_model_design_matrix(
             "lagged_outcome": "rows with no prior county history are excluded; missing exact prior-year incidence is imputed to 0.0 with feature_missing_prior_year_lyme_incidence",
             "spatial_neighbor": "prior-year neighbor incidence features use only county-adjacent rows from year Y-1; unavailable neighbor priors are imputed to 0.0 with a missing indicator",
             "regional_signal": "regional signal features use only prior-year and trailing-history fields from the Mid-Atlantic signal artifact; same-year diagnostic fields are not joined",
+            "regional_incidence_cluster": "regional incidence cluster features use only prior-year/trailing county incidence summaries and cluster labels; same-year actual incidence, case, and population fields are not joined",
         },
     )
     return ModelDesignMatrixResult(rows=output_rows, schema=schema)
@@ -439,6 +506,49 @@ def _regional_signal_row(row: dict[str, str]) -> dict[str, str]:
     }
 
 
+def _read_regional_incidence_clusters(
+    path: Path | None,
+) -> dict[tuple[str, int], dict[str, str]]:
+    if path is None:
+        return {}
+    required_columns = {
+        "county_fips",
+        "year",
+        "cluster_label",
+        "model_feature_quality_flags",
+        *REGIONAL_INCIDENCE_CLUSTER_SOURCE_COLUMNS,
+    }
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = set(reader.fieldnames or [])
+        missing_columns = required_columns - fieldnames
+        if missing_columns:
+            raise ModelDesignMatrixInputError(
+                "missing required regional incidence cluster column(s): "
+                f"{', '.join(sorted(missing_columns))}"
+            )
+        return {
+            (
+                str(row["county_fips"]).zfill(5),
+                int(row["year"]),
+            ): _regional_incidence_cluster_row(row)
+            for row in reader
+        }
+
+
+def _regional_incidence_cluster_row(row: dict[str, str]) -> dict[str, str]:
+    return {
+        "county_fips": str(row["county_fips"]).zfill(5),
+        "year": str(row["year"]),
+        "cluster_label": row.get("cluster_label", ""),
+        "model_feature_quality_flags": row.get("model_feature_quality_flags", ""),
+        **{
+            column: row.get(column, "")
+            for column in REGIONAL_INCIDENCE_CLUSTER_SOURCE_COLUMNS
+        },
+    }
+
+
 def _categorical_mappings(rows: list[dict[str, str]]) -> dict[str, list[str]]:
     mappings: dict[str, list[str]] = {}
     for column in STATUS_COLUMNS:
@@ -482,6 +592,7 @@ def _feature_columns(
     quality_flags: list[str],
     include_spatial_neighbors: bool,
     include_regional_signals: bool,
+    include_regional_incidence_clusters: bool,
 ) -> list[str]:
     columns = [
         "feature_year",
@@ -506,6 +617,8 @@ def _feature_columns(
     if include_regional_signals:
         columns.extend(REGIONAL_SIGNAL_FEATURE_COLUMNS)
         columns.extend(REGIONAL_SIGNAL_MISSING_COLUMNS)
+    if include_regional_incidence_clusters:
+        columns.extend(REGIONAL_INCIDENCE_CLUSTER_FEATURE_COLUMNS)
     columns.append("feature_deer_is_derived_total")
     columns.append("feature_missing_deer_is_derived_total")
     for source_column, values in categorical_mappings.items():
@@ -523,6 +636,8 @@ def _design_row(
     county_neighbors: dict[str, list[str]],
     regional_signals: dict[tuple[str, int], dict[str, str]],
     include_regional_signals: bool,
+    regional_incidence_clusters: dict[tuple[str, int], dict[str, str]],
+    include_regional_incidence_clusters: bool,
     lookback_years: int,
     categorical_mappings: dict[str, list[str]],
     quality_flags: list[str],
@@ -540,6 +655,9 @@ def _design_row(
         county_neighbors=county_neighbors,
     )
     regional_signal = regional_signals.get((row["county_fips"], year))
+    regional_incidence_cluster = regional_incidence_clusters.get(
+        (row["county_fips"], year)
+    )
     observed_quality_flags = _combined_flags(
         row.get("model_feature_quality_flags", ""),
         (
@@ -547,6 +665,13 @@ def _design_row(
             if regional_signal is not None
             else "missing_regional_signal"
             if include_regional_signals
+            else ""
+        ),
+        (
+            regional_incidence_cluster.get("model_feature_quality_flags", "")
+            if regional_incidence_cluster is not None
+            else "missing_regional_incidence_cluster"
+            if include_regional_incidence_clusters
             else ""
         ),
     )
@@ -587,6 +712,9 @@ def _design_row(
     feature_values.update(spatial_features)
     feature_values.update(_ecological_pressure_features(row))
     feature_values.update(_regional_signal_features(regional_signal))
+    feature_values.update(
+        _regional_incidence_cluster_features(regional_incidence_cluster)
+    )
     feature_values["feature_missing_contact_pressure"] = (
         "1" if _is_blank(row.get("residential_units_authorized", "")) else "0"
     )
@@ -662,6 +790,35 @@ def _regional_signal_features(
         source_value = "" if regional_signal is None else regional_signal.get(source_column, "")
         values[feature_column] = _format_float(source_value)
         values[missing_column] = "1" if _is_blank(source_value) else "0"
+    return values
+
+
+def _regional_incidence_cluster_features(
+    regional_incidence_cluster: dict[str, str] | None,
+) -> dict[str, str]:
+    values = {}
+    for source_column, feature_column in (
+        REGIONAL_INCIDENCE_CLUSTER_FEATURE_COLUMN_MAP.items()
+    ):
+        source_value = (
+            ""
+            if regional_incidence_cluster is None
+            else regional_incidence_cluster.get(source_column, "")
+        )
+        values[feature_column] = _format_float(source_value)
+    observed_band = (
+        ""
+        if regional_incidence_cluster is None
+        else _slug(regional_incidence_cluster.get("cluster_label", ""))
+    )
+    for band_column in REGIONAL_INCIDENCE_CLUSTER_BAND_COLUMNS:
+        band = band_column.removeprefix(
+            "feature_regional_incidence_cluster_band_"
+        )
+        values[band_column] = "1" if observed_band == band else "0"
+    values["feature_missing_regional_incidence_cluster"] = (
+        "1" if regional_incidence_cluster is None else "0"
+    )
     return values
 
 

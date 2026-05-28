@@ -48,7 +48,7 @@ The comparison harness supports these current branches:
 | `empirical_bayes_shrinkage` | County estimates shrunk toward broader Maryland behavior when data are sparse |
 | `ridge_forecast_safe` | Regularized annual model using conservative non-leaky features |
 | `ridge_forecast_spatial` | Regularized model adding timing-safe prior-year neighbor incidence |
-| `ridge_forecast_regional` | Regularized model adding timing-safe prior-year/trailing Mid-Atlantic reported-case signals |
+| `ridge_forecast_regional` | Regularized model adding timing-safe prior-year/trailing Mid-Atlantic reported-case signals and prior-incidence cluster bands |
 | `analog_year_forecast` | Forecast-safe analog-year lane with matched historical conditions and bootstrap interval diagnostics |
 | `ridge_forecast_ecology` | Regularized model including timing-safe ecology candidates |
 | `ridge_lag_weather_ecology` | Experimental retrospective weather/drought/ecology branch for comparison |
@@ -120,10 +120,12 @@ incidence. It ranked behind the simple blend and conservative safe ridge, with
 MAE 19.005867 per 100k in the current 2024-inclusive run, so it remains a
 diagnostic research lane. The regional and population-growth additions also
 remain research lanes unless a future validation slice shows stable improvement.
-After adding MEI.v2 to the ecology lane, `ridge_forecast_ecology` ranked at
-23.466694 MAE per 100k and `ridge_lag_weather_ecology` ranked at 25.233508
-MAE per 100k in the same run. That is useful negative evidence: MEI.v2 remains
-available for research, but it does not currently justify public promotion.
+After adding MEI.v2 and regional prior-incidence clusters to the research
+lanes, `ridge_forecast_ecology` ranked at 23.466694 MAE per 100k,
+`ridge_forecast_regional` ranked at 24.728232, and
+`ridge_lag_weather_ecology` ranked at 25.233508 in the same run. That is useful
+negative evidence: these features remain available for research, but they do
+not currently justify public promotion.
 
 ## Research lanes and diagnostics
 
@@ -156,7 +158,10 @@ into forecast-safe low/moderate/high/very-high bands. Each held-out year is
 clustered from prior trailing county incidence only, then checked against the
 same-year reported incidence. The output is useful for inspecting regional
 capacity intervals and movement between lighter and heavier pressure areas,
-but it is not a public score input.
+but it is not a public score input. When supplied to the design matrix, only the
+county-year assignment, prior-history incidence summaries, and band one-hots are
+joined; same-year actual incidence, cases, population, cluster IDs, run
+metadata, and diagnostic summary rows are excluded to avoid outcome leakage.
 
 Surveillance-regime diagnostics should remain separate from disease truth
 labels. They may flag case-definition eras, ED or inquiry coverage, reporting

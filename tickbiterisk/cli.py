@@ -2040,6 +2040,13 @@ def model_design_matrix(
         None,
         help="Optional Mid-Atlantic regional signal CSV for lagged regional features.",
     ),
+    regional_incidence_clusters_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional Mid-Atlantic regional incidence cluster CSV for prior-history "
+            "capacity-band features."
+        ),
+    ),
     lookback_years: int = typer.Option(
         5,
         help="Maximum prior county years used for lagged outcome features.",
@@ -2063,6 +2070,14 @@ def model_design_matrix(
         raise typer.BadParameter(
             f"Regional signals file not found: {regional_signals_path}"
         )
+    if (
+        regional_incidence_clusters_path is not None
+        and not regional_incidence_clusters_path.exists()
+    ):
+        raise typer.BadParameter(
+            "Regional incidence clusters file not found: "
+            f"{regional_incidence_clusters_path}"
+        )
 
     try:
         result = build_model_design_matrix(
@@ -2070,6 +2085,7 @@ def model_design_matrix(
             lookback_years=lookback_years,
             county_adjacency_path=county_adjacency_path,
             regional_signals_path=regional_signals_path,
+            regional_incidence_clusters_path=regional_incidence_clusters_path,
         )
     except ModelDesignMatrixInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
