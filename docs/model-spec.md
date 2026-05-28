@@ -35,6 +35,7 @@ The comparison harness supports these current branches:
 | `empirical_bayes_shrinkage` | County estimates shrunk toward broader Maryland behavior when data are sparse |
 | `ridge_forecast_safe` | Regularized annual model using conservative non-leaky features |
 | `ridge_forecast_spatial` | Regularized model adding timing-safe prior-year neighbor incidence |
+| `analog_year_forecast` | Forecast-safe analog-year lane with matched historical conditions and bootstrap interval diagnostics |
 | `ridge_forecast_ecology` | Regularized model including timing-safe ecology candidates |
 | `ridge_lag_weather_ecology` | Experimental retrospective weather/drought/ecology branch for comparison |
 

@@ -98,13 +98,13 @@ diagnosis, treatment recommendation, or certainty about any individual bite.
 
 ## how forecast updates work
 
-The model starts with a prior forecast from historical Lyme incidence,
-seasonality, forecast-safe weather/ecology and habitat context, host and human
-exposure proxies, regional patterns, and surveillance caveats. When new
-information arrives, the update-audit layer compares it with the prior forecast,
-labels the source vintage and surveillance regime, and records whether the
-change looks like disease-pressure signal, reporting-regime signal, or an
-ambiguous update.
+The current public score starts with a selected annual comparison branch and a
+static CDC seasonality prior. Research forecast lanes also test historical Lyme
+incidence, forecast-safe ecology and habitat context, host and human exposure
+proxies, regional patterns, and surveillance caveats. When new information
+arrives, the update-audit layer compares it with the prior forecast, labels the
+source vintage and surveillance regime, and records whether the change looks
+like disease-pressure signal, reporting-regime signal, or an ambiguous update.
 
 That reconciliation is the path toward stronger Bayesian or hierarchical
 forecasting: new information should update the next forecast with its caveats
