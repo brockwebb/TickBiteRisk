@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, seasonality baseline, and tick status
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -109,7 +109,11 @@ request/run manifests as those sources graduate into the modeling lane.
 
 9. `tickbiterisk etl mast-acorn`
    - Extracts text-supported Western Maryland DNR rolling mast/acorn tables.
-   - Writes source-report rows and extraction summaries with study-plot caveats.
+   - Writes source-report rows, extraction summaries, and
+     `acquisition_provenance.csv` with PDF source URLs, parser method,
+     extraction status, raw/output checksums, and study-plot caveats.
+   - Optional manual observations remain separate, anecdotal, and
+     not-public-default.
 
 10. `tickbiterisk etl usdm-drought`
     - Pulls U.S. Drought Monitor county weekly DSCI and severity statistics.

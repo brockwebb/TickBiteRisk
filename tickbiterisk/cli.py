@@ -67,6 +67,7 @@ from tickbiterisk.etl.deer_harvest import (
 from tickbiterisk.etl.ecology_sources import (
     ECOLOGY_RAW_DIR,
     ECOLOGY_SOURCE_FILES,
+    MarylandDnrMastReportSource,
     MARYLAND_DNR_MAST_REPORT_URLS,
 )
 from tickbiterisk.etl.enviroatlas import (
@@ -1821,6 +1822,10 @@ def mast_acorn(
         None,
         help="Optional manual mast observation CSV.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
 ) -> None:
     if parser not in {"pypdfium", "docling"}:
         raise typer.BadParameter("parser must be pypdfium or docling")
@@ -1845,6 +1850,19 @@ def mast_acorn(
         summaries.append(summary)
     rows_output = write_mast_acorn_output(rows, output_dir)
     summary_output = write_mast_acorn_summary_output(summaries, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_records = _mast_acorn_provenance_records(
+        sources=MARYLAND_DNR_MAST_REPORT_URLS,
+        summaries=summaries,
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=resolved_manifest_path,
+        rows_output=rows_output,
+        summary_output=summary_output,
+        parser=parser,
+    )
     typer.echo(f"Wrote {len(rows)} mast/acorn row(s) to {rows_output}")
     typer.echo(
         f"Wrote {len(summaries)} mast/acorn extraction summary row(s) "
@@ -1853,10 +1871,26 @@ def mast_acorn(
     if manual_observations_path is not None:
         manual_rows = read_manual_mast_observations(manual_observations_path)
         manual_output = write_manual_mast_observations_output(manual_rows, output_dir)
+        provenance_records.append(
+            _manual_mast_observation_provenance_record(
+                manual_observations_path=manual_observations_path,
+                manual_output=manual_output,
+                row_count=len(manual_rows),
+                raw_dir=raw_dir,
+                output_dir=output_dir,
+                manifest_path=resolved_manifest_path,
+                parser=parser,
+            )
+        )
         typer.echo(
             f"Wrote {len(manual_rows)} manual mast observation row(s) to "
             f"{manual_output}"
         )
+    provenance_output = write_acquisition_provenance_manifest(
+        provenance_records,
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("deer-harvest")
@@ -2929,6 +2963,172 @@ def _tick_status_acquisition_command(
             _public_provenance_path(manifest_path),
         ]
     )
+
+
+def _mast_acorn_provenance_records(
+    *,
+    sources: list[MarylandDnrMastReportSource],
+    summaries: list[object],
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+    rows_output: Path,
+    summary_output: Path,
+    parser: str,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _mast_acorn_acquisition_command(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=manifest_path,
+        parser=parser,
+        manual_observations_path=None,
+    )
+    summary_by_source_id = {
+        str(getattr(summary, "source_id", "")): summary for summary in summaries
+    }
+    records = []
+    for source in sources:
+        summary = summary_by_source_id[source.source_id]
+        source_path = raw_dir / Path(source.raw_relative_path).name
+        artifact_paths = [source_path, rows_output, summary_output]
+        extraction_status = str(getattr(summary, "extraction_status", "not_recorded"))
+        quality_flags = str(getattr(summary, "feature_quality_flags", "")).strip()
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=source.source_id,
+                source_name=(
+                    f"Maryland DNR Western Maryland mast survey summary "
+                    f"{source.year}"
+                ),
+                source_url=source.url,
+                citation_url=source.url,
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read an ignored local Maryland DNR mast survey PDF, "
+                    "extract text with the selected PDF parser, parse supported "
+                    "Western Maryland study-plot mast/acorn tables, and write "
+                    "structured rows plus extraction summaries."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    f"Read local raw Maryland DNR mast survey PDF "
+                    f"{source_path.name} from --raw-dir."
+                ),
+                derived_artifact_paths=artifact_paths,
+                derived_artifact_path_labels=[
+                    artifact_path.name for artifact_path in artifact_paths
+                ],
+                row_count=int(getattr(summary, "structured_row_count", 0)),
+                parser_method=f"build_mast_acorn_from_pdf:{parser}",
+                extraction_quality=extraction_status,
+                access_notes=(
+                    "Public Maryland DNR PDF retained in ignored raw storage; "
+                    "no secret or credential required."
+                ),
+                modeling_caveats=_mast_acorn_modeling_caveats(
+                    extraction_status=extraction_status,
+                    quality_flags=quality_flags,
+                ),
+            )
+        )
+    return records
+
+
+def _manual_mast_observation_provenance_record(
+    *,
+    manual_observations_path: Path,
+    manual_output: Path,
+    row_count: int,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+    parser: str,
+) -> AcquisitionProvenanceRecord:
+    return AcquisitionProvenanceRecord(
+        source_id="manual_mast_observations",
+        source_name="Manual mast observations",
+        source_url="local_manual_mast_observations",
+        citation_url="",
+        acquisition_command=_mast_acorn_acquisition_command(
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=manifest_path,
+            parser=parser,
+            manual_observations_path=manual_observations_path,
+        ),
+        acquisition_procedure=(
+            "Read an optional local manual mast observation CSV and normalize "
+            "rows into a separate not-public-default mast observation artifact."
+        ),
+        request_method="LOCAL_FILE_READ",
+        request_description=(
+            f"Read local manual mast observation CSV {manual_observations_path.name}."
+        ),
+        derived_artifact_paths=[manual_observations_path, manual_output],
+        derived_artifact_path_labels=[
+            manual_observations_path.name,
+            manual_output.name,
+        ],
+        row_count=row_count,
+        parser_method="read_manual_mast_observations",
+        extraction_quality="manual_observation",
+        access_notes=(
+            "Local manual observation file; not an official public source and "
+            "not intended for public default modeling."
+        ),
+        modeling_caveats=(
+            "manual_observation; anecdotal; not_official; not_model_default; "
+            "use only for exploratory review."
+        ),
+    )
+
+
+def _mast_acorn_modeling_caveats(
+    *,
+    extraction_status: str,
+    quality_flags: str,
+) -> str:
+    caveats = [
+        "western Maryland study-plot data only",
+        "not countywide or statewide",
+        "mast/acorn values are prior-year predictors, not same-year defaults",
+    ]
+    if quality_flags:
+        caveats.append(f"quality_flags={quality_flags}")
+    if extraction_status != "structured":
+        caveats.append("do not model until extraction confidence improves")
+    return "; ".join(caveats)
+
+
+def _mast_acorn_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+    parser: str,
+    manual_observations_path: Path | None,
+) -> str:
+    command_parts = [
+        "tickbiterisk",
+        "etl",
+        "mast-acorn",
+        "--raw-dir",
+        _public_provenance_path(raw_dir),
+        "--output-dir",
+        _public_provenance_path(output_dir),
+        "--parser",
+        parser,
+        "--provenance-manifest-path",
+        _public_provenance_path(manifest_path),
+    ]
+    if manual_observations_path is not None:
+        command_parts.extend(
+            [
+                "--manual-observations-path",
+                _public_provenance_path(manual_observations_path),
+            ]
+        )
+    return _format_cli_command(command_parts)
 
 
 def _public_provenance_path(path: Path) -> str:

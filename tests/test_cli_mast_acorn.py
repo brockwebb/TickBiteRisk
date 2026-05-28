@@ -1,3 +1,5 @@
+import csv
+
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
@@ -71,10 +73,35 @@ def test_mast_acorn_command_writes_structured_and_summary_outputs(
 
     assert result.exit_code == 0
     assert "Wrote 3 mast/acorn row(s)" in result.stdout
+    assert "Wrote acquisition provenance manifest" in result.stdout
     assert (tmp_path / "out" / "maryland_dnr_mast_acorn_county_year.csv").exists()
     assert (
         tmp_path / "out" / "maryland_dnr_mast_acorn_extraction_summary.csv"
     ).exists()
+
+    with (tmp_path / "out" / "acquisition_provenance.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        provenance_rows = list(csv.DictReader(handle))
+    assert [row["source_id"] for row in provenance_rows] == [
+        "maryland_dnr_wmd_mast_survey_2017",
+        "maryland_dnr_wmd_mast_survey_2020",
+        "maryland_dnr_wmd_mast_survey_2021",
+    ]
+    provenance_by_source = {row["source_id"]: row for row in provenance_rows}
+    survey_2017 = provenance_by_source["maryland_dnr_wmd_mast_survey_2017"]
+    assert survey_2017["row_count"] == "1"
+    assert survey_2017["parser_method"] == "build_mast_acorn_from_pdf:pypdfium"
+    assert survey_2017["extraction_quality"] == "structured"
+    assert "maryland_dnr_wmd_mast_survey_2017.pdf" in survey_2017[
+        "derived_artifact_paths"
+    ]
+    assert "maryland_dnr_mast_acorn_extraction_summary.csv=" in survey_2017[
+        "derived_artifact_sha256s"
+    ]
+    assert str(tmp_path) not in survey_2017["derived_artifact_paths"]
+    assert str(tmp_path) not in survey_2017["acquisition_command"]
+    assert "western Maryland" in survey_2017["modeling_caveats"]
 
 
 def test_mast_acorn_command_writes_manual_observations_when_provided(
@@ -130,7 +157,19 @@ def test_mast_acorn_command_writes_manual_observations_when_provided(
 
     assert result.exit_code == 0
     assert "Wrote 1 manual mast observation row(s)" in result.stdout
+    assert "Wrote acquisition provenance manifest" in result.stdout
     assert (tmp_path / "out" / "manual_mast_observations_county_year.csv").exists()
+
+    with (tmp_path / "out" / "acquisition_provenance.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        provenance_rows = list(csv.DictReader(handle))
+    manual_provenance = next(
+        row for row in provenance_rows if row["source_id"] == "manual_mast_observations"
+    )
+    assert manual_provenance["row_count"] == "1"
+    assert manual_provenance["parser_method"] == "read_manual_mast_observations"
+    assert "manual_observation" in manual_provenance["modeling_caveats"]
 
 
 def test_mast_acorn_command_validates_manual_observations_path_before_writing(
@@ -202,6 +241,7 @@ def test_mast_acorn_command_validates_manual_observations_path_before_writing(
     assert not (
         output_dir / "maryland_dnr_mast_acorn_extraction_summary.csv"
     ).exists()
+    assert not (output_dir / "acquisition_provenance.csv").exists()
 
 
 def test_mast_acorn_command_rejects_invalid_parser_cleanly(tmp_path) -> None:
