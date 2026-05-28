@@ -144,6 +144,8 @@ from tickbiterisk.etl.tick_status import (
 )
 from tickbiterisk.etl.tick_status_build import write_tick_status_outputs
 from tickbiterisk.etl.usdm_drought import (
+    USDM_DATA_DOWNLOAD_URL,
+    build_usdm_drought_urls,
     build_usdm_county_year_features,
     fetch_usdm_drought_year,
     fetch_usdm_text,
@@ -719,21 +721,41 @@ def usdm_drought(
         Path("build/etl/usdm-drought"),
         help="Output directory for USDM drought ETL artifacts.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     if start_year > end_year:
         raise typer.BadParameter("start-year must be less than or equal to end-year")
     rows = []
+    rows_by_year = {}
     for year in range(start_year, end_year + 1):
-        rows.extend(
-            fetch_usdm_drought_year(
-                aoi=aoi,
-                year=year,
-                fetcher=fetch_usdm_text,
-            )
+        year_rows = fetch_usdm_drought_year(
+            aoi=aoi,
+            year=year,
+            fetcher=fetch_usdm_text,
         )
+        rows_by_year[year] = year_rows
+        rows.extend(year_rows)
     weekly_output = write_usdm_weekly_output(rows, output_dir)
     county_year_rows = build_usdm_county_year_features(rows)
     county_year_output = write_usdm_county_year_output(county_year_rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _usdm_provenance_records(
+            start_year=start_year,
+            end_year=end_year,
+            aoi=aoi,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+            rows_by_year=rows_by_year,
+            derived_artifact_paths=[weekly_output, county_year_output],
+        ),
+        manifest_path=resolved_manifest_path,
+    )
     weekly_row_count = len({(row.county_fips, row.map_date) for row in rows})
     typer.echo(
         f"Wrote {weekly_row_count} USDM weekly drought row(s) to {weekly_output}"
@@ -742,6 +764,7 @@ def usdm_drought(
         f"Wrote {len(county_year_rows)} USDM county-year drought feature row(s) "
         f"to {county_year_output}"
     )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("enso-oni")
@@ -2105,6 +2128,81 @@ def _write_single_request_provenance_manifest(
         [record],
         manifest_path=manifest_path,
     )
+
+
+def _usdm_provenance_records(
+    *,
+    start_year: int,
+    end_year: int,
+    aoi: str,
+    output_dir: Path,
+    manifest_path: Path,
+    rows_by_year: dict[int, list[object]],
+    derived_artifact_paths: list[Path],
+) -> list[AcquisitionProvenanceRecord]:
+    command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "usdm-drought",
+            "--start-year",
+            str(start_year),
+            "--end-year",
+            str(end_year),
+            "--aoi",
+            aoi,
+            "--output-dir",
+            str(output_dir),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+    records = []
+    for year in range(start_year, end_year + 1):
+        urls = build_usdm_drought_urls(aoi=aoi, year=year)
+        year_rows = rows_by_year.get(year, [])
+        row_count = len(
+            {
+                (
+                    getattr(row, "county_fips", ""),
+                    getattr(row, "map_date", ""),
+                )
+                for row in year_rows
+            }
+        )
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=f"usdm_county_statistics_{aoi.lower()}_{year}",
+                source_name="U.S. Drought Monitor County Statistics",
+                source_url=f"{urls.dsci_url} {urls.severity_url}",
+                citation_url=USDM_DATA_DOWNLOAD_URL,
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Fetch paired USDM CountyStatistics DSCI and drought "
+                    "severity area-percent CSV responses, then merge them by "
+                    "county FIPS and map date."
+                ),
+                request_method="GET",
+                request_description=(
+                    "USDM CountyStatistics GetDSCI and "
+                    "GetDroughtSeverityStatisticsByAreaPercent requests for "
+                    f"{aoi} {year}."
+                ),
+                derived_artifact_paths=derived_artifact_paths,
+                row_count=row_count,
+                parser_method=(
+                    "fetch_usdm_drought_year;parse_usdm_dsci_csv;"
+                    "parse_usdm_severity_csv"
+                ),
+                extraction_quality="accepted",
+                access_notes="Public U.S. Drought Monitor endpoint; no API key required.",
+                modeling_caveats=(
+                    "Retrospective county drought exposure proxy; county-level "
+                    "weekly summaries do not establish tick exposure causality."
+                ),
+            )
+        )
+    return records
 
 
 def _format_cli_command(parts: list[str]) -> str:

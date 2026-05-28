@@ -95,7 +95,7 @@ def test_project_docs_define_acquisition_provenance_contract() -> None:
         "Acquisition provenance contract",
         "direct API ETL run manifests",
         "acquisition_provenance.csv",
-        "ENSO and EnviroAtlas",
+        "ENSO, EnviroAtlas, and USDM drought",
         "source URL or API endpoint",
         "rerunnable command",
         "citation URL",

@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 
 
 USDM_COUNTY_STATISTICS_BASE_URL = "https://usdmdataservices.unl.edu/api/CountyStatistics"
+USDM_DATA_DOWNLOAD_URL = "https://droughtmonitor.unl.edu/DmData/DataDownload.aspx"
 USDM_FEATURE_FLAGS = "drought_monitor_retro_observed"
 
 
