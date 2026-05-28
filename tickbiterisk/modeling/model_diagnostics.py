@@ -454,9 +454,132 @@ def _forecast_update_audit_row(
 
 
 def _build_forecast_update_summary(
-    _audit_rows: list[ForecastUpdateAudit],
+    audit_rows: list[ForecastUpdateAudit],
 ) -> list[ForecastUpdateSummary]:
-    return []
+    grouped: dict[
+        tuple[str, str, str, str, str, str, str, str, int | None],
+        list[ForecastUpdateAudit],
+    ] = {}
+    for row in audit_rows:
+        yearly_key = (
+            row.run_id,
+            row.model_name,
+            row.model_family,
+            row.feature_profile,
+            row.source_file_sha256,
+            row.source_vintage,
+            row.evaluation_mode,
+            row.surveillance_regime,
+            row.forecast_year,
+        )
+        overall_key = (
+            row.run_id,
+            row.model_name,
+            row.model_family,
+            row.feature_profile,
+            row.source_file_sha256,
+            row.source_vintage,
+            row.evaluation_mode,
+            row.surveillance_regime,
+            None,
+        )
+        grouped.setdefault(yearly_key, []).append(row)
+        grouped.setdefault(overall_key, []).append(row)
+    return [
+        _forecast_update_summary_row(rows, key)
+        for key, rows in sorted(
+            grouped.items(),
+            key=lambda item: (
+                item[0][0],
+                item[0][1],
+                item[0][3],
+                item[0][4],
+                item[0][5],
+                item[0][6],
+                item[0][7],
+                item[0][8] is None,
+                item[0][8] or 0,
+            ),
+        )
+    ]
+
+
+def _forecast_update_summary_row(
+    rows: list[ForecastUpdateAudit],
+    key: tuple[str, str, str, str, str, str, str, str, int | None],
+) -> ForecastUpdateSummary:
+    (
+        run_id,
+        model_name,
+        model_family,
+        feature_profile,
+        source_file_sha256,
+        source_vintage,
+        evaluation_mode,
+        surveillance_regime,
+        forecast_year,
+    ) = key
+    residuals = [row.residual_incidence_per_100k for row in rows]
+    assumption_flags = sorted(
+        {
+            flag
+            for row in rows
+            for flag in _split_flags(row.comparison_assumption_flags)
+            if flag
+        }
+    )
+    return ForecastUpdateSummary(
+        run_id=run_id,
+        model_name=model_name,
+        model_family=model_family,
+        feature_profile=feature_profile,
+        source_file_sha256=source_file_sha256,
+        source_vintage=source_vintage,
+        evaluation_mode=evaluation_mode,
+        surveillance_regime=surveillance_regime,
+        forecast_year=forecast_year,
+        n_updates=len(rows),
+        mean_residual_incidence_per_100k=_round(mean(residuals)),
+        mae_incidence_per_100k=_round(mean(abs(value) for value in residuals)),
+        rmse_incidence_per_100k=_round(
+            math.sqrt(mean(value * value for value in residuals))
+        ),
+        interval_available_count=sum(row.interval_available for row in rows),
+        covered_80_count=sum(row.covered_80 is True for row in rows),
+        covered_95_count=sum(row.covered_95 is True for row in rows),
+        forecast_signal_count=sum(
+            row.update_interpretation == "forecast_signal" for row in rows
+        ),
+        surveillance_regime_signal_count=sum(
+            row.update_interpretation == "surveillance_regime_signal"
+            for row in rows
+        ),
+        ambiguous_signal_count=sum(
+            row.update_interpretation == "ambiguous_signal" for row in rows
+        ),
+        insufficient_signal_count=sum(
+            row.update_interpretation == "insufficient_signal" for row in rows
+        ),
+        forecast_signal_share=_interpretation_share(rows, "forecast_signal"),
+        surveillance_regime_signal_share=_interpretation_share(
+            rows,
+            "surveillance_regime_signal",
+        ),
+        ambiguous_signal_share=_interpretation_share(rows, "ambiguous_signal"),
+        insufficient_signal_share=_interpretation_share(rows, "insufficient_signal"),
+        comparison_assumption_flags=",".join(assumption_flags),
+    )
+
+
+def _interpretation_share(
+    rows: list[ForecastUpdateAudit],
+    interpretation: str,
+) -> float:
+    if not rows:
+        return 0.0
+    return _round(
+        sum(row.update_interpretation == interpretation for row in rows) / len(rows)
+    )
 
 
 def _classify_surveillance_regime(quality_flags: str, test_year: int) -> str:

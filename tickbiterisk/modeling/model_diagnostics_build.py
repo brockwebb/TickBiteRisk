@@ -96,6 +96,72 @@ REGIONAL_CAPACITY_INTERVAL_COLUMNS = [
     "comparison_assumption_flags",
 ]
 
+FORECAST_UPDATE_AUDIT_COLUMNS = [
+    "run_id",
+    "model_name",
+    "model_family",
+    "feature_profile",
+    "source_file_sha256",
+    "source_vintage",
+    "county_fips",
+    "county_name",
+    "forecast_year",
+    "forecast_origin_year",
+    "as_of_date",
+    "data_cutoff_date",
+    "target_definition",
+    "evaluation_mode",
+    "update_mode",
+    "surveillance_regime",
+    "predicted_incidence_per_100k",
+    "predicted_cases",
+    "lower_80_incidence_per_100k",
+    "median_incidence_per_100k",
+    "upper_80_incidence_per_100k",
+    "lower_95_incidence_per_100k",
+    "upper_95_incidence_per_100k",
+    "interval_available",
+    "covered_80",
+    "covered_95",
+    "actual_incidence_per_100k",
+    "actual_cases",
+    "residual_incidence_per_100k",
+    "absolute_error_incidence_per_100k",
+    "signed_percent_error",
+    "update_direction",
+    "update_interpretation",
+    "model_feature_quality_flags",
+    "comparison_assumption_flags",
+]
+
+FORECAST_UPDATE_SUMMARY_COLUMNS = [
+    "run_id",
+    "model_name",
+    "model_family",
+    "feature_profile",
+    "source_file_sha256",
+    "source_vintage",
+    "evaluation_mode",
+    "surveillance_regime",
+    "forecast_year",
+    "n_updates",
+    "mean_residual_incidence_per_100k",
+    "mae_incidence_per_100k",
+    "rmse_incidence_per_100k",
+    "interval_available_count",
+    "covered_80_count",
+    "covered_95_count",
+    "forecast_signal_count",
+    "surveillance_regime_signal_count",
+    "ambiguous_signal_count",
+    "insufficient_signal_count",
+    "forecast_signal_share",
+    "surveillance_regime_signal_share",
+    "ambiguous_signal_share",
+    "insufficient_signal_share",
+    "comparison_assumption_flags",
+]
+
 
 @dataclass(frozen=True)
 class ModelDiagnosticsOutputPaths:
@@ -103,6 +169,8 @@ class ModelDiagnosticsOutputPaths:
     surveillance_summary_path: Path
     regional_hotspot_summary_path: Path
     regional_capacity_intervals_path: Path
+    forecast_update_audit_path: Path
+    forecast_update_summary_path: Path
 
 
 def write_model_diagnostics_outputs(
@@ -114,6 +182,8 @@ def write_model_diagnostics_outputs(
     surveillance_summary_path = output_dir / "surveillance_regime_summary.csv"
     regional_hotspot_summary_path = output_dir / "regional_hotspot_summary.csv"
     regional_capacity_intervals_path = output_dir / "regional_capacity_intervals.csv"
+    forecast_update_audit_path = output_dir / "forecast_update_audit.csv"
+    forecast_update_summary_path = output_dir / "forecast_update_summary.csv"
 
     _write_records(
         surveillance_residuals_path,
@@ -135,11 +205,23 @@ def write_model_diagnostics_outputs(
         [asdict(row) for row in result.regional_capacity_intervals],
         REGIONAL_CAPACITY_INTERVAL_COLUMNS,
     )
+    _write_records(
+        forecast_update_audit_path,
+        [asdict(row) for row in result.forecast_update_audit],
+        FORECAST_UPDATE_AUDIT_COLUMNS,
+    )
+    _write_records(
+        forecast_update_summary_path,
+        [asdict(row) for row in result.forecast_update_summary],
+        FORECAST_UPDATE_SUMMARY_COLUMNS,
+    )
     return ModelDiagnosticsOutputPaths(
         surveillance_residuals_path=surveillance_residuals_path,
         surveillance_summary_path=surveillance_summary_path,
         regional_hotspot_summary_path=regional_hotspot_summary_path,
         regional_capacity_intervals_path=regional_capacity_intervals_path,
+        forecast_update_audit_path=forecast_update_audit_path,
+        forecast_update_summary_path=forecast_update_summary_path,
     )
 
 

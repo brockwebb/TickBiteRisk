@@ -12,6 +12,8 @@ from tickbiterisk.modeling.model_diagnostics import (
     build_model_diagnostics,
 )
 from tickbiterisk.modeling.model_diagnostics_build import (
+    FORECAST_UPDATE_AUDIT_COLUMNS,
+    FORECAST_UPDATE_SUMMARY_COLUMNS,
     REGIONAL_CAPACITY_INTERVAL_COLUMNS,
     REGIONAL_HOTSPOT_SUMMARY_COLUMNS,
     SURVEILLANCE_REGIME_RESIDUAL_COLUMNS,
@@ -132,6 +134,50 @@ def test_model_diagnostics_builds_regional_hotspot_and_capacity_rows(
         newline="", encoding="utf-8"
     ) as handle:
         assert next(csv.reader(handle)) == REGIONAL_CAPACITY_INTERVAL_COLUMNS
+
+
+def test_model_diagnostics_writes_forecast_update_outputs(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    intervals = _write_intervals(tmp_path / "intervals.csv")
+
+    result = build_model_diagnostics(
+        predictions,
+        intervals_path=intervals,
+        as_of_date="2026-05-28",
+        data_cutoff_date="2024-12-31",
+        source_vintage="model_compare_fixture_v1",
+    )
+    outputs = write_model_diagnostics_outputs(result, tmp_path / "out")
+
+    assert outputs.forecast_update_audit_path.exists()
+    assert outputs.forecast_update_summary_path.exists()
+    with outputs.forecast_update_audit_path.open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        audit_header = next(csv.reader(handle))
+    assert audit_header == FORECAST_UPDATE_AUDIT_COLUMNS
+    with outputs.forecast_update_summary_path.open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        reader = csv.DictReader(handle)
+        assert reader.fieldnames == FORECAST_UPDATE_SUMMARY_COLUMNS
+        summary_rows = list(reader)
+
+    analog_summary = next(
+        row
+        for row in summary_rows
+        if row["model_name"] == "analog_year_forecast"
+        and row["surveillance_regime"] == "mdh_probable_only_2024"
+        and row["forecast_year"] == "2024"
+    )
+    assert analog_summary["n_updates"] == "2"
+    assert analog_summary["interval_available_count"] == "2"
+    assert analog_summary["covered_80_count"] == "2"
+    assert analog_summary["covered_95_count"] == "2"
+    assert analog_summary["ambiguous_signal_count"] == "2"
+    assert analog_summary["ambiguous_signal_share"] == "1.0"
 
 
 def test_build_model_diagnostics_builds_forecast_update_audit_rows(
