@@ -13,6 +13,8 @@ Primary artifacts:
 - `build/etl/model/model_features_county_year.csv`
 - `build/etl/model/model_design_matrix_county_year.csv`
 - `build/etl/model/model_design_matrix_schema.json`
+- `build/etl/regional-outcome-stress/regional_outcome_stress_predictions.csv`
+- `build/etl/regional-outcome-stress/regional_outcome_stress_metrics.csv`
 - `build/etl/model-comparison/model_comparison_predictions.csv`
 - `build/etl/model-comparison/model_comparison_intervals.csv`
 - `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv`
@@ -35,6 +37,7 @@ The comparison harness supports these current branches:
 | `empirical_bayes_shrinkage` | County estimates shrunk toward broader Maryland behavior when data are sparse |
 | `ridge_forecast_safe` | Regularized annual model using conservative non-leaky features |
 | `ridge_forecast_spatial` | Regularized model adding timing-safe prior-year neighbor incidence |
+| `ridge_forecast_regional` | Regularized model adding timing-safe prior-year/trailing Mid-Atlantic reported-case signals |
 | `analog_year_forecast` | Forecast-safe analog-year lane with matched historical conditions and bootstrap interval diagnostics |
 | `ridge_forecast_ecology` | Regularized model including timing-safe ecology candidates |
 | `ridge_lag_weather_ecology` | Experimental retrospective weather/drought/ecology branch for comparison |
@@ -111,6 +114,14 @@ county-years to historically similar lagged conditions and report transparent
 nearest-analog behavior alongside the simpler baselines. Bootstrap intervals
 are written as `model_comparison_intervals.csv` so each branch can expose
 empirical uncertainty without implying clinical precision.
+
+The `regional-outcome-stress` diagnostic is separate from the Maryland
+incidence comparison. It tests whether state or Mid-Atlantic capacity-share
+baselines improve county reported-case forecasts across DE, DC, MD, PA, VA,
+and WV. The first materialized run ranked prior-year county cases ahead of the
+state and Mid-Atlantic capacity-share baselines on overall case MAE, so the
+capacity idea remains a useful stress test rather than an accepted public model
+assumption.
 
 Surveillance-regime diagnostics should remain separate from disease truth
 labels. They may flag case-definition eras, ED or inquiry coverage, reporting

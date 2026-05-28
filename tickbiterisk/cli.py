@@ -220,6 +220,13 @@ from tickbiterisk.modeling.model_diagnostics import (
 from tickbiterisk.modeling.model_diagnostics_build import (
     write_model_diagnostics_outputs,
 )
+from tickbiterisk.modeling.regional_outcome_stress import (
+    RegionalOutcomeStressInputError,
+    build_regional_outcome_stress,
+)
+from tickbiterisk.modeling.regional_outcome_stress_build import (
+    write_regional_outcome_stress_outputs,
+)
 from tickbiterisk.modeling.spatial_neighbors import (
     build_county_adjacency_from_geojson,
     write_county_adjacency_output,
@@ -2000,6 +2007,66 @@ def regional_signals(
         f"Wrote {len(rows)} Mid-Atlantic regional signal row(s) to {output_path}"
     )
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
+@etl_app.command("regional-outcome-stress")
+def regional_outcome_stress(
+    regional_lyme_path: Path = typer.Option(
+        Path("build/etl/regional-lyme/midatlantic_lyme_county_year.csv"),
+        help="Input Mid-Atlantic Lyme county-year panel.",
+    ),
+    start_year: int = typer.Option(
+        2007,
+        help="First held-out test year to evaluate.",
+    ),
+    end_year: int | None = typer.Option(
+        None,
+        help="Last held-out test year to evaluate. Defaults to max year in input.",
+    ),
+    min_train_years: int = typer.Option(
+        3,
+        help="Minimum prior county years required for outcome stress tests.",
+    ),
+    lookback_years: int = typer.Option(
+        3,
+        help="Number of prior years used to estimate capacity shares.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-outcome-stress"),
+        help="Output directory for regional outcome stress artifacts.",
+    ),
+) -> None:
+    if not regional_lyme_path.exists():
+        raise typer.BadParameter(f"Regional Lyme panel not found: {regional_lyme_path}")
+    if min_train_years < 1:
+        raise typer.BadParameter("min-train-years must be at least 1")
+    if lookback_years < min_train_years:
+        raise typer.BadParameter(
+            "lookback-years must be greater than or equal to min-train-years"
+        )
+    if end_year is not None and start_year > end_year:
+        raise typer.BadParameter("start-year must be less than or equal to end-year")
+
+    try:
+        result = build_regional_outcome_stress(
+            regional_lyme_path=regional_lyme_path,
+            start_year=start_year,
+            end_year=end_year,
+            min_train_years=min_train_years,
+            lookback_years=lookback_years,
+        )
+    except RegionalOutcomeStressInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_regional_outcome_stress_outputs(result, output_dir)
+    typer.echo(f"Wrote 1 regional outcome stress run row(s) to {outputs.runs_path}")
+    typer.echo(
+        f"Wrote {len(result.predictions)} regional outcome stress prediction row(s) to "
+        f"{outputs.predictions_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.metrics)} regional outcome stress metric row(s) to "
+        f"{outputs.metrics_path}"
+    )
 
 
 @etl_app.command("lyme-outcomes")

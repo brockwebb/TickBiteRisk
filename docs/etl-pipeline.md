@@ -74,6 +74,17 @@ request/run manifests as those sources graduate into the modeling lane.
      prior-year or trailing regional history and are the only columns intended
      for forecast-time model experiments.
 
+1e. `tickbiterisk etl regional-outcome-stress`
+   - Runs rolling-origin, outcome-only stress tests against the Mid-Atlantic
+     county panel.
+   - Writes `regional_outcome_stress_runs.csv`,
+     `regional_outcome_stress_predictions.csv`, and
+     `regional_outcome_stress_metrics.csv`.
+   - Compares prior-year county cases, trailing county cases, state capacity
+     shares, and Mid-Atlantic capacity shares as transparent historical-range
+     baselines. These are research diagnostics over reported case counts, not
+     population-normalized public forecasts or latent true disease estimates.
+
 2. `tickbiterisk etl county-reference`
    - Builds Maryland county FIPS, names, area, and internal point reference.
    - Writes `county_reference.csv`.
