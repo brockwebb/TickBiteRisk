@@ -81,3 +81,25 @@ def test_project_manifest_tracks_remaining_candidate_sources() -> None:
         "ecological_pressure_index",
     ]:
         assert source_id in source_ids
+
+
+def test_project_docs_define_acquisition_provenance_contract() -> None:
+    docs_text = "\n".join(
+        [
+            Path("docs/etl-pipeline.md").read_text(encoding="utf-8"),
+            Path("docs/data-sources.md").read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "Acquisition provenance contract",
+        "source URL or API endpoint",
+        "rerunnable command",
+        "citation URL",
+        "secret-free",
+        "checksum",
+        "retrieval timestamp",
+        "parser method",
+        "extraction quality",
+    ]:
+        assert token in docs_text

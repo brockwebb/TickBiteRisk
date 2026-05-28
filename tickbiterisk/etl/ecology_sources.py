@@ -43,9 +43,36 @@ class EcologySourceFile:
     raw_relative_path: str
     description: str
     expected_format: str
+    citation_url: str = ""
+    acquisition_procedure: str = ""
+    access_notes: str = ""
+    parser_method: str = "not_run_raw_acquisition_only"
+    extraction_quality: str = "not_evaluated_at_raw_acquisition"
+    modeling_caveats: str = "not_model_input_until_parser_and_backtest_acceptance"
 
     def raw_path(self, raw_dir: Path = ECOLOGY_RAW_DIR) -> Path:
         return raw_dir / self.raw_relative_path
+
+    @property
+    def resolved_citation_url(self) -> str:
+        return self.citation_url or self.url
+
+    @property
+    def resolved_acquisition_procedure(self) -> str:
+        return (
+            self.acquisition_procedure
+            or "Fetch the registered official source URL with "
+            "`tickbiterisk etl ecology-sources` and keep raw bytes under "
+            "ignored raw storage for parser/audit review."
+        )
+
+    @property
+    def resolved_access_notes(self) -> str:
+        return (
+            self.access_notes
+            or "Public web source; no API key or secret is embedded in the "
+            "registry. Respect upstream terms and rate limits."
+        )
 
 
 @dataclass(frozen=True)

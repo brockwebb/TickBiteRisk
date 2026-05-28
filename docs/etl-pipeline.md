@@ -11,6 +11,25 @@ No live weekly ED scaler is wired into the current product. Weather, ecology,
 deer, construction, and tick surveillance fields are model features or research
 candidates until backtesting shows they improve the public score.
 
+## Acquisition provenance contract
+
+Every new acquired source should leave a saved, secret-free acquisition trail
+before it feeds model features or public artifacts. At minimum, the trail should
+record the source URL or API endpoint, a rerunnable command or procedure, the
+citation URL or official evidence page, local raw path, checksum, retrieval timestamp,
+parser method, extraction quality, redistribution/access notes, and modeling
+caveats. Query URLs that include credentials must be logged only in
+sanitized form; secrets stay in the local environment and never in manifests,
+docs, or public JSON.
+
+`tickbiterisk etl ecology-sources` now writes this contract into its raw source
+manifest for catalog-style acquisitions. Because that command only acquires raw
+files/pages, parser method and extraction quality are recorded as explicit
+not-yet-evaluated placeholders until a downstream parser writes source-specific
+extraction summaries. Direct API ETLs may still keep lineage in source URL
+hashes and output fields, but the same contract is the target shape for future
+API request/run manifests as those sources graduate into the modeling lane.
+
 ## Main flow
 
 1. `tickbiterisk etl lyme-outcomes`
