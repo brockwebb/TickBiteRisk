@@ -51,8 +51,9 @@ Each forecastable artifact should make these fields explicit:
 - `as_of_date`: the date the forecast artifact was produced;
 - `data_cutoff_date`: the latest source vintage intentionally included;
 - `target_definition`: the observed outcome being predicted;
-- `evaluation_mode`: `forecast`, `nowcast`, `retrospective`, or
-  `rolling_origin_backtest`;
+- `evaluation_mode`: `forecast`, `nowcast`, `retrospective`,
+  `rolling_origin_backtest`, or an existing legacy backtest label such as
+  `rolling_origin_prior_years` when preserving source artifact provenance;
 - `update_mode`: `pre_update`, `post_observed_outcome`,
   `post_provisional_signal`, or `post_anchor_signal`;
 - `source_vintage`: the source release or artifact hash used;
