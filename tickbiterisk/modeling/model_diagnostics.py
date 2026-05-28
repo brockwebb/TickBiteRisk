@@ -141,6 +141,7 @@ REQUIRED_INTERVAL_COLUMNS = [
     "source_file_sha256",
     "county_fips",
     "test_year",
+    "interval_method",
     "lower_80_incidence_per_100k",
     "median_incidence_per_100k",
     "upper_80_incidence_per_100k",
@@ -460,11 +461,22 @@ def _summarize_regional_capacity_interval(
     actual_cases = 0
     assumption_flags: set[str] = set()
     n_counties = 0
+    interval_methods = {row["interval_method"] for row in rows}
+    if len(interval_methods) > 1:
+        raise ModelDiagnosticsInputError(
+            "model interval regional group has mixed interval_method values "
+            f"for run_id={run_id} model_name={model_name} test_year={test_year} "
+            f"region_id={region_id}: {', '.join(sorted(interval_methods))}"
+        )
     for row in rows:
         model_key = _county_model_key(row)
         population = population_by_key.get(model_key)
         if population is None:
-            continue
+            raise ModelDiagnosticsInputError(
+                "model interval row has no matching prediction row for "
+                f"run_id={row['run_id']} model_name={row['model_name']} "
+                f"test_year={row['test_year']} county_fips={row['county_fips'].zfill(5)}"
+            )
         n_counties += 1
         actual_cases += actual_cases_by_key[model_key]
         lower_80 += _incidence_to_cases(row, "lower_80_incidence_per_100k", population)

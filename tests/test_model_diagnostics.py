@@ -215,6 +215,71 @@ def test_build_model_diagnostics_rejects_blank_required_numeric(
         build_model_diagnostics(predictions)
 
 
+def test_build_model_diagnostics_rejects_unmatched_interval_rows(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    intervals = _write_interval_rows(
+        tmp_path / "intervals.csv",
+        [
+            _interval_row(
+                county_fips="24999",
+                county_name="County 24999",
+                lower_80_incidence=20.0,
+                median_incidence=30.0,
+                upper_80_incidence=40.0,
+                lower_95_incidence=10.0,
+                upper_95_incidence=50.0,
+                observed_incidence=30.0,
+            )
+        ],
+    )
+
+    with pytest.raises(
+        ModelDiagnosticsInputError,
+        match="no matching prediction row",
+    ):
+        build_model_diagnostics(predictions, intervals_path=intervals)
+
+
+def test_build_model_diagnostics_rejects_mixed_interval_methods(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    intervals = _write_interval_rows(
+        tmp_path / "intervals.csv",
+        [
+            _interval_row(
+                county_fips="24009",
+                county_name="County 24009",
+                lower_80_incidence=20.0,
+                median_incidence=30.0,
+                upper_80_incidence=40.0,
+                lower_95_incidence=10.0,
+                upper_95_incidence=50.0,
+                observed_incidence=30.0,
+            ),
+            _interval_row(
+                county_fips="24011",
+                county_name="County 24011",
+                lower_80_incidence=20.0,
+                median_incidence=30.0,
+                upper_80_incidence=40.0,
+                lower_95_incidence=20.0,
+                upper_95_incidence=40.0,
+                observed_incidence=40.0,
+                interval_method="alternate_bootstrap",
+            ),
+        ],
+    )
+
+    with pytest.raises(
+        ModelDiagnosticsInputError,
+        match="mixed interval_method values",
+    ):
+        build_model_diagnostics(predictions, intervals_path=intervals)
+
+
 def _write_predictions(path: Path) -> Path:
     rows = [
         _prediction_row(
@@ -338,6 +403,10 @@ def _write_intervals(path: Path) -> Path:
             observed_incidence=40.0,
         ),
     ]
+    return _write_interval_rows(path, rows)
+
+
+def _write_interval_rows(path: Path, rows: list[dict[str, str]]) -> Path:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(
             handle,
@@ -420,6 +489,7 @@ def _interval_row(
     lower_95_incidence: float,
     upper_95_incidence: float,
     observed_incidence: float,
+    interval_method: str = "weighted_analog_bootstrap",
 ) -> dict[str, str]:
     return {
         "run_id": "run-1",
@@ -436,7 +506,7 @@ def _interval_row(
         "test_year": "2024",
         "train_start_year": "2018",
         "train_end_year": "2023",
-        "interval_method": "weighted_analog_bootstrap",
+        "interval_method": interval_method,
         "bootstrap_seed": "1337",
         "bootstrap_iterations": "200",
         "analog_count": "2",
