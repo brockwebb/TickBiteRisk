@@ -110,6 +110,8 @@ from tickbiterisk.etl.regional_lyme import (
 )
 from tickbiterisk.etl.regional_hotspots import build_midatlantic_hotspot_diagnostics
 from tickbiterisk.etl.regional_hotspots_build import write_regional_hotspot_outputs
+from tickbiterisk.etl.regional_incidence import build_midatlantic_incidence_panel
+from tickbiterisk.etl.regional_incidence_build import write_regional_incidence_outputs
 from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
 from tickbiterisk.etl.regional_population import (
     build_midatlantic_population_urls,
@@ -2094,6 +2096,45 @@ def regional_hotspots(
     )
     typer.echo(
         f"Wrote {len(result.summary_rows)} Mid-Atlantic hotspot summary row(s) to "
+        f"{outputs.summary_path}"
+    )
+
+
+@etl_app.command("regional-incidence")
+def regional_incidence(
+    regional_lyme_path: Path = typer.Option(
+        Path("build/etl/regional-lyme/midatlantic_lyme_county_year.csv"),
+        help="Input Mid-Atlantic Lyme county-year panel.",
+    ),
+    regional_population_path: Path = typer.Option(
+        Path("build/etl/regional-population/midatlantic_county_population_year.csv"),
+        help="Input Mid-Atlantic county-year population denominator panel.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-incidence"),
+        help="Output directory for Mid-Atlantic incidence diagnostic artifacts.",
+    ),
+) -> None:
+    if not regional_lyme_path.exists():
+        raise typer.BadParameter(f"Regional Lyme panel not found: {regional_lyme_path}")
+    if not regional_population_path.exists():
+        raise typer.BadParameter(
+            f"Regional population panel not found: {regional_population_path}"
+        )
+
+    result = build_midatlantic_incidence_panel(
+        regional_lyme_path=regional_lyme_path,
+        regional_population_path=regional_population_path,
+        lyme_panel_sha256=compute_sha256(regional_lyme_path),
+        population_panel_sha256=compute_sha256(regional_population_path),
+    )
+    outputs = write_regional_incidence_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote {len(result.county_year_rows)} Mid-Atlantic incidence county-year "
+        f"row(s) to {outputs.county_year_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.summary_rows)} Mid-Atlantic incidence summary row(s) to "
         f"{outputs.summary_path}"
     )
 

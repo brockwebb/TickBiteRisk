@@ -64,6 +64,8 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `model_design_matrix_schema.json` | `tickbiterisk etl model-design-matrix` | Design-matrix schema sidecar |
 | `midatlantic_hotspot_county_year.csv` | `tickbiterisk etl regional-hotspots` | Count/share/rank hotspot movement diagnostics from the Mid-Atlantic panel |
 | `midatlantic_hotspot_summary.csv` | `tickbiterisk etl regional-hotspots` | Annual top-quintile persistence, entry, and exit diagnostics |
+| `midatlantic_lyme_incidence_county_year.csv` | `tickbiterisk etl regional-incidence` | Mid-Atlantic county-year Lyme incidence per 100k diagnostics |
+| `midatlantic_lyme_incidence_summary.csv` | `tickbiterisk etl regional-incidence` | Annual denominator coverage and incidence hotspot transition diagnostics |
 | `regional_outcome_stress_predictions.csv` | `tickbiterisk etl regional-outcome-stress` | Mid-Atlantic outcome-only capacity-share stress predictions |
 | `regional_outcome_stress_metrics.csv` | `tickbiterisk etl regional-outcome-stress` | Case-count MAE/RMSE metrics for regional historical-range baselines |
 | `model_comparison_predictions.csv` | `tickbiterisk etl model-compare` | Rolling-origin predictions from candidate model branches |

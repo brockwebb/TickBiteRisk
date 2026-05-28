@@ -16,6 +16,8 @@ Primary artifacts:
 - `build/etl/regional-population/midatlantic_county_population_year.csv`
 - `build/etl/regional-hotspots/midatlantic_hotspot_county_year.csv`
 - `build/etl/regional-hotspots/midatlantic_hotspot_summary.csv`
+- `build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv`
+- `build/etl/regional-incidence/midatlantic_lyme_incidence_summary.csv`
 - `build/etl/regional-outcome-stress/regional_outcome_stress_predictions.csv`
 - `build/etl/regional-outcome-stress/regional_outcome_stress_metrics.csv`
 - `build/etl/model-comparison/model_comparison_predictions.csv`
@@ -142,6 +144,9 @@ surveillance-regime disruptions, but they are not forecast-safe model features.
 Regional Census population denominators are now materialized so a later slice
 can convert those count-only diagnostics into incidence-rate diagnostics; the
 population table itself is denominator evidence, not exposure evidence.
+The first regional incidence diagnostic now performs that join while preserving
+missing denominator rows. It remains a diagnostic panel, not a public Maryland
+forecast branch.
 
 ## Forecast Update Contract
 

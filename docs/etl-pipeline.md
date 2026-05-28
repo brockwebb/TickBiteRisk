@@ -92,7 +92,16 @@ request/run manifests as those sources graduate into the modeling lane.
      movement review and surveillance-regime inspection, not forecast-time
      public scoring.
 
-1g. `tickbiterisk etl regional-outcome-stress`
+1g. `tickbiterisk etl regional-incidence`
+   - Joins the Mid-Atlantic reported-case panel to the Mid-Atlantic
+     population denominator panel and computes county-year incidence per 100k.
+   - Writes `midatlantic_lyme_incidence_county_year.csv` and
+     `midatlantic_lyme_incidence_summary.csv`.
+   - Missing denominators stay explicit. The first live run preserves missing
+     Bedford city, VA rates for 2010-2023 rather than filling across a boundary
+     change.
+
+1h. `tickbiterisk etl regional-outcome-stress`
    - Runs rolling-origin, outcome-only stress tests against the Mid-Atlantic
      county panel.
    - Writes `regional_outcome_stress_runs.csv`,
