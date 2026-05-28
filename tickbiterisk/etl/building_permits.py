@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 
 
 CENSUS_BPS_COUNTY_BASE_URL = "https://www2.census.gov/econ/bps/County"
+CENSUS_BPS_CITATION_URL = "https://www.census.gov/construction/bps/"
 MARYLAND_STATE_FIPS = "24"
 
 

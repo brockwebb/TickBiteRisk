@@ -17,6 +17,7 @@ from tickbiterisk.etl.acquisition_provenance import (
 )
 from tickbiterisk.etl.build import write_reconciled_lyme_outputs
 from tickbiterisk.etl.building_permits import (
+    CENSUS_BPS_CITATION_URL,
     build_census_bps_county_annual_url,
     fetch_census_bps_county_text,
     parse_census_bps_county_text,
@@ -684,6 +685,10 @@ def building_permits(
         Path("build/etl/building-permits"),
         help="Output directory for building permit ETL artifacts.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for API acquisition provenance.",
+    ),
 ) -> None:
     if start_year > end_year:
         raise typer.BadParameter("start-year must be less than or equal to end-year")
@@ -692,19 +697,35 @@ def building_permits(
             "Census BPS county annual ASCII files are supported for 2000-2025"
         )
     rows = []
+    rows_by_year = {}
     for year in range(start_year, end_year + 1):
         source_url = build_census_bps_county_annual_url(year)
         text = fetch_census_bps_county_text(source_url)
-        rows.extend(
-            parse_census_bps_county_text(
-                text,
-                source_url=source_url,
-                source_id=source_id_from_census_bps_year(year),
-            )
+        year_rows = parse_census_bps_county_text(
+            text,
+            source_url=source_url,
+            source_id=source_id_from_census_bps_year(year),
         )
+        rows_by_year[year] = year_rows
+        rows.extend(year_rows)
     output = write_building_permits_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _building_permits_provenance_records(
+            start_year=start_year,
+            end_year=end_year,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+            output_path=output,
+            rows_by_year=rows_by_year,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
     written_row_count = len({(row.county_fips.zfill(5), row.year) for row in rows})
     typer.echo(f"Wrote {written_row_count} building permit row(s) to {output}")
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("contact-pressure")
@@ -2372,6 +2393,67 @@ def _census_population_source_metadata(*, latest_only: bool = False) -> list[dic
     if latest_only:
         return [metadata[-1]]
     return metadata
+
+
+def _building_permits_provenance_records(
+    *,
+    start_year: int,
+    end_year: int,
+    output_dir: Path,
+    manifest_path: Path,
+    output_path: Path,
+    rows_by_year: dict[int, list[object]],
+) -> list[AcquisitionProvenanceRecord]:
+    command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "building-permits",
+            "--start-year",
+            str(start_year),
+            "--end-year",
+            str(end_year),
+            "--output-dir",
+            str(output_dir),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+    records = []
+    for year in range(start_year, end_year + 1):
+        source_url = build_census_bps_county_annual_url(year)
+        year_rows = rows_by_year.get(year, [])
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=source_id_from_census_bps_year(year),
+                source_name="U.S. Census Bureau Building Permits Survey county file",
+                source_url=source_url,
+                citation_url=CENSUS_BPS_CITATION_URL,
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Fetch the annual Census Building Permits Survey county "
+                    "December year-to-date ASCII file and normalize Maryland "
+                    "county totals."
+                ),
+                request_method="GET",
+                request_description=(
+                    "Census Building Permits Survey annual county ASCII file "
+                    f"request for {year}."
+                ),
+                derived_artifact_paths=[output_path],
+                row_count=len(
+                    {(row.county_fips.zfill(5), row.year) for row in year_rows}
+                ),
+                parser_method="parse_census_bps_county_text",
+                extraction_quality="accepted",
+                access_notes="Public Census static file; no API key required.",
+                modeling_caveats=(
+                    "Construction/contact-pressure proxy only; permits do not "
+                    "prove human tick exposure or disease incidence."
+                ),
+            )
+        )
+    return records
 
 
 def _format_cli_command(parts: list[str]) -> str:
