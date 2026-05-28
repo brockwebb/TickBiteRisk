@@ -94,6 +94,15 @@ from tickbiterisk.etl.lyme import (
     parse_cdc_lyme_public_use,
     parse_mdh_lyme_pdf,
 )
+from tickbiterisk.etl.lyme_aggregate import (
+    build_aggregate_observations,
+    parse_cdc_lyme_aggregate_cases,
+    parse_cdc_lyme_aggregate_rates,
+)
+from tickbiterisk.etl.lyme_aggregate_build import (
+    LymeAggregateOutputPaths,
+    write_lyme_aggregate_outputs,
+)
 from tickbiterisk.etl.mast_acorn import (
     build_mast_acorn_from_pdf,
     read_manual_mast_observations,
@@ -379,6 +388,74 @@ TICK_STATUS_SOURCE_METADATA = [
         "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
         "parser_method": "parse_lone_star_status",
         "output_kind": "lone_star",
+    },
+]
+LYME_AGGREGATE_SOURCE_METADATA = [
+    {
+        "filename": "state_caseincid_cases.csv",
+        "source_id": "cdc_caseincid_cases_state_2023",
+        "source_name": "CDC Lyme cases by state/locality dashboard export",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_aggregate_cases",
+        "geography_type": "state",
+        "value_type": "cases",
+        "output_kind": "state",
+    },
+    {
+        "filename": "state_caseincid_rates.csv",
+        "source_id": "cdc_caseincid_rates_state_2023",
+        "source_name": "CDC Lyme rates by state/locality dashboard export",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_aggregate_rates",
+        "geography_type": "state",
+        "value_type": "rates",
+        "output_kind": "state",
+    },
+    {
+        "filename": "region_caseincid_cases.csv",
+        "source_id": "cdc_caseincid_cases_region_2023",
+        "source_name": "CDC Lyme cases by year and region dashboard export",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_aggregate_cases",
+        "geography_type": "region",
+        "value_type": "cases",
+        "output_kind": "region",
+    },
+    {
+        "filename": "region_caseincid_rates.csv",
+        "source_id": "cdc_caseincid_rates_region_2023",
+        "source_name": "CDC Lyme rates by year and region dashboard export",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_aggregate_rates",
+        "geography_type": "region",
+        "value_type": "rates",
+        "output_kind": "region",
+    },
+    {
+        "filename": "national_caseincid_cases.csv",
+        "source_id": "cdc_caseincid_overall_cases_2023",
+        "source_name": "CDC overall Lyme cases by year dashboard export",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_aggregate_cases",
+        "geography_type": "national",
+        "value_type": "cases",
+        "output_kind": "national",
+    },
+    {
+        "filename": "national_caseincid_rates.csv",
+        "source_id": "cdc_caseincid_overall_rate_2023",
+        "source_name": "CDC overall Lyme incidence by year dashboard export",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_aggregate_rates",
+        "geography_type": "national",
+        "value_type": "rates",
+        "output_kind": "national",
     },
 ]
 
@@ -1729,6 +1806,80 @@ def county_week_risk(
     typer.echo(f"Wrote 1 risk score scale row(s) to {outputs.scale_path}")
 
 
+@etl_app.command("lyme-aggregate-validation")
+def lyme_aggregate_validation(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/lyme-aggregate"),
+        help="Raw directory containing CDC Lyme aggregate dashboard exports.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/lyme-aggregate"),
+        help="Output directory for CDC Lyme aggregate validation artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
+) -> None:
+    source_paths_by_id = {
+        metadata["source_id"]: raw_dir / str(metadata["filename"])
+        for metadata in LYME_AGGREGATE_SOURCE_METADATA
+    }
+    for source_path in source_paths_by_id.values():
+        if not source_path.exists():
+            raise typer.BadParameter(
+                f"Lyme aggregate source file not found: {source_path}"
+            )
+
+    parsed_values_by_source = _parse_lyme_aggregate_sources(source_paths_by_id)
+    state_rows = build_aggregate_observations(
+        case_rows=parsed_values_by_source["cdc_caseincid_cases_state_2023"],
+        rate_rows=parsed_values_by_source["cdc_caseincid_rates_state_2023"],
+    )
+    region_rows = build_aggregate_observations(
+        case_rows=parsed_values_by_source["cdc_caseincid_cases_region_2023"],
+        rate_rows=parsed_values_by_source["cdc_caseincid_rates_region_2023"],
+    )
+    national_rows = build_aggregate_observations(
+        case_rows=parsed_values_by_source["cdc_caseincid_overall_cases_2023"],
+        rate_rows=parsed_values_by_source["cdc_caseincid_overall_rate_2023"],
+    )
+    outputs = write_lyme_aggregate_outputs(
+        state_rows=state_rows,
+        region_rows=region_rows,
+        national_rows=national_rows,
+        output_dir=output_dir,
+    )
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _lyme_aggregate_provenance_records(
+            source_metadata=LYME_AGGREGATE_SOURCE_METADATA,
+            parsed_values_by_source=parsed_values_by_source,
+            source_paths_by_id=source_paths_by_id,
+            outputs=outputs,
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(state_rows)} CDC Lyme state aggregate row(s) to "
+        f"{outputs.state_path}"
+    )
+    typer.echo(
+        f"Wrote {len(region_rows)} CDC Lyme regional aggregate row(s) to "
+        f"{outputs.region_path}"
+    )
+    typer.echo(
+        f"Wrote {len(national_rows)} CDC Lyme national aggregate row(s) to "
+        f"{outputs.national_path}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
 @etl_app.command("lyme-outcomes")
 def lyme_outcomes(
     raw_dir: Path = typer.Option(
@@ -2780,6 +2931,109 @@ def _lyme_outcomes_acquisition_command(
             "tickbiterisk",
             "etl",
             "lyme-outcomes",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _parse_lyme_aggregate_sources(
+    source_paths_by_id: dict[str, Path],
+) -> dict[str, list[object]]:
+    parsed_values = {}
+    for metadata in LYME_AGGREGATE_SOURCE_METADATA:
+        source_id = metadata["source_id"]
+        parser_function = (
+            parse_cdc_lyme_aggregate_cases
+            if metadata["value_type"] == "cases"
+            else parse_cdc_lyme_aggregate_rates
+        )
+        parsed_values[source_id] = parser_function(
+            source_paths_by_id[source_id],
+            source_id=source_id,
+            geography_type=metadata["geography_type"],
+        )
+    return parsed_values
+
+
+def _lyme_aggregate_provenance_records(
+    *,
+    source_metadata: list[dict[str, str]],
+    parsed_values_by_source: dict[str, list[object]],
+    source_paths_by_id: dict[str, Path],
+    outputs: LymeAggregateOutputPaths,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    output_paths_by_kind = {
+        "state": outputs.state_path,
+        "region": outputs.region_path,
+        "national": outputs.national_path,
+    }
+    command = _lyme_aggregate_acquisition_command(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=manifest_path,
+    )
+    records = []
+    for metadata in source_metadata:
+        source_id = metadata["source_id"]
+        source_path = source_paths_by_id[source_id]
+        output_path = output_paths_by_kind[metadata["output_kind"]]
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=source_id,
+                source_name=metadata["source_name"],
+                source_url=metadata["source_url"],
+                citation_url=metadata["citation_url"],
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read an ignored local CDC Lyme dashboard aggregate export, "
+                    "normalize state/region/national annual case or incidence "
+                    "values, and merge cases with rates into validation-anchor "
+                    "artifacts."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    f"Read local raw CDC Lyme aggregate CSV {source_path.name} "
+                    f"for {metadata['geography_type']} {metadata['value_type']}."
+                ),
+                derived_artifact_paths=[source_path, output_path],
+                derived_artifact_path_labels=[source_path.name, output_path.name],
+                row_count=len(parsed_values_by_source.get(source_id, [])),
+                parser_method=metadata["parser_method"],
+                extraction_quality="accepted",
+                access_notes=(
+                    "Local ignored raw export from public CDC Lyme surveillance "
+                    "dashboard source; no secret or credential required."
+                ),
+                modeling_caveats=(
+                    "Aggregate validation/capacity anchor only; no county "
+                    "detail, no direct human exposure signal, and reported "
+                    "cases are not stable true incidence across surveillance "
+                    "regime changes."
+                ),
+            )
+        )
+    return records
+
+
+def _lyme_aggregate_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "lyme-aggregate-validation",
             "--raw-dir",
             _public_provenance_path(raw_dir),
             "--output-dir",

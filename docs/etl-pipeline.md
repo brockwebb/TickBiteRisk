@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -47,6 +47,14 @@ request/run manifests as those sources graduate into the modeling lane.
      `acquisition_provenance.csv` with official CDC/MDH source URLs, local
      raw-file checksums, parser method, contributed row count, and the
      surveillance-regime caveats needed by forecasting models.
+
+1b. `tickbiterisk etl lyme-aggregate-validation`
+   - Normalizes CDC dashboard exports for state/locality, U.S. Census region,
+     and national Lyme cases/rates.
+   - Writes `cdc_lyme_state_year.csv`, `cdc_lyme_region_year.csv`,
+     `cdc_lyme_national_year.csv`, and `acquisition_provenance.csv`.
+   - These rows are aggregate validation and regional-capacity anchors only;
+     they are not county outcomes or direct exposure observations.
 
 2. `tickbiterisk etl county-reference`
    - Builds Maryland county FIPS, names, area, and internal point reference.
