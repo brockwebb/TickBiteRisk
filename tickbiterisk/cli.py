@@ -150,7 +150,10 @@ from tickbiterisk.etl.tick_status import (
     parse_lone_star_status,
     parse_pathogen_status,
 )
-from tickbiterisk.etl.tick_status_build import write_tick_status_outputs
+from tickbiterisk.etl.tick_status_build import (
+    TickStatusOutputPaths,
+    write_tick_status_outputs,
+)
 from tickbiterisk.etl.usdm_drought import (
     USDM_DATA_DOWNLOAD_URL,
     build_usdm_drought_urls,
@@ -346,6 +349,35 @@ SEASONALITY_SOURCE_METADATA = [
         "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
         "parser_method": "parse_cdc_lyme_weekly_onset",
         "grain": "mmwr_week",
+    },
+]
+TICK_STATUS_SOURCE_METADATA = [
+    {
+        "filename": "cdc_ixodes_county_status_2025.xlsx",
+        "source_id": "cdc_ixodes_county_status_2025",
+        "source_name": "CDC ArboNET Ixodes county status workbook",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_ixodes_status",
+        "output_kind": "vector",
+    },
+    {
+        "filename": "cdc_ixodes_pathogen_status_2025.xlsx",
+        "source_id": "cdc_ixodes_pathogen_status_2025",
+        "source_name": "CDC ArboNET Ixodes pathogen status workbook",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_pathogen_status",
+        "output_kind": "pathogen",
+    },
+    {
+        "filename": "cdc_lone_star_status_2024.xlsx",
+        "source_id": "cdc_lone_star_status_2024",
+        "source_name": "CDC Amblyomma americanum county status workbook",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_lone_star_status",
+        "output_kind": "lone_star",
     },
 ]
 
@@ -1122,41 +1154,31 @@ def tick_status(
         Path("build/etl/tick-status"),
         help="Output directory for normalized tick status artifacts.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
 ) -> None:
-    source_files = [
-        (
-            "cdc_ixodes_county_status_2025.xlsx",
-            "cdc_ixodes_county_status_2025",
-            parse_ixodes_status,
-        ),
-        (
-            "cdc_ixodes_pathogen_status_2025.xlsx",
-            "cdc_ixodes_pathogen_status_2025",
-            parse_pathogen_status,
-        ),
-        (
-            "cdc_lone_star_status_2024.xlsx",
-            "cdc_lone_star_status_2024",
-            parse_lone_star_status,
-        ),
-    ]
-    for filename, _, _ in source_files:
-        source_path = raw_dir / filename
+    source_paths_by_id = {
+        metadata["source_id"]: raw_dir / str(metadata["filename"])
+        for metadata in TICK_STATUS_SOURCE_METADATA
+    }
+    for source_path in source_paths_by_id.values():
         if not source_path.exists():
             raise typer.BadParameter(
                 f"tick status source file not found: {source_path}"
             )
 
     ixodes_rows = parse_ixodes_status(
-        raw_dir / "cdc_ixodes_county_status_2025.xlsx",
+        source_paths_by_id["cdc_ixodes_county_status_2025"],
         source_id="cdc_ixodes_county_status_2025",
     )
     pathogen_rows = parse_pathogen_status(
-        raw_dir / "cdc_ixodes_pathogen_status_2025.xlsx",
+        source_paths_by_id["cdc_ixodes_pathogen_status_2025"],
         source_id="cdc_ixodes_pathogen_status_2025",
     )
     lone_star_rows = parse_lone_star_status(
-        raw_dir / "cdc_lone_star_status_2024.xlsx",
+        source_paths_by_id["cdc_lone_star_status_2024"],
         source_id="cdc_lone_star_status_2024",
     )
     feature_rows = build_tick_status_county_features(
@@ -1171,10 +1193,30 @@ def tick_status(
         feature_rows=feature_rows,
         output_dir=output_dir,
     )
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _tick_status_provenance_records(
+            source_metadata=TICK_STATUS_SOURCE_METADATA,
+            rows_by_source={
+                "cdc_ixodes_county_status_2025": ixodes_rows,
+                "cdc_ixodes_pathogen_status_2025": pathogen_rows,
+                "cdc_lone_star_status_2024": lone_star_rows,
+            },
+            source_paths_by_id=source_paths_by_id,
+            outputs=outputs,
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
     typer.echo(
         f"Wrote {len(feature_rows)} tick status feature row(s) to "
         f"{outputs.features_path}"
     )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("seasonality-baseline")
@@ -2792,6 +2834,93 @@ def _seasonality_acquisition_command(
             "tickbiterisk",
             "etl",
             "seasonality-baseline",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _tick_status_provenance_records(
+    *,
+    source_metadata: list[dict[str, str]],
+    rows_by_source: dict[str, list[dict[str, object]]],
+    source_paths_by_id: dict[str, Path],
+    outputs: TickStatusOutputPaths,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _tick_status_acquisition_command(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=manifest_path,
+    )
+    output_paths_by_kind = {
+        "vector": outputs.vector_path,
+        "pathogen": outputs.pathogen_path,
+        "lone_star": outputs.lone_star_path,
+    }
+    feature_path = outputs.features_path
+    records = []
+    for metadata in source_metadata:
+        source_id = metadata["source_id"]
+        source_path = source_paths_by_id[source_id]
+        output_path = output_paths_by_kind[metadata["output_kind"]]
+        artifact_paths = [source_path, output_path, feature_path]
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=source_id,
+                source_name=metadata["source_name"],
+                source_url=metadata["source_url"],
+                citation_url=metadata["citation_url"],
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read an ignored local CDC tick status workbook, normalize "
+                    "Maryland county status rows, and build status-only county "
+                    "feature indicators."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    f"Read local raw CDC tick status workbook {source_path.name} "
+                    "from --raw-dir."
+                ),
+                derived_artifact_paths=artifact_paths,
+                derived_artifact_path_labels=[
+                    artifact_path.name for artifact_path in artifact_paths
+                ],
+                row_count=len(rows_by_source.get(source_id, [])),
+                parser_method=metadata["parser_method"],
+                extraction_quality="accepted",
+                access_notes=(
+                    "Local ignored CDC tick surveillance workbook; review CDC "
+                    "data-use language before publishing full row-level "
+                    "derived tables."
+                ),
+                modeling_caveats=(
+                    "Current county status only, not prevalence or abundance; "
+                    "no_records is not absence, and status timing may lag "
+                    "actual tick/pathogen establishment."
+                ),
+            )
+        )
+    return records
+
+
+def _tick_status_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "tick-status",
             "--raw-dir",
             _public_provenance_path(raw_dir),
             "--output-dir",

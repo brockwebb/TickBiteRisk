@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, and seasonality baseline
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, seasonality baseline, and tick status
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -126,6 +126,14 @@ request/run manifests as those sources graduate into the modeling lane.
       `noaa_cpc_oni_model_year_features.csv`.
     - Model-year rows use only complete 12-season prior years and remain
       optional; ONI is not Maryland-specific and is not a public-default input.
+
+11b. `tickbiterisk etl tick-status`
+    - Normalizes local CDC Ixodes, pathogen, and lone-star tick status
+      workbooks into Maryland county status features.
+    - Writes `tick_vector_status.csv`, `tick_pathogen_status.csv`,
+      `lone_star_status.csv`, `tick_status_county_features.csv`, and
+      `acquisition_provenance.csv` with workbook checksums, parser methods,
+      row counts, and status-only/not-prevalence caveats.
 
 12. `tickbiterisk etl seasonality-baseline`
     - Normalizes CDC Lyme onset exports by month and MMWR week.
