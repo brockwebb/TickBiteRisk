@@ -124,6 +124,17 @@ request/run manifests as those sources graduate into the modeling lane.
      historical-range tests. These are research diagnostics over reported
      incidence per 100k, not public forecasts or latent true disease estimates.
 
+1j. `tickbiterisk etl regional-incidence-clusters`
+   - Assigns county-years to low, moderate, high, and very-high regional
+     incidence-pressure bands using only prior-year/trailing county incidence.
+   - Writes `regional_incidence_cluster_runs.csv`,
+     `regional_incidence_cluster_county_year.csv`, and
+     `regional_incidence_cluster_summary.csv`.
+   - The summary rows keep prior cluster min/mean/max incidence bands and
+     same-year held-out actual incidence for diagnostics. These cluster bands
+     are regional forecasting research artifacts, not selected public score
+     inputs.
+
 2. `tickbiterisk etl county-reference`
    - Builds Maryland county FIPS, names, area, and internal point reference.
    - Writes `county_reference.csv`.

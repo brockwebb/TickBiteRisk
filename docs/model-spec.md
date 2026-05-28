@@ -22,6 +22,8 @@ Primary artifacts:
 - `build/etl/regional-outcome-stress/regional_outcome_stress_metrics.csv`
 - `build/etl/regional-incidence-stress/regional_incidence_stress_predictions.csv`
 - `build/etl/regional-incidence-stress/regional_incidence_stress_metrics.csv`
+- `build/etl/regional-incidence-clusters/regional_incidence_cluster_county_year.csv`
+- `build/etl/regional-incidence-clusters/regional_incidence_cluster_summary.csv`
 - `build/etl/model-comparison/model_comparison_predictions.csv`
 - `build/etl/model-comparison/model_comparison_intervals.csv`
 - `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv`
@@ -139,6 +141,13 @@ forecasts. The first materialized run still ranked prior-year county incidence
 best on overall incidence MAE, so it remains a research diagnostic rather than
 a selected public Maryland branch or latent disease-burden estimate.
 
+The `regional-incidence-clusters` diagnostic turns the regional pressure idea
+into forecast-safe low/moderate/high/very-high bands. Each held-out year is
+clustered from prior trailing county incidence only, then checked against the
+same-year reported incidence. The output is useful for inspecting regional
+capacity intervals and movement between lighter and heavier pressure areas,
+but it is not a public score input.
+
 Surveillance-regime diagnostics should remain separate from disease truth
 labels. They may flag case-definition eras, ED or inquiry coverage, reporting
 capacity, or other surveillance artifacts that help explain model error.
@@ -155,8 +164,9 @@ Regional Census population denominators and incidence-rate stress diagnostics
 are now materialized so the count-only regional diagnostics have a
 population-normalized companion; the population table itself is denominator
 evidence, not exposure evidence. The regional incidence diagnostic performs
-that join while preserving missing denominator rows. It remains a diagnostic
-panel, not a public Maryland forecast branch.
+that join while preserving missing denominator rows, and the cluster diagnostic
+summarizes prior-history pressure bands. They remain diagnostic panels, not
+public Maryland forecast branches.
 
 ## Forecast Update Contract
 
