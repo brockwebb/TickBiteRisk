@@ -108,6 +108,14 @@ from tickbiterisk.etl.regional_lyme import (
     RegionalLymeCountyYear,
     parse_cdc_midatlantic_county_dashboard,
 )
+from tickbiterisk.etl.regional_demographics import (
+    CENSUS_PEP_AGE_SEX_CITATION_URL,
+    build_midatlantic_age_sex_urls,
+    fetch_midatlantic_age_sex_demographics,
+)
+from tickbiterisk.etl.regional_demographics_build import (
+    write_regional_age_demographics_output,
+)
 from tickbiterisk.etl.regional_hotspots import build_midatlantic_hotspot_diagnostics
 from tickbiterisk.etl.regional_hotspots_build import write_regional_hotspot_outputs
 from tickbiterisk.etl.regional_incidence import build_midatlantic_incidence_panel
@@ -1145,6 +1153,49 @@ def regional_population(
     )
     typer.echo(
         f"Wrote {len(rows)} Mid-Atlantic county-year population row(s) to {output}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
+@etl_app.command("regional-demographics")
+def regional_demographics(
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-demographics"),
+        help="Output directory for Mid-Atlantic demographic artifacts.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        help="Print planned Census static CSV requests without fetching data.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for source acquisition provenance.",
+    ),
+) -> None:
+    urls = build_midatlantic_age_sex_urls()
+    if dry_run:
+        typer.echo(f"Planned Mid-Atlantic Census age/sex request(s): {len(urls)}")
+        for url in urls:
+            typer.echo(url)
+        return
+
+    rows = fetch_midatlantic_age_sex_demographics()
+    output = write_regional_age_demographics_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _regional_demographics_provenance_records(
+            urls=urls,
+            rows=rows,
+            output_path=output,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(rows)} Mid-Atlantic county-year demographic row(s) to {output}"
     )
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
@@ -4694,6 +4745,94 @@ def _regional_population_url_metadata(url: str) -> dict[str, str]:
         ),
         "request_description": "Census PEP 2023 county totals CSV request.",
         "parser_method": "parse_census_pep_2023_county_totals",
+    }
+
+
+def _regional_demographics_provenance_records(
+    *,
+    urls: list[str],
+    rows: list[object],
+    output_path: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "regional-demographics",
+            "--output-dir",
+            str(output_dir),
+            "--provenance-manifest-path",
+            str(manifest_path),
+        ]
+    )
+    row_counts = _regional_demographics_row_counts(rows)
+    return [
+        AcquisitionProvenanceRecord(
+            source_id=metadata["source_id"],
+            source_name=(
+                "U.S. Census Bureau Mid-Atlantic county age/sex estimates"
+            ),
+            source_url=url,
+            citation_url=CENSUS_PEP_AGE_SEX_CITATION_URL,
+            acquisition_command=command,
+            acquisition_procedure=metadata["acquisition_procedure"],
+            request_method="GET",
+            request_description=metadata["request_description"],
+            derived_artifact_paths=[output_path],
+            row_count=row_counts.get(metadata["row_count_key"], 0),
+            parser_method=metadata["parser_method"],
+            extraction_quality="accepted",
+            access_notes="Public Census static CSV endpoint; no API key required.",
+            modeling_caveats=(
+                "County age-structure context for exposure research only; not "
+                "tick-bite counts, not Lyme incidence, and subject to Census "
+                "vintage/revision changes."
+            ),
+        )
+        for metadata, url in [
+            (_regional_demographics_url_metadata(url), url) for url in urls
+        ]
+    ]
+
+
+def _regional_demographics_row_counts(rows: list[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        source_id = str(getattr(row, "source_id", ""))
+        counts[source_id] = counts.get(source_id, 0) + 1
+    return counts
+
+
+def _regional_demographics_url_metadata(url: str) -> dict[str, str]:
+    filename = Path(urlsplit(url).path).name
+    state_fips = filename.removesuffix(".csv").split("-")[-1].zfill(2)
+    if "cc-est2019-agesex-" in filename:
+        return {
+            "source_id": f"census_pep_2019_county_age_sex_{state_fips}",
+            "row_count_key": f"census_pep_2019_county_age_sex_{state_fips}",
+            "acquisition_procedure": (
+                "Fetch Census PEP 2019 county age/sex static CSV rows and "
+                "normalize Mid-Atlantic county age-structure context for "
+                "2010-2019."
+            ),
+            "request_description": (
+                f"Census PEP 2019 county age/sex CSV request for state {state_fips}."
+            ),
+            "parser_method": "parse_census_pep_2019_age_sex",
+        }
+    return {
+        "source_id": f"census_pep_2024_county_age_sex_{state_fips}",
+        "row_count_key": f"census_pep_2024_county_age_sex_{state_fips}",
+        "acquisition_procedure": (
+            "Fetch Census PEP 2024 county age/sex static CSV rows and "
+            "normalize Mid-Atlantic county age-structure context for 2020-2024."
+        ),
+        "request_description": (
+            f"Census PEP 2024 county age/sex CSV request for state {state_fips}."
+        ),
+        "parser_method": "parse_census_pep_2024_age_sex",
     }
 
 

@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, NSSP coverage, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, NSSP coverage, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -70,6 +70,14 @@ artifacts.
    - These rows are denominator estimates for regional incidence/rate
      diagnostics, not exposure evidence. Boundary changes can create gaps; the
      first live run lacks Bedford city, VA denominators for 2010-2023.
+
+1c-2. `tickbiterisk etl regional-demographics`
+   - Pulls keyless static Census PEP county age/sex CSVs for DE, DC, MD, PA,
+     VA, and WV.
+   - Writes `midatlantic_age_demographics_county_year.csv` and
+     `acquisition_provenance.csv`.
+   - These rows are age-structure context for human-exposure research only;
+     they are not tick-bite counts, direct exposure evidence, or Lyme outcomes.
 
 1d. `tickbiterisk etl regional-lyme-outcomes`
    - Reshapes the CDC county dashboard export into DE, DC, MD, PA, VA, and WV

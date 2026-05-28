@@ -14,6 +14,7 @@ Primary artifacts:
 - `build/etl/model/model_design_matrix_county_year.csv`
 - `build/etl/model/model_design_matrix_schema.json`
 - `build/etl/regional-population/midatlantic_county_population_year.csv`
+- `build/etl/regional-demographics/midatlantic_age_demographics_county_year.csv`
 - `build/etl/regional-hotspots/midatlantic_hotspot_county_year.csv`
 - `build/etl/regional-hotspots/midatlantic_hotspot_summary.csv`
 - `build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv`
@@ -61,6 +62,8 @@ Current model-ready feature groups include:
 - Historical Lyme incidence and population-normalized rates.
 - Census denominator-derived prior-year population growth, used only as a
   timing-safe demographic/contact-pressure proxy.
+- Census PEP regional age-structure context through 2024, currently a
+  research-only human exposure proxy and not a public default model input.
 - NOAA weekly weather aggregates rolled to county-year predictors.
 - CDC Lyme seasonality shares by week and month of onset.
 - Prior-year Lyme incidence in counties sharing a land boundary.
@@ -167,6 +170,12 @@ evidence, not exposure evidence. The regional incidence diagnostic performs
 that join while preserving missing denominator rows, and the cluster diagnostic
 summarizes prior-history pressure bands. They remain diagnostic panels, not
 public Maryland forecast branches.
+
+Regional Census age/sex demographics are also materialized as a candidate
+human-exposure context layer. Age mix may help explain who is more likely to
+be diagnosed, exposed, or represented in reported incidence, but it is not a
+tick-encounter measure. ACS detailed-table residential form and tenure fields
+remain a separate candidate for low-density/single-family contact proxies.
 
 ## Forecast Update Contract
 

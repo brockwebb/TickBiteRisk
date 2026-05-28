@@ -86,6 +86,38 @@ CREATE TABLE IF NOT EXISTS midatlantic_regional_signals (
     PRIMARY KEY (county_fips, year, source_panel_sha256)
 );
 
+CREATE TABLE IF NOT EXISTS midatlantic_age_demographics (
+    state_fips char(2) NOT NULL,
+    state_abbr char(2) NOT NULL,
+    state_name text NOT NULL,
+    county_fips char(5) NOT NULL,
+    county_name text NOT NULL,
+    year integer NOT NULL,
+    population integer NOT NULL CHECK (population >= 0),
+    under5_population integer NOT NULL CHECK (under5_population >= 0),
+    age5_13_population integer NOT NULL CHECK (age5_13_population >= 0),
+    age14_17_population integer NOT NULL CHECK (age14_17_population >= 0),
+    age5_17_population integer NOT NULL CHECK (age5_17_population >= 0),
+    age18_24_population integer NOT NULL CHECK (age18_24_population >= 0),
+    age25_44_population integer NOT NULL CHECK (age25_44_population >= 0),
+    age45_64_population integer NOT NULL CHECK (age45_64_population >= 0),
+    age65plus_population integer NOT NULL CHECK (age65plus_population >= 0),
+    median_age double precision,
+    under5_share double precision,
+    age5_17_share double precision,
+    age18_24_share double precision,
+    age25_44_share double precision,
+    age45_64_share double precision,
+    age65plus_share double precision,
+    source_id text NOT NULL,
+    census_dataset text NOT NULL,
+    vintage integer NOT NULL,
+    source_url_hash text NOT NULL,
+    feature_quality_flags text DEFAULT '',
+    created_at timestamptz DEFAULT now(),
+    PRIMARY KEY (county_fips, year, source_id)
+);
+
 CREATE TABLE IF NOT EXISTS tick_vector_status (
     source_id text NOT NULL,
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
