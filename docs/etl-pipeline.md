@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, and Lyme outcomes
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, and seasonality baseline
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -129,7 +129,9 @@ request/run manifests as those sources graduate into the modeling lane.
 
 12. `tickbiterisk etl seasonality-baseline`
     - Normalizes CDC Lyme onset exports by month and MMWR week.
-    - Writes `seasonality_observations.csv` and `seasonality_baseline.csv`.
+    - Writes `seasonality_observations.csv`, `seasonality_baseline.csv`, and
+      `acquisition_provenance.csv` with official CDC source citation, raw-file
+      checksums, parser method, row counts, and national-curve caveats.
 
 13. `tickbiterisk etl model-features`
     - Joins Lyme outcomes, population, weather, deer, contact-pressure,

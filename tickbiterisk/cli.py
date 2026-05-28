@@ -328,6 +328,26 @@ LYME_MDH_SOURCE_METADATA = {
         "canonical for overlapping 2013-2023 rows."
     ),
 }
+SEASONALITY_SOURCE_METADATA = [
+    {
+        "filename": "cdc_lyme_monthly_onset_2010_2023.csv",
+        "source_id": "cdc_seasonality_month_2023",
+        "source_name": "CDC Lyme cases by month of disease onset",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_monthly_onset",
+        "grain": "month",
+    },
+    {
+        "filename": "cdc_lyme_weekly_onset_2010_2023.csv",
+        "source_id": "cdc_seasonality_week_2023",
+        "source_name": "CDC Lyme cases by MMWR week of disease onset",
+        "source_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "citation_url": CDC_LYME_SURVEILLANCE_CITATION_URL,
+        "parser_method": "parse_cdc_lyme_weekly_onset",
+        "grain": "mmwr_week",
+    },
+]
 
 
 @etl_app.command("check")
@@ -1167,9 +1187,13 @@ def seasonality_baseline(
         Path("build/etl/seasonality"),
         help="Output directory for seasonality baseline ETL artifacts.",
     ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
 ) -> None:
-    monthly_path = raw_dir / "cdc_lyme_monthly_onset_2010_2023.csv"
-    weekly_path = raw_dir / "cdc_lyme_weekly_onset_2010_2023.csv"
+    monthly_path = raw_dir / str(SEASONALITY_SOURCE_METADATA[0]["filename"])
+    weekly_path = raw_dir / str(SEASONALITY_SOURCE_METADATA[1]["filename"])
     for source_path in [monthly_path, weekly_path]:
         if not source_path.exists():
             raise typer.BadParameter(
@@ -1195,6 +1219,27 @@ def seasonality_baseline(
         baseline_rows=baseline_rows,
         output_dir=output_dir,
     )
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _seasonality_provenance_records(
+            source_metadata=SEASONALITY_SOURCE_METADATA,
+            observations=observations,
+            source_paths_by_id={
+                "cdc_seasonality_month_2023": monthly_path,
+                "cdc_seasonality_week_2023": weekly_path,
+            },
+            output_paths=[
+                outputs.observations_path,
+                outputs.baseline_path,
+            ],
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
     typer.echo(
         f"Wrote {len(observations)} seasonality observation row(s) to "
         f"{outputs.observations_path}"
@@ -1203,6 +1248,7 @@ def seasonality_baseline(
         f"Wrote {len(baseline_rows)} seasonality baseline row(s) to "
         f"{outputs.baseline_path}"
     )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("model-features")
@@ -2658,6 +2704,94 @@ def _lyme_outcomes_acquisition_command(
             "tickbiterisk",
             "etl",
             "lyme-outcomes",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _seasonality_provenance_records(
+    *,
+    source_metadata: list[dict[str, str]],
+    observations: list[object],
+    source_paths_by_id: dict[str, Path],
+    output_paths: list[Path],
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _seasonality_acquisition_command(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=manifest_path,
+    )
+    row_counts = _seasonality_observation_row_counts(observations)
+    records = []
+    for metadata in source_metadata:
+        source_id = metadata["source_id"]
+        source_path = source_paths_by_id[source_id]
+        artifact_paths = [source_path, *output_paths]
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=source_id,
+                source_name=metadata["source_name"],
+                source_url=metadata["source_url"],
+                citation_url=metadata["citation_url"],
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read an ignored local CDC Lyme seasonality source export, "
+                    "normalize disease-onset observations, and build national "
+                    "month/MMWR-week seasonal-share baselines."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    f"Read local raw CDC Lyme seasonality CSV {source_path.name} "
+                    f"for {metadata['grain']} observations from --raw-dir."
+                ),
+                derived_artifact_paths=artifact_paths,
+                derived_artifact_path_labels=[
+                    artifact_path.name for artifact_path in artifact_paths
+                ],
+                row_count=row_counts.get(source_id, 0),
+                parser_method=metadata["parser_method"],
+                extraction_quality="accepted",
+                access_notes=(
+                    "Local ignored raw export from public CDC Lyme surveillance "
+                    "dashboard source; no secret or credential required."
+                ),
+                modeling_caveats=(
+                    "national curve only, not county-specific; shares are "
+                    "normalized by annual total and should be used as a static "
+                    "seasonality prior rather than a live case forecast."
+                ),
+            )
+        )
+    return records
+
+
+def _seasonality_observation_row_counts(observations: list[object]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for observation in observations:
+        source_id = str(getattr(observation, "source_id", ""))
+        counts[source_id] = counts.get(source_id, 0) + 1
+    return counts
+
+
+def _seasonality_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "seasonality-baseline",
             "--raw-dir",
             _public_provenance_path(raw_dir),
             "--output-dir",
