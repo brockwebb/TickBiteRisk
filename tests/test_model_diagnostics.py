@@ -328,6 +328,30 @@ def test_forecast_update_audit_uses_source_hash_as_default_vintage(
     assert audit.update_interpretation == "ambiguous_signal"
 
 
+def test_forecast_update_audit_keeps_blank_source_vintage_insufficient(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    intervals = _write_intervals(tmp_path / "intervals.csv")
+
+    result = build_model_diagnostics(
+        predictions,
+        intervals_path=intervals,
+        as_of_date="2026-05-28",
+        data_cutoff_date="2024-12-31",
+        source_vintage="",
+    )
+
+    audit = next(
+        row
+        for row in result.forecast_update_audit
+        if row.model_name == "analog_year_forecast"
+        and row.county_fips == "24009"
+    )
+    assert audit.source_vintage == ""
+    assert audit.update_interpretation == "insufficient_signal"
+
+
 def test_build_model_diagnostics_keeps_runs_in_separate_summary_groups(
     tmp_path: Path,
 ) -> None:

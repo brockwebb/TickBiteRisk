@@ -378,7 +378,9 @@ def _forecast_update_audit_row(
 ) -> ForecastUpdateAudit:
     forecast_year = _parse_int(row["test_year"], "test_year")
     forecast_origin_year = _parse_int(row["train_end_year"], "train_end_year")
-    effective_source_vintage = source_vintage or row["source_file_sha256"]
+    effective_source_vintage = (
+        row["source_file_sha256"] if source_vintage is None else source_vintage
+    )
     actual_incidence = _parse_float(
         row["actual_incidence_per_100k"],
         "actual_incidence_per_100k",
