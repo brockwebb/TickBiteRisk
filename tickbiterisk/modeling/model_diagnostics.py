@@ -199,6 +199,7 @@ REQUIRED_PREDICTION_COLUMNS = [
     "evaluation_mode",
     "source_file_sha256",
     "test_year",
+    "train_end_year",
     "county_fips",
     "county_name",
     "actual_incidence_per_100k",
@@ -377,6 +378,7 @@ def _forecast_update_audit_row(
 ) -> ForecastUpdateAudit:
     forecast_year = _parse_int(row["test_year"], "test_year")
     forecast_origin_year = _parse_int(row["train_end_year"], "train_end_year")
+    effective_source_vintage = source_vintage or row["source_file_sha256"]
     actual_incidence = _parse_float(
         row["actual_incidence_per_100k"],
         "actual_incidence_per_100k",
@@ -408,7 +410,7 @@ def _forecast_update_audit_row(
         covered_95=covered_95,
         as_of_date=as_of_date,
         data_cutoff_date=data_cutoff_date,
-        source_vintage=source_vintage,
+        source_vintage=effective_source_vintage,
     )
     return ForecastUpdateAudit(
         run_id=row["run_id"],
@@ -416,7 +418,7 @@ def _forecast_update_audit_row(
         model_family=row["model_family"],
         feature_profile=row["feature_profile"],
         source_file_sha256=row["source_file_sha256"],
-        source_vintage=source_vintage or row["source_file_sha256"],
+        source_vintage=effective_source_vintage,
         county_fips=row["county_fips"].zfill(5),
         county_name=row["county_name"],
         forecast_year=forecast_year,

@@ -274,6 +274,60 @@ def test_forecast_update_audit_does_not_reuse_wrong_model_interval(
     assert audit.update_interpretation == "insufficient_signal"
 
 
+def test_build_model_diagnostics_rejects_missing_train_end_year_column(
+    tmp_path: Path,
+) -> None:
+    predictions = tmp_path / "predictions.csv"
+    row = _prediction_row(
+        county_fips="24005",
+        county_name="County 24005",
+        test_year=2022,
+        actual_cases=40,
+        predicted_cases=20,
+        actual_incidence=60.0,
+        predicted_incidence=40.0,
+        quality_flags="lyme_case_definition_change",
+    )
+    fieldnames = [
+        column
+        for column in MODEL_COMPARISON_PREDICTION_COLUMNS
+        if column != "train_end_year"
+    ]
+    with predictions.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow({column: row[column] for column in fieldnames})
+
+    with pytest.raises(
+        ModelDiagnosticsInputError,
+        match="model comparison predictions missing required column\\(s\\): train_end_year",
+    ):
+        build_model_diagnostics(predictions)
+
+
+def test_forecast_update_audit_uses_source_hash_as_default_vintage(
+    tmp_path: Path,
+) -> None:
+    predictions = _write_predictions(tmp_path / "predictions.csv")
+    intervals = _write_intervals(tmp_path / "intervals.csv")
+
+    result = build_model_diagnostics(
+        predictions,
+        intervals_path=intervals,
+        as_of_date="2026-05-28",
+        data_cutoff_date="2024-12-31",
+    )
+
+    audit = next(
+        row
+        for row in result.forecast_update_audit
+        if row.model_name == "analog_year_forecast"
+        and row.county_fips == "24009"
+    )
+    assert audit.source_vintage == "abc123"
+    assert audit.update_interpretation == "ambiguous_signal"
+
+
 def test_build_model_diagnostics_keeps_runs_in_separate_summary_groups(
     tmp_path: Path,
 ) -> None:
