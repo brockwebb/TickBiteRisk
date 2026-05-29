@@ -121,6 +121,13 @@ from tickbiterisk.etl.lyme_aggregate_build import (
     LymeAggregateOutputPaths,
     write_lyme_aggregate_outputs,
 )
+from tickbiterisk.etl.maine_jmmc_tickborne import (
+    MaineJmmcTickborneCountyRate,
+    parse_maine_jmmc_tickborne_rates_pdf,
+)
+from tickbiterisk.etl.maine_jmmc_tickborne_build import (
+    write_maine_jmmc_tickborne_rates_output,
+)
 from tickbiterisk.etl.mass_dph_syndromic_ed import (
     MassDphSyndromicEdCountySummary,
     parse_mass_dph_syndromic_ed_docx,
@@ -820,6 +827,19 @@ NJ_DOH_REPORTABLE_TICKBORNE_METADATA = {
     ),
     "citation_url": "https://www.nj.gov/health/cd/statistics/reportable-disease-stats/",
     "parser_method": "parse_nj_doh_reportable_tickborne_pdf:pypdfium_text_reportable_rows",
+}
+MAINE_JMMC_TICKBORNE_RATES_METADATA = {
+    "filename": "jmmc_maine_tickborne_trends_2001_2024.pdf",
+    "source_id": "maine_jmmc_2024_county_rates_pdf",
+    "source_name": "Maine JMMC tickborne disease trends county rates, 2024",
+    "source_url": (
+        "https://knowledgeconnection.mainehealth.org/cgi/viewcontent.cgi"
+        "?article=1219&context=jmmc"
+    ),
+    "citation_url": "https://knowledgeconnection.mainehealth.org/jmmc/vol7/iss2/10/",
+    "doi_url": "https://doi.org/10.46804/2641-2225.1219",
+    "underlying_data_url": "https://data.mainepublichealth.gov/tracking/tickborne",
+    "parser_method": "parse_maine_jmmc_tickborne_rates_pdf:pypdfium_text_table2_rates",
 }
 
 
@@ -3052,6 +3072,52 @@ def nj_doh_reportable_tickborne(
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
+@etl_app.command("maine-jmmc-tickborne-rates")
+def maine_jmmc_tickborne_rates(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/lyme/maine"),
+        help="Raw directory containing the Maine JMMC tickborne trends PDF.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/maine-jmmc-tickborne-rates"),
+        help="Output directory for Maine JMMC tickborne county-rate artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
+) -> None:
+    pdf_path = raw_dir / str(MAINE_JMMC_TICKBORNE_RATES_METADATA["filename"])
+    if not pdf_path.exists():
+        raise typer.BadParameter(f"Maine JMMC tickborne trends PDF not found: {pdf_path}")
+
+    rows = parse_maine_jmmc_tickborne_rates_pdf(
+        pdf_path,
+        source_id=str(MAINE_JMMC_TICKBORNE_RATES_METADATA["source_id"]),
+        source_url=str(MAINE_JMMC_TICKBORNE_RATES_METADATA["source_url"]),
+    )
+    output_path = write_maine_jmmc_tickborne_rates_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _maine_jmmc_tickborne_rates_provenance_records(
+            rows=rows,
+            pdf_path=pdf_path,
+            output_path=output_path,
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(rows)} Maine JMMC tickborne county-rate row(s) to "
+        f"{output_path}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
 @etl_app.command("regional-lyme-outcomes")
 def regional_lyme_outcomes(
     raw_dir: Path = typer.Option(
@@ -5010,6 +5076,84 @@ def _nj_doh_reportable_tickborne_acquisition_command(
             "tickbiterisk",
             "etl",
             "nj-doh-reportable-tickborne",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _maine_jmmc_tickborne_rates_provenance_records(
+    *,
+    rows: list[MaineJmmcTickborneCountyRate],
+    pdf_path: Path,
+    output_path: Path,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    metadata = MAINE_JMMC_TICKBORNE_RATES_METADATA
+    return [
+        AcquisitionProvenanceRecord(
+            source_id=str(metadata["source_id"]),
+            source_name=str(metadata["source_name"]),
+            source_url=str(metadata["source_url"]),
+            citation_url=str(metadata["citation_url"]),
+            acquisition_command=_maine_jmmc_tickborne_rates_acquisition_command(
+                raw_dir=raw_dir,
+                output_dir=output_dir,
+                manifest_path=manifest_path,
+            ),
+            acquisition_procedure=(
+                "Read the ignored local Journal of Maine Medical Center PDF, "
+                "extract only Table 2 county/state rates of selected "
+                "tick-borne diseases per 100,000 persons for 2024, and keep "
+                "rates as rates without deriving case counts."
+            ),
+            request_method="LOCAL_FILE_READ",
+            request_description=(
+                "Read local raw Maine JMMC review PDF "
+                f"{pdf_path.name}; source URL is {metadata['source_url']}; "
+                f"DOI is {metadata['doi_url']}; underlying official dashboard "
+                f"lead is {metadata['underlying_data_url']}."
+            ),
+            derived_artifact_paths=[pdf_path, output_path],
+            derived_artifact_path_labels=[pdf_path.name, output_path.name],
+            row_count=len(rows),
+            parser_method=str(metadata["parser_method"]),
+            extraction_quality="accepted_table2_county_state_rates_only",
+            access_notes=(
+                "Open-access Journal of Maine Medical Center article under "
+                "CC-BY 4.0; raw PDF remains in ignored storage. The article "
+                "cites Maine CDC/Maine Tracking Network surveillance data."
+            ),
+            modeling_caveats=(
+                "Maine external comparator sidecar only; Maine is outside "
+                "the active forecast footprint. Values are preliminary rates "
+                "only as of January 20, 2025, not county case counts, not a "
+                "confirmed disease truth label, not stable true incidence, "
+                "not public-default, and not model input in this slice. "
+                "Later Maine CDC surveillance reports may revise statewide "
+                "counts."
+            ),
+        )
+    ]
+
+
+def _maine_jmmc_tickborne_rates_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "maine-jmmc-tickborne-rates",
             "--raw-dir",
             _public_provenance_path(raw_dir),
             "--output-dir",

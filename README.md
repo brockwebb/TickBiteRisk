@@ -169,6 +169,7 @@ tickbiterisk etl regional-lyme-outcomes --raw-dir data/raw/lyme --pa-2024-workbo
 tickbiterisk etl wv-vectorborne-summary --raw-dir data/raw/lyme/west-virginia --output-dir build/etl/wv-vectorborne
 tickbiterisk etl mass-dph-syndromic-ed --raw-dir data/raw/exposure/massachusetts --output-dir build/etl/mass-dph-syndromic-ed
 tickbiterisk etl nj-doh-reportable-tickborne --raw-dir data/raw/lyme/new-jersey --output-dir build/etl/nj-doh-reportable-tickborne
+tickbiterisk etl maine-jmmc-tickborne-rates --raw-dir data/raw/lyme/maine --output-dir build/etl/maine-jmmc-tickborne-rates
 tickbiterisk etl regional-signals --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --output-dir build/etl/regional-signals
 tickbiterisk etl regional-hotspots --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --output-dir build/etl/regional-hotspots
 tickbiterisk etl regional-incidence --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --output-dir build/etl/regional-incidence
@@ -246,6 +247,14 @@ reported tickborne counts, not a confirmed disease truth label or current model
 input; technical notes flag 2022 Lyme laboratory-based surveillance and other
 reporting caveats. The 2026-05-29 live smoke wrote 217 state/county disease
 rows, including 6,256 statewide 2024 Lyme disease cases.
+
+Current Maine JMMC tickborne county rates note:
+`maine-jmmc-tickborne-rates` parses Table 2 from the open Journal of Maine
+Medical Center 2001-2024 trends review into
+`maine_jmmc_tickborne_county_rates_2024.csv`. This is an external comparator
+sidecar, outside the active forecast footprint, for Maine JMMC tickborne county
+rates. Values are preliminary rates only as of 2025-01-20, not case counts, not
+a confirmed disease truth label, and not current model input.
 
 Current age-structure note: `model-features` can join
 `midatlantic_age_demographics_county_year.csv` with

@@ -120,6 +120,9 @@ def test_project_manifest_tracks_2024_plus_source_watchlist() -> None:
         elif source_id == "nj_doh_tickborne_page":
             assert "etl_supported" in source.status
             assert "reportable_tickborne_sidecar" in source.status
+        elif source_id == "maine_jmmc_2024_county_rates":
+            assert "etl_supported" in source.status
+            assert "county_rate_sidecar" in source.status
         else:
             assert "candidate" in source.status
         assert "not a confirmed disease truth label" in source.notes
@@ -137,7 +140,7 @@ def test_project_docs_define_acquisition_provenance_contract() -> None:
         "Acquisition provenance contract",
         "Direct API and raw-source ETL run manifests",
         "acquisition_provenance.csv",
-        "ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, New Jersey DOH reportable tickborne, NSSP coverage, seasonality baseline, tick status, and mast/acorn",
+        "ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, New Jersey DOH reportable tickborne, Maine JMMC tickborne county rates, NSSP coverage, seasonality baseline, tick status, and mast/acorn",
         "source URL or API endpoint",
         "rerunnable command",
         "citation URL",

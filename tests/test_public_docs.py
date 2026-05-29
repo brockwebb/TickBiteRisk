@@ -190,6 +190,27 @@ def test_public_docs_catalog_new_jersey_reportable_tickborne_sidecar() -> None:
         assert token in docs_text
 
 
+def test_public_docs_catalog_maine_jmmc_tickborne_rates_sidecar() -> None:
+    docs_text = "\n".join(
+        [
+            README.read_text(encoding="utf-8"),
+            DATA_SOURCES.read_text(encoding="utf-8"),
+            Path("docs/data-manifest.md").read_text(encoding="utf-8"),
+            ETL_PIPELINE.read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "maine-jmmc-tickborne-rates",
+        "maine_jmmc_tickborne_county_rates_2024.csv",
+        "Maine JMMC tickborne county rates",
+        "external comparator",
+        "preliminary rates only",
+        "not a confirmed disease truth label",
+    ]:
+        assert token in docs_text
+
+
 def test_readme_contribution_checks_match_configured_tooling() -> None:
     readme = README.read_text(encoding="utf-8")
     contribute = readme.split("## contribute", maxsplit=1)[1].split(

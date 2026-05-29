@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, New Jersey DOH reportable tickborne, NSSP coverage, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, New Jersey DOH reportable tickborne, Maine JMMC tickborne county rates, NSSP coverage, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -101,6 +101,21 @@ artifacts.
      Lyme laboratory-based surveillance, 2024 anaplasmosis/ehrlichiosis
      reporting changes, alpha-gal undercount caveats, and low-count
      interpretation limits.
+
+1b5. `tickbiterisk etl maine-jmmc-tickborne-rates`
+   - Reads the ignored local Journal of Maine Medical Center review PDF,
+     downloaded from the open article page and cross-referenced to Maine
+     Tracking Network as the underlying surveillance lead.
+   - Extracts Table 2 county/state 2024 rates per 100,000 persons for
+     anaplasmosis, babesiosis, hard tick relapsing fever, Lyme disease, and
+     Powassan virus disease.
+   - Writes `maine_jmmc_tickborne_county_rates_2024.csv` and
+     `acquisition_provenance.csv`.
+   - These rows are Maine JMMC tickborne county rates for external comparator
+     context only. Maine is outside the active forecast footprint. Values are
+     preliminary rates only as of 2025-01-20, not case counts, not a confirmed
+     disease truth label, not public-default, and not model input in this
+     slice.
 
 1c. `tickbiterisk etl regional-population`
    - Pulls keyless static Census county population CSVs for DE, DC, MD, PA,
