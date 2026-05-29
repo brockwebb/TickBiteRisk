@@ -9,7 +9,7 @@ score. It also provides a single-bite Lyme decision-support score for organizing
 post-bite evidence against CDC prophylaxis consideration criteria.
 
 This is not an absolute infection probability, diagnosis, treatment
-recommendation, or weather-adjusted forecast.
+recommendation, or same-year weather-adjusted forecast.
 
 ## Current v0 scope
 
@@ -23,8 +23,8 @@ The current v0 scope is deliberately narrower than the long-term idea:
 - Normalized ETL for CDC Lyme, Maryland surveillance, NOAA weather, Census
   population, deer harvest, land-cover/habitat proxies, tick vector/pathogen
   status, and CDC seasonality data.
-- Model comparison across transparent baseline, empirical-Bayes shrinkage, and
-  ridge-style annual incidence branches.
+- Model comparison across transparent baseline, empirical-Bayes shrinkage,
+  analog, ridge-style, and random-forest research annual incidence branches.
 - Plain-language risk interpretation, source links, and CDC guidance links.
 - Public-safe GitHub Pages deployment with no runtime secrets and no raw data
   redistribution.
@@ -79,6 +79,9 @@ Future work may test:
 - Mid-Atlantic expansion into West Virginia, Virginia, Pennsylvania, Delaware,
   and the District of Columbia/Washington, DC, so a larger ecological and
   surveillance region can challenge the current Maryland-only model.
+- Bayesian update and hierarchical branches that can ingest newly observed
+  outcomes without leaking future data and must beat the transparent baselines
+  in rolling-origin backtests before any public promotion.
 - Temporal exploration views that let users compare year-over-year patterns,
   seasonal shifts, and apparent spatial movement without treating those
   patterns as proof of tick migration or individual exposure.
@@ -96,4 +99,4 @@ public-health review support them.
    pass.
 5. Clear separation between informational risk context and medical guidance.
 
-Last updated: 2026-05-28.
+Last updated: 2026-05-29.
