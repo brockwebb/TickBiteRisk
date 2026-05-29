@@ -24,7 +24,6 @@ const fixtures = {
     },
     selected_forecast_metadata: {
       forecast_origin_year: 2023,
-      forecast_year: 2026,
     },
   },
   "regional_county_metadata.json": {
@@ -219,6 +218,15 @@ test("regional research dashboard renders county risk, week slider, and regime i
 
   await expect(page.locator("#regional-source-content")).toContainText(
     "Forecast-safe branches use prior-year"
+  );
+  await expect(page.locator("#regional-forecast-provenance")).toContainText(
+    "Forecast origin 2023"
+  );
+  await expect(page.locator("#regional-forecast-provenance")).toContainText(
+    "Forecast year 2026"
+  );
+  await expect(page.locator("#regional-forecast-provenance")).toContainText(
+    "empirical bayes spatial regime incidence"
   );
 
   expect(consoleErrors).toEqual([]);

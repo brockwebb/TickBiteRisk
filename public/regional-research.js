@@ -76,6 +76,7 @@ async function initRegionalResearch() {
     renderRegionalMap();
     renderRegionalCountyList();
     renderRegionalSources();
+    renderRegionalForecastProvenance();
     selectRegionalCounty(regionalState.selectedCounty);
   } catch (error) {
     renderRegionalLoadError(error);
@@ -571,6 +572,52 @@ function renderRegionalSources() {
     ${sourceItems ? `<ul class="source-detail-list">${sourceItems}</ul>` : ""}`;
 }
 
+function renderRegionalForecastProvenance() {
+  const target = document.getElementById("regional-forecast-provenance");
+  const weekly = regionalState.weekly || {};
+  const modelCard = regionalState.modelCard || {};
+  const selectedForecast = weekly.selected_forecast_metadata || {};
+  const modelName =
+    modelCard.model_name || weekly.model_name || "regional research forecast";
+  const forecastYear =
+    selectedForecast.forecast_year || regionalForecastYearFromRecords();
+  target.innerHTML = `<dl class="regional-provenance-grid">
+    <div>
+      <dt>Model</dt>
+      <dd>${regionalEscapeHtml(regionalReadableName(modelName))}</dd>
+    </div>
+    <div>
+      <dt>Forecast origin</dt>
+      <dd>Forecast origin ${regionalEscapeHtml(selectedForecast.forecast_origin_year || "unknown")}</dd>
+    </div>
+    <div>
+      <dt>Forecast year</dt>
+      <dd>Forecast year ${regionalEscapeHtml(forecastYear || "unknown")}</dd>
+    </div>
+    <div>
+      <dt>Boundary</dt>
+      <dd>Research only, not public Maryland default</dd>
+    </div>
+  </dl>`;
+}
+
+function regionalForecastYearFromRecords() {
+  const years = Array.from(
+    new Set(
+      (regionalState.weekly.records || [])
+        .map((record) => record.data_year || record.year)
+        .filter(Boolean)
+    )
+  ).sort();
+  if (years.length === 1) {
+    return years[0];
+  }
+  if (years.length > 1) {
+    return `${years[0]}-${years[years.length - 1]}`;
+  }
+  return "";
+}
+
 function selectedRegionalRegimeId() {
   const metadata = regionalState.metadataByCounty.get(regionalState.selectedCounty);
   const regime = metadata && metadata.selected_spatial_regime;
@@ -601,6 +648,8 @@ function renderRegionalLoadError(error) {
     '<h3 id="regional-regime-title">Localized spatial regime</h3><p class="muted">Regional regime data are unavailable.</p>';
   document.getElementById("regional-source-content").innerHTML =
     "<p>Regional source notes are unavailable.</p>";
+  document.getElementById("regional-forecast-provenance").innerHTML =
+    "<p>Regional forecast provenance is unavailable.</p>";
 }
 
 function regionalGeoBounds(features) {
