@@ -26,6 +26,12 @@ ANALOG_MODEL_FEATURE_FLAGS = (
     "analog_horizon_matched_outcome,"
     "forecast_safe_prior_outcomes_only"
 )
+SPATIAL_REGIME_MODEL_FEATURE_FLAGS = (
+    "localized_spatial_regime_feature,"
+    "forecast_safe_prior_history_spatial_regime,"
+    "forecast_safe_prior_outcomes_only,"
+    "not_public_default"
+)
 REQUIRED_REGIONAL_INCIDENCE_COLUMNS = {
     "state_fips",
     "state_abbr",
@@ -56,6 +62,7 @@ MODEL_SPECS = (
     "analog_year_county_incidence",
     "empirical_bayes_state_incidence",
     "empirical_bayes_midatlantic_incidence",
+    "empirical_bayes_spatial_regime_incidence",
 )
 FORECAST_ORIGIN_ASSUMPTION_FLAG_ALLOWLIST = {
     "covid_reporting_disruption",
@@ -79,6 +86,9 @@ class RegionalAnnualForecastRun:
     regional_incidence_sha256: str
     regional_population_path: str
     regional_population_sha256: str
+    regional_spatial_regimes_path: str | None
+    regional_spatial_regimes_sha256: str | None
+    regional_spatial_regime_feature_year: int | None
     target_year: int
     forecast_origin_year: int
     as_of_date: str
@@ -188,6 +198,8 @@ def build_regional_annual_forecast(
     *,
     regional_incidence_path: Path,
     population_path: Path,
+    regional_spatial_regimes_path: Path | None = None,
+    regional_spatial_regime_feature_year: int | None = None,
     target_year: int = 2026,
     forecast_origin_year: int | None = None,
     min_train_years: int = 3,
@@ -198,6 +210,14 @@ def build_regional_annual_forecast(
     source_vintage: str | None = None,
     update_mode: str = "pre_update",
 ) -> RegionalAnnualForecastResult:
+    if (
+        regional_spatial_regime_feature_year is not None
+        and regional_spatial_regimes_path is None
+    ):
+        raise RegionalAnnualForecastInputError(
+            "regional_spatial_regime_feature_year requires "
+            "regional_spatial_regimes_path"
+        )
     if min_train_years < 1:
         raise RegionalAnnualForecastInputError("min_train_years must be at least 1")
     if lookback_years < min_train_years:
@@ -244,11 +264,38 @@ def build_regional_annual_forecast(
 
     regional_incidence_sha = _sha256_file(regional_incidence_path)
     population_sha = _sha256_file(population_path)
+    resolved_regime_feature_year = (
+        regional_spatial_regime_feature_year
+        if regional_spatial_regime_feature_year is not None
+        else resolved_origin_year + 1
+    )
+    if (
+        regional_spatial_regimes_path is not None
+        and resolved_regime_feature_year > resolved_origin_year + 1
+    ):
+        raise RegionalAnnualForecastInputError(
+            "regional_spatial_regime_feature_year must be less than or equal "
+            "to forecast_origin_year + 1"
+        )
+    spatial_regimes = _read_spatial_regimes(
+        regional_spatial_regimes_path,
+        expected_source_file_sha256=regional_incidence_sha,
+        feature_year=resolved_regime_feature_year,
+    )
+    regional_spatial_regimes_sha = (
+        None
+        if regional_spatial_regimes_path is None
+        else _sha256_file(regional_spatial_regimes_path)
+    )
     resolved_source_vintage = source_vintage or regional_incidence_sha
+    regime_run_suffix = (
+        "_spatialregimes" if regional_spatial_regimes_path is not None else ""
+    )
     run_id = (
         f"regional_annual_forecast_target{target_year}_"
         f"origin{resolved_origin_year}_mintrain{min_train_years}_"
         f"lookback{lookback_years}_shrink{_slug_float(shrinkage_strength)}"
+        f"{regime_run_suffix}"
     )
     rows_by_county = _group_by_county(rows)
     forecast_rows = _forecast_rows(
@@ -260,6 +307,7 @@ def build_regional_annual_forecast(
         min_train_years=min_train_years,
         lookback_years=lookback_years,
         shrinkage_strength=shrinkage_strength,
+        spatial_regimes=spatial_regimes,
         run_id=run_id,
         regional_incidence_sha=regional_incidence_sha,
         population_sha=population_sha,
@@ -279,6 +327,17 @@ def build_regional_annual_forecast(
         regional_incidence_sha256=regional_incidence_sha,
         regional_population_path=str(population_path),
         regional_population_sha256=population_sha,
+        regional_spatial_regimes_path=(
+            None
+            if regional_spatial_regimes_path is None
+            else str(regional_spatial_regimes_path)
+        ),
+        regional_spatial_regimes_sha256=regional_spatial_regimes_sha,
+        regional_spatial_regime_feature_year=(
+            resolved_regime_feature_year
+            if regional_spatial_regimes_path is not None
+            else None
+        ),
         target_year=target_year,
         forecast_origin_year=resolved_origin_year,
         as_of_date=as_of_date,
@@ -347,6 +406,7 @@ def _forecast_rows(
     min_train_years: int,
     lookback_years: int,
     shrinkage_strength: float,
+    spatial_regimes: dict[str, dict[str, str]],
     run_id: str,
     regional_incidence_sha: str,
     population_sha: str,
@@ -393,6 +453,7 @@ def _forecast_rows(
             all_prior_county_history=all_prior_county_history,
             state_history=state_history,
             regional_history=regional_history,
+            spatial_regime=spatial_regimes.get(county_fips),
             target_year=target_year,
             forecast_origin_year=forecast_origin_year,
             lookback_years=lookback_years,
@@ -440,6 +501,7 @@ def _predict_models(
     all_prior_county_history: list[_IncidenceRow],
     state_history: list[_IncidenceRow],
     regional_history: list[_IncidenceRow],
+    spatial_regime: dict[str, str] | None,
     target_year: int,
     forecast_origin_year: int,
     lookback_years: int,
@@ -485,6 +547,15 @@ def _predict_models(
     )
     if analog_prediction is not None:
         predictions["analog_year_county_incidence"] = analog_prediction
+    spatial_regime_prediction = _spatial_regime_prediction(
+        county_history=county_history,
+        spatial_regime=spatial_regime,
+        shrinkage_strength=shrinkage_strength,
+    )
+    if spatial_regime_prediction is not None:
+        predictions["empirical_bayes_spatial_regime_incidence"] = (
+            spatial_regime_prediction
+        )
     return predictions
 
 
@@ -649,6 +720,35 @@ def _analog_county_prediction(
     )
 
 
+def _spatial_regime_prediction(
+    *,
+    county_history: list[_IncidenceRow],
+    spatial_regime: dict[str, str] | None,
+    shrinkage_strength: float,
+) -> _ModelPrediction | None:
+    if spatial_regime is None:
+        return None
+    regime_mean = _parse_optional_float(
+        spatial_regime.get("feature_regime_trailing_mean_incidence_per_100k", ""),
+        "feature_regime_trailing_mean_incidence_per_100k",
+    )
+    if regime_mean is None:
+        return None
+    county_mean = mean(_known_incidence(row) for row in county_history)
+    return _model_prediction(
+        _shrunk_mean(
+            county_mean=county_mean,
+            county_n=len(county_history),
+            prior_mean=regime_mean,
+            prior_strength=shrinkage_strength,
+        ),
+        model_feature_quality_flags=_join_flags(
+            spatial_regime.get("model_feature_quality_flags", ""),
+            SPATIAL_REGIME_MODEL_FEATURE_FLAGS,
+        ),
+    )
+
+
 def _analog_feature_vector(
     *,
     history_by_year: dict[int, _IncidenceRow],
@@ -743,6 +843,61 @@ def _read_population_rows(path: Path, *, target_year: int) -> dict[str, _Populat
     return rows
 
 
+def _read_spatial_regimes(
+    path: Path | None,
+    *,
+    expected_source_file_sha256: str,
+    feature_year: int,
+) -> dict[str, dict[str, str]]:
+    if path is None:
+        return {}
+    required_columns = {
+        "source_file_sha256",
+        "regional_adjacency_sha256",
+        "county_fips",
+        "year",
+        "spatial_regime_id",
+        "feature_regime_trailing_mean_incidence_per_100k",
+        "model_feature_quality_flags",
+    }
+    regimes = {}
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        missing = required_columns - set(reader.fieldnames or [])
+        if missing:
+            raise RegionalAnnualForecastInputError(
+                f"missing regional spatial regime columns: {sorted(missing)}"
+            )
+        for row in reader:
+            source_file_sha256 = str(row["source_file_sha256"])
+            if source_file_sha256 != expected_source_file_sha256:
+                raise RegionalAnnualForecastInputError(
+                    "regional spatial regime source_file_sha256 does not match "
+                    "regional incidence panel"
+                )
+            if _parse_int(row["year"], "year") != feature_year:
+                continue
+            county_fips = row["county_fips"].zfill(5)
+            regimes[county_fips] = {
+                "source_file_sha256": source_file_sha256,
+                "regional_adjacency_sha256": str(row["regional_adjacency_sha256"]),
+                "county_fips": county_fips,
+                "year": str(row["year"]),
+                "spatial_regime_id": str(row["spatial_regime_id"]),
+                "feature_regime_trailing_mean_incidence_per_100k": str(
+                    row["feature_regime_trailing_mean_incidence_per_100k"]
+                ),
+                "model_feature_quality_flags": str(
+                    row.get("model_feature_quality_flags", "")
+                ),
+            }
+    if not regimes:
+        raise RegionalAnnualForecastInputError(
+            f"no regional spatial regime rows for feature year {feature_year}"
+        )
+    return regimes
+
+
 def _group_by_county(rows: list[_IncidenceRow]) -> dict[str, list[_IncidenceRow]]:
     grouped: dict[str, list[_IncidenceRow]] = {}
     for row in rows:
@@ -778,6 +933,8 @@ def _shrunk_mean(
 def _model_family(model_name: str) -> str:
     if model_name.startswith("analog_"):
         return "analog"
+    if model_name == "empirical_bayes_spatial_regime_incidence":
+        return "empirical_bayes_spatial_regime"
     if model_name.startswith("empirical_bayes_"):
         return "empirical_bayes_incidence_shrinkage"
     return "county_incidence_baseline"
@@ -790,6 +947,9 @@ def _feature_profile(model_name: str) -> str:
         "analog_year_county_incidence": "forecast_safe_horizon_matched_analog",
         "empirical_bayes_state_incidence": "state_shrunken_incidence",
         "empirical_bayes_midatlantic_incidence": "midatlantic_shrunken_incidence",
+        "empirical_bayes_spatial_regime_incidence": (
+            "localized_spatial_regime_shrinkage"
+        ),
     }[model_name]
 
 

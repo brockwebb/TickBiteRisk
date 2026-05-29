@@ -3721,6 +3721,22 @@ def regional_annual_forecast(
         "--population-path",
         help="Mid-Atlantic county-year population panel containing the target year.",
     ),
+    regional_spatial_regimes_path: Path | None = typer.Option(
+        None,
+        "--regional-spatial-regimes-path",
+        help=(
+            "Optional regional spatial regime county-year CSV for localized "
+            "spatial-regime forecast research branches."
+        ),
+    ),
+    regional_spatial_regime_feature_year: int | None = typer.Option(
+        None,
+        "--regional-spatial-regime-feature-year",
+        help=(
+            "Spatial-regime feature year to use. Defaults to "
+            "forecast-origin-year + 1."
+        ),
+    ),
     target_year: int = typer.Option(
         2026,
         help="Future regional forecast year to score.",
@@ -3773,6 +3789,22 @@ def regional_annual_forecast(
         )
     if not population_path.exists():
         raise typer.BadParameter(f"Population panel not found: {population_path}")
+    if (
+        regional_spatial_regimes_path is not None
+        and not regional_spatial_regimes_path.exists()
+    ):
+        raise typer.BadParameter(
+            "Regional spatial regimes file not found: "
+            f"{regional_spatial_regimes_path}"
+        )
+    if (
+        regional_spatial_regime_feature_year is not None
+        and regional_spatial_regimes_path is None
+    ):
+        raise typer.BadParameter(
+            "regional-spatial-regime-feature-year requires "
+            "--regional-spatial-regimes-path"
+        )
     if forecast_origin_year is not None and target_year <= forecast_origin_year:
         raise typer.BadParameter(
             "target-year must be greater than forecast-origin-year"
@@ -3793,6 +3825,8 @@ def regional_annual_forecast(
         result = build_regional_annual_forecast(
             regional_incidence_path=regional_incidence_path,
             population_path=population_path,
+            regional_spatial_regimes_path=regional_spatial_regimes_path,
+            regional_spatial_regime_feature_year=regional_spatial_regime_feature_year,
             target_year=target_year,
             forecast_origin_year=forecast_origin_year,
             min_train_years=min_train_years,

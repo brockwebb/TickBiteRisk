@@ -118,7 +118,7 @@ parser evidence, and time-aware validation before it can move into a model lane.
 | `regional_spatial_regime_county_year.csv` | `tickbiterisk etl regional-spatial-regimes` | Forecast-safe localized spatial regime county-year assignments and prior-history features |
 | `regional_spatial_regime_summary.csv` | `tickbiterisk etl regional-spatial-regimes` | Localized spatial regime annual summaries with feature priors and diagnostic held-out outcomes |
 | `regional_annual_forecast_runs.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic target-year forecast run manifest with origin, hashes, and forecast caveats |
-| `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows, including horizon-matched analog branch, without observed target, residual, or error columns |
+| `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows, including horizon-matched analog and optional localized spatial-regime branches, without observed target, residual, or error columns |
 | `regional_forecast_capacity_runs.csv` | `tickbiterisk etl regional-forecast-capacity` | Mid-Atlantic forecast-capacity diagnostic run manifest |
 | `regional_forecast_capacity_summary.csv` | `tickbiterisk etl regional-forecast-capacity` | State and Mid-Atlantic forecast totals compared with historical reported-incidence ranges |
 | `regional_incidence_cluster_runs.csv` | `tickbiterisk etl regional-incidence-clusters` | Mid-Atlantic prior-incidence cluster run manifest |
@@ -204,8 +204,9 @@ parser evidence, and time-aware validation before it can move into a model lane.
   population denominators. Partial state-source overlays and stale
   boundary-change geographies are diagnostic unless an origin is explicitly
   requested. Regional forecast runs and predictions carry the same
-  as-of/cutoff/source-vintage/update-mode contract, and analog rows preserve
-  matched origin/outcome years plus match distance.
+  as-of/cutoff/source-vintage/update-mode contract. Analog rows preserve
+  matched origin/outcome years plus match distance; spatial-regime rows use
+  only `feature_*` prior-regime fields and validate the source incidence hash.
 - The regional forecast-capacity artifact compares 2026 forecast branch totals
   with historical reported-case and incidence ranges using only years at or
   before the forecast origin and complete historical rows for the same forecast

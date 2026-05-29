@@ -242,7 +242,7 @@ artifacts.
 
 1i-2. `tickbiterisk etl regional-annual-forecast`
    - Typical 2026 run:
-     `tickbiterisk etl regional-annual-forecast --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --as-of-date 2026-05-28 --data-cutoff-date 2023-12-31 --source-vintage cdc_lyme_county_dashboard_2023 --update-mode pre_update --output-dir build/etl/regional-annual-forecast`.
+     `tickbiterisk etl regional-annual-forecast --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --regional-spatial-regimes-path build/etl/regional-spatial-regimes/regional_spatial_regime_county_year.csv --target-year 2026 --as-of-date 2026-05-29 --data-cutoff-date 2023-12-31 --source-vintage cdc_lyme_county_dashboard_2023 --update-mode pre_update --output-dir build/etl/regional-annual-forecast`.
    - Projects the Mid-Atlantic reported-incidence panel into a target year
      without observed target-year Lyme outcomes.
    - Defaults the forecast origin to the latest coverage-complete incidence
@@ -258,6 +258,12 @@ artifacts.
      rows preserve the matched origin year, observed outcome year, and match
      distance, and require the matched outcome to have been observed by the
      forecast origin.
+   - When `--regional-spatial-regimes-path` points to
+     `regional_spatial_regime_county_year.csv`, includes
+     `empirical_bayes_spatial_regime_incidence`. This branch uses only
+     localized regime `feature_*` priors from the regime feature year, defaults
+     that year to `forecast_origin_year + 1`, and rejects stale regime artifacts
+     whose incidence-panel hash does not match the annual forecast input.
    - Run and prediction rows preserve `forecast_origin_year`, `as_of_date`,
      `data_cutoff_date`, `source_vintage`, and `update_mode`; when
      `source_vintage` is omitted it falls back to the regional incidence input

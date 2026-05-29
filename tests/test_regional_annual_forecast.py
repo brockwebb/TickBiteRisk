@@ -1,4 +1,5 @@
 import csv
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -237,6 +238,121 @@ def test_build_regional_annual_forecast_can_explicitly_use_partial_origin(
     assert {row.county_fips for row in result.predictions} == {"42001"}
 
 
+def test_regional_annual_forecast_uses_spatial_regime_prior_not_diagnostic_actual(
+    tmp_path: Path,
+) -> None:
+    panel = _write_incidence_panel(tmp_path / "incidence.csv")
+    regimes = _write_spatial_regimes(
+        tmp_path / "regional_spatial_regimes.csv",
+        source_file_sha256=_sha256_file(panel),
+        feature_year=2022,
+    )
+
+    result = build_regional_annual_forecast(
+        regional_incidence_path=panel,
+        population_path=_write_population(tmp_path / "population.csv"),
+        regional_spatial_regimes_path=regimes,
+        target_year=2023,
+        forecast_origin_year=2021,
+        min_train_years=2,
+        lookback_years=2,
+        shrinkage_strength=2.0,
+    )
+
+    spatial_regime = next(
+        row
+        for row in result.predictions
+        if row.model_name == "empirical_bayes_spatial_regime_incidence"
+        and row.county_fips == "24001"
+    )
+    assert spatial_regime.predicted_incidence_per_100k == 67.5
+    assert spatial_regime.predicted_incidence_per_100k != 999.0
+    assert spatial_regime.model_family == "empirical_bayes_spatial_regime"
+    assert spatial_regime.feature_profile == "localized_spatial_regime_shrinkage"
+    assert "localized_spatial_regime_feature" in (
+        spatial_regime.model_feature_quality_flags
+    )
+    assert "forecast_safe_prior_history_spatial_regime" in (
+        spatial_regime.model_feature_quality_flags
+    )
+    assert "not_public_default" in spatial_regime.model_feature_quality_flags
+    assert result.run.regional_spatial_regimes_path == str(regimes)
+    assert len(result.run.regional_spatial_regimes_sha256 or "") == 64
+    assert result.run.regional_spatial_regime_feature_year == 2022
+    assert "empirical_bayes_spatial_regime_incidence" in result.run.model_names
+
+
+def test_regional_annual_forecast_rejects_spatial_regime_source_mismatch(
+    tmp_path: Path,
+) -> None:
+    regimes = _write_spatial_regimes(
+        tmp_path / "regional_spatial_regimes.csv",
+        source_file_sha256="not_the_incidence_panel_hash",
+    )
+
+    with pytest.raises(RegionalAnnualForecastInputError, match="source_file_sha256"):
+        build_regional_annual_forecast(
+            regional_incidence_path=_write_incidence_panel(tmp_path / "incidence.csv"),
+            population_path=_write_population(tmp_path / "population.csv"),
+            regional_spatial_regimes_path=regimes,
+            target_year=2023,
+            forecast_origin_year=2021,
+            min_train_years=2,
+            lookback_years=2,
+        )
+
+
+def test_regional_annual_forecast_rejects_future_spatial_regime_feature_year(
+    tmp_path: Path,
+) -> None:
+    panel = _write_incidence_panel(tmp_path / "incidence.csv")
+    regimes = _write_spatial_regimes(
+        tmp_path / "regional_spatial_regimes.csv",
+        source_file_sha256=_sha256_file(panel),
+        feature_year=2023,
+    )
+
+    with pytest.raises(
+        RegionalAnnualForecastInputError,
+        match="regional_spatial_regime_feature_year",
+    ):
+        build_regional_annual_forecast(
+            regional_incidence_path=panel,
+            population_path=_write_population(tmp_path / "population.csv"),
+            regional_spatial_regimes_path=regimes,
+            regional_spatial_regime_feature_year=2023,
+            target_year=2023,
+            forecast_origin_year=2021,
+            min_train_years=2,
+            lookback_years=2,
+        )
+
+
+def test_regional_annual_forecast_rejects_empty_spatial_regime_feature_year(
+    tmp_path: Path,
+) -> None:
+    panel = _write_incidence_panel(tmp_path / "incidence.csv")
+    regimes = _write_spatial_regimes(
+        tmp_path / "regional_spatial_regimes.csv",
+        source_file_sha256=_sha256_file(panel),
+        feature_year=2020,
+    )
+
+    with pytest.raises(
+        RegionalAnnualForecastInputError,
+        match="no regional spatial regime rows for feature year 2022",
+    ):
+        build_regional_annual_forecast(
+            regional_incidence_path=panel,
+            population_path=_write_population(tmp_path / "population.csv"),
+            regional_spatial_regimes_path=regimes,
+            target_year=2023,
+            forecast_origin_year=2021,
+            min_train_years=2,
+            lookback_years=2,
+        )
+
+
 def test_build_regional_annual_forecast_requires_county_depth_and_origin_row(
     tmp_path: Path,
 ) -> None:
@@ -452,6 +568,50 @@ def _write_single_county_incidence_panel(path: Path, values: list[int]) -> Path:
         writer.writeheader()
         writer.writerows(rows)
     return path
+
+
+def _write_spatial_regimes(
+    path: Path,
+    *,
+    source_file_sha256: str,
+    feature_year: int = 2022,
+) -> Path:
+    rows = []
+    for county_fips, regime_mean in {
+        "24001": 100,
+        "24003": 10,
+        "42001": 20,
+        "42003": 15,
+    }.items():
+        rows.append(
+            {
+                "source_file_sha256": source_file_sha256,
+                "regional_adjacency_sha256": "adjacency123",
+                "county_fips": county_fips,
+                "year": str(feature_year),
+                "spatial_regime_id": f"{feature_year}_regime_{county_fips}",
+                "feature_regime_trailing_mean_incidence_per_100k": str(regime_mean),
+                "diagnostic_actual_regime_incidence_per_100k": "999",
+                "model_feature_quality_flags": (
+                    "localized_spatial_regime_feature,"
+                    "forecast_safe_prior_history_spatial_regime,"
+                    "not_public_default"
+                ),
+            }
+        )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _write_incidence_panel(
