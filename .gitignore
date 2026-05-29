@@ -143,7 +143,6 @@ venv.bak/
 
 # Node / browser smoke dependencies
 node_modules/
-public/research-data/regional/
 
 # Spyder project settings
 .spyderproject

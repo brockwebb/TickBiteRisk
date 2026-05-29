@@ -1,0 +1,24 @@
+{
+  "export_type": "static_export_manifest",
+  "files": [
+    "regional_county_risk_weekly.json",
+    "regional_county_metadata.json",
+    "model_card.json",
+    "source_catalog.json",
+    "static_export_manifest.json",
+    "regional_counties.geojson",
+    "regional_spatial_regime_overlays.json"
+  ],
+  "generated_at": "2026-05-29T15:53:43+00:00",
+  "record_counts": {
+    "county_metadata": 283,
+    "regional_county_geojson_features": 283,
+    "spatial_regime_overlays": 127,
+    "weekly_risk": 14999
+  },
+  "research_status": {
+    "not_public_maryland_default": true,
+    "research_only": true
+  },
+  "schema_version": "county-week-risk-static-v1"
+}

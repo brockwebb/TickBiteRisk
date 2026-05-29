@@ -49,7 +49,9 @@ jobs:
         run: pytest -q
 
       - name: Check dashboard JavaScript syntax
-        run: node --check public/app.js
+        run: |
+          node --check public/app.js
+          node --check public/regional-research.js
 
       - name: Run dashboard browser smoke
         run: npm run test:dashboard
@@ -78,6 +80,112 @@ jobs:
                   parsed = json.load(handle)
               if filename.endswith(".geojson") and parsed.get("type") != "FeatureCollection":
                   raise SystemExit(f"Expected GeoJSON FeatureCollection: {path}")
+          PY
+
+      - name: Validate regional research preview data
+        run: |
+          python - <<'PY'
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          data_dir = Path("public/research-data/regional")
+          expected_files = [
+              "model_card.json",
+              "regional_counties.geojson",
+              "regional_county_metadata.json",
+              "regional_county_risk_weekly.json",
+              "regional_spatial_regime_overlays.json",
+              "source_catalog.json",
+              "static_export_manifest.json",
+          ]
+          expected_research_status = {
+              "not_public_maryland_default": True,
+              "research_only": True,
+          }
+
+          present = sorted(
+              path.relative_to(data_dir).as_posix()
+              for path in data_dir.rglob("*")
+              if path.is_file()
+          )
+          if present != expected_files:
+              raise SystemExit(
+                  f"Unexpected regional research data files: {present}; expected {expected_files}"
+              )
+
+          def load_json(filename):
+              path = data_dir / filename
+              with path.open(encoding="utf-8") as handle:
+                  return json.load(handle)
+
+          model_card = load_json("model_card.json")
+          weekly = load_json("regional_county_risk_weekly.json")
+          metadata = load_json("regional_county_metadata.json")
+          geojson = load_json("regional_counties.geojson")
+          overlays = load_json("regional_spatial_regime_overlays.json")
+          source_catalog = load_json("source_catalog.json")
+          manifest = load_json("static_export_manifest.json")
+          regional_payloads = {
+              "model_card.json": model_card,
+              "regional_county_metadata.json": metadata,
+              "regional_county_risk_weekly.json": weekly,
+              "regional_spatial_regime_overlays.json": overlays,
+              "source_catalog.json": source_catalog,
+              "static_export_manifest.json": manifest,
+          }
+
+          weekly_counties = {record["county_fips"] for record in weekly["records"]}
+          metadata_counties = {county["county_fips"] for county in metadata["counties"]}
+          geojson_counties = {
+              feature["properties"]["county_fips"] for feature in geojson["features"]
+          }
+          week_counts = Counter(record["county_fips"] for record in weekly["records"])
+
+          for filename, payload in regional_payloads.items():
+              if payload["research_status"] != expected_research_status:
+                  raise SystemExit(f"{filename} must remain research-only.")
+          if weekly["record_count"] != len(weekly["records"]):
+              raise SystemExit("Regional weekly risk record_count does not match records.")
+          if len(weekly_counties) != 283:
+              raise SystemExit(f"Expected 283 regional counties, found {len(weekly_counties)}.")
+          if weekly_counties != metadata_counties or weekly_counties != geojson_counties:
+              raise SystemExit("Regional county FIPS mismatch across weekly, metadata, and GeoJSON assets.")
+          if set(week_counts.values()) != {53}:
+              raise SystemExit("Each regional county must have 53 weekly forecast rows.")
+          if {record["year"] for record in weekly["records"]} != {2026}:
+              raise SystemExit("Regional preview must contain only the 2026 forecast year.")
+          if {record["mmwr_week"] for record in weekly["records"]} != set(range(1, 54)):
+              raise SystemExit("Regional preview must cover MMWR weeks 1-53.")
+          if not all(1 <= record["risk_score"] <= 10 for record in weekly["records"]):
+              raise SystemExit("Regional risk_score values must stay on the 1-10 scale.")
+          allowed_categories = {"very_low", "low", "moderate", "high", "very_high"}
+          if not all(record["risk_category"] in allowed_categories for record in weekly["records"]):
+              raise SystemExit("Regional risk_category contains an unexpected value.")
+
+          if geojson.get("type") != "FeatureCollection":
+              raise SystemExit("Regional counties GeoJSON must be a FeatureCollection.")
+          if geojson["metadata"]["web_map_simplified"] is not True:
+              raise SystemExit("Regional counties GeoJSON must be simplified for web preview.")
+          if geojson["metadata"]["feature_count"] != 283 or len(geojson["features"]) != 283:
+              raise SystemExit("Regional counties GeoJSON must contain 283 county features.")
+
+          if metadata["county_count"] != 283 or not all(
+              county.get("selected_spatial_regime") for county in metadata["counties"]
+          ):
+              raise SystemExit("Regional county metadata must include selected spatial regimes.")
+          if overlays["record_count"] != len(overlays["records"]):
+              raise SystemExit("Regional spatial overlay record_count does not match records.")
+          if manifest["record_counts"]["weekly_risk"] != weekly["record_count"]:
+              raise SystemExit("Regional manifest weekly_risk count does not match payload.")
+          if sorted(manifest["files"]) != expected_files:
+              raise SystemExit("Regional manifest file list does not match committed assets.")
+
+          for source in source_catalog["sources"]:
+              if source.get("redistribution") != "public derived data":
+                  raise SystemExit("Regional source catalog must label redistribution boundaries.")
+              if not source.get("source_id") or not source.get("notes"):
+                  raise SystemExit("Regional source catalog must include source IDs and caveats.")
           PY
 
   deploy:

@@ -1,0 +1,70 @@
+{
+  "data_lag_and_update_policy": {
+    "forecast_boundary": "Forecast-safe branches use prior-year and trailing data; nowcast or retrospective branches must be labeled separately.",
+    "medical_boundary": "Forecasts do not diagnose disease, decide treatment, or determine whether an individual bite caused infection.",
+    "reconciliation_policy": "New observed reports are reconciled against prior forecasts using surveillance-regime diagnostics, calibration backtests, and source quality flags before they are promoted into future reviewed estimates.",
+    "summary": "Official Lyme surveillance data lag real-world exposure conditions, so TickBiteRisk treats forecasts as provisional informational estimates that improve as new validated data arrive.",
+    "why_forecasting": "Forecasting gives timely prevention context while county-level surveillance reports, population denominators, and reviewed source updates catch up."
+  },
+  "export_type": "source_catalog",
+  "generated_at": "2026-05-29T15:53:43+00:00",
+  "guidance_links": [
+    {
+      "title": "CDC: What to do after a tick bite",
+      "url": "https://www.cdc.gov/ticks/after-a-tick-bite/index.html"
+    },
+    {
+      "title": "CDC: Preventing tick bites",
+      "url": "https://www.cdc.gov/ticks/prevention/index.html"
+    },
+    {
+      "title": "CDC: Lyme disease signs and symptoms",
+      "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
+    }
+  ],
+  "input_artifact_sha256": "d63791634c9abe012b2fab2a7957c7219e008834b8222b693faf66bc27f18e7b",
+  "research_status": {
+    "not_public_maryland_default": true,
+    "research_only": true
+  },
+  "schema_version": "county-week-risk-static-v1",
+  "source_prediction_run_id": "regional_annual_forecast_target2026_origin2023_mintrain3_lookback3_shrink5p0_spatialregimes",
+  "source_prediction_sha256": "866af9dbcd39b1629ac4709c73eed0e5835fd3b701158791168f2cdf71286bf3",
+  "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
+  "sources": [
+    {
+      "artifact_type": "derived",
+      "notes": "Derived from selected annual forecast rows and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
+      "redistribution": "public derived data",
+      "sha256": "d63791634c9abe012b2fab2a7957c7219e008834b8222b693faf66bc27f18e7b",
+      "source_id": "county_week_seasonal_risk_baseline"
+    },
+    {
+      "annual_interval_available": true,
+      "annual_interval_method": "empirical_rolling_origin_residual_quantile",
+      "artifact_type": "annual prediction branch",
+      "as_of_date": "2026-05-29",
+      "data_cutoff_date": "2023-12-31",
+      "evaluation_mode": "regional_annual_forecast_no_observed_target",
+      "forecast_origin_year": 2023,
+      "interval_sha256": "9c0427a5d9616e6c778365683861bfc5e0b34bec26d3a907f60d62cc5f1704ef",
+      "model_family": "empirical_bayes_spatial_regime",
+      "model_name": "empirical_bayes_spatial_regime_incidence",
+      "notes": "Selected annual no-observed-target forecast rows; historical backtests are separate validation evidence, not the forecast source.",
+      "redistribution": "public derived data",
+      "run_id": "regional_annual_forecast_target2026_origin2023_mintrain3_lookback3_shrink5p0_spatialregimes",
+      "sha256": "866af9dbcd39b1629ac4709c73eed0e5835fd3b701158791168f2cdf71286bf3",
+      "source_id": "annual_prediction_branch",
+      "source_vintage": "cdc_lyme_county_dashboard_2023",
+      "update_mode": "pre_update",
+      "weather_mode": "not_used_by_regional_annual_forecast"
+    },
+    {
+      "artifact_type": "derived seasonality prior",
+      "notes": "CDC national onset seasonality; not county-specific.",
+      "redistribution": "public derived data",
+      "sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
+      "source_id": "cdc_seasonality_week_2023"
+    }
+  ]
+}
