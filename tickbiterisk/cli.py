@@ -346,6 +346,15 @@ app.add_typer(etl_app, name="etl")
 app.add_typer(risk_app, name="risk")
 app.add_typer(dashboard_app, name="dashboard")
 
+FORECAST_UPDATE_MODE_CHOICES = ("pre_update", "post_observed_outcome")
+
+
+def _validate_forecast_update_mode(update_mode: str) -> None:
+    if update_mode not in FORECAST_UPDATE_MODE_CHOICES:
+        allowed = ", ".join(FORECAST_UPDATE_MODE_CHOICES)
+        raise typer.BadParameter(f"update-mode must be one of: {allowed}")
+
+
 OPEN_METEO_HISTORICAL_WEATHER_CITATION_URL = (
     "https://open-meteo.com/en/docs/historical-weather-api"
 )
@@ -2251,6 +2260,24 @@ def annual_forecast(
         5.0,
         help="Pseudo-count strength for empirical Bayes county shrinkage.",
     ),
+    as_of_date: str = typer.Option(
+        "unspecified",
+        help="Forecast artifact as-of date for provenance.",
+    ),
+    data_cutoff_date: str = typer.Option(
+        "unspecified",
+        help="Latest source data cutoff date represented by this forecast.",
+    ),
+    source_vintage: str | None = typer.Option(
+        None,
+        help="Source vintage label. Defaults to the input design matrix SHA-256.",
+    ),
+    update_mode: str = typer.Option(
+        "pre_update",
+        help=(
+            "Forecast update mode label: pre_update or post_observed_outcome."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/annual-forecast"),
         help="Output directory for annual forecast artifacts.",
@@ -2270,6 +2297,7 @@ def annual_forecast(
         raise typer.BadParameter("min-train-years must be at least 1")
     if shrinkage_strength < 0:
         raise typer.BadParameter("shrinkage-strength must be non-negative")
+    _validate_forecast_update_mode(update_mode)
 
     try:
         result = build_annual_forecast(
@@ -2279,6 +2307,10 @@ def annual_forecast(
             forecast_origin_year=forecast_origin_year,
             min_train_years=min_train_years,
             shrinkage_strength=shrinkage_strength,
+            as_of_date=as_of_date,
+            data_cutoff_date=data_cutoff_date,
+            source_vintage=source_vintage,
+            update_mode=update_mode,
         )
     except AnnualForecastInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -2912,6 +2944,24 @@ def regional_annual_forecast(
         5.0,
         help="Pseudo-year strength for empirical-Bayes incidence shrinkage.",
     ),
+    as_of_date: str = typer.Option(
+        "unspecified",
+        help="Forecast artifact as-of date for provenance.",
+    ),
+    data_cutoff_date: str = typer.Option(
+        "unspecified",
+        help="Latest source data cutoff date represented by this forecast.",
+    ),
+    source_vintage: str | None = typer.Option(
+        None,
+        help="Source vintage label. Defaults to the regional incidence SHA-256.",
+    ),
+    update_mode: str = typer.Option(
+        "pre_update",
+        help=(
+            "Forecast update mode label: pre_update or post_observed_outcome."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/regional-annual-forecast"),
         help="Output directory for regional annual forecast artifacts.",
@@ -2937,6 +2987,7 @@ def regional_annual_forecast(
         raise typer.BadParameter(
             "shrinkage-strength must be finite and non-negative"
         )
+    _validate_forecast_update_mode(update_mode)
 
     try:
         result = build_regional_annual_forecast(
@@ -2947,6 +2998,10 @@ def regional_annual_forecast(
             min_train_years=min_train_years,
             lookback_years=lookback_years,
             shrinkage_strength=shrinkage_strength,
+            as_of_date=as_of_date,
+            data_cutoff_date=data_cutoff_date,
+            source_vintage=source_vintage,
+            update_mode=update_mode,
         )
     except RegionalAnnualForecastInputError as exc:
         raise typer.BadParameter(str(exc)) from exc

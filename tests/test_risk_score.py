@@ -129,12 +129,39 @@ def test_build_seasonal_risk_scores_reads_annual_forecast_predictions(
     assert len(result.rows) == 4
     first = result.rows[0]
     assert first.year == 2026
+    assert first.forecast_origin_year == 2024
+    assert first.as_of_date == "2026-05-28"
+    assert first.data_cutoff_date == "2024-12-31"
+    assert first.source_vintage == "mdh_2024_reviewed_v1"
+    assert first.update_mode == "pre_update"
     assert first.evaluation_mode == "annual_forecast_no_observed_target"
     assert first.predicted_annual_cases == 21.0
     assert first.model_feature_quality_flags == "mdh_probable_only_2024"
     assert "forecast_without_observed_target" in first.backtest_assumption_flags
     assert "no_official_2026_census_denominator" in first.backtest_assumption_flags
     assert "drought_monitor_retro_observed" not in first.feature_quality_flags
+
+
+def test_build_seasonal_risk_scores_keeps_legacy_inputs_backward_compatible(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_model_comparison_predictions(
+        tmp_path / "model_comparison_predictions.csv"
+    )
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+
+    result = build_seasonal_risk_scores(
+        predictions_path=predictions_path,
+        seasonality_baseline_path=seasonality_path,
+        model_name="ridge_forecast_safe",
+    )
+
+    first = result.rows[0]
+    assert first.forecast_origin_year == 2019
+    assert first.as_of_date == "unspecified"
+    assert first.data_cutoff_date == "unspecified"
+    assert first.source_vintage == "b" * 64
+    assert first.update_mode == "pre_update"
 
 
 def test_build_seasonal_risk_scores_filters_unused_research_flags_for_lagged_branch(
@@ -575,6 +602,10 @@ def _annual_forecast_prediction_row(
         "forecast_year": "2026",
         "forecast_origin_year": "2024",
         "forecast_horizon_years": "2",
+        "as_of_date": "2026-05-28",
+        "data_cutoff_date": "2024-12-31",
+        "source_vintage": "mdh_2024_reviewed_v1",
+        "update_mode": "pre_update",
         "predicted_cases": predicted_cases,
         "predicted_incidence_per_100k": predicted_incidence,
         "model_feature_quality_flags": (

@@ -7,7 +7,7 @@
     "why_forecasting": "Forecasting gives timely prevention context while county-level surveillance reports, population denominators, and reviewed source updates catch up."
   },
   "export_type": "source_catalog",
-  "generated_at": "2026-05-28T23:46:18+00:00",
+  "generated_at": "2026-05-29T00:00:16+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -22,7 +22,7 @@
       "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
     }
   ],
-  "input_artifact_sha256": "17b9b34103002e05d32ee23a55a342df047642a211b6ba750deb3f02c0887fa8",
+  "input_artifact_sha256": "445c0e2218eb800df5a728433cfb0580385c395590654120a1ab85666c921c5c",
   "schema_version": "county-week-risk-static-v1",
   "source_prediction_run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
   "source_prediction_sha256": "289a1394e95ce292ca83fdf91c08d1b2f8511d0c2724538d1f08107c0a63af95",
@@ -32,12 +32,15 @@
       "artifact_type": "derived",
       "notes": "Derived from selected annual forecast rows and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
       "redistribution": "public derived data",
-      "sha256": "17b9b34103002e05d32ee23a55a342df047642a211b6ba750deb3f02c0887fa8",
+      "sha256": "445c0e2218eb800df5a728433cfb0580385c395590654120a1ab85666c921c5c",
       "source_id": "county_week_seasonal_risk_baseline"
     },
     {
       "artifact_type": "annual prediction branch",
+      "as_of_date": "unspecified",
+      "data_cutoff_date": "unspecified",
       "evaluation_mode": "rolling_origin_prior_years",
+      "forecast_origin_year": 2023,
       "model_family": "ensemble",
       "model_name": "linear_blend_baseline",
       "notes": "Selected annual forecast rows from prior-year validation; not raw surveillance data.",
@@ -45,6 +48,8 @@
       "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
       "sha256": "289a1394e95ce292ca83fdf91c08d1b2f8511d0c2724538d1f08107c0a63af95",
       "source_id": "annual_prediction_branch",
+      "source_vintage": "612eee73315dcdd4fbbf5fe05a9f6a6b1c3fc1d8d0e364320ab43695ff08ce7f",
+      "update_mode": "pre_update",
       "weather_mode": "not_used_by_lagged_model"
     },
     {

@@ -190,6 +190,12 @@ def test_county_week_risk_tables_define_score_bounds_and_keys() -> None:
 
     assert "CREATE TABLE IF NOT EXISTS county_week_seasonal_risk_baseline" in schema
     assert "mmwr_week integer NOT NULL CHECK (mmwr_week BETWEEN 1 AND 53)" in schema
+    assert "forecast_origin_year integer" in schema
+    assert "as_of_date text NOT NULL DEFAULT 'unspecified'" in schema
+    assert "data_cutoff_date text NOT NULL DEFAULT 'unspecified'" in schema
+    assert "source_vintage text NOT NULL DEFAULT 'unspecified'" in schema
+    assert "update_mode text NOT NULL DEFAULT 'pre_update'" in schema
+    assert "'post_observed_outcome'" in schema
     assert "risk_score integer NOT NULL CHECK (risk_score BETWEEN 1 AND 10)" in schema
     assert "risk_category text NOT NULL" in schema
     assert "score_denominator double precision NOT NULL" in schema

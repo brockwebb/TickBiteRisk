@@ -39,6 +39,13 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert weekly["seasonality_source_id"] == "cdc_seasonality_week_2023"
     assert weekly["score_scale"]["range"] == [1, 10]
     assert weekly["selected_score_config"]["source_prediction_sha256"] == "a" * 64
+    assert weekly["selected_forecast_metadata"] == {
+        "forecast_origin_year": 2022,
+        "as_of_date": "2026-05-28",
+        "data_cutoff_date": "2024-12-31",
+        "source_vintage": "mdh_2024_reviewed_v1",
+        "update_mode": "pre_update",
+    }
     assert (
         "Relative Maryland county-week Lyme forecast, not a per-bite infection probability."
         in weekly["caveats"]
@@ -84,6 +91,11 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert model_card["annual_prediction_source"]["weather_mode"] == (
         "not_used_by_baseline"
     )
+    assert model_card["annual_prediction_source"]["forecast_origin_year"] == 2022
+    assert model_card["annual_prediction_source"]["as_of_date"] == "2026-05-28"
+    assert model_card["annual_prediction_source"]["source_vintage"] == (
+        "mdh_2024_reviewed_v1"
+    )
     assert model_card["validation_summary"] == {
         "run_id": "run1",
         "model_name": "linear_blend_baseline",
@@ -125,6 +137,8 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert source_catalog["sources"][1]["run_id"] == "run1"
     assert source_catalog["sources"][1]["sha256"] == "a" * 64
     assert source_catalog["sources"][1]["model_name"] == "linear_blend_baseline"
+    assert source_catalog["sources"][1]["forecast_origin_year"] == 2022
+    assert source_catalog["sources"][1]["update_mode"] == "pre_update"
     assert source_catalog["sources"][2]["artifact_type"] == "derived seasonality prior"
     public_notes = " ".join(source["notes"] for source in source_catalog["sources"])
     assert "model-comparison" not in public_notes

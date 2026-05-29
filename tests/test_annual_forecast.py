@@ -27,10 +27,18 @@ def test_build_annual_forecast_emits_target_year_rows_without_actuals(
         forecast_origin_year=2024,
         min_train_years=2,
         shrinkage_strength=3.0,
+        as_of_date="2026-05-28",
+        data_cutoff_date="2024-12-31",
+        source_vintage="mdh_2024_reviewed_v1",
+        update_mode="pre_update",
     )
 
     assert result.run.target_year == 2026
     assert result.run.forecast_origin_year == 2024
+    assert result.run.as_of_date == "2026-05-28"
+    assert result.run.data_cutoff_date == "2024-12-31"
+    assert result.run.source_vintage == "mdh_2024_reviewed_v1"
+    assert result.run.update_mode == "pre_update"
     assert result.run.n_forecast_rows == 8
     assert "forecast_without_observed_target" in result.run.forecast_assumption_flags
     assert {row.model_name for row in result.predictions} == {
@@ -48,6 +56,10 @@ def test_build_annual_forecast_emits_target_year_rows_without_actuals(
     )
     assert latest.forecast_year == 2026
     assert latest.forecast_origin_year == 2024
+    assert latest.as_of_date == "2026-05-28"
+    assert latest.data_cutoff_date == "2024-12-31"
+    assert latest.source_vintage == "mdh_2024_reviewed_v1"
+    assert latest.update_mode == "pre_update"
     assert latest.forecast_horizon_years == 2
     assert latest.forecast_population == 110000
     assert latest.population_source_id == "regional_population_linear_projection"
@@ -85,6 +97,18 @@ def test_build_annual_forecast_requires_future_target_year(tmp_path: Path) -> No
             population_path=population,
             target_year=2024,
             forecast_origin_year=2024,
+        )
+
+
+def test_build_annual_forecast_rejects_unknown_update_mode(tmp_path: Path) -> None:
+    with pytest.raises(AnnualForecastInputError, match="update_mode"):
+        build_annual_forecast(
+            design_matrix_path=_write_design_matrix(tmp_path / "design_matrix.csv"),
+            population_path=_write_population(tmp_path / "population.csv"),
+            target_year=2026,
+            forecast_origin_year=2024,
+            min_train_years=2,
+            update_mode="post_update",
         )
 
 

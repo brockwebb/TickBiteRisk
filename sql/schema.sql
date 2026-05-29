@@ -477,6 +477,13 @@ CREATE TABLE IF NOT EXISTS county_week_seasonal_risk_baseline (
     county_fips char(5) NOT NULL REFERENCES md_jurisdictions(county_fips),
     county_name text NOT NULL,
     year integer NOT NULL,
+    forecast_origin_year integer,
+    as_of_date text NOT NULL DEFAULT 'unspecified',
+    data_cutoff_date text NOT NULL DEFAULT 'unspecified',
+    source_vintage text NOT NULL DEFAULT 'unspecified',
+    update_mode text NOT NULL DEFAULT 'pre_update' CHECK (
+        update_mode IN ('pre_update', 'post_observed_outcome')
+    ),
     mmwr_week integer NOT NULL CHECK (mmwr_week BETWEEN 1 AND 53),
     period_label text NOT NULL,
     predicted_annual_incidence_per_100k double precision NOT NULL CHECK (

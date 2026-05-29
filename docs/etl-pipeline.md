@@ -158,6 +158,8 @@ artifacts.
      incidence per 100k, not public forecasts or latent true disease estimates.
 
 1i-2. `tickbiterisk etl regional-annual-forecast`
+   - Typical 2026 run:
+     `tickbiterisk etl regional-annual-forecast --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --as-of-date 2026-05-28 --data-cutoff-date 2023-12-31 --source-vintage cdc_lyme_county_dashboard_2023 --update-mode pre_update --output-dir build/etl/regional-annual-forecast`.
    - Projects the Mid-Atlantic reported-incidence panel into a target year
      without observed target-year Lyme outcomes.
    - Defaults the forecast origin to the latest incidence year in the input
@@ -166,6 +168,10 @@ artifacts.
      projected Census denominators and preserve projection flags.
    - Writes `regional_annual_forecast_runs.csv` and
      `regional_annual_forecast_predictions.csv`.
+   - Run and prediction rows preserve `forecast_origin_year`, `as_of_date`,
+     `data_cutoff_date`, `source_vintage`, and `update_mode`; when
+     `source_vintage` is omitted it falls back to the regional incidence input
+     SHA-256.
    - Prediction rows intentionally omit actual, residual, error, and metrics
      columns. This is a regional forecast scaffold, not the public Maryland
      dashboard default.
@@ -340,7 +346,7 @@ artifacts.
 
 16b. `tickbiterisk etl annual-forecast`
     - Typical 2026 run:
-      `tickbiterisk etl annual-forecast --design-matrix-path build/etl/model/model_design_matrix_county_year.csv --population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --forecast-origin-year 2024 --output-dir build/etl/annual-forecast`.
+      `tickbiterisk etl annual-forecast --design-matrix-path build/etl/model/model_design_matrix_county_year.csv --population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --forecast-origin-year 2024 --as-of-date 2026-05-28 --data-cutoff-date 2024-12-31 --source-vintage 2024-inclusive-local --update-mode pre_update --output-dir build/etl/annual-forecast`.
     - Trains transparent lagged-outcome annual forecast branches through the
       declared `forecast_origin_year` and scores a later `target_year` without
       requiring observed target-year Lyme outcomes.
@@ -349,6 +355,9 @@ artifacts.
       rows and preserve explicit forecast/projection flags.
     - Writes `annual_forecast_runs.csv` and
       `annual_forecast_predictions.csv`.
+    - Run and prediction rows preserve `forecast_origin_year`, `as_of_date`,
+      `data_cutoff_date`, `source_vintage`, and `update_mode`; when
+      `source_vintage` is omitted it falls back to the design matrix SHA-256.
     - Prediction rows intentionally omit observed target, actual, residual,
       error, and coverage columns because this artifact is a true forecast, not
       a rolling-origin evaluation table.
@@ -391,11 +400,19 @@ artifacts.
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.
       The input can be a rolling-origin model-comparison prediction table or a
       true annual forecast table with `forecast_year`.
+    - Carries forecast-vintage metadata into the county-week artifact. Legacy
+      model-comparison inputs default to `train_end_year` as
+      `forecast_origin_year`, `unspecified` as-of/cutoff dates, the source or
+      design-matrix SHA carried by the prediction row as `source_vintage`, and
+      `pre_update` as `update_mode`.
     - Writes `county_week_seasonal_risk_baseline.csv` and
       `risk_score_scale.csv`.
 
 19. `tickbiterisk risk export-static`
     - Selects one unambiguous model/source/scale branch for public use.
+    - Exposes the selected forecast metadata in `md_county_risk_weekly.json`,
+      `model_card.json`, and `source_catalog.json` so public static bundles are
+      auditable by forecast origin and source vintage.
     - Writes dashboard JSON files under `public/data`.
 
 ## Runtime lookup

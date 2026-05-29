@@ -294,6 +294,7 @@ def _weekly_payload(
         "record_count": len(records),
         "year_selection": "latest_available_per_county_mmwr_week",
         "selected_score_config": _selected_score_config(first),
+        "selected_forecast_metadata": _selected_forecast_metadata(first),
         "score_scale": {
             "range": [1, 10],
             "categories": SCORE_CATEGORIES,
@@ -537,6 +538,7 @@ def _source_catalog_payload(
                 "model_family": first.model_family,
                 "evaluation_mode": first.evaluation_mode,
                 "weather_mode": first.weather_mode,
+                **_selected_forecast_metadata(first),
                 "notes": (
                     "Selected annual forecast rows from prior-year validation; "
                     "not raw surveillance data."
@@ -562,6 +564,7 @@ def _annual_prediction_source(record: CountyWeekRiskRecord) -> dict[str, object]
         "model_family": record.model_family,
         "evaluation_mode": record.evaluation_mode,
         "weather_mode": record.weather_mode,
+        **_selected_forecast_metadata(record),
     }
 
 
@@ -616,6 +619,16 @@ def _selected_score_config(record: CountyWeekRiskRecord) -> dict[str, object]:
         "source_prediction_run_id": record.source_prediction_run_id,
         "source_prediction_sha256": record.source_prediction_sha256,
         "source_seasonality_sha256": record.source_seasonality_sha256,
+    }
+
+
+def _selected_forecast_metadata(record: CountyWeekRiskRecord) -> dict[str, object]:
+    return {
+        "forecast_origin_year": record.forecast_origin_year,
+        "as_of_date": record.as_of_date,
+        "data_cutoff_date": record.data_cutoff_date,
+        "source_vintage": record.source_vintage,
+        "update_mode": record.update_mode,
     }
 
 

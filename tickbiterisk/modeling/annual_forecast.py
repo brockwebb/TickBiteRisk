@@ -56,6 +56,7 @@ FORECAST_ORIGIN_ASSUMPTION_FLAG_ALLOWLIST = {
     "state_source_not_cdc_public_use",
     "reported_cases_not_stable_true_incidence",
 }
+ALLOWED_UPDATE_MODES = {"pre_update", "post_observed_outcome"}
 
 
 class AnnualForecastInputError(ValueError):
@@ -71,6 +72,10 @@ class AnnualForecastRun:
     population_sha256: str
     target_year: int
     forecast_origin_year: int
+    as_of_date: str
+    data_cutoff_date: str
+    source_vintage: str
+    update_mode: str
     min_train_years: int
     shrinkage_strength: float
     model_names: str
@@ -99,6 +104,10 @@ class AnnualForecastPrediction:
     county_name: str
     forecast_year: int
     forecast_origin_year: int
+    as_of_date: str
+    data_cutoff_date: str
+    source_vintage: str
+    update_mode: str
     forecast_horizon_years: int
     train_start_year: int
     train_end_year: int
@@ -140,6 +149,10 @@ def build_annual_forecast(
     forecast_origin_year: int,
     min_train_years: int = 5,
     shrinkage_strength: float = 5.0,
+    as_of_date: str = "unspecified",
+    data_cutoff_date: str = "unspecified",
+    source_vintage: str | None = None,
+    update_mode: str = "pre_update",
 ) -> AnnualForecastResult:
     if target_year <= forecast_origin_year:
         raise AnnualForecastInputError(
@@ -149,6 +162,9 @@ def build_annual_forecast(
         raise AnnualForecastInputError("min_train_years must be at least 1")
     if shrinkage_strength < 0:
         raise AnnualForecastInputError("shrinkage_strength must be non-negative")
+    if update_mode not in ALLOWED_UPDATE_MODES:
+        allowed = ", ".join(sorted(ALLOWED_UPDATE_MODES))
+        raise AnnualForecastInputError(f"update_mode must be one of: {allowed}")
 
     rows, _feature_columns = _read_training_design_rows(design_matrix_path)
     train_rows = [row for row in rows if row.year <= forecast_origin_year]
@@ -172,6 +188,7 @@ def build_annual_forecast(
 
     source_sha = _sha256_file(design_matrix_path)
     population_sha = _sha256_file(population_path)
+    resolved_source_vintage = source_vintage or source_sha
     train_start_year = min(row.year for row in train_rows)
     train_end_year = max(row.year for row in train_rows)
     train_county_count = len({row.county_fips for row in train_rows})
@@ -198,6 +215,10 @@ def build_annual_forecast(
                     design_matrix_sha=source_sha,
                     population_sha=population_sha,
                     forecast_origin_year=forecast_origin_year,
+                    as_of_date=as_of_date,
+                    data_cutoff_date=data_cutoff_date,
+                    source_vintage=resolved_source_vintage,
+                    update_mode=update_mode,
                     train_start_year=train_start_year,
                     train_end_year=train_end_year,
                     train_row_count=len(train_rows),
@@ -213,6 +234,10 @@ def build_annual_forecast(
         population_sha256=population_sha,
         target_year=target_year,
         forecast_origin_year=forecast_origin_year,
+        as_of_date=as_of_date,
+        data_cutoff_date=data_cutoff_date,
+        source_vintage=resolved_source_vintage,
+        update_mode=update_mode,
         min_train_years=min_train_years,
         shrinkage_strength=shrinkage_strength,
         model_names=",".join(sorted({row.model_name for row in predictions})),
@@ -325,6 +350,10 @@ def _forecast_prediction_row(
     design_matrix_sha: str,
     population_sha: str,
     forecast_origin_year: int,
+    as_of_date: str,
+    data_cutoff_date: str,
+    source_vintage: str,
+    update_mode: str,
     train_start_year: int,
     train_end_year: int,
     train_row_count: int,
@@ -352,6 +381,10 @@ def _forecast_prediction_row(
         county_name=row.county_name,
         forecast_year=row.year,
         forecast_origin_year=forecast_origin_year,
+        as_of_date=as_of_date,
+        data_cutoff_date=data_cutoff_date,
+        source_vintage=source_vintage,
+        update_mode=update_mode,
         forecast_horizon_years=row.year - forecast_origin_year,
         train_start_year=train_start_year,
         train_end_year=train_end_year,

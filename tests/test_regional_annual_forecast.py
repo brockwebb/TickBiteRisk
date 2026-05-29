@@ -28,10 +28,18 @@ def test_build_regional_annual_forecast_emits_target_year_rows_without_actuals(
         min_train_years=2,
         lookback_years=2,
         shrinkage_strength=2.0,
+        as_of_date="2026-05-28",
+        data_cutoff_date="2023-12-31",
+        source_vintage="cdc_2023_dashboard_v1",
+        update_mode="pre_update",
     )
 
     assert result.run.target_year == 2023
     assert result.run.forecast_origin_year == 2021
+    assert result.run.as_of_date == "2026-05-28"
+    assert result.run.data_cutoff_date == "2023-12-31"
+    assert result.run.source_vintage == "cdc_2023_dashboard_v1"
+    assert result.run.update_mode == "pre_update"
     assert result.run.n_training_rows == 8
     assert result.run.n_forecast_counties == 4
     assert result.run.n_forecast_rows == 16
@@ -50,6 +58,10 @@ def test_build_regional_annual_forecast_emits_target_year_rows_without_actuals(
     )
     assert latest.forecast_year == 2023
     assert latest.forecast_origin_year == 2021
+    assert latest.as_of_date == "2026-05-28"
+    assert latest.data_cutoff_date == "2023-12-31"
+    assert latest.source_vintage == "cdc_2023_dashboard_v1"
+    assert latest.update_mode == "pre_update"
     assert latest.forecast_horizon_years == 2
     assert latest.feature_profile == "latest_observed_origin_incidence"
     assert latest.forecast_population == 110000
@@ -135,6 +147,21 @@ def test_build_regional_annual_forecast_requires_future_target_year(
             population_path=_write_population(tmp_path / "population.csv"),
             target_year=2021,
             forecast_origin_year=2021,
+        )
+
+
+def test_build_regional_annual_forecast_rejects_unknown_update_mode(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(RegionalAnnualForecastInputError, match="update_mode"):
+        build_regional_annual_forecast(
+            regional_incidence_path=_write_incidence_panel(tmp_path / "incidence.csv"),
+            population_path=_write_population(tmp_path / "population.csv"),
+            target_year=2023,
+            forecast_origin_year=2021,
+            min_train_years=2,
+            lookback_years=2,
+            update_mode="post_update",
         )
 
 

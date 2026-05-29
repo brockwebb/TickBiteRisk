@@ -57,6 +57,7 @@ FORECAST_ORIGIN_ASSUMPTION_FLAG_ALLOWLIST = {
     "not_public_maryland_default",
     "cdc_dashboard_total_cases",
 }
+ALLOWED_UPDATE_MODES = {"pre_update", "post_observed_outcome"}
 
 
 class RegionalAnnualForecastInputError(ValueError):
@@ -72,6 +73,10 @@ class RegionalAnnualForecastRun:
     regional_population_sha256: str
     target_year: int
     forecast_origin_year: int
+    as_of_date: str
+    data_cutoff_date: str
+    source_vintage: str
+    update_mode: str
     min_train_years: int
     lookback_years: int
     shrinkage_strength: float
@@ -103,6 +108,10 @@ class RegionalAnnualForecastPrediction:
     county_name: str
     forecast_year: int
     forecast_origin_year: int
+    as_of_date: str
+    data_cutoff_date: str
+    source_vintage: str
+    update_mode: str
     forecast_horizon_years: int
     train_start_year: int
     train_end_year: int
@@ -161,6 +170,10 @@ def build_regional_annual_forecast(
     min_train_years: int = 3,
     lookback_years: int = 3,
     shrinkage_strength: float = 5.0,
+    as_of_date: str = "unspecified",
+    data_cutoff_date: str = "unspecified",
+    source_vintage: str | None = None,
+    update_mode: str = "pre_update",
 ) -> RegionalAnnualForecastResult:
     if min_train_years < 1:
         raise RegionalAnnualForecastInputError("min_train_years must be at least 1")
@@ -171,6 +184,11 @@ def build_regional_annual_forecast(
     if not math.isfinite(shrinkage_strength) or shrinkage_strength < 0:
         raise RegionalAnnualForecastInputError(
             "shrinkage_strength must be finite and non-negative"
+        )
+    if update_mode not in ALLOWED_UPDATE_MODES:
+        allowed = ", ".join(sorted(ALLOWED_UPDATE_MODES))
+        raise RegionalAnnualForecastInputError(
+            f"update_mode must be one of: {allowed}"
         )
 
     rows = _read_incidence_rows(regional_incidence_path)
@@ -200,6 +218,7 @@ def build_regional_annual_forecast(
 
     regional_incidence_sha = _sha256_file(regional_incidence_path)
     population_sha = _sha256_file(population_path)
+    resolved_source_vintage = source_vintage or regional_incidence_sha
     run_id = (
         f"regional_annual_forecast_target{target_year}_"
         f"origin{resolved_origin_year}_mintrain{min_train_years}_"
@@ -218,6 +237,10 @@ def build_regional_annual_forecast(
         run_id=run_id,
         regional_incidence_sha=regional_incidence_sha,
         population_sha=population_sha,
+        as_of_date=as_of_date,
+        data_cutoff_date=data_cutoff_date,
+        source_vintage=resolved_source_vintage,
+        update_mode=update_mode,
     )
     if not forecast_rows:
         raise RegionalAnnualForecastInputError(
@@ -232,6 +255,10 @@ def build_regional_annual_forecast(
         regional_population_sha256=population_sha,
         target_year=target_year,
         forecast_origin_year=resolved_origin_year,
+        as_of_date=as_of_date,
+        data_cutoff_date=data_cutoff_date,
+        source_vintage=resolved_source_vintage,
+        update_mode=update_mode,
         min_train_years=min_train_years,
         lookback_years=lookback_years,
         shrinkage_strength=shrinkage_strength,
@@ -271,6 +298,10 @@ def _forecast_rows(
     run_id: str,
     regional_incidence_sha: str,
     population_sha: str,
+    as_of_date: str,
+    data_cutoff_date: str,
+    source_vintage: str,
+    update_mode: str,
 ) -> list[RegionalAnnualForecastPrediction]:
     predictions = []
     window_start = forecast_origin_year - lookback_years + 1
@@ -326,6 +357,10 @@ def _forecast_rows(
                     predicted_incidence=model_predictions[model_name],
                     regional_incidence_sha=regional_incidence_sha,
                     population_sha=population_sha,
+                    as_of_date=as_of_date,
+                    data_cutoff_date=data_cutoff_date,
+                    source_vintage=source_vintage,
+                    update_mode=update_mode,
                     flags=flags,
                 )
             )
@@ -386,6 +421,10 @@ def _prediction_row(
     predicted_incidence: float,
     regional_incidence_sha: str,
     population_sha: str,
+    as_of_date: str,
+    data_cutoff_date: str,
+    source_vintage: str,
+    update_mode: str,
     flags: str,
 ) -> RegionalAnnualForecastPrediction:
     predicted_incidence = _round(max(predicted_incidence, 0.0))
@@ -407,6 +446,10 @@ def _prediction_row(
         county_name=latest.county_name,
         forecast_year=target_year,
         forecast_origin_year=forecast_origin_year,
+        as_of_date=as_of_date,
+        data_cutoff_date=data_cutoff_date,
+        source_vintage=source_vintage,
+        update_mode=update_mode,
         forecast_horizon_years=target_year - forecast_origin_year,
         train_start_year=train_start_year,
         train_end_year=train_end_year,

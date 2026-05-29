@@ -170,6 +170,23 @@ def test_lookup_requires_unambiguous_source_version_when_same_scale_overlaps(
     assert response.source_metadata["source_prediction_run_id"] == "run2"
 
 
+def test_lookup_exposes_forecast_vintage_metadata(tmp_path: Path) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    store = RiskLookupStore.from_csv(scores_path)
+
+    response = store.lookup(
+        county_fips="24003",
+        query_date="2023-01-01",
+        model_name="linear_blend_baseline",
+    )
+
+    assert response.source_metadata["forecast_origin_year"] == "2022"
+    assert response.source_metadata["as_of_date"] == "2026-05-28"
+    assert response.source_metadata["data_cutoff_date"] == "2024-12-31"
+    assert response.source_metadata["source_vintage"] == "mdh_2024_reviewed_v1"
+    assert response.source_metadata["update_mode"] == "pre_update"
+
+
 def test_lookup_rejects_unknown_county(tmp_path: Path) -> None:
     scores_path = _write_scores(tmp_path / "scores.csv")
     store = RiskLookupStore.from_csv(scores_path)
@@ -232,6 +249,11 @@ def _score_row(
         "feature_set": "historical_outcome_baselines",
         "evaluation_mode": "forecast_prior_year",
         "weather_mode": "not_used_by_baseline",
+        "forecast_origin_year": "2022",
+        "as_of_date": "2026-05-28",
+        "data_cutoff_date": "2024-12-31",
+        "source_vintage": "mdh_2024_reviewed_v1",
+        "update_mode": "pre_update",
         "county_fips": county_fips,
         "county_name": county_name,
         "year": year,

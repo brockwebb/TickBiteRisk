@@ -86,6 +86,11 @@ class CountyWeekRiskRecord:
     county_fips: str
     county_name: str
     year: int
+    forecast_origin_year: int | None
+    as_of_date: str
+    data_cutoff_date: str
+    source_vintage: str
+    update_mode: str
     mmwr_week: int
     period_label: str
     predicted_annual_incidence_per_100k: float
@@ -326,6 +331,14 @@ class RiskLookupStore:
                 "source_prediction_run_id": record.source_prediction_run_id,
                 "source_prediction_sha256": record.source_prediction_sha256,
                 "source_seasonality_sha256": record.source_seasonality_sha256,
+                "forecast_origin_year": (
+                    "" if record.forecast_origin_year is None
+                    else str(record.forecast_origin_year)
+                ),
+                "as_of_date": record.as_of_date,
+                "data_cutoff_date": record.data_cutoff_date,
+                "source_vintage": record.source_vintage,
+                "update_mode": record.update_mode,
             },
             feature_quality_flags=_split_flags(record.feature_quality_flags),
             backtest_assumption_flags=_split_flags(record.backtest_assumption_flags),
@@ -384,6 +397,18 @@ def _score_record_from_row(row: dict[str, str]) -> CountyWeekRiskRecord:
         county_fips=_normalize_fips(row["county_fips"]),
         county_name=row["county_name"],
         year=_parse_int(row["year"], "year"),
+        forecast_origin_year=_parse_optional_int(
+            row.get("forecast_origin_year", ""),
+            "forecast_origin_year",
+        ),
+        as_of_date=row.get("as_of_date", "") or "unspecified",
+        data_cutoff_date=row.get("data_cutoff_date", "") or "unspecified",
+        source_vintage=(
+            row.get("source_vintage", "")
+            or row.get("source_prediction_sha256", "")
+            or "unspecified"
+        ),
+        update_mode=row.get("update_mode", "") or "pre_update",
         mmwr_week=_parse_week(row["mmwr_week"]),
         period_label=row["period_label"],
         predicted_annual_incidence_per_100k=_parse_float(
@@ -491,6 +516,12 @@ def _parse_int(value: str, field_name: str) -> int:
         return int(str(value).replace(",", "").strip())
     except ValueError as exc:
         raise RiskLookupInputError(f"{field_name} must be an integer") from exc
+
+
+def _parse_optional_int(value: str, field_name: str) -> int | None:
+    if str(value or "").strip() == "":
+        return None
+    return _parse_int(value, field_name)
 
 
 def _parse_week(value: str) -> int:

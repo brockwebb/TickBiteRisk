@@ -1,3 +1,4 @@
+import csv
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -32,6 +33,14 @@ def test_regional_annual_forecast_command_writes_outputs(tmp_path: Path) -> None
             "2",
             "--lookback-years",
             "2",
+            "--as-of-date",
+            "2026-05-28",
+            "--data-cutoff-date",
+            "2023-12-31",
+            "--source-vintage",
+            "cdc_2023_dashboard_v1",
+            "--update-mode",
+            "pre_update",
             "--output-dir",
             str(output_dir),
         ],
@@ -42,6 +51,16 @@ def test_regional_annual_forecast_command_writes_outputs(tmp_path: Path) -> None
     assert "regional_annual_forecast_predictions.csv" in result.stdout
     assert (output_dir / "regional_annual_forecast_runs.csv").exists()
     assert (output_dir / "regional_annual_forecast_predictions.csv").exists()
+
+    with (output_dir / "regional_annual_forecast_predictions.csv").open(
+        encoding="utf-8",
+        newline="",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert {row["as_of_date"] for row in rows} == {"2026-05-28"}
+    assert {row["data_cutoff_date"] for row in rows} == {"2023-12-31"}
+    assert {row["source_vintage"] for row in rows} == {"cdc_2023_dashboard_v1"}
+    assert {row["update_mode"] for row in rows} == {"pre_update"}
 
 
 def test_regional_annual_forecast_command_fails_cleanly_when_input_missing(
@@ -96,4 +115,40 @@ def test_regional_annual_forecast_command_rejects_non_future_target_year(
 
     assert result.exit_code != 0
     assert "target-year must be greater than forecast-origin-year" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_regional_annual_forecast_command_rejects_unknown_update_mode(
+    tmp_path: Path,
+) -> None:
+    panel = _write_incidence_panel(tmp_path / "incidence.csv")
+    population = _write_population(tmp_path / "population.csv")
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "regional-annual-forecast",
+            "--regional-incidence-path",
+            str(panel),
+            "--population-path",
+            str(population),
+            "--target-year",
+            "2023",
+            "--forecast-origin-year",
+            "2021",
+            "--min-train-years",
+            "2",
+            "--lookback-years",
+            "2",
+            "--update-mode",
+            "post_update",
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+        env={"COLUMNS": "200"},
+    )
+
+    assert result.exit_code != 0
+    assert "update-mode must be one of" in result.output
     assert "Traceback" not in result.output

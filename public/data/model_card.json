@@ -1,11 +1,16 @@
 {
   "annual_prediction_source": {
     "artifact_type": "annual_prediction_branch",
+    "as_of_date": "unspecified",
+    "data_cutoff_date": "unspecified",
     "evaluation_mode": "rolling_origin_prior_years",
+    "forecast_origin_year": 2023,
     "model_family": "ensemble",
     "model_name": "linear_blend_baseline",
     "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
     "sha256": "289a1394e95ce292ca83fdf91c08d1b2f8511d0c2724538d1f08107c0a63af95",
+    "source_vintage": "612eee73315dcdd4fbbf5fe05a9f6a6b1c3fc1d8d0e364320ab43695ff08ce7f",
+    "update_mode": "pre_update",
     "weather_mode": "not_used_by_lagged_model"
   },
   "caveats": [
@@ -48,7 +53,7 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-28T23:46:18+00:00",
+  "generated_at": "2026-05-29T00:00:16+00:00",
   "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
   "model_name": "linear_blend_baseline",
   "not_for": [

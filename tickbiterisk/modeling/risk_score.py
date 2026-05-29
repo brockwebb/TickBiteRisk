@@ -56,6 +56,11 @@ class SeasonalRiskScore:
     county_fips: str
     county_name: str
     year: int
+    forecast_origin_year: int | None
+    as_of_date: str
+    data_cutoff_date: str
+    source_vintage: str
+    update_mode: str
     mmwr_week: int
     period_label: str
     predicted_annual_incidence_per_100k: float
@@ -121,6 +126,11 @@ class _PredictionInput:
     county_fips: str
     county_name: str
     year: int
+    forecast_origin_year: int | None
+    as_of_date: str
+    data_cutoff_date: str
+    source_vintage: str
+    update_mode: str
     predicted_cases: float
     predicted_incidence_per_100k: float
     model_feature_quality_flags: str
@@ -250,6 +260,11 @@ def _risk_score_row(
         county_fips=prediction.county_fips,
         county_name=prediction.county_name,
         year=prediction.year,
+        forecast_origin_year=prediction.forecast_origin_year,
+        as_of_date=prediction.as_of_date,
+        data_cutoff_date=prediction.data_cutoff_date,
+        source_vintage=prediction.source_vintage,
+        update_mode=prediction.update_mode,
         mmwr_week=seasonality.period,
         period_label=seasonality.period_label,
         predicted_annual_incidence_per_100k=_round(
@@ -326,6 +341,16 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
             county_fips=str(row["county_fips"]).zfill(5),
             county_name=row["county_name"],
             year=_parse_prediction_year(row),
+            forecast_origin_year=_parse_prediction_origin_year(row),
+            as_of_date=row.get("as_of_date", "") or "unspecified",
+            data_cutoff_date=row.get("data_cutoff_date", "") or "unspecified",
+            source_vintage=(
+                row.get("source_vintage", "")
+                or row.get("source_file_sha256", "")
+                or row.get("design_matrix_sha256", "")
+                or "unspecified"
+            ),
+            update_mode=row.get("update_mode", "") or "pre_update",
             predicted_cases=_parse_float(
                 row.get("predicted_cases", ""),
                 "predicted_cases",
@@ -349,6 +374,16 @@ def _parse_prediction_year(row: dict[str, str]) -> int:
     if "test_year" in row:
         return _parse_int(row["test_year"], "test_year")
     return _parse_int(row.get("forecast_year", ""), "forecast_year")
+
+
+def _parse_prediction_origin_year(row: dict[str, str]) -> int | None:
+    value = (
+        row.get("forecast_origin_year", "")
+        or row.get("train_end_year", "")
+    )
+    if not value:
+        return None
+    return _parse_int(value, "forecast_origin_year")
 
 
 def _score_model_feature_quality_flags(prediction: _PredictionInput) -> str:
