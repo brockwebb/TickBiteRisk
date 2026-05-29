@@ -62,6 +62,16 @@ artifacts.
    - These rows are aggregate validation and regional-capacity anchors only;
      they are not county outcomes or direct exposure observations.
 
+1b2. `tickbiterisk etl wv-vectorborne-summary`
+   - Reads ignored local West Virginia OEPS Vectorborne Disease Summary PDFs
+     downloaded from the official Arboviral Diseases page.
+   - Extracts text from Table 3 for provisional confirmed/probable tickborne
+     disease counts and counties-reported coverage.
+   - Writes `wv_vectorborne_state_summary.csv` and
+     `acquisition_provenance.csv`.
+   - These rows are West Virginia state aggregate validation/context only.
+     They do not provide county rows; county maps are not digitized.
+
 1c. `tickbiterisk etl regional-population`
    - Pulls keyless static Census county population CSVs for DE, DC, MD, PA,
      VA, and WV, including the official Vintage 2025 county totals.

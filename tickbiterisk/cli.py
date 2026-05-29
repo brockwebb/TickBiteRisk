@@ -155,6 +155,11 @@ from tickbiterisk.etl.regional_population_build import (
 )
 from tickbiterisk.etl.regional_signals import build_midatlantic_regional_signals
 from tickbiterisk.etl.regional_signals_build import write_regional_signals_output
+from tickbiterisk.etl.wv_vectorborne import (
+    WestVirginiaVectorborneStateSummary,
+    parse_wv_vectorborne_report_pdf,
+)
+from tickbiterisk.etl.wv_vectorborne_build import write_wv_vectorborne_state_summary
 from tickbiterisk.etl.mast_acorn import (
     build_mast_acorn_from_pdf,
     read_manual_mast_observations,
@@ -705,6 +710,26 @@ REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA = {
         "reported cases are not stable true incidence."
     ),
 }
+WV_VECTORBORNE_SOURCE_METADATA = [
+    {
+        "filename": "west_virginia_oeps_vectorborne_2024.pdf",
+        "source_id": "west_virginia_oeps_vectorborne_2024_pdf",
+        "source_name": "West Virginia OEPS vectorborne disease summary, 2024",
+        "source_url": "https://oeps.wv.gov/media/20/download?inline",
+        "citation_url": "https://oeps.wv.gov/arboviral-diseases",
+        "parser_method": "parse_wv_vectorborne_report_pdf:pypdfium_text_table3",
+        "report_year": "2024",
+    },
+    {
+        "filename": "west_virginia_oeps_vectorborne_2025.pdf",
+        "source_id": "west_virginia_oeps_vectorborne_2025_pdf",
+        "source_name": "West Virginia OEPS vectorborne disease summary, 2025",
+        "source_url": "https://oeps.wv.gov/media/21/download?inline",
+        "citation_url": "https://oeps.wv.gov/arboviral-diseases",
+        "parser_method": "parse_wv_vectorborne_report_pdf:pypdfium_text_table3",
+        "report_year": "2025",
+    },
+]
 
 
 @etl_app.command("check")
@@ -2759,6 +2784,64 @@ def lyme_aggregate_validation(
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
+@etl_app.command("wv-vectorborne-summary")
+def wv_vectorborne_summary(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/lyme/west-virginia"),
+        help="Raw directory containing WV OEPS vectorborne PDF summaries.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/wv-vectorborne"),
+        help="Output directory for WV vectorborne aggregate artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
+) -> None:
+    rows_by_source: dict[str, list[WestVirginiaVectorborneStateSummary]] = {}
+    source_paths_by_id = {}
+    for metadata in WV_VECTORBORNE_SOURCE_METADATA:
+        source_path = raw_dir / str(metadata["filename"])
+        if not source_path.exists():
+            raise typer.BadParameter(
+                f"WV vectorborne report source file not found: {source_path}"
+            )
+        source_id = str(metadata["source_id"])
+        source_paths_by_id[source_id] = source_path
+        rows_by_source[source_id] = parse_wv_vectorborne_report_pdf(
+            source_path,
+            source_id=source_id,
+            source_url=str(metadata["source_url"]),
+        )
+
+    rows = [
+        row
+        for source_id in sorted(rows_by_source)
+        for row in rows_by_source[source_id]
+    ]
+    output_path = write_wv_vectorborne_state_summary(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _wv_vectorborne_provenance_records(
+            rows_by_source=rows_by_source,
+            source_paths_by_id=source_paths_by_id,
+            output_path=output_path,
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(rows)} West Virginia vectorborne state summary row(s) to "
+        f"{output_path}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
 @etl_app.command("regional-lyme-outcomes")
 def regional_lyme_outcomes(
     raw_dir: Path = typer.Option(
@@ -4465,6 +4548,89 @@ def _lyme_aggregate_acquisition_command(
             "tickbiterisk",
             "etl",
             "lyme-aggregate-validation",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _wv_vectorborne_provenance_records(
+    *,
+    rows_by_source: dict[str, list[WestVirginiaVectorborneStateSummary]],
+    source_paths_by_id: dict[str, Path],
+    output_path: Path,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _wv_vectorborne_acquisition_command(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=manifest_path,
+    )
+    metadata_by_source = {
+        str(metadata["source_id"]): metadata
+        for metadata in WV_VECTORBORNE_SOURCE_METADATA
+    }
+    records = []
+    for source_id in sorted(rows_by_source):
+        metadata = metadata_by_source[source_id]
+        source_path = source_paths_by_id[source_id]
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=source_id,
+                source_name=str(metadata["source_name"]),
+                source_url=str(metadata["source_url"]),
+                citation_url=str(metadata["citation_url"]),
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read the ignored local West Virginia OEPS vectorborne "
+                    "disease summary PDF, extract text from Table 3, and write "
+                    "state aggregate validation rows for provisional "
+                    "confirmed/probable tickborne disease counts."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    "Read local raw West Virginia OEPS vectorborne summary PDF "
+                    f"{source_path.name}."
+                ),
+                derived_artifact_paths=[source_path, output_path],
+                derived_artifact_path_labels=[source_path.name, output_path.name],
+                row_count=len(rows_by_source[source_id]),
+                parser_method=str(metadata["parser_method"]),
+                extraction_quality="accepted_state_aggregate_only",
+                access_notes=(
+                    "Public West Virginia OEPS PDF reached from the official "
+                    "Arboviral Diseases Vectorborne Disease Summary page; no "
+                    "secret or credential required. Raw PDF remains in ignored "
+                    "storage."
+                ),
+                modeling_caveats=(
+                    "West Virginia state aggregate validation/context only; "
+                    "provisional YTD counts, no county rows, county maps are "
+                    "not digitized, and reported cases are not stable true "
+                    "incidence."
+                ),
+            )
+        )
+    return records
+
+
+def _wv_vectorborne_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "wv-vectorborne-summary",
             "--raw-dir",
             _public_provenance_path(raw_dir),
             "--output-dir",

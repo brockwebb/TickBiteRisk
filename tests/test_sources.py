@@ -111,6 +111,9 @@ def test_project_manifest_tracks_2024_plus_source_watchlist() -> None:
         elif source_id == "virginia_vdh_reportable_disease_dashboard":
             assert "etl_supported" in source.status
             assert "state_overlay" in source.status
+        elif source_id == "west_virginia_oeps_vectorborne_reports":
+            assert "etl_supported" in source.status
+            assert "state_aggregate" in source.status
         else:
             assert "candidate" in source.status
         assert "not a confirmed disease truth label" in source.notes

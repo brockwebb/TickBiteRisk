@@ -279,6 +279,28 @@ def test_docs_capture_virginia_2024_state_overlay() -> None:
     ]:
         assert token in docs_text
 
+
+def test_docs_capture_wv_vectorborne_state_aggregate_and_dc_blocker() -> None:
+    docs_text = "\n".join(
+        [
+            README.read_text(encoding="utf-8"),
+            DATA_SOURCES.read_text(encoding="utf-8"),
+            ETL_PIPELINE.read_text(encoding="utf-8"),
+            Path("docs/data-manifest.md").read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "wv-vectorborne-summary",
+        "wv_vectorborne_state_summary.csv",
+        "west_virginia_oeps_vectorborne_2025_pdf",
+        "4,019",
+        "state aggregate validation",
+        "county maps are not digitized",
+        "DC Health current-data blocker",
+    ]:
+        assert token in docs_text
+
     for token in [
         "stdlib baselines, ridge profiles, empirical-Bayes shrinkage, and future model lanes",
         "current v0 model comparison",
