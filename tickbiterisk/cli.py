@@ -350,8 +350,11 @@ from tickbiterisk.modeling.regional_annual_forecast_build import (
 )
 from tickbiterisk.modeling.regional_annual_forecast_intervals import (
     RegionalAnnualForecastIntervalInputError,
+    RegionalSpatialRegimeForecastIntervalInputError,
     build_regional_annual_forecast_intervals,
+    build_regional_spatial_regime_forecast_interval_summary,
     write_regional_annual_forecast_interval_outputs,
+    write_regional_spatial_regime_forecast_interval_summary_outputs,
 )
 from tickbiterisk.modeling.regional_forecast_capacity import (
     RegionalForecastCapacityInputError,
@@ -3920,6 +3923,71 @@ def regional_annual_forecast_intervals(
     typer.echo(
         f"Wrote {len(result.summary)} regional annual forecast interval summary "
         f"row(s) to {outputs.summary_path}"
+    )
+
+
+@etl_app.command("regional-spatial-regime-forecast-interval-summary")
+def regional_spatial_regime_forecast_interval_summary(
+    regional_annual_forecast_intervals_path: Path = typer.Option(
+        Path("build/etl/regional-annual-forecast/regional_annual_forecast_intervals.csv"),
+        help="Input regional annual forecast county interval CSV.",
+    ),
+    regional_spatial_regime_county_year_path: Path = typer.Option(
+        Path(
+            "build/etl/regional-spatial-regimes/"
+            "regional_spatial_regime_county_year.csv"
+        ),
+        help="Input regional spatial regime county-year assignment CSV.",
+    ),
+    spatial_regime_feature_year: int | None = typer.Option(
+        None,
+        help=(
+            "Spatial regime feature year to join. Defaults to "
+            "forecast-origin-year + 1, matching the forecast-safe regime "
+            "convention."
+        ),
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-annual-forecast"),
+        help="Output directory for regional spatial-regime interval summaries.",
+    ),
+) -> None:
+    if not regional_annual_forecast_intervals_path.exists():
+        raise typer.BadParameter(
+            "Regional annual forecast intervals not found: "
+            f"{regional_annual_forecast_intervals_path}"
+        )
+    if not regional_spatial_regime_county_year_path.exists():
+        raise typer.BadParameter(
+            "Regional spatial regime county-year file not found: "
+            f"{regional_spatial_regime_county_year_path}"
+        )
+    if spatial_regime_feature_year is not None and spatial_regime_feature_year < 1:
+        raise typer.BadParameter("spatial-regime-feature-year must be at least 1")
+
+    try:
+        result = build_regional_spatial_regime_forecast_interval_summary(
+            regional_annual_forecast_intervals_path=(
+                regional_annual_forecast_intervals_path
+            ),
+            regional_spatial_regime_county_year_path=(
+                regional_spatial_regime_county_year_path
+            ),
+            spatial_regime_feature_year=spatial_regime_feature_year,
+        )
+    except RegionalSpatialRegimeForecastIntervalInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_regional_spatial_regime_forecast_interval_summary_outputs(
+        result,
+        output_dir,
+    )
+    typer.echo(
+        "Wrote 1 regional spatial regime forecast interval summary run row(s) "
+        f"to {outputs.runs_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.summary)} regional spatial regime forecast interval "
+        f"summary row(s) to {outputs.summary_path}"
     )
 
 

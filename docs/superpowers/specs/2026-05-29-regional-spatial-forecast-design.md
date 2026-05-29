@@ -82,6 +82,27 @@ or clarifies risk estimates against county-only, state, Mid-Atlantic, analog,
 Bayesian/shrinkage, and random-forest lanes while remaining explainable and
 forecast-safe.
 
+## Visualization Implications
+
+The primary public interaction remains county-first. A user should be able to
+click any DE/DC/MD/PA/VA/WV county-equivalent and receive the specific forecast
+risk information for that county, including forecast year/window, score,
+source caveats, and uncertainty bands when available.
+
+States are useful visualization, reporting, and aggregation boundaries because
+official statistics are released that way, but they should not be the only
+baseline layer. Custom localized regimes are model-created regions based on
+shared prior history, adjacency, and later ecological or exposure
+characteristics. The map should be able to show these regimes as optional
+overlays without replacing the county click target.
+
+Forecast UX should make uncertainty visible rather than hiding it. A time
+slider can show weekly or seasonal risk changing through the forecast window,
+while charts can show county, state, Mid-Atlantic, and localized-regime
+trajectories with prediction intervals or margins of error. Exploratory EDA
+views may live below the main map or in a separate product surface, but the
+central product question remains the same: "What is the forecast risk here?"
+
 ## Source And Provenance
 
 The regional county graph uses the Census TIGERweb `State_County` county layer
@@ -104,6 +125,16 @@ incidence hash, and must avoid `actual_*`, residual, error, or coverage fields
 in pre-update forecast artifacts. The interval output is an uncertainty band
 around reported-incidence proxy risk pressure, not a claim about individual
 infection probability.
+
+Spatial-regime interval summaries join county forecast intervals to localized
+regime membership using the same forecast-safe feature-year convention as the
+annual spatial-regime branch. They are planning and visualization aggregates:
+county empirical intervals are summed within each custom region, and the result
+is not a full joint posterior. The artifact should fail rather than silently
+drop counties with missing regime membership so the eventual map layer stays
+complete and auditable. The current live research artifact summarizes 283
+county-equivalents into 127 localized spatial regimes for the 2026 forecast
+from the 2023 origin year.
 
 The next modeling slices should compare whether localized regime priors and
 their uncertainty bands are more useful than state-level shrinkage for reported

@@ -180,6 +180,7 @@ tickbiterisk etl regional-spatial-regimes --regional-incidence-path build/etl/re
 tickbiterisk etl regional-incidence-stress --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-adjacency-path build/etl/regional-county-adjacency/regional_county_adjacency.csv --regional-spatial-regimes-path build/etl/regional-spatial-regimes/regional_spatial_regime_county_year.csv --output-dir build/etl/regional-incidence-stress
 tickbiterisk etl regional-annual-forecast --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --regional-spatial-regimes-path build/etl/regional-spatial-regimes/regional_spatial_regime_county_year.csv --target-year 2026 --as-of-date 2026-05-29 --data-cutoff-date 2023-12-31 --source-vintage cdc_lyme_county_dashboard_2023 --update-mode pre_update --output-dir build/etl/regional-annual-forecast
 tickbiterisk etl regional-annual-forecast-intervals --forecast-predictions-path build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv --regional-incidence-stress-predictions-path build/etl/regional-incidence-stress/regional_incidence_stress_predictions.csv --output-dir build/etl/regional-annual-forecast
+tickbiterisk etl regional-spatial-regime-forecast-interval-summary --regional-annual-forecast-intervals-path build/etl/regional-annual-forecast/regional_annual_forecast_intervals.csv --regional-spatial-regime-county-year-path build/etl/regional-spatial-regimes/regional_spatial_regime_county_year.csv --output-dir build/etl/regional-annual-forecast
 tickbiterisk etl regional-incidence-clusters --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --output-dir build/etl/regional-incidence-clusters
 tickbiterisk etl provenance-audit --root-dir build/etl
 tickbiterisk etl nssp-coverage --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/nssp-coverage
@@ -260,6 +261,18 @@ wrote 1,698 interval rows for the six regional annual forecast branches. These
 are uncertainty bands around reported-incidence proxy risk pressure, not
 individual infection probabilities, medical advice, or public-default score
 intervals.
+
+Spatial-regime interval summary note:
+`regional-spatial-regime-forecast-interval-summary` joins county-level regional
+annual forecast intervals to forecast-safe localized spatial-regime membership
+and writes aggregate regime summaries. It defaults the regime feature year to
+`forecast_origin_year + 1`, rejects future feature years, validates the regime
+source incidence hash against the interval artifact, and fails if any forecast
+county/county-equivalent is missing regime membership. The output supports
+custom-region map overlays and exploratory interval charts while keeping the
+county as the clickable risk unit. The 2026-05-29 live research run wrote
+762 summary rows for 127 localized spatial regimes across the six regional
+annual forecast branches.
 
 Regional weekly risk note: `county-week-risk` can now read regional annual
 forecast predictions that omit weather-mode columns and labels the score scale

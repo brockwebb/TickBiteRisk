@@ -18,9 +18,14 @@ from tickbiterisk.modeling.regional_annual_forecast_intervals import (
     REGIONAL_ANNUAL_FORECAST_INTERVAL_COLUMNS,
     REGIONAL_ANNUAL_FORECAST_INTERVAL_RUN_COLUMNS,
     REGIONAL_ANNUAL_FORECAST_INTERVAL_SUMMARY_COLUMNS,
+    REGIONAL_SPATIAL_REGIME_FORECAST_INTERVAL_RUN_COLUMNS,
+    REGIONAL_SPATIAL_REGIME_FORECAST_INTERVAL_SUMMARY_COLUMNS,
     RegionalAnnualForecastIntervalInputError,
+    RegionalSpatialRegimeForecastIntervalInputError,
     build_regional_annual_forecast_intervals,
+    build_regional_spatial_regime_forecast_interval_summary,
     write_regional_annual_forecast_interval_outputs,
+    write_regional_spatial_regime_forecast_interval_summary_outputs,
 )
 
 
@@ -218,6 +223,252 @@ def test_write_regional_annual_forecast_interval_outputs_uses_stable_schemas(
     assert outputs.runs_path.name == "regional_annual_forecast_interval_runs.csv"
     assert outputs.intervals_path.name == "regional_annual_forecast_intervals.csv"
     assert outputs.summary_path.name == "regional_annual_forecast_interval_summary.csv"
+
+
+def test_regional_spatial_regime_forecast_interval_summary_uses_safe_feature_year(
+    tmp_path: Path,
+) -> None:
+    intervals_path = _write_interval_artifact(tmp_path)
+    incidence_sha = _sha256_file(tmp_path / "incidence.csv")
+    regimes_path = _write_spatial_regime_assignments(
+        tmp_path / "regional_spatial_regime_county_year.csv",
+        source_file_sha256=incidence_sha,
+    )
+
+    result = build_regional_spatial_regime_forecast_interval_summary(
+        regional_annual_forecast_intervals_path=intervals_path,
+        regional_spatial_regime_county_year_path=regimes_path,
+    )
+
+    assert result.run.spatial_regime_feature_year == 2022
+    assert result.run.n_interval_rows == 20
+    assert result.run.n_summary_rows == 10
+    assert result.run.n_spatial_regimes == 2
+    appalachian = next(
+        row
+        for row in result.summary
+        if row.model_name == "latest_observed_county_incidence"
+        and row.region_id == "appalachian_prior_history"
+    )
+    assert appalachian.geography_level == "spatial_regime"
+    assert appalachian.region_name == "Spatial regime 1"
+    assert appalachian.spatial_regime_rank == 1
+    assert appalachian.spatial_regime_feature_year == 2022
+    assert appalachian.n_counties == 2
+    assert appalachian.spatial_regime_member_count == 2
+    assert appalachian.county_fips_list == "24001,42001"
+    assert appalachian.forecast_population == 210000
+    assert appalachian.predicted_total_cases == 74.0
+    assert appalachian.predicted_incidence_per_100k == 35.238095
+    assert appalachian.lower_80_cases == 57.2
+    assert appalachian.upper_95_cases == 93.95
+    assert "localized_spatial_regime_research" in (
+        appalachian.summary_assumption_flags
+    )
+    assert "spatial_regime_membership_forecast_origin_safe" in (
+        appalachian.summary_assumption_flags
+    )
+    assert "summed_county_empirical_intervals" in (
+        appalachian.summary_assumption_flags
+    )
+    assert "not_public_default" in appalachian.summary_assumption_flags
+
+
+def test_regional_spatial_regime_forecast_interval_summary_rejects_source_mismatch(
+    tmp_path: Path,
+) -> None:
+    intervals_path = _write_interval_artifact(tmp_path)
+    regimes_path = _write_spatial_regime_assignments(
+        tmp_path / "regional_spatial_regime_county_year.csv",
+        source_file_sha256="not_the_interval_incidence_hash",
+    )
+
+    with pytest.raises(
+        RegionalSpatialRegimeForecastIntervalInputError,
+        match="source_file_sha256",
+    ):
+        build_regional_spatial_regime_forecast_interval_summary(
+            regional_annual_forecast_intervals_path=intervals_path,
+            regional_spatial_regime_county_year_path=regimes_path,
+        )
+
+
+def test_regional_spatial_regime_forecast_interval_summary_rejects_missing_county(
+    tmp_path: Path,
+) -> None:
+    intervals_path = _write_interval_artifact(tmp_path)
+    incidence_sha = _sha256_file(tmp_path / "incidence.csv")
+    regimes_path = _write_spatial_regime_assignments(
+        tmp_path / "regional_spatial_regime_county_year.csv",
+        source_file_sha256=incidence_sha,
+        omitted_county_fips="42003",
+    )
+
+    with pytest.raises(
+        RegionalSpatialRegimeForecastIntervalInputError,
+        match="missing spatial regime membership",
+    ):
+        build_regional_spatial_regime_forecast_interval_summary(
+            regional_annual_forecast_intervals_path=intervals_path,
+            regional_spatial_regime_county_year_path=regimes_path,
+        )
+
+
+def test_regional_spatial_regime_forecast_interval_summary_rejects_duplicate_intervals(
+    tmp_path: Path,
+) -> None:
+    intervals_path = _write_interval_artifact(tmp_path)
+    incidence_sha = _sha256_file(tmp_path / "incidence.csv")
+    regimes_path = _write_spatial_regime_assignments(
+        tmp_path / "regional_spatial_regime_county_year.csv",
+        source_file_sha256=incidence_sha,
+    )
+    _append_duplicate_csv_row(intervals_path)
+
+    with pytest.raises(
+        RegionalSpatialRegimeForecastIntervalInputError,
+        match="duplicate regional annual forecast interval row",
+    ):
+        build_regional_spatial_regime_forecast_interval_summary(
+            regional_annual_forecast_intervals_path=intervals_path,
+            regional_spatial_regime_county_year_path=regimes_path,
+        )
+
+
+def test_regional_spatial_regime_forecast_interval_summary_rejects_future_feature_year(
+    tmp_path: Path,
+) -> None:
+    intervals_path = _write_interval_artifact(tmp_path)
+    incidence_sha = _sha256_file(tmp_path / "incidence.csv")
+    regimes_path = _write_spatial_regime_assignments(
+        tmp_path / "regional_spatial_regime_county_year.csv",
+        source_file_sha256=incidence_sha,
+        feature_year=2023,
+    )
+
+    with pytest.raises(
+        RegionalSpatialRegimeForecastIntervalInputError,
+        match="spatial_regime_feature_year",
+    ):
+        build_regional_spatial_regime_forecast_interval_summary(
+            regional_annual_forecast_intervals_path=intervals_path,
+            regional_spatial_regime_county_year_path=regimes_path,
+            spatial_regime_feature_year=2023,
+        )
+
+
+def test_write_regional_spatial_regime_forecast_interval_summary_uses_stable_schemas(
+    tmp_path: Path,
+) -> None:
+    intervals_path = _write_interval_artifact(tmp_path)
+    incidence_sha = _sha256_file(tmp_path / "incidence.csv")
+    regimes_path = _write_spatial_regime_assignments(
+        tmp_path / "regional_spatial_regime_county_year.csv",
+        source_file_sha256=incidence_sha,
+    )
+    result = build_regional_spatial_regime_forecast_interval_summary(
+        regional_annual_forecast_intervals_path=intervals_path,
+        regional_spatial_regime_county_year_path=regimes_path,
+    )
+
+    outputs = write_regional_spatial_regime_forecast_interval_summary_outputs(
+        result,
+        tmp_path / "out",
+    )
+
+    with outputs.runs_path.open(newline="", encoding="utf-8") as handle:
+        assert next(csv.reader(handle)) == (
+            REGIONAL_SPATIAL_REGIME_FORECAST_INTERVAL_RUN_COLUMNS
+        )
+    with outputs.summary_path.open(newline="", encoding="utf-8") as handle:
+        assert next(csv.reader(handle)) == (
+            REGIONAL_SPATIAL_REGIME_FORECAST_INTERVAL_SUMMARY_COLUMNS
+        )
+    assert (
+        outputs.runs_path.name
+        == "regional_spatial_regime_forecast_interval_summary_runs.csv"
+    )
+    assert (
+        outputs.summary_path.name
+        == "regional_spatial_regime_forecast_interval_summary.csv"
+    )
+
+
+def _write_interval_artifact(tmp_path: Path) -> Path:
+    forecast_predictions = _write_forecast_predictions(tmp_path)
+    incidence_sha = _sha256_file(tmp_path / "incidence.csv")
+    stress_predictions = _write_stress_predictions(
+        tmp_path / "stress_predictions.csv",
+        source_file_sha256=incidence_sha,
+    )
+    result = build_regional_annual_forecast_intervals(
+        forecast_predictions_path=forecast_predictions,
+        regional_incidence_stress_predictions_path=stress_predictions,
+        min_residual_count=2,
+    )
+    outputs = write_regional_annual_forecast_interval_outputs(
+        result,
+        tmp_path / "intervals",
+    )
+    return outputs.intervals_path
+
+
+def _append_duplicate_csv_row(path: Path) -> None:
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = list(reader.fieldnames or [])
+        rows = list(reader)
+    rows.append(dict(rows[0]))
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _write_spatial_regime_assignments(
+    path: Path,
+    *,
+    source_file_sha256: str,
+    feature_year: int = 2022,
+    omitted_county_fips: str | None = None,
+) -> Path:
+    assignments = [
+        ("24001", "appalachian_prior_history", "1", "2"),
+        ("42001", "appalachian_prior_history", "1", "2"),
+        ("24003", "coastal_prior_history", "2", "2"),
+        ("42003", "coastal_prior_history", "2", "2"),
+    ]
+    rows = [
+        {
+            "source_file_sha256": source_file_sha256,
+            "regional_adjacency_sha256": "adjacency123",
+            "county_fips": county_fips,
+            "year": str(feature_year),
+            "spatial_regime_id": spatial_regime_id,
+            "spatial_regime_rank": spatial_regime_rank,
+            "spatial_regime_member_count": spatial_regime_member_count,
+            "model_feature_quality_flags": (
+                "localized_spatial_regime_feature,"
+                "forecast_safe_prior_history_spatial_regime,"
+                "not_public_default"
+            ),
+            "comparison_assumption_flags": (
+                "localized_spatial_regime_research,not_public_default"
+            ),
+        }
+        for (
+            county_fips,
+            spatial_regime_id,
+            spatial_regime_rank,
+            spatial_regime_member_count,
+        ) in assignments
+        if county_fips != omitted_county_fips
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
 
 
 def _write_forecast_predictions(tmp_path: Path) -> Path:

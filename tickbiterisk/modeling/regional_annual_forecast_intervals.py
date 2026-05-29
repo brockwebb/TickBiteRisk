@@ -25,6 +25,13 @@ SUMMARY_ASSUMPTION_FLAGS = (
     "planning_aggregate_not_joint_posterior,"
     "not_public_default"
 )
+SPATIAL_REGIME_SUMMARY_ASSUMPTION_FLAGS = (
+    "spatial_regime_membership_forecast_origin_safe,"
+    "localized_spatial_regime_research,"
+    "summed_county_empirical_intervals,"
+    "planning_aggregate_not_joint_posterior,"
+    "not_public_default"
+)
 EXPECTED_STRESS_FEATURE_SET = (
     "historical_incidence_shrinkage_analog_random_forest_baselines"
 )
@@ -69,6 +76,17 @@ REQUIRED_STRESS_COLUMNS = {
     "source_file_sha256",
     "test_year",
     "residual_incidence_per_100k",
+    "comparison_assumption_flags",
+}
+REQUIRED_SPATIAL_REGIME_COLUMNS = {
+    "source_file_sha256",
+    "regional_adjacency_sha256",
+    "county_fips",
+    "year",
+    "spatial_regime_id",
+    "spatial_regime_rank",
+    "spatial_regime_member_count",
+    "model_feature_quality_flags",
     "comparison_assumption_flags",
 }
 
@@ -175,9 +193,76 @@ REGIONAL_ANNUAL_FORECAST_INTERVAL_SUMMARY_COLUMNS = [
     "summary_assumption_flags",
 ]
 
+REGIONAL_SPATIAL_REGIME_FORECAST_INTERVAL_RUN_COLUMNS = [
+    "run_id",
+    "regional_annual_forecast_intervals_path",
+    "regional_annual_forecast_intervals_sha256",
+    "regional_spatial_regime_county_year_path",
+    "regional_spatial_regime_county_year_sha256",
+    "source_interval_run_id",
+    "source_forecast_run_id",
+    "regional_incidence_sha256",
+    "regional_adjacency_sha256",
+    "forecast_year",
+    "forecast_origin_year",
+    "spatial_regime_feature_year",
+    "n_interval_rows",
+    "n_summary_rows",
+    "n_spatial_regimes",
+    "n_counties",
+    "summary_assumption_flags",
+]
+
+REGIONAL_SPATIAL_REGIME_FORECAST_INTERVAL_SUMMARY_COLUMNS = [
+    "run_id",
+    "source_interval_run_id",
+    "source_forecast_run_id",
+    "model_name",
+    "model_family",
+    "target_definition",
+    "feature_set",
+    "feature_profile",
+    "evaluation_mode",
+    "geography_level",
+    "region_id",
+    "region_name",
+    "spatial_regime_rank",
+    "spatial_regime_feature_year",
+    "regional_incidence_sha256",
+    "regional_adjacency_sha256",
+    "forecast_year",
+    "forecast_origin_year",
+    "interval_method",
+    "n_counties",
+    "spatial_regime_member_count",
+    "county_fips_list",
+    "forecast_population",
+    "predicted_total_cases",
+    "predicted_incidence_per_100k",
+    "lower_80_cases",
+    "median_cases",
+    "upper_80_cases",
+    "lower_95_cases",
+    "upper_95_cases",
+    "lower_80_incidence_per_100k",
+    "median_incidence_per_100k",
+    "upper_80_incidence_per_100k",
+    "lower_95_incidence_per_100k",
+    "upper_95_incidence_per_100k",
+    "residual_count_min",
+    "residual_count_max",
+    "residual_test_start_year",
+    "residual_test_end_year",
+    "summary_assumption_flags",
+]
+
 
 class RegionalAnnualForecastIntervalInputError(ValueError):
     """Raised when regional annual forecast interval inputs are invalid."""
+
+
+class RegionalSpatialRegimeForecastIntervalInputError(ValueError):
+    """Raised when spatial-regime forecast interval summary inputs are invalid."""
 
 
 @dataclass(frozen=True)
@@ -302,6 +387,84 @@ class RegionalAnnualForecastIntervalOutputPaths:
 
 
 @dataclass(frozen=True)
+class RegionalSpatialRegimeForecastIntervalSummaryRun:
+    run_id: str
+    regional_annual_forecast_intervals_path: str
+    regional_annual_forecast_intervals_sha256: str
+    regional_spatial_regime_county_year_path: str
+    regional_spatial_regime_county_year_sha256: str
+    source_interval_run_id: str
+    source_forecast_run_id: str
+    regional_incidence_sha256: str
+    regional_adjacency_sha256: str
+    forecast_year: int
+    forecast_origin_year: int
+    spatial_regime_feature_year: int
+    n_interval_rows: int
+    n_summary_rows: int
+    n_spatial_regimes: int
+    n_counties: int
+    summary_assumption_flags: str
+
+
+@dataclass(frozen=True)
+class RegionalSpatialRegimeForecastIntervalSummary:
+    run_id: str
+    source_interval_run_id: str
+    source_forecast_run_id: str
+    model_name: str
+    model_family: str
+    target_definition: str
+    feature_set: str
+    feature_profile: str
+    evaluation_mode: str
+    geography_level: str
+    region_id: str
+    region_name: str
+    spatial_regime_rank: int
+    spatial_regime_feature_year: int
+    regional_incidence_sha256: str
+    regional_adjacency_sha256: str
+    forecast_year: int
+    forecast_origin_year: int
+    interval_method: str
+    n_counties: int
+    spatial_regime_member_count: int
+    county_fips_list: str
+    forecast_population: int
+    predicted_total_cases: float
+    predicted_incidence_per_100k: float
+    lower_80_cases: float
+    median_cases: float
+    upper_80_cases: float
+    lower_95_cases: float
+    upper_95_cases: float
+    lower_80_incidence_per_100k: float
+    median_incidence_per_100k: float
+    upper_80_incidence_per_100k: float
+    lower_95_incidence_per_100k: float
+    upper_95_incidence_per_100k: float
+    residual_count_min: int
+    residual_count_max: int
+    residual_test_start_year: int
+    residual_test_end_year: int
+    summary_assumption_flags: str
+
+
+@dataclass(frozen=True)
+class RegionalSpatialRegimeForecastIntervalSummaryResult:
+    run_id: str
+    run: RegionalSpatialRegimeForecastIntervalSummaryRun
+    summary: list[RegionalSpatialRegimeForecastIntervalSummary]
+
+
+@dataclass(frozen=True)
+class RegionalSpatialRegimeForecastIntervalSummaryOutputPaths:
+    runs_path: Path
+    summary_path: Path
+
+
+@dataclass(frozen=True)
 class _ForecastRow:
     source_forecast_run_id: str
     model_name: str
@@ -352,6 +515,19 @@ class _ResidualBranch:
     feature_set: str
     evaluation_mode: str
     residuals: list[_StressResidual]
+
+
+@dataclass(frozen=True)
+class _SpatialRegimeAssignment:
+    source_file_sha256: str
+    regional_adjacency_sha256: str
+    county_fips: str
+    year: int
+    spatial_regime_id: str
+    spatial_regime_rank: int
+    spatial_regime_member_count: int
+    model_feature_quality_flags: str
+    comparison_assumption_flags: str
 
 
 def build_regional_annual_forecast_intervals(
@@ -483,6 +659,123 @@ def build_regional_annual_forecast_intervals(
     )
 
 
+def build_regional_spatial_regime_forecast_interval_summary(
+    *,
+    regional_annual_forecast_intervals_path: Path,
+    regional_spatial_regime_county_year_path: Path,
+    spatial_regime_feature_year: int | None = None,
+) -> RegionalSpatialRegimeForecastIntervalSummaryResult:
+    intervals = _read_interval_rows(regional_annual_forecast_intervals_path)
+    if not intervals:
+        raise RegionalSpatialRegimeForecastIntervalInputError(
+            "regional annual forecast intervals have no rows"
+        )
+    source_interval_run_id = _single_spatial_value(
+        {row.run_id for row in intervals},
+        "interval run_id",
+    )
+    source_forecast_run_id = _single_spatial_value(
+        {row.source_forecast_run_id for row in intervals},
+        "source_forecast_run_id",
+    )
+    forecast_year = _single_spatial_value(
+        {row.forecast_year for row in intervals},
+        "forecast_year",
+    )
+    forecast_origin_year = _single_spatial_value(
+        {row.forecast_origin_year for row in intervals},
+        "forecast_origin_year",
+    )
+    regional_incidence_sha256 = _single_spatial_value(
+        {row.regional_incidence_sha256 for row in intervals},
+        "regional_incidence_sha256",
+    )
+    resolved_feature_year = (
+        spatial_regime_feature_year
+        if spatial_regime_feature_year is not None
+        else forecast_origin_year + 1
+    )
+    if resolved_feature_year > forecast_origin_year + 1:
+        raise RegionalSpatialRegimeForecastIntervalInputError(
+            "spatial_regime_feature_year must be less than or equal to "
+            "forecast_origin_year + 1"
+        )
+
+    assignments = _read_spatial_regime_assignments(
+        regional_spatial_regime_county_year_path,
+        feature_year=resolved_feature_year,
+    )
+    if not assignments:
+        raise RegionalSpatialRegimeForecastIntervalInputError(
+            "no regional spatial regime rows for feature year "
+            f"{resolved_feature_year}"
+        )
+    assignment_source_hash = _single_spatial_value(
+        {row.source_file_sha256 for row in assignments},
+        "spatial regime source_file_sha256",
+    )
+    if assignment_source_hash != regional_incidence_sha256:
+        raise RegionalSpatialRegimeForecastIntervalInputError(
+            "regional spatial regime source_file_sha256 does not match "
+            "regional annual forecast interval regional_incidence_sha256"
+        )
+    regional_adjacency_sha256 = _single_spatial_value(
+        {row.regional_adjacency_sha256 for row in assignments},
+        "regional_adjacency_sha256",
+    )
+    assignments_by_county = _assignments_by_county(assignments)
+    interval_counties = {row.county_fips for row in intervals}
+    missing_counties = sorted(interval_counties - set(assignments_by_county))
+    if missing_counties:
+        raise RegionalSpatialRegimeForecastIntervalInputError(
+            "missing spatial regime membership for interval county/county-equivalent "
+            f"FIPS: {', '.join(missing_counties)}"
+        )
+
+    intervals_sha = _sha256_file(regional_annual_forecast_intervals_path)
+    regimes_sha = _sha256_file(regional_spatial_regime_county_year_path)
+    run_id = (
+        "regional_spatial_regime_forecast_interval_summary_"
+        f"forecast{forecast_year}_origin{forecast_origin_year}_"
+        f"regime{resolved_feature_year}_{intervals_sha[:12]}_{regimes_sha[:12]}"
+    )
+    summary = _spatial_regime_summary_rows(
+        run_id=run_id,
+        intervals=intervals,
+        assignments_by_county=assignments_by_county,
+        spatial_regime_feature_year=resolved_feature_year,
+        regional_adjacency_sha256=regional_adjacency_sha256,
+    )
+    run = RegionalSpatialRegimeForecastIntervalSummaryRun(
+        run_id=run_id,
+        regional_annual_forecast_intervals_path=str(
+            regional_annual_forecast_intervals_path
+        ),
+        regional_annual_forecast_intervals_sha256=intervals_sha,
+        regional_spatial_regime_county_year_path=str(
+            regional_spatial_regime_county_year_path
+        ),
+        regional_spatial_regime_county_year_sha256=regimes_sha,
+        source_interval_run_id=source_interval_run_id,
+        source_forecast_run_id=source_forecast_run_id,
+        regional_incidence_sha256=regional_incidence_sha256,
+        regional_adjacency_sha256=regional_adjacency_sha256,
+        forecast_year=forecast_year,
+        forecast_origin_year=forecast_origin_year,
+        spatial_regime_feature_year=resolved_feature_year,
+        n_interval_rows=len(intervals),
+        n_summary_rows=len(summary),
+        n_spatial_regimes=len({row.region_id for row in summary}),
+        n_counties=len(interval_counties),
+        summary_assumption_flags=SPATIAL_REGIME_SUMMARY_ASSUMPTION_FLAGS,
+    )
+    return RegionalSpatialRegimeForecastIntervalSummaryResult(
+        run_id=run_id,
+        run=run,
+        summary=summary,
+    )
+
+
 def write_regional_annual_forecast_interval_outputs(
     result: RegionalAnnualForecastIntervalResult,
     output_dir: Path,
@@ -509,6 +802,31 @@ def write_regional_annual_forecast_interval_outputs(
     return RegionalAnnualForecastIntervalOutputPaths(
         runs_path=runs_path,
         intervals_path=intervals_path,
+        summary_path=summary_path,
+    )
+
+
+def write_regional_spatial_regime_forecast_interval_summary_outputs(
+    result: RegionalSpatialRegimeForecastIntervalSummaryResult,
+    output_dir: Path,
+) -> RegionalSpatialRegimeForecastIntervalSummaryOutputPaths:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    runs_path = (
+        output_dir / "regional_spatial_regime_forecast_interval_summary_runs.csv"
+    )
+    summary_path = output_dir / "regional_spatial_regime_forecast_interval_summary.csv"
+    _write_records(
+        runs_path,
+        [asdict(result.run)],
+        REGIONAL_SPATIAL_REGIME_FORECAST_INTERVAL_RUN_COLUMNS,
+    )
+    _write_records(
+        summary_path,
+        [asdict(row) for row in result.summary],
+        REGIONAL_SPATIAL_REGIME_FORECAST_INTERVAL_SUMMARY_COLUMNS,
+    )
+    return RegionalSpatialRegimeForecastIntervalSummaryOutputPaths(
+        runs_path=runs_path,
         summary_path=summary_path,
     )
 
@@ -616,6 +934,151 @@ def _summary_row(
         summary_assumption_flags=_join_flags(
             SUMMARY_ASSUMPTION_FLAGS,
             *(row.interval_assumption_flags for row in intervals),
+        ),
+    )
+
+
+def _spatial_regime_summary_rows(
+    *,
+    run_id: str,
+    intervals: list[RegionalAnnualForecastInterval],
+    assignments_by_county: dict[str, _SpatialRegimeAssignment],
+    spatial_regime_feature_year: int,
+    regional_adjacency_sha256: str,
+) -> list[RegionalSpatialRegimeForecastIntervalSummary]:
+    groups: dict[
+        tuple[str, str, int, int, str],
+        list[tuple[RegionalAnnualForecastInterval, _SpatialRegimeAssignment]],
+    ] = {}
+    for interval in intervals:
+        assignment = assignments_by_county[interval.county_fips]
+        groups.setdefault(
+            (
+                interval.source_forecast_run_id,
+                interval.model_name,
+                interval.forecast_year,
+                interval.forecast_origin_year,
+                assignment.spatial_regime_id,
+            ),
+            [],
+        ).append((interval, assignment))
+    rows = [
+        _spatial_regime_summary_row(
+            run_id=run_id,
+            spatial_regime_feature_year=spatial_regime_feature_year,
+            regional_adjacency_sha256=regional_adjacency_sha256,
+            interval_assignments=interval_assignments,
+        )
+        for _key, interval_assignments in sorted(groups.items())
+    ]
+    return sorted(
+        rows,
+        key=lambda row: (
+            row.model_name,
+            row.forecast_year,
+            row.forecast_origin_year,
+            row.spatial_regime_rank,
+            row.region_id,
+        ),
+    )
+
+
+def _spatial_regime_summary_row(
+    *,
+    run_id: str,
+    spatial_regime_feature_year: int,
+    regional_adjacency_sha256: str,
+    interval_assignments: list[
+        tuple[RegionalAnnualForecastInterval, _SpatialRegimeAssignment]
+    ],
+) -> RegionalSpatialRegimeForecastIntervalSummary:
+    intervals = [row for row, _assignment in interval_assignments]
+    assignments = [assignment for _row, assignment in interval_assignments]
+    first = intervals[0]
+    first_assignment = assignments[0]
+    spatial_regime_ranks = {row.spatial_regime_rank for row in assignments}
+    if len(spatial_regime_ranks) != 1:
+        raise RegionalSpatialRegimeForecastIntervalInputError(
+            f"mixed spatial_regime_rank for {first_assignment.spatial_regime_id}"
+        )
+    spatial_regime_member_counts = {
+        row.spatial_regime_member_count for row in assignments
+    }
+    if len(spatial_regime_member_counts) != 1:
+        raise RegionalSpatialRegimeForecastIntervalInputError(
+            "mixed spatial_regime_member_count for "
+            f"{first_assignment.spatial_regime_id}"
+        )
+    forecast_population = sum(row.forecast_population for row in intervals)
+    predicted_total_cases = _round(sum(row.predicted_cases for row in intervals))
+    lower_80_cases = _round(sum(row.lower_80_cases for row in intervals))
+    median_cases = _round(sum(row.median_cases for row in intervals))
+    upper_80_cases = _round(sum(row.upper_80_cases for row in intervals))
+    lower_95_cases = _round(sum(row.lower_95_cases for row in intervals))
+    upper_95_cases = _round(sum(row.upper_95_cases for row in intervals))
+    county_fips = sorted({row.county_fips for row in intervals})
+    return RegionalSpatialRegimeForecastIntervalSummary(
+        run_id=run_id,
+        source_interval_run_id=first.run_id,
+        source_forecast_run_id=first.source_forecast_run_id,
+        model_name=first.model_name,
+        model_family=first.model_family,
+        target_definition=first.target_definition,
+        feature_set=first.feature_set,
+        feature_profile=first.feature_profile,
+        evaluation_mode=first.evaluation_mode,
+        geography_level="spatial_regime",
+        region_id=first_assignment.spatial_regime_id,
+        region_name=f"Spatial regime {first_assignment.spatial_regime_rank}",
+        spatial_regime_rank=first_assignment.spatial_regime_rank,
+        spatial_regime_feature_year=spatial_regime_feature_year,
+        regional_incidence_sha256=first.regional_incidence_sha256,
+        regional_adjacency_sha256=regional_adjacency_sha256,
+        forecast_year=first.forecast_year,
+        forecast_origin_year=first.forecast_origin_year,
+        interval_method="summed_county_empirical_residual_intervals_by_spatial_regime",
+        n_counties=len(county_fips),
+        spatial_regime_member_count=first_assignment.spatial_regime_member_count,
+        county_fips_list=",".join(county_fips),
+        forecast_population=forecast_population,
+        predicted_total_cases=predicted_total_cases,
+        predicted_incidence_per_100k=_cases_to_incidence(
+            predicted_total_cases,
+            forecast_population,
+        ),
+        lower_80_cases=lower_80_cases,
+        median_cases=median_cases,
+        upper_80_cases=upper_80_cases,
+        lower_95_cases=lower_95_cases,
+        upper_95_cases=upper_95_cases,
+        lower_80_incidence_per_100k=_cases_to_incidence(
+            lower_80_cases,
+            forecast_population,
+        ),
+        median_incidence_per_100k=_cases_to_incidence(
+            median_cases,
+            forecast_population,
+        ),
+        upper_80_incidence_per_100k=_cases_to_incidence(
+            upper_80_cases,
+            forecast_population,
+        ),
+        lower_95_incidence_per_100k=_cases_to_incidence(
+            lower_95_cases,
+            forecast_population,
+        ),
+        upper_95_incidence_per_100k=_cases_to_incidence(
+            upper_95_cases,
+            forecast_population,
+        ),
+        residual_count_min=min(row.residual_count for row in intervals),
+        residual_count_max=max(row.residual_count for row in intervals),
+        residual_test_start_year=min(row.residual_test_start_year for row in intervals),
+        residual_test_end_year=max(row.residual_test_end_year for row in intervals),
+        summary_assumption_flags=_join_flags(
+            SPATIAL_REGIME_SUMMARY_ASSUMPTION_FLAGS,
+            *(row.interval_assumption_flags for row in intervals),
+            *(row.comparison_assumption_flags for row in assignments),
         ),
     )
 
@@ -918,6 +1381,212 @@ def _read_stress_residuals(path: Path) -> list[_StressResidual]:
         ]
 
 
+def _read_interval_rows(path: Path) -> list[RegionalAnnualForecastInterval]:
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                raise RegionalSpatialRegimeForecastIntervalInputError(
+                    "regional annual forecast intervals CSV has no header"
+                )
+            missing_columns = set(REGIONAL_ANNUAL_FORECAST_INTERVAL_COLUMNS) - set(
+                reader.fieldnames
+            )
+            if missing_columns:
+                raise RegionalSpatialRegimeForecastIntervalInputError(
+                    "regional annual forecast intervals missing required column(s): "
+                    f"{', '.join(sorted(missing_columns))}"
+                )
+            rows = [
+                RegionalAnnualForecastInterval(
+                    run_id=str(row["run_id"]),
+                    source_forecast_run_id=str(row["source_forecast_run_id"]),
+                    model_name=str(row["model_name"]),
+                    model_family=str(row["model_family"]),
+                    target_definition=str(row["target_definition"]),
+                    feature_set=str(row["feature_set"]),
+                    feature_profile=str(row["feature_profile"]),
+                    evaluation_mode=str(row["evaluation_mode"]),
+                    regional_incidence_sha256=str(row["regional_incidence_sha256"]),
+                    regional_population_sha256=str(row["regional_population_sha256"]),
+                    residual_source_run_id=str(row["residual_source_run_id"]),
+                    residual_model_name=str(row["residual_model_name"]),
+                    residual_source_file_sha256=str(row["residual_source_file_sha256"]),
+                    state_fips=str(row["state_fips"]).zfill(2),
+                    state_abbr=str(row["state_abbr"]),
+                    state_name=str(row["state_name"]),
+                    county_fips=str(row["county_fips"]).zfill(5),
+                    county_name=str(row["county_name"]),
+                    forecast_year=_parse_int(row["forecast_year"], "forecast_year"),
+                    forecast_origin_year=_parse_int(
+                        row["forecast_origin_year"],
+                        "forecast_origin_year",
+                    ),
+                    as_of_date=str(row["as_of_date"]),
+                    data_cutoff_date=str(row["data_cutoff_date"]),
+                    source_vintage=str(row["source_vintage"]),
+                    update_mode=str(row["update_mode"]),
+                    forecast_population=_parse_int(
+                        row["forecast_population"],
+                        "forecast_population",
+                    ),
+                    predicted_cases=_parse_float(
+                        row["predicted_cases"],
+                        "predicted_cases",
+                    ),
+                    predicted_incidence_per_100k=_parse_float(
+                        row["predicted_incidence_per_100k"],
+                        "predicted_incidence_per_100k",
+                    ),
+                    interval_method=str(row["interval_method"]),
+                    residual_count=_parse_int(row["residual_count"], "residual_count"),
+                    residual_test_start_year=_parse_int(
+                        row["residual_test_start_year"],
+                        "residual_test_start_year",
+                    ),
+                    residual_test_end_year=_parse_int(
+                        row["residual_test_end_year"],
+                        "residual_test_end_year",
+                    ),
+                    lower_80_incidence_per_100k=_parse_float(
+                        row["lower_80_incidence_per_100k"],
+                        "lower_80_incidence_per_100k",
+                    ),
+                    median_incidence_per_100k=_parse_float(
+                        row["median_incidence_per_100k"],
+                        "median_incidence_per_100k",
+                    ),
+                    upper_80_incidence_per_100k=_parse_float(
+                        row["upper_80_incidence_per_100k"],
+                        "upper_80_incidence_per_100k",
+                    ),
+                    lower_95_incidence_per_100k=_parse_float(
+                        row["lower_95_incidence_per_100k"],
+                        "lower_95_incidence_per_100k",
+                    ),
+                    upper_95_incidence_per_100k=_parse_float(
+                        row["upper_95_incidence_per_100k"],
+                        "upper_95_incidence_per_100k",
+                    ),
+                    lower_80_cases=_parse_float(
+                        row["lower_80_cases"],
+                        "lower_80_cases",
+                    ),
+                    median_cases=_parse_float(row["median_cases"], "median_cases"),
+                    upper_80_cases=_parse_float(
+                        row["upper_80_cases"],
+                        "upper_80_cases",
+                    ),
+                    lower_95_cases=_parse_float(
+                        row["lower_95_cases"],
+                        "lower_95_cases",
+                    ),
+                    upper_95_cases=_parse_float(
+                        row["upper_95_cases"],
+                        "upper_95_cases",
+                    ),
+                    interval_feature_quality_flags=str(
+                        row["interval_feature_quality_flags"]
+                    ),
+                    interval_assumption_flags=str(row["interval_assumption_flags"]),
+                )
+                for row in reader
+            ]
+        _reject_duplicate_interval_rows(rows)
+        return rows
+    except RegionalAnnualForecastIntervalInputError as exc:
+        raise RegionalSpatialRegimeForecastIntervalInputError(str(exc)) from exc
+
+
+def _read_spatial_regime_assignments(
+    path: Path,
+    *,
+    feature_year: int,
+) -> list[_SpatialRegimeAssignment]:
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                raise RegionalSpatialRegimeForecastIntervalInputError(
+                    "regional spatial regime county-year CSV has no header"
+                )
+            missing_columns = REQUIRED_SPATIAL_REGIME_COLUMNS - set(reader.fieldnames)
+            if missing_columns:
+                raise RegionalSpatialRegimeForecastIntervalInputError(
+                    "regional spatial regime county-year missing required column(s): "
+                    f"{', '.join(sorted(missing_columns))}"
+                )
+            rows = []
+            for row in reader:
+                year = _parse_int(row["year"], "year")
+                if year != feature_year:
+                    continue
+                rows.append(
+                    _SpatialRegimeAssignment(
+                        source_file_sha256=str(row["source_file_sha256"]),
+                        regional_adjacency_sha256=str(
+                            row["regional_adjacency_sha256"]
+                        ),
+                        county_fips=str(row["county_fips"]).zfill(5),
+                        year=year,
+                        spatial_regime_id=str(row["spatial_regime_id"]),
+                        spatial_regime_rank=_parse_int(
+                            row["spatial_regime_rank"],
+                            "spatial_regime_rank",
+                        ),
+                        spatial_regime_member_count=_parse_int(
+                            row["spatial_regime_member_count"],
+                            "spatial_regime_member_count",
+                        ),
+                        model_feature_quality_flags=str(
+                            row["model_feature_quality_flags"]
+                        ),
+                        comparison_assumption_flags=str(
+                            row["comparison_assumption_flags"]
+                        ),
+                    )
+                )
+            return rows
+    except RegionalAnnualForecastIntervalInputError as exc:
+        raise RegionalSpatialRegimeForecastIntervalInputError(str(exc)) from exc
+
+
+def _assignments_by_county(
+    assignments: list[_SpatialRegimeAssignment],
+) -> dict[str, _SpatialRegimeAssignment]:
+    by_county = {}
+    for assignment in assignments:
+        if assignment.county_fips in by_county:
+            raise RegionalSpatialRegimeForecastIntervalInputError(
+                "duplicate spatial regime membership for county/county-equivalent "
+                f"FIPS {assignment.county_fips} in year {assignment.year}"
+            )
+        by_county[assignment.county_fips] = assignment
+    return by_county
+
+
+def _reject_duplicate_interval_rows(
+    rows: list[RegionalAnnualForecastInterval],
+) -> None:
+    seen = set()
+    for row in rows:
+        key = (
+            row.run_id,
+            row.source_forecast_run_id,
+            row.model_name,
+            row.county_fips,
+            row.forecast_year,
+            row.forecast_origin_year,
+        )
+        if key in seen:
+            raise RegionalSpatialRegimeForecastIntervalInputError(
+                "duplicate regional annual forecast interval row for "
+                f"{row.run_id}, {row.model_name}, {row.county_fips}, "
+                f"{row.forecast_year}"
+            )
+        seen.add(key)
+
+
 def _reject_duplicate_forecast_rows(rows: list[_ForecastRow]) -> None:
     seen = set()
     for row in rows:
@@ -995,6 +1664,15 @@ def _single_value(values: set[object], field_name: str):
     if len(values) != 1:
         raise RegionalAnnualForecastIntervalInputError(
             f"regional annual forecast intervals require one {field_name}"
+        )
+    return next(iter(values))
+
+
+def _single_spatial_value(values: set[object], field_name: str):
+    if len(values) != 1:
+        raise RegionalSpatialRegimeForecastIntervalInputError(
+            "regional spatial regime forecast interval summary requires one "
+            f"{field_name}"
         )
     return next(iter(values))
 
