@@ -145,7 +145,9 @@ jobs:
           geojson_counties = {
               feature["properties"]["county_fips"] for feature in geojson["features"]
           }
-          week_counts = Counter(record["county_fips"] for record in weekly["records"])
+          week_counts = Counter(
+              (record["county_fips"], record["year"]) for record in weekly["records"]
+          )
 
           for filename, payload in regional_payloads.items():
               if payload["research_status"] != expected_research_status:
@@ -156,10 +158,20 @@ jobs:
               raise SystemExit(f"Expected 283 regional counties, found {len(weekly_counties)}.")
           if weekly_counties != metadata_counties or weekly_counties != geojson_counties:
               raise SystemExit("Regional county FIPS mismatch across weekly, metadata, and GeoJSON assets.")
+          if weekly.get("year_selection") != "all_available_years":
+              raise SystemExit("Regional preview must preserve all forecast years.")
+          if {record["year"] for record in weekly["records"]} != {2024, 2025, 2026}:
+              raise SystemExit("Regional preview must contain forecast years 2024, 2025, and 2026.")
+          if {record["data_year"] for record in weekly["records"]} != {2024, 2025, 2026}:
+              raise SystemExit("Regional preview data_year values must match forecast years.")
+          if weekly["selected_forecast_metadata"].get("forecast_years") != [2024, 2025, 2026]:
+              raise SystemExit("Regional forecast metadata must advertise the forecast-year set.")
+          if len(weekly["selected_forecast_metadata"].get("source_prediction_run_ids", [])) != 3:
+              raise SystemExit("Regional forecast metadata must retain all source prediction run IDs.")
+          if weekly["record_count"] != 283 * 53 * 3:
+              raise SystemExit("Regional preview must include 283 counties x 53 weeks x 3 forecast years.")
           if set(week_counts.values()) != {53}:
-              raise SystemExit("Each regional county must have 53 weekly forecast rows.")
-          if {record["year"] for record in weekly["records"]} != {2026}:
-              raise SystemExit("Regional preview must contain only the 2026 forecast year.")
+              raise SystemExit("Each regional county-year must have 53 weekly forecast rows.")
           if {record["mmwr_week"] for record in weekly["records"]} != set(range(1, 54)):
               raise SystemExit("Regional preview must cover MMWR weeks 1-53.")
           if not all(1 <= record["risk_score"] <= 10 for record in weekly["records"]):
@@ -190,6 +202,12 @@ jobs:
               raise SystemExit("Regional annual incidence record_count does not match records.")
           if annual["year_range"] != [2001, 2024]:
               raise SystemExit("Regional annual incidence must cover observed years 2001-2024.")
+          if sum(1 for record in annual["records"] if record["year"] == 2024) != 67:
+              raise SystemExit("Regional 2024 observed incidence must remain the partial PA overlay.")
+          if {
+              record["state_abbr"] for record in annual["records"] if record["year"] == 2024
+          } != {"PA"}:
+              raise SystemExit("Regional 2024 observed incidence must be labeled as PA-only.")
           if len({record["county_fips"] for record in annual["records"]}) != 283:
               raise SystemExit("Regional annual incidence must include 283 counties.")
           expected_annual_fields = {
@@ -227,11 +245,21 @@ jobs:
               annual["caveats"]
           ).lower():
               raise SystemExit("Regional annual incidence must explain reported-case caveats.")
+          if not any(
+              source.get("source_id") == "regional_observed_annual_incidence"
+              for source in source_catalog["sources"]
+          ):
+              raise SystemExit("Regional source catalog must include the observed annual incidence layer.")
 
           if metadata["county_count"] != 283 or not all(
               county.get("selected_spatial_regime") for county in metadata["counties"]
           ):
               raise SystemExit("Regional county metadata must include selected spatial regimes.")
+          if not all(
+              county.get("available_years") == [2024, 2025, 2026]
+              for county in metadata["counties"]
+          ):
+              raise SystemExit("Regional county metadata must expose 2024-2026 forecast years.")
           if overlays["record_count"] != len(overlays["records"]):
               raise SystemExit("Regional spatial overlay record_count does not match records.")
           if manifest["record_counts"]["weekly_risk"] != weekly["record_count"]:

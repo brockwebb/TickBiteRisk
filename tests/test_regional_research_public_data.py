@@ -171,5 +171,10 @@ def test_pages_workflow_validates_regional_research_preview_assets() -> None:
         "regional_county_risk_weekly.json",
         "regional_counties.geojson",
         "regional_states.geojson",
+        "forecast_years",
+        "source_prediction_run_ids",
+        "Regional preview must contain forecast years 2024, 2025, and 2026.",
+        "regional_observed_annual_incidence",
+        "Regional 2024 observed incidence must remain the partial PA overlay.",
     ]:
         assert token in workflow
