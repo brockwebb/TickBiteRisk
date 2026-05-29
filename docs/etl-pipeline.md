@@ -221,7 +221,8 @@ artifacts.
      `regional_incidence_stress_predictions.csv`, and
      `regional_incidence_stress_metrics.csv`.
    - Compares prior-year county incidence, trailing county incidence,
-     forecast-safe analog/like-year incidence, and state/Mid-Atlantic
+     forecast-safe analog/like-year incidence, deterministic random forest over
+     prior county/state/regional incidence history, and state/Mid-Atlantic
      empirical-Bayes shrinkage baselines as transparent historical-range tests.
      These are research diagnostics over reported incidence per 100k, not
      public forecasts or latent true disease estimates.

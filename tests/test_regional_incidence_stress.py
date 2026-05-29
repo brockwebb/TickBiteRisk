@@ -23,6 +23,7 @@ def test_build_regional_incidence_stress_compares_shrinkage_baselines(
         min_train_years=2,
         lookback_years=2,
         shrinkage_strength=2.0,
+        random_forest_n_estimators=5,
     )
 
     model_names = {row.model_name for row in result.predictions}
@@ -31,6 +32,7 @@ def test_build_regional_incidence_stress_compares_shrinkage_baselines(
         "empirical_bayes_midatlantic_incidence",
         "empirical_bayes_state_incidence",
         "prior_year_county_incidence",
+        "random_forest_regional_incidence",
         "trailing_mean_county_incidence",
     }
     eb_state = next(
@@ -50,6 +52,28 @@ def test_build_regional_incidence_stress_compares_shrinkage_baselines(
         eb_state.comparison_assumption_flags
     )
     assert result.run.shrinkage_strength == 2.0
+    assert result.run.random_forest_n_estimators == 5
+    assert result.run.random_forest_min_samples_leaf == 3
+    assert result.run.random_forest_max_features == "sqrt"
+    assert result.run.random_forest_random_state == 1337
+
+    random_forest = next(
+        row
+        for row in result.predictions
+        if row.model_name == "random_forest_regional_incidence"
+        and row.county_fips == "24001"
+    )
+    assert random_forest.model_family == "random_forest_incidence"
+    assert random_forest.predicted_incidence_per_100k >= 0
+    assert random_forest.train_start_year == 2020
+    assert random_forest.train_end_year == 2020
+    assert random_forest.train_end_year < random_forest.test_year
+    assert "random_forest_regional_research" in (
+        random_forest.model_feature_quality_flags
+    )
+    assert "forecast_safe_prior_outcomes_only" in (
+        random_forest.model_feature_quality_flags
+    )
 
     overall_prior = next(
         row

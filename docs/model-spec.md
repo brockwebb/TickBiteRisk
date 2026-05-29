@@ -163,14 +163,16 @@ than an accepted public model assumption.
 The `regional-incidence-stress` diagnostic is the population-normalized
 companion to `regional-outcome-stress`. It uses the Mid-Atlantic reported
 incidence panel, preserves denominator gaps rather than filling them, and tests
-whether analog/like-year matching or state/Mid-Atlantic shrinkage baselines
-improve county incidence forecasts. The analog lane matches the prior-year
-forecast origin to earlier county histories only when the matched origin's
-next-year outcome was already observed before the held-out test year. The
-latest materialized run still ranked prior-year county incidence best on
-overall incidence MAE, so the analog and shrinkage branches remain research
-diagnostics rather than selected public Maryland branches or latent
-disease-burden estimates.
+whether analog/like-year matching, deterministic random forests over prior
+incidence history, or state/Mid-Atlantic shrinkage baselines improve county
+incidence forecasts. The analog lane matches the prior-year forecast origin to
+earlier county histories only when the matched origin's next-year outcome was
+already observed before the held-out test year. The regional RF lane trains
+only on target years before the held-out year and features derived from prior
+county, state, and Mid-Atlantic incidence history. The latest materialized run
+still ranked prior-year county incidence best on overall incidence MAE, with
+regional RF second, so these branches remain research diagnostics rather than
+selected public Maryland branches or latent disease-burden estimates.
 
 The `regional-incidence-clusters` diagnostic turns the regional pressure idea
 into forecast-safe low/moderate/high/very-high bands. Each held-out year is

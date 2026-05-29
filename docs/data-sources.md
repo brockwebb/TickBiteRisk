@@ -109,7 +109,7 @@ parser evidence, and time-aware validation before it can move into a model lane.
 | `regional_outcome_stress_predictions.csv` | `tickbiterisk etl regional-outcome-stress` | Mid-Atlantic outcome-only capacity-share stress predictions |
 | `regional_outcome_stress_metrics.csv` | `tickbiterisk etl regional-outcome-stress` | Case-count MAE/RMSE metrics for regional historical-range baselines |
 | `regional_incidence_stress_runs.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate stress run manifest |
-| `regional_incidence_stress_predictions.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate shrinkage and analog stress predictions |
+| `regional_incidence_stress_predictions.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate shrinkage, analog, and random-forest stress predictions |
 | `regional_incidence_stress_metrics.csv` | `tickbiterisk etl regional-incidence-stress` | Incidence MAE/RMSE metrics for regional historical-range baselines |
 | `regional_annual_forecast_runs.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic target-year forecast run manifest with origin, hashes, and forecast caveats |
 | `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows, including horizon-matched analog branch, without observed target, residual, or error columns |

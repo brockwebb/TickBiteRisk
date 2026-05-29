@@ -355,6 +355,10 @@ from tickbiterisk.modeling.regional_outcome_stress_build import (
     write_regional_outcome_stress_outputs,
 )
 from tickbiterisk.modeling.regional_incidence_stress import (
+    RANDOM_FOREST_MAX_FEATURES as REGIONAL_RF_MAX_FEATURES,
+    RANDOM_FOREST_MIN_SAMPLES_LEAF as REGIONAL_RF_MIN_SAMPLES_LEAF,
+    RANDOM_FOREST_N_ESTIMATORS as REGIONAL_RF_N_ESTIMATORS,
+    RANDOM_FOREST_RANDOM_STATE as REGIONAL_RF_RANDOM_STATE,
     RegionalIncidenceStressInputError,
     build_regional_incidence_stress,
 )
@@ -3489,6 +3493,22 @@ def regional_incidence_stress(
         5.0,
         help="Pseudo-year strength for empirical-Bayes incidence shrinkage.",
     ),
+    random_forest_n_estimators: int = typer.Option(
+        REGIONAL_RF_N_ESTIMATORS,
+        help="Tree count for the regional random forest incidence research lane.",
+    ),
+    random_forest_min_samples_leaf: int = typer.Option(
+        REGIONAL_RF_MIN_SAMPLES_LEAF,
+        help="Minimum leaf size for the regional random forest incidence lane.",
+    ),
+    random_forest_max_features: str = typer.Option(
+        REGIONAL_RF_MAX_FEATURES,
+        help="Max-feature strategy for the regional random forest incidence lane.",
+    ),
+    random_forest_random_state: int = typer.Option(
+        REGIONAL_RF_RANDOM_STATE,
+        help="Random seed for the regional random forest incidence lane.",
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/regional-incidence-stress"),
         help="Output directory for regional incidence stress artifacts.",
@@ -3508,6 +3528,12 @@ def regional_incidence_stress(
         raise typer.BadParameter(
             "shrinkage-strength must be finite and non-negative"
         )
+    if random_forest_n_estimators < 1:
+        raise typer.BadParameter("random-forest-n-estimators must be at least 1")
+    if random_forest_min_samples_leaf < 1:
+        raise typer.BadParameter(
+            "random-forest-min-samples-leaf must be at least 1"
+        )
     if end_year is not None and start_year > end_year:
         raise typer.BadParameter("start-year must be less than or equal to end-year")
 
@@ -3519,6 +3545,10 @@ def regional_incidence_stress(
             min_train_years=min_train_years,
             lookback_years=lookback_years,
             shrinkage_strength=shrinkage_strength,
+            random_forest_n_estimators=random_forest_n_estimators,
+            random_forest_min_samples_leaf=random_forest_min_samples_leaf,
+            random_forest_max_features=random_forest_max_features,
+            random_forest_random_state=random_forest_random_state,
         )
     except RegionalIncidenceStressInputError as exc:
         raise typer.BadParameter(str(exc)) from exc

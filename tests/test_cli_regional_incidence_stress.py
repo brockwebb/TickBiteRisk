@@ -26,6 +26,8 @@ def test_regional_incidence_stress_command_writes_outputs(tmp_path: Path) -> Non
             "2",
             "--lookback-years",
             "2",
+            "--random-forest-n-estimators",
+            "5",
             "--output-dir",
             str(output_dir),
         ],
@@ -37,6 +39,11 @@ def test_regional_incidence_stress_command_writes_outputs(tmp_path: Path) -> Non
     assert (output_dir / "regional_incidence_stress_runs.csv").exists()
     assert (output_dir / "regional_incidence_stress_predictions.csv").exists()
     assert (output_dir / "regional_incidence_stress_metrics.csv").exists()
+
+    run_header = (output_dir / "regional_incidence_stress_runs.csv").read_text(
+        encoding="utf-8"
+    ).splitlines()[0]
+    assert "random_forest_n_estimators" in run_header
 
 
 def test_regional_incidence_stress_command_fails_cleanly_when_input_missing(

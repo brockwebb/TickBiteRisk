@@ -17,13 +17,24 @@ COMPARISON_ASSUMPTION_FLAGS = (
 )
 EVALUATION_MODE = "rolling_origin_prior_years"
 TARGET_DEFINITION = "reported_lyme_incidence_per_100k"
-FEATURE_SET = "historical_incidence_shrinkage_and_analog_baselines"
+FEATURE_SET = "historical_incidence_shrinkage_analog_random_forest_baselines"
 ANALOG_MODEL_FEATURE_FLAGS = (
     "analog_like_year_hindcast,"
     "forecast_origin_prior_year_only,"
     "analog_outcome_observed_before_test_year,"
     "forecast_safe_prior_outcomes_only"
 )
+RANDOM_FOREST_MODEL_FEATURE_FLAGS = (
+    "random_forest_regional_research,"
+    "forecast_safe_prior_outcomes_only,"
+    "reported_incidence_history_only,"
+    "not_public_maryland_default"
+)
+RANDOM_FOREST_N_ESTIMATORS = 200
+RANDOM_FOREST_MIN_SAMPLES_LEAF = 3
+RANDOM_FOREST_MAX_FEATURES = "sqrt"
+RANDOM_FOREST_RANDOM_STATE = 1337
+RANDOM_FOREST_ALLOWED_MAX_FEATURES = {"sqrt", "log2"}
 REQUIRED_REGIONAL_INCIDENCE_COLUMNS = {
     "state_fips",
     "state_abbr",
@@ -52,6 +63,10 @@ class RegionalIncidenceStressRun:
     min_train_years: int
     lookback_years: int
     shrinkage_strength: float
+    random_forest_n_estimators: int
+    random_forest_min_samples_leaf: int
+    random_forest_max_features: str
+    random_forest_random_state: int
     model_names: str
     target_definition: str
     feature_set: str
@@ -150,6 +165,14 @@ class _ModelPrediction:
     analog_match_distance: float | None = None
 
 
+@dataclass(frozen=True)
+class _RegionalRandomForestModel:
+    estimator: object
+    train_start_year: int
+    train_end_year: int
+    train_year_count: int
+
+
 def build_regional_incidence_stress(
     *,
     regional_incidence_path: Path,
@@ -158,6 +181,10 @@ def build_regional_incidence_stress(
     min_train_years: int = 3,
     lookback_years: int = 3,
     shrinkage_strength: float = 5.0,
+    random_forest_n_estimators: int = RANDOM_FOREST_N_ESTIMATORS,
+    random_forest_min_samples_leaf: int = RANDOM_FOREST_MIN_SAMPLES_LEAF,
+    random_forest_max_features: str = RANDOM_FOREST_MAX_FEATURES,
+    random_forest_random_state: int = RANDOM_FOREST_RANDOM_STATE,
 ) -> RegionalIncidenceStressResult:
     if min_train_years < 1:
         raise RegionalIncidenceStressInputError("min_train_years must be at least 1")
@@ -168,6 +195,19 @@ def build_regional_incidence_stress(
     if not math.isfinite(shrinkage_strength) or shrinkage_strength < 0:
         raise RegionalIncidenceStressInputError(
             "shrinkage_strength must be finite and non-negative"
+        )
+    if random_forest_n_estimators < 1:
+        raise RegionalIncidenceStressInputError(
+            "random_forest_n_estimators must be at least 1"
+        )
+    if random_forest_min_samples_leaf < 1:
+        raise RegionalIncidenceStressInputError(
+            "random_forest_min_samples_leaf must be at least 1"
+        )
+    if random_forest_max_features not in RANDOM_FOREST_ALLOWED_MAX_FEATURES:
+        allowed = ", ".join(sorted(RANDOM_FOREST_ALLOWED_MAX_FEATURES))
+        raise RegionalIncidenceStressInputError(
+            "random_forest_max_features must be one of: " f"{allowed}"
         )
 
     rows = _read_incidence_rows(regional_incidence_path)
@@ -200,12 +240,26 @@ def build_regional_incidence_stress(
     run_id = (
         f"regional_incidence_stress_start{start_year}_end{resolved_end_year}_"
         f"mintrain{min_train_years}_lookback{lookback_years}_"
-        f"shrinkage{_slug_float(shrinkage_strength)}"
+        f"shrinkage{_slug_float(shrinkage_strength)}_"
+        f"rf{random_forest_n_estimators}_leaf{random_forest_min_samples_leaf}_"
+        f"max{random_forest_max_features}_seed{random_forest_random_state}"
     )
 
     predictions = []
     for test_year in range(start_year, resolved_end_year + 1):
         train_window_start = test_year - lookback_years
+        random_forest_model = _fit_regional_random_forest_model(
+            rows=rows,
+            rows_by_county=rows_by_county,
+            rows_by_year=rows_by_year,
+            test_year=test_year,
+            min_train_years=min_train_years,
+            lookback_years=lookback_years,
+            n_estimators=random_forest_n_estimators,
+            min_samples_leaf=random_forest_min_samples_leaf,
+            max_features=random_forest_max_features,
+            random_state=random_forest_random_state,
+        )
         year_rows = sorted(
             rows_by_year.get(test_year, []),
             key=lambda item: item.county_fips,
@@ -260,6 +314,18 @@ def build_regional_incidence_stress(
                 regional_history=regional_history,
                 shrinkage_strength=shrinkage_strength,
             )
+            random_forest_prediction = _regional_random_forest_prediction(
+                row=row,
+                random_forest_model=random_forest_model,
+                rows_by_county=rows_by_county,
+                rows_by_year=rows_by_year,
+                min_train_years=min_train_years,
+                lookback_years=lookback_years,
+            )
+            if random_forest_prediction is not None:
+                model_predictions["random_forest_regional_incidence"] = (
+                    random_forest_prediction
+                )
             flags = _combined_flags(row.feature_quality_flags, COMPARISON_ASSUMPTION_FLAGS)
             for model_name, model_prediction in model_predictions.items():
                 predictions.append(
@@ -290,6 +356,10 @@ def build_regional_incidence_stress(
         min_train_years=min_train_years,
         lookback_years=lookback_years,
         shrinkage_strength=shrinkage_strength,
+        random_forest_n_estimators=random_forest_n_estimators,
+        random_forest_min_samples_leaf=random_forest_min_samples_leaf,
+        random_forest_max_features=random_forest_max_features,
+        random_forest_random_state=random_forest_random_state,
         model_names=",".join(sorted({row.model_name for row in predictions})),
         target_definition=TARGET_DEFINITION,
         feature_set=FEATURE_SET,
@@ -609,6 +679,181 @@ def _model_prediction(
     )
 
 
+def _fit_regional_random_forest_model(
+    *,
+    rows: list[_IncidenceRow],
+    rows_by_county: dict[str, list[_IncidenceRow]],
+    rows_by_year: dict[int, list[_IncidenceRow]],
+    test_year: int,
+    min_train_years: int,
+    lookback_years: int,
+    n_estimators: int,
+    min_samples_leaf: int,
+    max_features: str,
+    random_state: int,
+) -> _RegionalRandomForestModel | None:
+    x_rows = []
+    y_values = []
+    train_years = set()
+    for candidate in rows:
+        if candidate.year >= test_year or candidate.incidence_per_100k is None:
+            continue
+        features = _regional_random_forest_feature_vector(
+            row=candidate,
+            rows_by_county=rows_by_county,
+            rows_by_year=rows_by_year,
+            target_year=candidate.year,
+            min_train_years=min_train_years,
+            lookback_years=lookback_years,
+        )
+        if features is None:
+            continue
+        x_rows.append(features)
+        y_values.append(candidate.incidence_per_100k)
+        train_years.add(candidate.year)
+    if not x_rows:
+        return None
+
+    from sklearn.ensemble import RandomForestRegressor
+
+    estimator = RandomForestRegressor(
+        n_estimators=n_estimators,
+        min_samples_leaf=min_samples_leaf,
+        max_features=max_features,
+        random_state=random_state,
+        n_jobs=1,
+    )
+    estimator.fit(x_rows, y_values)
+    return _RegionalRandomForestModel(
+        estimator=estimator,
+        train_start_year=min(train_years),
+        train_end_year=max(train_years),
+        train_year_count=len(train_years),
+    )
+
+
+def _regional_random_forest_prediction(
+    *,
+    row: _IncidenceRow,
+    random_forest_model: _RegionalRandomForestModel | None,
+    rows_by_county: dict[str, list[_IncidenceRow]],
+    rows_by_year: dict[int, list[_IncidenceRow]],
+    min_train_years: int,
+    lookback_years: int,
+) -> _ModelPrediction | None:
+    if random_forest_model is None:
+        return None
+    features = _regional_random_forest_feature_vector(
+        row=row,
+        rows_by_county=rows_by_county,
+        rows_by_year=rows_by_year,
+        target_year=row.year,
+        min_train_years=min_train_years,
+        lookback_years=lookback_years,
+    )
+    if features is None:
+        return None
+    prediction = float(random_forest_model.estimator.predict([features])[0])
+    return _model_prediction(
+        predicted_incidence_per_100k=max(prediction, 0.0),
+        population=row.population,
+        train_start_year=random_forest_model.train_start_year,
+        train_end_year=random_forest_model.train_end_year,
+        train_year_count=random_forest_model.train_year_count,
+        model_feature_quality_flags=RANDOM_FOREST_MODEL_FEATURE_FLAGS,
+    )
+
+
+def _regional_random_forest_feature_vector(
+    *,
+    row: _IncidenceRow,
+    rows_by_county: dict[str, list[_IncidenceRow]],
+    rows_by_year: dict[int, list[_IncidenceRow]],
+    target_year: int,
+    min_train_years: int,
+    lookback_years: int,
+) -> list[float] | None:
+    history = [
+        prior
+        for prior in rows_by_county[row.county_fips]
+        if (
+            target_year - lookback_years <= prior.year < target_year
+            and prior.incidence_per_100k is not None
+        )
+    ]
+    if len(history) < min_train_years:
+        return None
+    prior_year_row = next(
+        (
+            prior
+            for prior in history
+            if prior.year == target_year - 1
+            and prior.incidence_per_100k is not None
+        ),
+        None,
+    )
+    if prior_year_row is None:
+        return None
+
+    county_values = [_known_incidence(prior) for prior in history]
+    county_mean = mean(county_values)
+    ordered_history = sorted(history, key=lambda prior: prior.year)
+    state_prior_values = _known_year_values(
+        rows_by_year.get(target_year - 1, []),
+        state_fips=row.state_fips,
+    )
+    regional_prior_values = _known_year_values(rows_by_year.get(target_year - 1, []))
+    state_history_values = _known_window_values(
+        rows_by_year=rows_by_year,
+        start_year=target_year - lookback_years,
+        end_year=target_year,
+        state_fips=row.state_fips,
+    )
+    regional_history_values = _known_window_values(
+        rows_by_year=rows_by_year,
+        start_year=target_year - lookback_years,
+        end_year=target_year,
+    )
+    return [
+        _known_incidence(prior_year_row),
+        county_mean,
+        min(county_values),
+        max(county_values),
+        _known_incidence(ordered_history[-1]) - _known_incidence(ordered_history[0]),
+        float(len(history)),
+        mean(state_prior_values) if state_prior_values else county_mean,
+        mean(state_history_values) if state_history_values else county_mean,
+        mean(regional_prior_values) if regional_prior_values else county_mean,
+        mean(regional_history_values) if regional_history_values else county_mean,
+    ]
+
+
+def _known_year_values(
+    rows: list[_IncidenceRow],
+    *,
+    state_fips: str | None = None,
+) -> list[float]:
+    return [
+        _known_incidence(row)
+        for row in rows
+        if row.incidence_per_100k is not None
+        and (state_fips is None or row.state_fips == state_fips)
+    ]
+
+
+def _known_window_values(
+    *,
+    rows_by_year: dict[int, list[_IncidenceRow]],
+    start_year: int,
+    end_year: int,
+    state_fips: str | None = None,
+) -> list[float]:
+    values = []
+    for year in range(start_year, end_year):
+        values.extend(_known_year_values(rows_by_year.get(year, []), state_fips=state_fips))
+    return values
+
+
 def _analog_county_prediction(
     *,
     row: _IncidenceRow,
@@ -699,6 +944,8 @@ def _analog_distance(
 
 
 def _model_family(model_name: str) -> str:
+    if model_name.startswith("random_forest_"):
+        return "random_forest_incidence"
     if model_name.startswith("analog_"):
         return "analog"
     if model_name.startswith("empirical_bayes_"):
