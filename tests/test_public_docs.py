@@ -259,6 +259,26 @@ def test_public_modeling_docs_do_not_overclaim_unimplemented_model_lanes() -> No
     for token in forbidden_tokens:
         assert token not in docs_text
 
+
+def test_docs_capture_virginia_2024_state_overlay() -> None:
+    docs_text = "\n".join(
+        [
+            README.read_text(encoding="utf-8"),
+            DATA_SOURCES.read_text(encoding="utf-8"),
+            ETL_PIPELINE.read_text(encoding="utf-8"),
+            Path("docs/data-manifest.md").read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "--va-vdh-locality-csv-path",
+        "virginia_vdh_reportable_disease_locality_2024_csv",
+        "VDH 2024 locality",
+        "state 2024 locality overlay",
+        "Virginia localities include counties and independent cities",
+    ]:
+        assert token in docs_text
+
     for token in [
         "stdlib baselines, ridge profiles, empirical-Bayes shrinkage, and future model lanes",
         "current v0 model comparison",

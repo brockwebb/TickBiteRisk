@@ -105,6 +105,10 @@ artifacts.
      `--pa-2024-workbook-path`; those rows remain flagged state-source regional
      research overlays, with suppressed county values represented as zero plus
      suppression flags.
+   - Can append the Virginia VDH 2024 reportable-disease geography CSV with
+     `--va-vdh-locality-csv-path`; those rows remain flagged state 2024 locality
+     overlay records. Virginia localities include counties and independent
+     cities, so FIPS is the canonical join key.
    - Can read the Delaware DHSS 2019-2023 Lyme HTML page with
      `--de-lyme-html-path` and write
      `regional_lyme_state_source_validation.csv` as a state-source validation

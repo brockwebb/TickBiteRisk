@@ -108,6 +108,9 @@ def test_project_manifest_tracks_2024_plus_source_watchlist() -> None:
         if source_id == "delaware_dhss_lyme_table":
             assert "etl_supported" in source.status
             assert "not_model_input" in source.status
+        elif source_id == "virginia_vdh_reportable_disease_dashboard":
+            assert "etl_supported" in source.status
+            assert "state_overlay" in source.status
         else:
             assert "candidate" in source.status
         assert "not a confirmed disease truth label" in source.notes

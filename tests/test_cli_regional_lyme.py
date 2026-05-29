@@ -185,6 +185,84 @@ def test_regional_lyme_outcomes_command_writes_de_validation_sidecar(
     assert "state-source validation sidecar" in de_provenance["modeling_caveats"]
 
 
+def test_regional_lyme_outcomes_command_appends_va_state_overlay(
+    tmp_path: Path,
+) -> None:
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "out"
+    raw_dir.mkdir()
+    (raw_dir / "cdc_lyme_county_dashboard_2023.csv").write_text(
+        "\n".join(
+            [
+                "Ctyname,stname,ststatus,stcode,ctycode,Cases2023",
+                "Arlington County,Virginia,Low Incidence,51,13,27",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    va_path = raw_dir / "virginia_vdh_reportable_disease_geography_2024.csv"
+    va_path.write_text(
+        "\n".join(
+            [
+                "_id,Year,Condition,Geography Level,Geography Value,FIPS,Annual Case Count,Incidence Rate",
+                "493,2024,Lyme disease,Locality,Accomack,51001,4,12",
+                "496,2024,Lyme disease,Locality,Alexandria,51510,8,5.2",
+                "497,2024,Lyme disease,State,Virginia,NA,1420,16.2",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "regional-lyme-outcomes",
+            "--raw-dir",
+            str(raw_dir),
+            "--output-dir",
+            str(output_dir),
+            "--va-vdh-locality-csv-path",
+            str(va_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 3 Mid-Atlantic Lyme county-year outcome row(s)" in result.stdout
+
+    with (output_dir / "midatlantic_lyme_county_year.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 3
+    va_2024 = [
+        row
+        for row in rows
+        if row["source_id"] == "virginia_vdh_reportable_disease_locality_2024_csv"
+    ]
+    assert [(row["county_fips"], row["total_cases"]) for row in va_2024] == [
+        ("51001", "4"),
+        ("51510", "8"),
+    ]
+    assert all(
+        "va_vdh_official_locality_cases" in row["feature_quality_flags"]
+        for row in va_2024
+    )
+
+    with (output_dir / "acquisition_provenance.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        provenance_rows = list(csv.DictReader(handle))
+    assert [row["source_id"] for row in provenance_rows] == [
+        "cdc_lyme_county_dashboard_2023",
+        "virginia_vdh_reportable_disease_locality_2024_csv",
+    ]
+    va_provenance = provenance_rows[1]
+    assert va_provenance["row_count"] == "2"
+    assert "--va-vdh-locality-csv-path" in va_provenance["acquisition_command"]
+    assert "state 2024 locality overlay" in va_provenance["modeling_caveats"]
+
+
 def test_regional_lyme_outcomes_command_fails_before_writing_when_missing_dashboard(
     tmp_path: Path,
 ) -> None:

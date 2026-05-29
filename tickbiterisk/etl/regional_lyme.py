@@ -259,6 +259,60 @@ def parse_de_dhss_lyme_county_html(
     return sorted(rows, key=lambda row: (row.county_fips, row.year))
 
 
+def parse_va_vdh_reportable_disease_locality_csv(
+    path: Path,
+    *,
+    source_id: str,
+    target_year: int = 2024,
+) -> list[RegionalLymeCountyYear]:
+    df = pd.read_csv(path, dtype=str, encoding="utf-8-sig")
+    df.columns = [str(column).strip() for column in df.columns]
+    required = {
+        "Year",
+        "Condition",
+        "Geography Level",
+        "Geography Value",
+        "FIPS",
+        "Annual Case Count",
+    }
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing Virginia VDH locality CSV columns: {sorted(missing)}")
+
+    year_text = str(target_year)
+    filtered = df[
+        df["Year"].astype(str).str.strip().eq(year_text)
+        & df["Condition"].astype(str).str.strip().str.casefold().eq("lyme disease")
+        & df["Geography Level"].astype(str).str.strip().str.casefold().eq("locality")
+    ].copy()
+    filtered = filtered.drop_duplicates()
+
+    rows: list[RegionalLymeCountyYear] = []
+    for record in filtered.to_dict(orient="records"):
+        fips = str(record.get("FIPS", "")).strip()
+        if not fips or fips.upper() == "NA":
+            continue
+        case_value = record.get("Annual Case Count")
+        rows.append(
+            RegionalLymeCountyYear(
+                state_fips="51",
+                state_abbr="VA",
+                state_name="Virginia",
+                county_fips=f"{int(float(fips)):05d}",
+                county_name=str(record.get("Geography Value", "")).strip(),
+                year=target_year,
+                total_cases=_frequency_to_int(case_value),
+                source_id=source_id,
+                feature_quality_flags=",".join(
+                    _va_vdh_quality_flags(year=target_year, case_value=case_value)
+                ),
+            )
+        )
+    if not rows:
+        raise ValueError("No Virginia VDH Lyme locality rows parsed from CSV")
+    return sorted(rows, key=lambda row: (row.county_fips, row.year))
+
+
 def _find_de_dhss_lyme_table(tables: list[pd.DataFrame]) -> pd.DataFrame:
     for table in tables:
         text = " ".join(
@@ -377,6 +431,22 @@ def _de_dhss_quality_flags(*, year: int, case_value: object) -> list[str]:
     ]
     if year == 2020:
         flags.append("covid_reporting_disruption")
+    if year >= 2022:
+        flags.append("lyme_case_definition_change")
+    if _case_value_is_suppressed_or_unknown(case_value):
+        flags.append("case_value_suppressed_or_unknown")
+    return flags
+
+
+def _va_vdh_quality_flags(*, year: int, case_value: object) -> list[str]:
+    flags = [
+        "regional_expansion_stress_test",
+        "va_vdh_official_locality_cases",
+        "state_source_not_cdc_public_use",
+        "virginia_county_or_independent_city_locality",
+        "not_public_maryland_default",
+        "reported_cases_not_stable_true_incidence",
+    ]
     if year >= 2022:
         flags.append("lyme_case_definition_change")
     if _case_value_is_suppressed_or_unknown(case_value):

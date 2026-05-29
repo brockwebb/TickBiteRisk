@@ -6,6 +6,7 @@ from tickbiterisk.etl.regional_lyme import (
     parse_cdc_midatlantic_county_dashboard,
     parse_de_dhss_lyme_county_html,
     parse_pa_doh_lyme_county_workbook,
+    parse_va_vdh_reportable_disease_locality_csv,
 )
 from tickbiterisk.etl.regional_lyme_build import (
     write_regional_lyme_output,
@@ -196,6 +197,54 @@ def test_de_dhss_html_parser_extracts_county_rows_as_validation_only(
     assert "lyme_case_definition_change" in new_castle_2023.feature_quality_flags
     assert "reported_cases_not_stable_true_incidence" in (
         new_castle_2023.feature_quality_flags
+    )
+
+
+def test_va_vdh_csv_parser_adds_2024_locality_rows_with_state_source_flags(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "va_vdh_geography.csv"
+    path.write_text(
+        "\n".join(
+            [
+                "_id,Year,Condition,Geography Level,Geography Value,FIPS,Annual Case Count,Incidence Rate",
+                "492,2024,Lyme disease,State,Virginia,NA,1420,16.2",
+                "493,2024,Lyme disease,Locality,Accomack,51001,4,12",
+                "493,2024,Lyme disease,Locality,Accomack,51001,4,12",
+                "494,2024,Lyme disease,Locality,Accomack,51001,4,12.1",
+                "495,2024,Amebiasis,Locality,Accomack,51001,0,0",
+                "496,2024,Lyme disease,Locality,Alexandria,51510,8,5.2",
+                "497,2023,Lyme disease,Locality,Alexandria,51510,6,3.9",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rows = parse_va_vdh_reportable_disease_locality_csv(
+        path,
+        source_id="virginia_vdh_reportable_disease_locality_2024_csv",
+        target_year=2024,
+    )
+
+    assert [(row.county_fips, row.county_name, row.total_cases) for row in rows] == [
+        ("51001", "Accomack", 4),
+        ("51001", "Accomack", 4),
+        ("51510", "Alexandria", 8),
+    ]
+    alexandria = rows[2]
+    assert alexandria.state_fips == "51"
+    assert alexandria.state_abbr == "VA"
+    assert alexandria.state_name == "Virginia"
+    assert alexandria.year == 2024
+    assert "va_vdh_official_locality_cases" in alexandria.feature_quality_flags
+    assert "state_source_not_cdc_public_use" in alexandria.feature_quality_flags
+    assert "virginia_county_or_independent_city_locality" in (
+        alexandria.feature_quality_flags
+    )
+    assert "not_public_maryland_default" in alexandria.feature_quality_flags
+    assert "lyme_case_definition_change" in alexandria.feature_quality_flags
+    assert "reported_cases_not_stable_true_incidence" in (
+        alexandria.feature_quality_flags
     )
 
 

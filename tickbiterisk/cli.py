@@ -126,6 +126,7 @@ from tickbiterisk.etl.regional_lyme import (
     parse_cdc_midatlantic_county_dashboard,
     parse_de_dhss_lyme_county_html,
     parse_pa_doh_lyme_county_workbook,
+    parse_va_vdh_reportable_disease_locality_csv,
 )
 from tickbiterisk.etl.regional_demographics import (
     CENSUS_PEP_AGE_SEX_CITATION_URL,
@@ -685,6 +686,23 @@ REGIONAL_DE_LYME_SOURCE_METADATA = {
         "regional years and are not appended to the model input panel, not "
         "the public Maryland default, and reported cases are not stable true "
         "incidence."
+    ),
+}
+REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA = {
+    "filename": "virginia_vdh_reportable_disease_geography_2024.csv",
+    "source_id": "virginia_vdh_reportable_disease_locality_2024_csv",
+    "source_name": "Virginia VDH reportable disease surveillance locality CSV, 2024",
+    "source_url": (
+        "https://data.virginia.gov/datastore/dump/"
+        "5b1fc1e7-3ef9-42cd-8dd1-6c3d4ef4da79?bom=True"
+    ),
+    "citation_url": "https://www.vdh.virginia.gov/surveillance-and-investigation/annual-report/",
+    "parser_method": "parse_va_vdh_reportable_disease_locality_csv:target_year=2024",
+    "modeling_caveats": (
+        "Virginia VDH state 2024 locality overlay for regional expansion/"
+        "stress-test panel only; Virginia localities include counties and "
+        "independent cities, rows are not the public Maryland default, and "
+        "reported cases are not stable true incidence."
     ),
 }
 
@@ -2762,6 +2780,14 @@ def regional_lyme_outcomes(
             "without appending overlapping years to the model panel."
         ),
     ),
+    va_vdh_locality_csv_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional Virginia VDH reportable disease geography CSV; when "
+            "provided, appends flagged 2024 locality state-source rows to the "
+            "regional outcome panel."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/regional-lyme"),
         help="Output directory for Mid-Atlantic Lyme outcome artifacts.",
@@ -2803,6 +2829,20 @@ def regional_lyme_outcomes(
             de_lyme_html_path,
             source_id=str(REGIONAL_DE_LYME_SOURCE_METADATA["source_id"]),
         )
+    va_rows: list[RegionalLymeCountyYear] = []
+    if va_vdh_locality_csv_path is not None:
+        if not va_vdh_locality_csv_path.exists():
+            raise typer.BadParameter(
+                "Virginia VDH locality CSV source not found: "
+                f"{va_vdh_locality_csv_path}"
+            )
+        va_rows = parse_va_vdh_reportable_disease_locality_csv(
+            va_vdh_locality_csv_path,
+            source_id=str(REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA["source_id"]),
+            target_year=2024,
+        )
+        rows.extend(va_rows)
+        rows.sort(key=lambda row: (row.state_fips, row.county_fips, row.year))
     output_path = write_regional_lyme_output(rows, output_dir)
     de_validation_output_path: Path | None = None
     if de_validation_rows:
@@ -2823,6 +2863,8 @@ def regional_lyme_outcomes(
             de_validation_rows=de_validation_rows,
             de_source_path=de_lyme_html_path,
             de_validation_output_path=de_validation_output_path,
+            va_rows=va_rows,
+            va_source_path=va_vdh_locality_csv_path,
             raw_dir=raw_dir,
             output_dir=output_dir,
             manifest_path=resolved_manifest_path,
@@ -4443,6 +4485,8 @@ def _regional_lyme_provenance_records(
     de_validation_rows: list[RegionalLymeCountyYear],
     de_source_path: Path | None,
     de_validation_output_path: Path | None,
+    va_rows: list[RegionalLymeCountyYear],
+    va_source_path: Path | None,
     raw_dir: Path,
     output_dir: Path,
     manifest_path: Path,
@@ -4452,6 +4496,7 @@ def _regional_lyme_provenance_records(
         raw_dir=raw_dir,
         pa_source_path=pa_source_path,
         de_source_path=de_source_path,
+        va_source_path=va_source_path,
         output_dir=output_dir,
         manifest_path=manifest_path,
     )
@@ -4559,6 +4604,50 @@ def _regional_lyme_provenance_records(
                 ],
             )
         )
+    if va_source_path is not None:
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA["source_id"],
+                source_name=REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA[
+                    "source_name"
+                ],
+                source_url=REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA["source_url"],
+                citation_url=REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA[
+                    "citation_url"
+                ],
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read the ignored local Virginia VDH reportable disease "
+                    "geography CSV, filter to 2024 Lyme disease locality rows, "
+                    "and append them as flagged state-source rows to the "
+                    "regional outcome panel."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    "Read local raw Virginia VDH reportable disease geography "
+                    f"CSV {va_source_path.name} for the state 2024 locality "
+                    "overlay."
+                ),
+                derived_artifact_paths=[va_source_path, output_path],
+                derived_artifact_path_labels=[
+                    va_source_path.name,
+                    output_path.name,
+                ],
+                row_count=len(va_rows),
+                parser_method=REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA[
+                    "parser_method"
+                ],
+                extraction_quality="accepted_state_overlay",
+                access_notes=(
+                    "Public Virginia VDH data.virginia.gov CSV export; no "
+                    "secret or credential required. Raw CSV remains in ignored "
+                    "storage."
+                ),
+                modeling_caveats=REGIONAL_VA_VDH_LYME_2024_SOURCE_METADATA[
+                    "modeling_caveats"
+                ],
+            )
+        )
     return records
 
 
@@ -4567,6 +4656,7 @@ def _regional_lyme_acquisition_command(
     raw_dir: Path,
     pa_source_path: Path | None,
     de_source_path: Path | None,
+    va_source_path: Path | None,
     output_dir: Path,
     manifest_path: Path,
 ) -> str:
@@ -4589,6 +4679,13 @@ def _regional_lyme_acquisition_command(
             [
                 "--de-lyme-html-path",
                 _public_provenance_path(de_source_path),
+            ]
+        )
+    if va_source_path is not None:
+        command_parts.extend(
+            [
+                "--va-vdh-locality-csv-path",
+                _public_provenance_path(va_source_path),
             ]
         )
     command_parts.extend(
