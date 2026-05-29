@@ -113,6 +113,8 @@ parser evidence, and time-aware validation before it can move into a model lane.
 | `regional_incidence_stress_metrics.csv` | `tickbiterisk etl regional-incidence-stress` | Incidence MAE/RMSE metrics for regional historical-range baselines |
 | `regional_annual_forecast_runs.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic target-year forecast run manifest with origin, hashes, and forecast caveats |
 | `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows, including horizon-matched analog branch, without observed target, residual, or error columns |
+| `regional_forecast_capacity_runs.csv` | `tickbiterisk etl regional-forecast-capacity` | Mid-Atlantic forecast-capacity diagnostic run manifest |
+| `regional_forecast_capacity_summary.csv` | `tickbiterisk etl regional-forecast-capacity` | State and Mid-Atlantic forecast totals compared with historical reported-incidence ranges |
 | `regional_incidence_cluster_runs.csv` | `tickbiterisk etl regional-incidence-clusters` | Mid-Atlantic prior-incidence cluster run manifest |
 | `regional_incidence_cluster_county_year.csv` | `tickbiterisk etl regional-incidence-clusters` | Forecast-safe low/moderate/high/very-high prior-incidence band assignments |
 | `regional_incidence_cluster_summary.csv` | `tickbiterisk etl regional-incidence-clusters` | Prior cluster capacity bands and held-out actual incidence diagnostics |
@@ -198,5 +200,10 @@ parser evidence, and time-aware validation before it can move into a model lane.
   requested. Regional forecast runs and predictions carry the same
   as-of/cutoff/source-vintage/update-mode contract, and analog rows preserve
   matched origin/outcome years plus match distance.
+- The regional forecast-capacity artifact compares 2026 forecast branch totals
+  with historical reported-case and incidence ranges using only years at or
+  before the forecast origin and complete historical rows for the same forecast
+  county set. It is a control-limit review tool, not an observed 2026 outcome
+  or latent true disease-capacity estimate.
 
 Last updated: 2026-05-29.

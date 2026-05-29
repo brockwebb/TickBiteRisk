@@ -252,6 +252,21 @@ artifacts.
      columns. This is a regional forecast scaffold, not the public Maryland
      dashboard default.
 
+1i-3. `tickbiterisk etl regional-forecast-capacity`
+   - Typical 2026 run:
+     `tickbiterisk etl regional-forecast-capacity --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --forecast-predictions-path build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv --output-dir build/etl/regional-forecast-capacity`.
+   - Compares each regional annual forecast branch against historical state and
+     Mid-Atlantic reported-case and incidence ranges using only rows at or
+     before the forecast origin.
+   - Uses the forecast branch county set for each comparison; historical years
+     are counted only when every forecast county has a supported historical
+     row.
+   - Writes `regional_forecast_capacity_runs.csv` and
+     `regional_forecast_capacity_summary.csv`.
+   - This is a control-limit diagnostic for forecast review, not an observed
+     target-year outcome, public Maryland branch, or latent true disease
+     capacity estimate.
+
 1j. `tickbiterisk etl regional-incidence-clusters`
    - Assigns county-years to low, moderate, high, and very-high regional
      incidence-pressure bands using only prior-year/trailing county incidence.

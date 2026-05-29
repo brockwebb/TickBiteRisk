@@ -336,6 +336,13 @@ from tickbiterisk.modeling.regional_annual_forecast import (
 from tickbiterisk.modeling.regional_annual_forecast_build import (
     write_regional_annual_forecast_outputs,
 )
+from tickbiterisk.modeling.regional_forecast_capacity import (
+    RegionalForecastCapacityInputError,
+    build_regional_forecast_capacity,
+)
+from tickbiterisk.modeling.regional_forecast_capacity_build import (
+    write_regional_forecast_capacity_outputs,
+)
 from tickbiterisk.modeling.regional_outcome_stress import (
     RegionalOutcomeStressInputError,
     build_regional_outcome_stress,
@@ -3598,6 +3605,47 @@ def regional_annual_forecast(
     typer.echo(
         f"Wrote {len(result.predictions)} regional annual forecast prediction row(s) "
         f"to {outputs.predictions_path}"
+    )
+
+
+@etl_app.command("regional-forecast-capacity")
+def regional_forecast_capacity(
+    regional_incidence_path: Path = typer.Option(
+        Path("build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv"),
+        help="Input Mid-Atlantic Lyme incidence county-year panel.",
+    ),
+    forecast_predictions_path: Path = typer.Option(
+        Path("build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv"),
+        help="Input regional annual forecast predictions CSV.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-forecast-capacity"),
+        help="Output directory for regional forecast capacity artifacts.",
+    ),
+) -> None:
+    if not regional_incidence_path.exists():
+        raise typer.BadParameter(
+            f"Regional incidence panel not found: {regional_incidence_path}"
+        )
+    if not forecast_predictions_path.exists():
+        raise typer.BadParameter(
+            f"Regional forecast predictions not found: {forecast_predictions_path}"
+        )
+
+    try:
+        result = build_regional_forecast_capacity(
+            regional_incidence_path=regional_incidence_path,
+            forecast_predictions_path=forecast_predictions_path,
+        )
+    except RegionalForecastCapacityInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_regional_forecast_capacity_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote 1 regional forecast capacity run row(s) to {outputs.runs_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.capacity_summary)} regional forecast capacity row(s) "
+        f"to {outputs.capacity_summary_path}"
     )
 
 
