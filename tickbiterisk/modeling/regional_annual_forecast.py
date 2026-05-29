@@ -204,7 +204,7 @@ def build_regional_annual_forecast(
     resolved_origin_year = (
         forecast_origin_year
         if forecast_origin_year is not None
-        else max(row.year for row in usable_origin_rows)
+        else _default_forecast_origin_year(usable_origin_rows)
     )
     if target_year <= resolved_origin_year:
         raise RegionalAnnualForecastInputError(
@@ -283,6 +283,19 @@ def build_regional_annual_forecast(
         run=run,
         predictions=forecast_rows,
     )
+
+
+def _default_forecast_origin_year(rows: list[_IncidenceRow]) -> int:
+    county_counts_by_year: dict[int, set[str]] = {}
+    for row in rows:
+        county_counts_by_year.setdefault(row.year, set()).add(row.county_fips)
+    max_count = max(len(counties) for counties in county_counts_by_year.values())
+    eligible_years = [
+        year
+        for year, counties in county_counts_by_year.items()
+        if len(counties) == max_count
+    ]
+    return max(eligible_years)
 
 
 def _forecast_rows(

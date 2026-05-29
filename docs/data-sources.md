@@ -154,8 +154,10 @@ feature ideas to test in time-aware backtests before any public model claim.
   vintage, and update mode.
 - The regional annual forecast artifact applies the same no-observed-target
   boundary to the DE/DC/MD/PA/VA/WV incidence panel. Current 2026 rows are
-  trained through the latest regional incidence origin year, 2023, and use
-  projected 2026 regional population denominators. Regional forecast runs and
-  predictions carry the same as-of/cutoff/source-vintage/update-mode contract.
+  trained through the latest coverage-complete regional incidence origin year,
+  2023, and use projected 2026 regional population denominators. Partial
+  state-source overlays are diagnostic unless an origin is explicitly
+  requested. Regional forecast runs and predictions carry the same
+  as-of/cutoff/source-vintage/update-mode contract.
 
 Last updated: 2026-05-29.

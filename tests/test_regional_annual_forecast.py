@@ -92,7 +92,7 @@ def test_build_regional_annual_forecast_emits_target_year_rows_without_actuals(
     assert eb_state.feature_profile == "state_shrunken_incidence"
 
 
-def test_build_regional_annual_forecast_defaults_origin_to_latest_input_year(
+def test_build_regional_annual_forecast_defaults_origin_to_latest_complete_year(
     tmp_path: Path,
 ) -> None:
     result = build_regional_annual_forecast(
@@ -105,6 +105,68 @@ def test_build_regional_annual_forecast_defaults_origin_to_latest_input_year(
 
     assert result.run.forecast_origin_year == 2021
     assert {row.forecast_origin_year for row in result.predictions} == {2021}
+
+
+def test_build_regional_annual_forecast_ignores_partial_overlay_year_by_default(
+    tmp_path: Path,
+) -> None:
+    result = build_regional_annual_forecast(
+        regional_incidence_path=_write_incidence_panel(
+            tmp_path / "incidence.csv",
+            partial_overlay_year=True,
+        ),
+        population_path=_write_population(tmp_path / "population.csv"),
+        target_year=2023,
+        min_train_years=2,
+        lookback_years=2,
+    )
+
+    assert result.run.forecast_origin_year == 2021
+    assert result.run.n_forecast_counties == 4
+    assert {row.forecast_origin_year for row in result.predictions} == {2021}
+
+
+def test_build_regional_annual_forecast_ignores_high_coverage_partial_year(
+    tmp_path: Path,
+) -> None:
+    result = build_regional_annual_forecast(
+        regional_incidence_path=_write_incidence_panel(
+            tmp_path / "incidence.csv",
+            extra_full_county=True,
+            high_coverage_partial_overlay_year=True,
+        ),
+        population_path=_write_population(
+            tmp_path / "population.csv",
+            extra_counties=["24005"],
+        ),
+        target_year=2023,
+        min_train_years=2,
+        lookback_years=2,
+    )
+
+    assert result.run.forecast_origin_year == 2021
+    assert result.run.n_forecast_counties == 5
+    assert {row.forecast_origin_year for row in result.predictions} == {2021}
+
+
+def test_build_regional_annual_forecast_can_explicitly_use_partial_origin(
+    tmp_path: Path,
+) -> None:
+    result = build_regional_annual_forecast(
+        regional_incidence_path=_write_incidence_panel(
+            tmp_path / "incidence.csv",
+            partial_overlay_year=True,
+        ),
+        population_path=_write_population(tmp_path / "population.csv"),
+        target_year=2023,
+        forecast_origin_year=2022,
+        min_train_years=2,
+        lookback_years=2,
+    )
+
+    assert result.run.forecast_origin_year == 2022
+    assert result.run.n_forecast_counties == 1
+    assert {row.county_fips for row in result.predictions} == {"42001"}
 
 
 def test_build_regional_annual_forecast_requires_county_depth_and_origin_row(
@@ -306,6 +368,9 @@ def _write_incidence_panel(
     all_incidence_missing: bool = False,
     override_incidence: str | None = None,
     override_total_cases: str | None = None,
+    partial_overlay_year: bool = False,
+    high_coverage_partial_overlay_year: bool = False,
+    extra_full_county: bool = False,
 ) -> Path:
     rows = []
     series = {
@@ -314,6 +379,8 @@ def _write_incidence_panel(
         ("42", "PA", "Pennsylvania", "42001", "Adams County"): [5, 10, 20, 30],
         ("42", "PA", "Pennsylvania", "42003", "Allegheny County"): [15, 10, 0, 10],
     }
+    if extra_full_county:
+        series[("24", "MD", "Maryland", "24005", "County 24005")] = [6, 7, 8, 9]
     for key, values in series.items():
         state_fips, state_abbr, state_name, county_fips, county_name = key
         for offset, incidence in enumerate(values):
@@ -365,6 +432,56 @@ def _write_incidence_panel(
                     str(incidence),
                     str(float(incidence)),
                     "regional_incidence_diagnostic",
+                )
+            )
+    if partial_overlay_year:
+        rows.append(
+            _incidence_row(
+                "42",
+                "PA",
+                "Pennsylvania",
+                "42001",
+                "Adams County",
+                "2022",
+                "128",
+                "119.9",
+                (
+                    "regional_incidence_diagnostic,"
+                    "state_source_not_cdc_public_use"
+                ),
+            )
+        )
+    if high_coverage_partial_overlay_year:
+        for county_fips, incidence in [
+            ("24001", 41),
+            ("24003", 8),
+            ("42001", 128),
+            ("42003", 12),
+        ]:
+            state_fips = "42" if county_fips.startswith("42") else "24"
+            state_abbr = "PA" if state_fips == "42" else "MD"
+            state_name = "Pennsylvania" if state_fips == "42" else "Maryland"
+            county_name = (
+                "Adams County"
+                if county_fips == "42001"
+                else "Allegheny County"
+                if county_fips == "42003"
+                else f"County {county_fips}"
+            )
+            rows.append(
+                _incidence_row(
+                    state_fips,
+                    state_abbr,
+                    state_name,
+                    county_fips,
+                    county_name,
+                    "2022",
+                    str(incidence),
+                    str(float(incidence)),
+                    (
+                        "regional_incidence_diagnostic,"
+                        "state_source_not_cdc_public_use"
+                    ),
                 )
             )
     with path.open("w", encoding="utf-8", newline="") as handle:

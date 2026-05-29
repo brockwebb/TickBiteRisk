@@ -166,8 +166,11 @@ artifacts.
      `tickbiterisk etl regional-annual-forecast --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --as-of-date 2026-05-28 --data-cutoff-date 2023-12-31 --source-vintage cdc_lyme_county_dashboard_2023 --update-mode pre_update --output-dir build/etl/regional-annual-forecast`.
    - Projects the Mid-Atlantic reported-incidence panel into a target year
      without observed target-year Lyme outcomes.
-   - Defaults the forecast origin to the latest incidence year in the input
-     panel, currently 2023 for the CDC dashboard-based regional panel.
+   - Defaults the forecast origin to the latest coverage-complete incidence
+     year in the input panel, currently 2023 for the CDC dashboard-based
+     regional panel. Partial state-source overlay years are retained for
+     diagnostics without becoming the default origin unless explicitly
+     requested.
    - Uses target-year regional population denominators. Current 2026 runs use
      projected Census denominators and preserve projection flags.
    - Writes `regional_annual_forecast_runs.csv` and
