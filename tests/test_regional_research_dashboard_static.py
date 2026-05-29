@@ -12,6 +12,9 @@ def test_regional_research_html_has_map_controls_and_research_boundaries() -> No
         "TickBiteRisk Regional Research",
         "Mid-Atlantic county-week Lyme risk forecast research",
         'id="regional-risk-map"',
+        'id="year-slider"',
+        'id="year-label" class="muted" aria-live="polite"',
+        'id="year-mode-label" class="mode-pill forecast-mode"',
         'id="week-slider"',
         'id="week-label" class="muted" aria-live="polite"',
         'id="regional-county-panel"',
@@ -36,6 +39,7 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
 
     for token in [
         "research-data/regional/regional_county_risk_weekly.json",
+        "research-data/regional/regional_county_incidence_annual.json",
         "research-data/regional/regional_counties.geojson",
         "research-data/regional/regional_states.geojson",
         "research-data/regional/regional_county_metadata.json",
@@ -46,6 +50,9 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function renderRegionalRegime",
         "function regionalRegimeCountyNames",
         "function renderRegionalForecastChart",
+        "function renderRegionalObservedHistoryChart",
+        "function handleYearSliderInput",
+        "function selectedRegionalYearMode",
         "function regionalCountyWeekRecords",
         "function handleRegionalListFilterChange",
         "function filteredRegionalFeatures",
@@ -54,6 +61,9 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "forecast_safe_prior_history_spatial_regime",
         "Forecast origin",
         "Forecast year",
+        "Observed historical",
+        "observed reported incidence",
+        "observed-history-line",
         "county-forecast-line",
         "interval-band-95",
         "data-active-week",
@@ -81,6 +91,8 @@ def test_regional_research_css_has_stable_map_slider_and_regime_styles() -> None
         ".regional-county-shape.is-same-regime",
         ".regional-state-boundary",
         ".week-slider-row",
+        ".mode-pill",
+        ".observed-history-line",
     ]:
         assert token in css
 

@@ -26,6 +26,25 @@ const fixtures = {
       forecast_origin_year: 2023,
     },
   },
+  "regional_county_incidence_annual.json": {
+    caveats: ["reported cases are not stable true incidence", "informational only"],
+    county_count: 3,
+    data_role: "observed_historical",
+    export_type: "regional_county_incidence_annual",
+    record_count: 5,
+    records: [
+      annualRecord("24001", "Allegany County", "MD", 2023, 35, 68000, 51.47, "top_quintile"),
+      annualRecord("24001", "Allegany County", "MD", 2024, 41, 68100, 60.21, "top_quintile"),
+      annualRecord("24023", "Garrett County", "MD", 2023, 22, 28500, 77.19, "top_decile"),
+      annualRecord("24023", "Garrett County", "MD", 2024, 19, 28400, 66.9, "top_quintile"),
+      annualRecord("51810", "Virginia Beach city", "VA", 2024, 4, 455000, 0.88, "lower_half"),
+    ],
+    research_status: {
+      research_only: true,
+      not_public_maryland_default: true,
+    },
+    year_range: [2023, 2024],
+  },
   "regional_county_metadata.json": {
     county_count: 3,
     counties: [
@@ -163,6 +182,8 @@ test("regional research dashboard renders county risk, week slider, and regime i
   ).toBeVisible();
   await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(3);
   await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(2);
+  await expect(page.locator("#year-label")).toContainText("2026");
+  await expect(page.locator("#year-mode-label")).toContainText("Forecast");
   await expect(page.locator("#regional-panel-content")).toHaveAttribute(
     "aria-live",
     "polite"
@@ -242,6 +263,29 @@ test("regional research dashboard renders county risk, week slider, and regime i
     "empirical bayes spatial regime incidence"
   );
 
+  await page.locator("#year-slider").fill("0");
+  await expect(page.locator("#year-label")).toContainText("2023");
+  await expect(page.locator("#year-mode-label")).toContainText("Observed historical");
+  await expect(page.locator("#week-slider")).toBeDisabled();
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Observed reported incidence"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText("22 reported cases");
+  await expect(page.locator("#regional-panel-content")).toContainText("77.19 per 100k");
+  await expect(page.locator("#regional-forecast-chart .observed-history-line")).toHaveCount(1);
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "observed annual incidence history"
+  );
+  await expect(page.locator("#regional-source-content")).toContainText(
+    "reported cases are not stable true incidence"
+  );
+
+  await page.locator("#year-slider").fill("2");
+  await expect(page.locator("#year-label")).toContainText("2026");
+  await expect(page.locator("#year-mode-label")).toContainText("Forecast");
+  await expect(page.locator("#week-slider")).toBeEnabled();
+  await expect(page.locator("#regional-panel-content")).toContainText("8/10");
+
   expect(consoleErrors).toEqual([]);
 });
 
@@ -275,6 +319,37 @@ function riskRecord(
     risk_category: category,
     risk_score: score,
     year: 2026,
+  };
+}
+
+function annualRecord(
+  countyFips,
+  countyName,
+  stateAbbr,
+  year,
+  reportedCases,
+  population,
+  incidence,
+  tier
+) {
+  return {
+    county_fips: countyFips,
+    county_name: countyName,
+    data_role: "observed_historical",
+    diagnostic_midatlantic_incidence_percentile: tier === "top_decile" ? 0.96 : 0.82,
+    diagnostic_midatlantic_incidence_rank: tier === "top_decile" ? 6 : 30,
+    diagnostic_midatlantic_incidence_tier: tier,
+    feature_quality_flags: [
+      "reported_cases_not_stable_true_incidence",
+      "diagnostic_same_year_not_forecast_feature",
+    ],
+    incidence_per_100k: incidence,
+    population,
+    reported_cases: reportedCases,
+    state_abbr: stateAbbr,
+    state_fips: countyFips.slice(0, 2),
+    state_name: stateAbbr === "MD" ? "Maryland" : "Virginia",
+    year,
   };
 }
 

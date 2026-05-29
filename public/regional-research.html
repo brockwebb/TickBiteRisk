@@ -25,7 +25,13 @@
 
     <main class="dashboard regional-dashboard">
       <section class="controls regional-controls" aria-labelledby="regional-controls-title">
-        <h2 id="regional-controls-title">Forecast week</h2>
+        <h2 id="regional-controls-title">Time controls</h2>
+        <div class="week-slider-row">
+          <label for="year-slider">Year</label>
+          <input id="year-slider" type="range" min="0" max="0" step="1" value="0" />
+          <output id="year-label" class="muted" aria-live="polite">Loading year...</output>
+          <span id="year-mode-label" class="mode-pill forecast-mode">Loading mode...</span>
+        </div>
         <div class="week-slider-row">
           <label for="week-slider">MMWR week</label>
           <input id="week-slider" type="range" min="1" max="53" step="1" value="1" />
