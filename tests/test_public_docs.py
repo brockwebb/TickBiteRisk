@@ -111,6 +111,24 @@ def test_readme_quick_start_leads_with_implemented_cli_not_unwired_http_api() ->
     assert "curl 'http://localhost:8000/risk" not in quick_start
 
 
+def test_operational_runbook_documents_2026_forecast_refresh_procedure() -> None:
+    runbook = RUNBOOK.read_text(encoding="utf-8")
+
+    for token in [
+        "2026 public forecast refresh",
+        "tickbiterisk etl annual-forecast",
+        "--as-of-date 2026-05-28",
+        "--data-cutoff-date 2024-12-31",
+        "--source-vintage 2024-inclusive-local",
+        "annual_forecast_predictions.csv",
+        "tickbiterisk etl county-week-risk",
+        "--replace",
+        "tickbiterisk risk export-static",
+        "model_comparison_summary.csv",
+    ]:
+        assert token in runbook
+
+
 def test_readme_frames_current_build_as_forecasting_product_with_explainer_placeholders() -> None:
     readme = README.read_text(encoding="utf-8")
 

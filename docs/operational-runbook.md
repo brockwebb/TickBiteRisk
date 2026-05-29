@@ -40,7 +40,41 @@ The `public/data` JSON bundle is a public-safe derived data product. It should
 not include raw surveillance extracts, API keys, database dumps, or private
 warehouse tables.
 
-## 3. Regenerate public data
+## 3. 2026 public forecast refresh
+
+The current public bundle is a true 2026 forecast. Rebuild the annual forecast
+first, then replace the county-week risk artifact from that annual forecast
+branch, then export static JSON.
+
+```bash
+tickbiterisk etl annual-forecast \
+  --design-matrix-path build/etl/model/model_design_matrix_county_year.csv \
+  --population-path build/etl/regional-population/midatlantic_county_population_year.csv \
+  --target-year 2026 \
+  --forecast-origin-year 2024 \
+  --as-of-date 2026-05-28 \
+  --data-cutoff-date 2024-12-31 \
+  --source-vintage 2024-inclusive-local \
+  --update-mode pre_update \
+  --output-dir build/etl/annual-forecast
+
+tickbiterisk etl county-week-risk \
+  --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv \
+  --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv \
+  --model-name linear_blend_baseline \
+  --output-dir build/etl/county-week-risk \
+  --replace
+
+tickbiterisk risk export-static \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --model-summary-path build/etl/model-comparison/model_comparison_summary.csv \
+  --output-dir public/data
+```
+
+The model-comparison summary is validation evidence for the selected branch; it
+is not the source of the 2026 public forecast rows.
+
+## 4. Regenerate public data
 
 When the derived county-week risk CSV changes, rebuild the static data bundle:
 
@@ -60,7 +94,7 @@ Use selectors such as `--source-prediction-sha256`, `--source-prediction-run-id`
 `--benchmark-quantile`, or `--score-denominator` if multiple model/source/scale
 branches coexist.
 
-## 4. Local validation
+## 5. Local validation
 
 Run the same checks used by the Pages workflow:
 
@@ -92,7 +126,7 @@ Open `http://localhost:8000` and confirm:
 - sources and CDC guidance links appear,
 - public caveats say informational only and not medical advice.
 
-## 5. Deployment
+## 6. Deployment
 
 GitHub Pages deployment is handled by `.github/workflows/pages.yml`.
 
@@ -109,13 +143,13 @@ Repository Settings > Pages should use GitHub Actions as the source. No GitHub
 Actions secrets are required for deployment because the site uses committed
 derived data.
 
-## 6. Failure response
+## 7. Failure response
 
 If GitHub Pages deployment fails:
 
 1. Open the failed workflow run.
 2. Check whether failure happened in validation or deployment.
-3. For validation failures, reproduce locally with the commands in section 4.
+3. For validation failures, reproduce locally with the commands in section 5.
 4. For missing JSON files, regenerate `public/data` from the selected derived
    score branch.
 5. For dashboard JavaScript errors, run `node --check public/app.js` and a local
@@ -123,11 +157,11 @@ If GitHub Pages deployment fails:
 6. For deployment-only failures, retry the workflow after confirming GitHub
    Pages is enabled for the repository.
 
-## 7. Future service runbook
+## 8. Future service runbook
 
 A database-backed HTTP API may be added later. That would require a separate
 runbook covering service inventory, secrets, backups, monitoring, incident
 response, and disaster recovery. Those service operations are not part of the
 implemented v0 static dashboard.
 
-*Last updated: 2026-05-27*
+*Last updated: 2026-05-28*
