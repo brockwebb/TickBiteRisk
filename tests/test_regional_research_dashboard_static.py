@@ -37,9 +37,11 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
     for token in [
         "research-data/regional/regional_county_risk_weekly.json",
         "research-data/regional/regional_counties.geojson",
+        "research-data/regional/regional_states.geojson",
         "research-data/regional/regional_county_metadata.json",
         "research-data/regional/regional_spatial_regime_overlays.json",
         "function renderRegionalMap",
+        "function regionalStateBoundaryPath",
         "function selectRegionalCounty",
         "function renderRegionalRegime",
         "function regionalRegimeCountyNames",
@@ -60,6 +62,7 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "95% empirical interval",
         "Regime 95% interval",
         "Regime counties",
+        "regional-state-boundary",
     ]:
         assert token in js
 
@@ -76,6 +79,7 @@ def test_regional_research_css_has_stable_map_slider_and_regime_styles() -> None
         ".regional-map-shell",
         ".regional-regime-strip",
         ".regional-county-shape.is-same-regime",
+        ".regional-state-boundary",
         ".week-slider-row",
     ]:
         assert token in css

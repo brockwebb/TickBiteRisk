@@ -7,6 +7,7 @@ from tests.test_runtime_risk_lookup import _write_scores
 from tests.test_static_export import _write_ambiguous_scores
 from tests.test_dashboard_assets import (
     _regional_geojson,
+    _regional_state_geojson,
     _write_regional_overlay_summary,
 )
 from tickbiterisk.cli import app
@@ -110,6 +111,11 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
         json.dumps(_regional_geojson()),
         encoding="utf-8",
     )
+    regional_states_path = tmp_path / "regional_states.geojson"
+    regional_states_path.write_text(
+        json.dumps(_regional_state_geojson()),
+        encoding="utf-8",
+    )
     overlay_path = _write_regional_overlay_summary(tmp_path / "overlays.csv")
     output_dir = tmp_path / "regional-dashboard"
 
@@ -122,6 +128,8 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
             str(scores_path),
             "--regional-counties-geojson-path",
             str(regional_geojson_path),
+            "--regional-states-geojson-path",
+            str(regional_states_path),
             "--spatial-regime-summary-path",
             str(overlay_path),
             "--output-dir",
@@ -135,6 +143,7 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
     assert "regional research dashboard assets" in result.stdout
     assert (output_dir / "regional_county_risk_weekly.json").exists()
     assert (output_dir / "regional_counties.geojson").exists()
+    assert (output_dir / "regional_states.geojson").exists()
     assert (output_dir / "regional_spatial_regime_overlays.json").exists()
 
 

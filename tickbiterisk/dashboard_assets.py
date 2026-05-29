@@ -43,6 +43,7 @@ class RegionalResearchDashboardAssetPaths:
     source_catalog_path: Path
     export_manifest_path: Path
     county_geojson_path: Path
+    state_geojson_path: Path | None
     spatial_regime_overlays_path: Path | None
 
 
@@ -94,6 +95,7 @@ def write_regional_research_dashboard_assets(
     scores_path: Path,
     output_dir: Path,
     regional_counties_geojson_path: Path,
+    regional_states_geojson_path: Path | None = None,
     spatial_regime_summary_path: Path | None = None,
     model_name: str = "empirical_bayes_spatial_regime_incidence",
     seasonality_source_id: str = "cdc_seasonality_week_2023",
@@ -126,6 +128,21 @@ def write_regional_research_dashboard_assets(
         json.dumps(normalized_geojson, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    state_geojson_path = None
+    state_feature_count = 0
+    if regional_states_geojson_path is not None:
+        raw_state_geojson = json.loads(
+            regional_states_geojson_path.read_text(encoding="utf-8")
+        )
+        normalized_state_geojson = simplify_regional_geojson_for_web_map(
+            normalize_regional_state_geojson(raw_state_geojson)
+        )
+        state_geojson_path = output_dir / "regional_states.geojson"
+        state_geojson_path.write_text(
+            json.dumps(normalized_state_geojson, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        state_feature_count = len(normalized_state_geojson["features"])
     overlay_path = None
     overlay_count = 0
     overlay_payload = None
@@ -148,6 +165,8 @@ def write_regional_research_dashboard_assets(
         static_paths.export_manifest_path,
         county_geojson_path=county_geojson_path,
         feature_count=len(normalized_geojson["features"]),
+        state_geojson_path=state_geojson_path,
+        state_feature_count=state_feature_count,
         spatial_regime_overlays_path=overlay_path,
         spatial_regime_overlay_count=overlay_count,
     )
@@ -155,6 +174,7 @@ def write_regional_research_dashboard_assets(
         output_dir,
         static_paths,
         county_geojson_path,
+        state_geojson_path,
         overlay_path,
     )
 
@@ -264,6 +284,55 @@ def normalize_regional_county_geojson(
     }
 
 
+def normalize_regional_state_geojson(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    features = []
+    for feature in payload.get("features", []):
+        properties = feature.get("properties", {})
+        state_fips = str(
+            properties.get("state_fips")
+            or properties.get("STATE")
+            or properties.get("GEOID")
+            or ""
+        ).zfill(2)
+        state_abbr = str(properties.get("state_abbr") or properties.get("STUSAB") or "")
+        state_name = str(
+            properties.get("state_name")
+            or properties.get("NAME")
+            or properties.get("BASENAME")
+            or ""
+        )
+        geometry = feature.get("geometry")
+        if len(state_fips) != 2 or not state_abbr or not state_name or not geometry:
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "state_fips": state_fips,
+                    "state_abbr": state_abbr,
+                    "state_name": state_name,
+                },
+                "geometry": geometry,
+            }
+        )
+    features.sort(key=lambda item: item["properties"]["state_fips"])
+    if not features:
+        raise ValueError("Expected at least one regional state boundary feature")
+    return {
+        "type": "FeatureCollection",
+        "metadata": {
+            "scope": "midatlantic_state_boundary",
+            "states": [feature["properties"]["state_abbr"] for feature in features],
+            "feature_count": len(features),
+            "research_only": True,
+            "not_public_maryland_default": True,
+        },
+        "features": features,
+    }
+
+
 def simplify_regional_geojson_for_web_map(
     payload: dict[str, Any],
     *,
@@ -342,6 +411,7 @@ def _regional_paths_from_static(
     output_dir: Path,
     static_paths: StaticRiskExportPaths,
     county_geojson_path: Path,
+    state_geojson_path: Path | None,
     spatial_regime_overlays_path: Path | None,
 ) -> RegionalResearchDashboardAssetPaths:
     return RegionalResearchDashboardAssetPaths(
@@ -352,6 +422,7 @@ def _regional_paths_from_static(
         source_catalog_path=static_paths.source_catalog_path,
         export_manifest_path=static_paths.export_manifest_path,
         county_geojson_path=county_geojson_path,
+        state_geojson_path=state_geojson_path,
         spatial_regime_overlays_path=spatial_regime_overlays_path,
     )
 
@@ -379,6 +450,8 @@ def _augment_manifest_with_regional_assets(
     *,
     county_geojson_path: Path,
     feature_count: int,
+    state_geojson_path: Path | None,
+    state_feature_count: int,
     spatial_regime_overlays_path: Path | None,
     spatial_regime_overlay_count: int,
 ) -> None:
@@ -386,8 +459,12 @@ def _augment_manifest_with_regional_assets(
     files = manifest.setdefault("files", [])
     if county_geojson_path.name not in files:
         files.append(county_geojson_path.name)
+    if state_geojson_path is not None and state_geojson_path.name not in files:
+        files.append(state_geojson_path.name)
     record_counts = manifest.setdefault("record_counts", {})
     record_counts["regional_county_geojson_features"] = feature_count
+    if state_geojson_path is not None:
+        record_counts["regional_state_geojson_features"] = state_feature_count
     if spatial_regime_overlays_path is not None:
         if spatial_regime_overlays_path.name not in files:
             files.append(spatial_regime_overlays_path.name)

@@ -1289,6 +1289,14 @@ def dashboard_build_regional_research_assets(
         Path("build/etl/regional-county-adjacency/regional_counties.geojson"),
         help="Regional county-equivalent GeoJSON from regional-county-adjacency.",
     ),
+    regional_states_geojson_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional regional state-boundary GeoJSON. If omitted, a "
+            "regional_states.geojson file next to the regional county GeoJSON "
+            "is used when present."
+        ),
+    ),
     spatial_regime_summary_path: Path | None = typer.Option(
         Path(
             "build/etl/regional-annual-forecast/"
@@ -1320,6 +1328,17 @@ def dashboard_build_regional_research_assets(
         raise typer.BadParameter(
             f"Regional county GeoJSON file not found: {regional_counties_geojson_path}"
         )
+    resolved_regional_states_geojson_path = regional_states_geojson_path
+    if resolved_regional_states_geojson_path is None:
+        sibling_states_path = regional_counties_geojson_path.with_name(
+            "regional_states.geojson"
+        )
+        if sibling_states_path.exists():
+            resolved_regional_states_geojson_path = sibling_states_path
+    elif not resolved_regional_states_geojson_path.exists():
+        raise typer.BadParameter(
+            f"Regional state GeoJSON file not found: {regional_states_geojson_path}"
+        )
     resolved_spatial_regime_summary_path = (
         spatial_regime_summary_path if spatial_regime_overlays else None
     )
@@ -1336,6 +1355,7 @@ def dashboard_build_regional_research_assets(
             scores_path=scores_path,
             output_dir=output_dir,
             regional_counties_geojson_path=regional_counties_geojson_path,
+            regional_states_geojson_path=resolved_regional_states_geojson_path,
             spatial_regime_summary_path=resolved_spatial_regime_summary_path,
             model_name=model_name,
             seasonality_source_id=seasonality_source_id,
@@ -1345,6 +1365,8 @@ def dashboard_build_regional_research_assets(
     typer.echo(f"Wrote regional research dashboard assets to {output_dir}")
     typer.echo(f"Wrote {outputs.weekly_risk_path}")
     typer.echo(f"Wrote {outputs.county_geojson_path}")
+    if outputs.state_geojson_path is not None:
+        typer.echo(f"Wrote {outputs.state_geojson_path}")
     if outputs.spatial_regime_overlays_path is not None:
         typer.echo(f"Wrote {outputs.spatial_regime_overlays_path}")
 

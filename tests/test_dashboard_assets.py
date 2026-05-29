@@ -6,6 +6,7 @@ from tickbiterisk.dashboard_assets import (
     TIGERWEB_COUNTIES_URL,
     normalize_maryland_county_geojson,
     normalize_regional_county_geojson,
+    normalize_regional_state_geojson,
     simplify_regional_geojson_for_web_map,
     write_dashboard_assets,
     write_regional_research_dashboard_assets,
@@ -82,6 +83,20 @@ def test_normalize_regional_county_geojson_keeps_state_and_county_fields() -> No
     }
 
 
+def test_normalize_regional_state_geojson_keeps_public_boundary_fields() -> None:
+    normalized = normalize_regional_state_geojson(_regional_state_geojson())
+
+    assert normalized["type"] == "FeatureCollection"
+    assert normalized["metadata"]["feature_count"] == 2
+    assert normalized["metadata"]["scope"] == "midatlantic_state_boundary"
+    assert normalized["metadata"]["research_only"] is True
+    assert normalized["features"][0]["properties"] == {
+        "state_fips": "24",
+        "state_abbr": "MD",
+        "state_name": "Maryland",
+    }
+
+
 def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     tmp_path: Path,
 ) -> None:
@@ -91,6 +106,11 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         json.dumps(_regional_geojson()),
         encoding="utf-8",
     )
+    regional_states_path = tmp_path / "regional_states.geojson"
+    regional_states_path.write_text(
+        json.dumps(_regional_state_geojson()),
+        encoding="utf-8",
+    )
     overlays_path = _write_regional_overlay_summary(tmp_path / "overlays.csv")
     output_dir = tmp_path / "regional-dashboard"
 
@@ -98,12 +118,15 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         scores_path=scores_path,
         output_dir=output_dir,
         regional_counties_geojson_path=regional_geojson_path,
+        regional_states_geojson_path=regional_states_path,
         spatial_regime_summary_path=overlays_path,
         model_name="linear_blend_baseline",
     )
 
     assert result.weekly_risk_path.name == "regional_county_risk_weekly.json"
     assert result.county_geojson_path.name == "regional_counties.geojson"
+    assert result.state_geojson_path is not None
+    assert result.state_geojson_path.name == "regional_states.geojson"
     assert result.spatial_regime_overlays_path is not None
     assert result.spatial_regime_overlays_path.name == (
         "regional_spatial_regime_overlays.json"
@@ -114,6 +137,7 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         result.county_metadata_path.read_text(encoding="utf-8")
     )
     counties = json.loads(result.county_geojson_path.read_text(encoding="utf-8"))
+    states = json.loads(result.state_geojson_path.read_text(encoding="utf-8"))
     overlays = json.loads(
         result.spatial_regime_overlays_path.read_text(encoding="utf-8")
     )
@@ -122,6 +146,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert weekly["scope"] == "midatlantic_county_week"
     assert weekly["research_status"]["research_only"] is True
     assert counties["metadata"]["feature_count"] == 2
+    assert states["metadata"]["scope"] == "midatlantic_state_boundary"
+    assert states["metadata"]["feature_count"] == 2
+    assert states["features"][0]["properties"]["state_abbr"] == "MD"
     assert overlays["record_count"] == 1
     assert overlays["records"][0]["region_id"] == "2024_regime_01"
     assert overlays["records"][0]["county_fips_list"] == ["24003", "42001"]
@@ -139,8 +166,10 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         "forecast_origin_year": 2023,
     }
     assert "regional_counties.geojson" in manifest["files"]
+    assert "regional_states.geojson" in manifest["files"]
     assert "regional_spatial_regime_overlays.json" in manifest["files"]
     assert manifest["record_counts"]["regional_county_geojson_features"] == 2
+    assert manifest["record_counts"]["regional_state_geojson_features"] == 2
     assert manifest["record_counts"]["spatial_regime_overlays"] == 1
 
 
@@ -227,6 +256,56 @@ def _regional_geojson() -> dict:
                     "source_geoid": "42001",
                 },
                 "geometry": {"type": "Point", "coordinates": [-77.2, 39.9]},
+            },
+        ],
+    }
+
+
+def _regional_state_geojson() -> dict:
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {
+                    "STATE": "24",
+                    "STUSAB": "MD",
+                    "NAME": "Maryland",
+                    "GEOID": "24",
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [-79.5, 37.8],
+                            [-75.0, 37.8],
+                            [-75.0, 39.8],
+                            [-79.5, 39.8],
+                            [-79.5, 37.8],
+                        ]
+                    ],
+                },
+            },
+            {
+                "type": "Feature",
+                "properties": {
+                    "STATE": "42",
+                    "STUSAB": "PA",
+                    "NAME": "Pennsylvania",
+                    "GEOID": "42",
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [-80.6, 39.7],
+                            [-74.7, 39.7],
+                            [-74.7, 42.3],
+                            [-80.6, 42.3],
+                            [-80.6, 39.7],
+                        ]
+                    ],
+                },
             },
         ],
     }

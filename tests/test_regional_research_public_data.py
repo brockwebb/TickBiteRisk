@@ -10,6 +10,7 @@ REGIONAL_DATA_DIR = REPO_ROOT / "public" / "research-data" / "regional"
 EXPECTED_REGIONAL_DATA_FILES = {
     "model_card.json",
     "regional_counties.geojson",
+    "regional_states.geojson",
     "regional_county_metadata.json",
     "regional_county_risk_weekly.json",
     "regional_spatial_regime_overlays.json",
@@ -47,6 +48,7 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     weekly = load_regional_json("regional_county_risk_weekly.json")
     metadata = load_regional_json("regional_county_metadata.json")
     geojson = load_regional_json("regional_counties.geojson")
+    states = load_regional_json("regional_states.geojson")
     overlays = load_regional_json("regional_spatial_regime_overlays.json")
     research_status_payloads = [
         load_regional_json(filename)
@@ -73,6 +75,13 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     assert geojson["metadata"]["web_map_simplified"] is True
     assert geojson["metadata"]["feature_count"] == 283
     assert len(geojson["features"]) == 283
+    assert states["metadata"]["scope"] == "midatlantic_state_boundary"
+    assert states["metadata"]["web_map_simplified"] is True
+    assert states["metadata"]["feature_count"] == 6
+    assert len(states["features"]) == 6
+    assert {
+        feature["properties"]["state_abbr"] for feature in states["features"]
+    } == {"DE", "DC", "MD", "PA", "VA", "WV"}
 
     assert overlays["record_count"] == len(overlays["records"])
     assert overlays["research_status"]["research_only"] is True
@@ -95,5 +104,6 @@ def test_pages_workflow_validates_regional_research_preview_assets() -> None:
         "regional_payloads",
         "regional_county_risk_weekly.json",
         "regional_counties.geojson",
+        "regional_states.geojson",
     ]:
         assert token in workflow

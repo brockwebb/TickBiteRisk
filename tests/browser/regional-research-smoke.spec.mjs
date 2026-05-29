@@ -57,6 +57,18 @@ const fixtures = {
       countyFeature("51810", "Virginia Beach city", "VA", -76.0, 36.8),
     ],
   },
+  "regional_states.geojson": {
+    type: "FeatureCollection",
+    metadata: {
+      feature_count: 2,
+      research_only: true,
+      scope: "midatlantic_state_boundary",
+    },
+    features: [
+      stateFeature("24", "MD", "Maryland", -79.8, 37.6, -75.0, 39.8),
+      stateFeature("51", "VA", "Virginia", -76.6, 36.2, -75.3, 37.4),
+    ],
+  },
   "regional_spatial_regime_overlays.json": {
     export_type: "regional_spatial_regime_overlays",
     model_name: "empirical_bayes_spatial_regime_incidence",
@@ -150,6 +162,7 @@ test("regional research dashboard renders county risk, week slider, and regime i
     page.getByRole("heading", { name: "TickBiteRisk Regional Research" })
   ).toBeVisible();
   await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(3);
+  await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(2);
   await expect(page.locator("#regional-panel-content")).toHaveAttribute(
     "aria-live",
     "polite"
@@ -301,6 +314,29 @@ function countyFeature(countyFips, countyName, stateAbbr, longitude, latitude) {
           [longitude + size, latitude + size],
           [longitude - size, latitude + size],
           [longitude - size, latitude - size],
+        ],
+      ],
+    },
+  };
+}
+
+function stateFeature(stateFips, stateAbbr, stateName, minLon, minLat, maxLon, maxLat) {
+  return {
+    type: "Feature",
+    properties: {
+      state_abbr: stateAbbr,
+      state_fips: stateFips,
+      state_name: stateName,
+    },
+    geometry: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [minLon, minLat],
+          [maxLon, minLat],
+          [maxLon, maxLat],
+          [minLon, maxLat],
+          [minLon, minLat],
         ],
       ],
     },

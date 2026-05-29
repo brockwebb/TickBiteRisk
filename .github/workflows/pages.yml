@@ -93,6 +93,7 @@ jobs:
           expected_files = [
               "model_card.json",
               "regional_counties.geojson",
+              "regional_states.geojson",
               "regional_county_metadata.json",
               "regional_county_risk_weekly.json",
               "regional_spatial_regime_overlays.json",
@@ -123,6 +124,7 @@ jobs:
           weekly = load_json("regional_county_risk_weekly.json")
           metadata = load_json("regional_county_metadata.json")
           geojson = load_json("regional_counties.geojson")
+          states = load_json("regional_states.geojson")
           overlays = load_json("regional_spatial_regime_overlays.json")
           source_catalog = load_json("source_catalog.json")
           manifest = load_json("static_export_manifest.json")
@@ -169,6 +171,16 @@ jobs:
               raise SystemExit("Regional counties GeoJSON must be simplified for web preview.")
           if geojson["metadata"]["feature_count"] != 283 or len(geojson["features"]) != 283:
               raise SystemExit("Regional counties GeoJSON must contain 283 county features.")
+          if states["metadata"]["scope"] != "midatlantic_state_boundary":
+              raise SystemExit("Regional states GeoJSON must be state-boundary geometry.")
+          if states["metadata"]["web_map_simplified"] is not True:
+              raise SystemExit("Regional states GeoJSON must be simplified for web preview.")
+          if states["metadata"]["feature_count"] != 6 or len(states["features"]) != 6:
+              raise SystemExit("Regional states GeoJSON must contain 6 state features.")
+          if {
+              feature["properties"]["state_abbr"] for feature in states["features"]
+          } != {"DE", "DC", "MD", "PA", "VA", "WV"}:
+              raise SystemExit("Regional states GeoJSON must cover DE/DC/MD/PA/VA/WV.")
 
           if metadata["county_count"] != 283 or not all(
               county.get("selected_spatial_regime") for county in metadata["counties"]

@@ -1,6 +1,7 @@
 const regionalState = {
   weekly: null,
   counties: null,
+  states: null,
   countyMetadata: null,
   overlays: null,
   modelCard: null,
@@ -19,6 +20,7 @@ const defaultRegionalDataBase = "research-data/regional";
 const defaultRegionalDataPaths = {
   weekly: "research-data/regional/regional_county_risk_weekly.json",
   counties: "research-data/regional/regional_counties.geojson",
+  states: "research-data/regional/regional_states.geojson",
   countyMetadata: "research-data/regional/regional_county_metadata.json",
   overlays: "research-data/regional/regional_spatial_regime_overlays.json",
   modelCard: "research-data/regional/model_card.json",
@@ -51,10 +53,11 @@ async function initRegionalResearch() {
     .addEventListener("input", handleRegionalListFilterChange);
 
   try {
-    const [weekly, counties, countyMetadata, overlays, modelCard, sourceCatalog] =
+    const [weekly, counties, states, countyMetadata, overlays, modelCard, sourceCatalog] =
       await Promise.all([
         fetchRegionalJson(regionalDataPaths.weekly),
         fetchRegionalJson(regionalDataPaths.counties),
+        fetchRegionalJson(regionalDataPaths.states),
         fetchRegionalJson(regionalDataPaths.countyMetadata),
         fetchRegionalJson(regionalDataPaths.overlays),
         fetchRegionalJson(regionalDataPaths.modelCard),
@@ -63,6 +66,7 @@ async function initRegionalResearch() {
 
     regionalState.weekly = weekly;
     regionalState.counties = counties;
+    regionalState.states = states;
     regionalState.countyMetadata = countyMetadata;
     regionalState.overlays = overlays;
     regionalState.modelCard = modelCard;
@@ -92,6 +96,7 @@ function regionalResearchDataPaths() {
   return {
     weekly: `${regionalDataBase}/regional_county_risk_weekly.json`,
     counties: `${regionalDataBase}/regional_counties.geojson`,
+    states: `${regionalDataBase}/regional_states.geojson`,
     countyMetadata: `${regionalDataBase}/regional_county_metadata.json`,
     overlays: `${regionalDataBase}/regional_spatial_regime_overlays.json`,
     modelCard: `${regionalDataBase}/model_card.json`,
@@ -211,7 +216,13 @@ function renderRegionalMap() {
   const paths = features
     .map((feature) => regionalCountyPath(feature, bounds, width, height))
     .join("");
-  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="group" aria-label="Mid-Atlantic counties colored by regional Lyme forecast research">${paths}</svg>`;
+  const statePaths = ((regionalState.states && regionalState.states.features) || [])
+    .map((feature) => regionalStateBoundaryPath(feature, bounds, width, height))
+    .join("");
+  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="group" aria-label="Mid-Atlantic counties colored by regional Lyme forecast research">
+    <g class="regional-county-layer">${paths}</g>
+    <g class="regional-state-boundary-layer" aria-hidden="true">${statePaths}</g>
+  </svg>`;
   container.querySelectorAll("[data-county]").forEach((shape) => {
     shape.addEventListener("click", () => selectRegionalCounty(shape.dataset.county));
     shape.addEventListener("keydown", (event) => {
@@ -224,6 +235,17 @@ function renderRegionalMap() {
   document.getElementById("regional-map-meta").textContent =
     `${features.length} county-equivalents across DE, DC, MD, PA, VA, and WV`;
   updateRegionalSelectedControls();
+}
+
+function regionalStateBoundaryPath(feature, bounds, width, height) {
+  const props = feature.properties || {};
+  const label = `${props.state_name || props.state_abbr || "State"} boundary`;
+  return `<path
+    class="regional-state-boundary"
+    d="${regionalGeometryPath(feature.geometry, bounds, width, height)}"
+    data-state="${regionalEscapeHtml(props.state_abbr || props.state_fips || "")}">
+    <title>${regionalEscapeHtml(label)}</title>
+  </path>`;
 }
 
 function regionalCountyPath(feature, bounds, width, height) {
