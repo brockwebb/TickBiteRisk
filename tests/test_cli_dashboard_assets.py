@@ -8,6 +8,7 @@ from tests.test_static_export import _write_ambiguous_scores
 from tests.test_dashboard_assets import (
     _regional_geojson,
     _regional_state_geojson,
+    _write_regional_annual_forecast_predictions,
     _write_regional_incidence,
     _write_regional_overlay_summary,
 )
@@ -121,6 +122,9 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
         tmp_path / "regional_incidence.csv"
     )
     overlay_path = _write_regional_overlay_summary(tmp_path / "overlays.csv")
+    annual_forecast_path = _write_regional_annual_forecast_predictions(
+        tmp_path / "regional_annual_forecast_predictions.csv"
+    )
     output_dir = tmp_path / "regional-dashboard"
 
     result = runner.invoke(
@@ -138,6 +142,8 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
             str(regional_incidence_path),
             "--spatial-regime-summary-path",
             str(overlay_path),
+            "--regional-annual-forecast-path",
+            str(annual_forecast_path),
             "--output-dir",
             str(output_dir),
             "--model-name",
@@ -152,6 +158,14 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
     assert (output_dir / "regional_states.geojson").exists()
     assert (output_dir / "regional_county_incidence_annual.json").exists()
     assert (output_dir / "regional_spatial_regime_overlays.json").exists()
+    metadata = json.loads(
+        (output_dir / "regional_county_metadata.json").read_text(encoding="utf-8")
+    )
+    assert any(
+        county.get("nearest_comparable_years")
+        for county in metadata["counties"]
+        if county["county_fips"] == "24003"
+    )
 
 
 def test_dashboard_build_regional_research_assets_fails_when_geometry_missing(

@@ -237,7 +237,7 @@ tickbiterisk etl model-backtest --model-features-path build/etl/model/model_feat
 tickbiterisk etl county-week-risk --predictions-path build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv --prediction-intervals-path build/etl/regional-annual-forecast/regional_annual_forecast_intervals.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --output-dir build/etl/regional-county-week-risk --replace
 tickbiterisk etl county-week-risk --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name linear_blend_baseline --output-dir build/etl/county-week-risk --replace
 tickbiterisk risk export-static --scores-path build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --geography-scope midatlantic_county_week --output-dir build/public-regional-risk
-tickbiterisk dashboard build-regional-research-assets --scores-path build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv --regional-counties-geojson-path build/etl/regional-county-adjacency/regional_counties.geojson --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --spatial-regime-summary-path build/etl/regional-annual-forecast/regional_spatial_regime_forecast_interval_summary.csv --output-dir build/public-regional-risk
+tickbiterisk dashboard build-regional-research-assets --scores-path build/etl/regional-county-week-risk-multiyear/county_week_seasonal_risk_baseline.csv --regional-counties-geojson-path build/etl/regional-county-adjacency/regional_counties.geojson --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --spatial-regime-summary-path build/etl/regional-annual-forecast/regional_spatial_regime_forecast_interval_summary.csv --regional-annual-forecast-path build/etl/regional-annual-forecast-multiyear/regional_annual_forecast_predictions.csv --output-dir build/public-regional-risk
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest --include-annual-report-pdfs
 tickbiterisk etl ecology-sources --raw-dir data/raw/ecology --manifest-path build/etl/ecology/source_manifest.csv
@@ -338,7 +338,11 @@ Regional dashboard asset note: `dashboard build-regional-research-assets` adds
 research bundle currently includes 14,999 county-week risk records, 283
 county-equivalent map features, and 127 localized spatial-regime overlay rows
 for `empirical_bayes_spatial_regime_incidence`; the county metadata also carries
-each county's selected spatial-regime membership for map click panels.
+each county's selected spatial-regime membership for map click panels. When a
+regional annual forecast predictions CSV is provided, county metadata also
+includes the nearest horizon-matched analog history for each forecast year so
+the UI can explain the comparable-year basis without making that analog branch
+the selected risk score.
 The regional map GeoJSON is simplified for browser rendering while preserving
 the full 283-county feature set and source/caveat metadata.
 `public/regional-research.html` can consume this bundle from ignored
@@ -360,7 +364,9 @@ and annual-forecast like-year lane, with `model_comparison_intervals.csv`
 carrying `weighted_analog_bootstrap` interval diagnostics. Regional
 `analog_year_county_incidence` is a separate horizon-matched branch that records
 the matched origin, matched outcome, and distance, and only uses a matched
-outcome observed by the forecast origin. Regional
+outcome observed by the forecast origin. Regional county click panels can expose
+that match as "nearest comparable history" while the selected risk score remains
+the chosen forecast branch. Regional
 `regional_annual_forecast_intervals.csv` uses rolling-origin residuals to write
 empirical prediction bands, not posterior intervals or personal-risk claims.
 

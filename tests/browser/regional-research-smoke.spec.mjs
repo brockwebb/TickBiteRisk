@@ -92,7 +92,7 @@ const fixtures = {
     record_count: 5,
     records: [
       annualRecord("24001", "Allegany County", "MD", 2023, 35, 68000, 51.47, "top_quintile"),
-      annualRecord("24001", "Allegany County", "MD", 2024, 41, 68100, 60.21, "top_quintile"),
+      annualRecord("24001", "Allegany County", "PA", 2024, 41, 68100, 60.21, "top_quintile"),
       annualRecord("24023", "Garrett County", "MD", 2023, 22, 28500, 77.19, "top_decile"),
     ],
     research_status: {
@@ -240,6 +240,8 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(2);
   await expect(page.locator("#year-label")).toContainText("2026");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
+  await expect(page.locator("#week-label")).toContainText("May 24-30, 2026");
+  await expect(page.locator("#week-label")).toContainText("MMWR week 21");
   await expect(page.locator("#regional-panel-content")).toHaveAttribute(
     "aria-live",
     "polite"
@@ -248,6 +250,10 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await page.locator('path[data-county="24001"]').click();
   await expect(page.locator("#regional-panel-content")).toContainText("Allegany County");
   await expect(page.locator("#regional-panel-content")).toContainText("MD");
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "May 24-30, 2026"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText("MMWR week 21");
   await expect(page.locator("#regional-panel-content")).toContainText("9/10");
   await expect(page.locator("#regional-panel-content")).toContainText(
     "95% empirical interval: 0.80 to 5.40 per 100k"
@@ -289,6 +295,12 @@ test("regional research dashboard renders county risk, week slider, and regime i
     "research-only"
   );
   await expect(page.locator("#regional-panel-content")).toContainText(
+    "Nearest comparable history"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "2018 origin -> 2021 observed outcome"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
     "Spatial regime 7"
   );
   await expect(page.locator("#regional-regime-panel")).toContainText("2 counties");
@@ -314,7 +326,11 @@ test("regional research dashboard renders county risk, week slider, and regime i
   );
 
   await page.locator("#week-slider").fill("22");
+  await expect(page.locator("#week-label")).toContainText("May 31-Jun 6, 2026");
   await expect(page.locator("#week-label")).toContainText("MMWR week 22");
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "May 31-Jun 6, 2026"
+  );
   await expect(page.locator("#regional-panel-content")).toContainText("10/10");
   await expect(page.locator("#regional-panel-content")).toContainText(
     "95% empirical interval: 0.90 to 6.20 per 100k"
@@ -388,6 +404,15 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#regional-panel-content")).toContainText(
     "41 reported cases"
   );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "PA 2024 forecast check"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "observed 60.21 per 100k vs forecast 38.00 per 100k"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "post-forecast goodness-of-fit"
+  );
   await page.locator('path[data-county="51810"]').click();
   await expect(page.locator("#regional-panel-content")).toContainText(
     "forecast year 2024"
@@ -436,6 +461,8 @@ function riskRecord(
       "empirical_prediction_band",
     ],
     mmwr_week: mmwrWeek,
+    week_start_date: mmwrWeek === 22 ? `${year}-05-31` : `${year}-05-24`,
+    week_end_date: mmwrWeek === 22 ? `${year}-06-06` : `${year}-05-30`,
     predicted_weekly_incidence_80_interval: interval80,
     predicted_weekly_incidence_95_interval: interval95,
     predicted_annual_incidence_per_100k:
@@ -477,7 +504,12 @@ function annualRecord(
     reported_cases: reportedCases,
     state_abbr: stateAbbr,
     state_fips: countyFips.slice(0, 2),
-    state_name: stateAbbr === "MD" ? "Maryland" : "Virginia",
+    state_name:
+      stateAbbr === "MD"
+        ? "Maryland"
+        : stateAbbr === "PA"
+          ? "Pennsylvania"
+          : "Virginia",
     year,
   };
 }
@@ -496,6 +528,19 @@ function countyMetadata(countyFips, countyName, regionId, regionName, rank) {
       spatial_regime_feature_year: 2024,
       spatial_regime_rank: rank,
     },
+    nearest_comparable_years: [
+      {
+        analog_model_name: "analog_year_county_incidence",
+        basis: "horizon-matched reported-incidence history",
+        forecast_horizon_years: 3,
+        forecast_origin_year: 2023,
+        forecast_year: 2026,
+        match_distance: 2.75,
+        match_observed_year: 2021,
+        match_origin_year: 2018,
+        predicted_incidence_per_100k: 42.5,
+      },
+    ],
   };
 }
 

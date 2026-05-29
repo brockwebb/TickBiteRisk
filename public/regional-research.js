@@ -313,7 +313,8 @@ function updateRegionalWeekLabel() {
   const input = document.getElementById("week-input");
   const slider = document.getElementById("week-slider");
   const mode = selectedRegionalDataMode();
-  const hasWeeklyRows = regionalForecastRecordsForSelectedYear().length > 0;
+  const yearRecords = regionalForecastRecordsForSelectedYear();
+  const hasWeeklyRows = yearRecords.length > 0;
   const enableWeekControls =
     hasWeeklyRows && (mode === "forecast" || mode === "mixed");
   input.disabled = !enableWeekControls;
@@ -327,8 +328,13 @@ function updateRegionalWeekLabel() {
   if (mode === "mixed") {
     suffix = " for forecast counties; observed counties remain annual";
   }
+  const activeRecord = yearRecords.find(
+    (record) => Number(record.mmwr_week) === regionalState.selectedWeek
+  );
+  const dateRange = regionalWeekDateRange(activeRecord);
+  const weekText = `MMWR week ${regionalState.selectedWeek}`;
   document.getElementById("week-label").textContent =
-    `Using MMWR week ${regionalState.selectedWeek}${suffix}`;
+    dateRange ? `Using ${dateRange} (${weekText})${suffix}` : `Using ${weekText}${suffix}`;
 }
 
 function updateRegionalYearLabel() {
@@ -672,8 +678,12 @@ function selectRegionalCounty(countyFips) {
 
   const interval80 = record.predicted_weekly_incidence_80_interval || [0, 0];
   const interval95 = record.predicted_weekly_incidence_95_interval || [0, 0];
+  const dateRange = regionalWeekDateRange(record);
+  const periodText = dateRange
+    ? `${dateRange} (MMWR week ${record.mmwr_week})`
+    : `MMWR week ${record.mmwr_week}`;
   panel.innerHTML = `<div class="score-card">
-    <p class="muted">MMWR week ${regionalEscapeHtml(record.mmwr_week)}, forecast year ${regionalEscapeHtml(record.data_year || record.year)}</p>
+    <p class="muted">${regionalEscapeHtml(periodText)}, forecast year ${regionalEscapeHtml(record.data_year || record.year)}</p>
     <h3>${regionalEscapeHtml(countyName)}${stateAbbr ? `, ${regionalEscapeHtml(stateAbbr)}` : ""}</h3>
     <p><span class="score-badge ${regionalRiskClass(record.risk_score)}">${regionalEscapeHtml(record.risk_score)}/10</span> ${regionalEscapeHtml(regionalCategoryLabel(record.risk_category))}</p>
     <p>Predicted weekly incidence: ${regionalFormatNumber(record.predicted_weekly_incidence_per_100k)} per 100k.</p>
@@ -681,6 +691,7 @@ function selectRegionalCounty(countyFips) {
     <p>95% empirical interval: ${regionalFormatNumber(interval95[0])} to ${regionalFormatNumber(interval95[1])} per 100k.</p>
     ${renderRegionalScaleDiagnostics(record)}
     ${renderRegionalForecastBasis(record)}
+    ${renderRegionalComparableYear(record, metadata)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
     <p class="disclaimer">Research only. This is not a per-bite infection probability, diagnosis, treatment recommendation, or public Maryland default.</p>
@@ -775,6 +786,71 @@ function regionalForecastBasisList(items, fallback) {
   return values.map((item) => regionalEscapeHtml(String(item))).join(", ");
 }
 
+function renderRegionalComparableYear(record, metadata) {
+  const matches =
+    metadata && Array.isArray(metadata.nearest_comparable_years)
+      ? metadata.nearest_comparable_years
+      : [];
+  const forecastYear = Number(record.data_year || record.year);
+  const match = matches.find(
+    (candidate) => Number(candidate.forecast_year) === forecastYear
+  );
+  if (!match) return "";
+  const distance =
+    match.match_distance === undefined || match.match_distance === null
+      ? "unknown distance"
+      : `distance ${regionalFormatNumber(match.match_distance)}`;
+  const horizon =
+    match.forecast_horizon_years === undefined || match.forecast_horizon_years === null
+      ? "horizon-matched"
+      : `${regionalEscapeHtml(match.forecast_horizon_years)}-year horizon`;
+  return `<section class="lineage-strip comparable-year" aria-labelledby="regional-comparable-year-heading">
+    <h4 id="regional-comparable-year-heading">Nearest comparable history</h4>
+    <p>${regionalEscapeHtml(match.match_origin_year)} origin -&gt; ${regionalEscapeHtml(match.match_observed_year)} observed outcome (${horizon}; ${regionalEscapeHtml(distance)}).</p>
+    <p>Basis: ${regionalEscapeHtml(match.basis || "horizon-matched reported-incidence history")} from ${regionalEscapeHtml(regionalReadableName(match.analog_model_name || "analog_year_county_incidence"))}.</p>
+  </section>`;
+}
+
+function regionalWeekDateRange(record) {
+  if (!record) return "";
+  return formatRegionalDateRange(record.week_start_date, record.week_end_date);
+}
+
+function formatRegionalDateRange(startIso, endIso) {
+  const start = regionalDateParts(startIso);
+  const end = regionalDateParts(endIso);
+  if (!start || !end) return "";
+  if (start.year === end.year && start.month === end.month) {
+    return `${start.monthName} ${start.day}-${end.day}, ${end.year}`;
+  }
+  if (start.year === end.year) {
+    return `${start.monthName} ${start.day}-${end.monthName} ${end.day}, ${end.year}`;
+  }
+  return `${start.monthName} ${start.day}, ${start.year}-${end.monthName} ${end.day}, ${end.year}`;
+}
+
+function regionalDateParts(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return null;
+  const [year, month, day] = String(value).split("-").map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return {
+    day,
+    month,
+    monthName: date.toLocaleString("en-US", { month: "short", timeZone: "UTC" }),
+    year,
+  };
+}
+
 function renderRegionalObservedCounty({
   countyFips,
   countyName,
@@ -791,6 +867,7 @@ function renderRegionalObservedCounty({
     updateRegionalSelectedControls();
     return;
   }
+  const forecastRecord = getRegionalRecord(countyFips);
   panel.innerHTML = `<div class="score-card observed-card">
     <p class="muted">Observed historical, reported surveillance year ${regionalEscapeHtml(annualRecord.year)}</p>
     <h3>${regionalEscapeHtml(countyName)}${stateAbbr ? `, ${regionalEscapeHtml(stateAbbr)}` : ""}</h3>
@@ -798,6 +875,7 @@ function renderRegionalObservedCounty({
     <p>Observed reported incidence: ${regionalFormatNumber(annualRecord.incidence_per_100k)} per 100k.</p>
     <p>${regionalEscapeHtml(annualRecord.reported_cases)} reported cases; population denominator ${regionalFormatNumber(annualRecord.population)}.</p>
     <p>Mid-Atlantic diagnostic tier: ${regionalEscapeHtml(regionalReadableName(annualRecord.diagnostic_midatlantic_incidence_tier))}.</p>
+    ${renderRegionalForecastCheck(annualRecord, forecastRecord)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(annualRecord)}
     <p class="disclaimer">Reported cases are not stable true incidence. This historical layer is informational only, not medical advice, and not a forecast-safe feature for the selected year.</p>
@@ -806,6 +884,27 @@ function renderRegionalObservedCounty({
   renderRegionalObservedHistoryChart(countyFips);
   renderRegionalMap();
   updateRegionalSelectedControls();
+}
+
+function renderRegionalForecastCheck(annualRecord, forecastRecord) {
+  if (
+    !annualRecord ||
+    !forecastRecord ||
+    annualRecord.state_abbr !== "PA" ||
+    Number(annualRecord.year) !== 2024
+  ) {
+    return "";
+  }
+  const observed = Number(annualRecord.incidence_per_100k);
+  const forecast = Number(forecastRecord.predicted_annual_incidence_per_100k);
+  if (!Number.isFinite(observed) || !Number.isFinite(forecast)) return "";
+  const residual = observed - forecast;
+  const residualText = `${residual >= 0 ? "+" : ""}${regionalFormatNumber(residual)}`;
+  return `<section class="lineage-strip forecast-check" aria-labelledby="regional-forecast-check-heading">
+    <h4 id="regional-forecast-check-heading">PA 2024 forecast check</h4>
+    <p>Partial state-source overlay: observed ${regionalFormatNumber(observed)} per 100k vs forecast ${regionalFormatNumber(forecast)} per 100k; residual ${regionalEscapeHtml(residualText)} per 100k.</p>
+    <p>This is post-forecast goodness-of-fit context, not regional truth, model training data, or automatic calibration.</p>
+  </section>`;
 }
 
 function renderRegionalObservedAnnualContext(countyFips) {

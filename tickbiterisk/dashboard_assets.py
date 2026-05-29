@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import csv
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -99,6 +99,7 @@ def write_regional_research_dashboard_assets(
     regional_states_geojson_path: Path | None = None,
     regional_incidence_path: Path | None = None,
     spatial_regime_summary_path: Path | None = None,
+    regional_annual_forecast_path: Path | None = None,
     model_name: str = "empirical_bayes_spatial_regime_incidence",
     seasonality_source_id: str = "cdc_seasonality_week_2023",
     benchmark_quantile: float | None = None,
@@ -183,6 +184,19 @@ def write_regional_research_dashboard_assets(
             static_paths.county_metadata_path,
             overlay_payload,
         )
+    comparable_year_count = 0
+    if regional_annual_forecast_path is not None:
+        comparable_years = regional_nearest_comparable_years_payload(
+            regional_annual_forecast_path,
+            allowed_county_fips=allowed_county_fips,
+        )
+        comparable_year_count = _augment_regional_county_metadata_with_comparable_years(
+            static_paths.county_metadata_path,
+            comparable_years,
+        )
+        _augment_regional_source_catalog_with_comparable_years(
+            static_paths.source_catalog_path
+        )
     _augment_manifest_with_regional_assets(
         static_paths.export_manifest_path,
         county_geojson_path=county_geojson_path,
@@ -193,6 +207,7 @@ def write_regional_research_dashboard_assets(
         annual_incidence_count=annual_incidence_count,
         spatial_regime_overlays_path=overlay_path,
         spatial_regime_overlay_count=overlay_count,
+        comparable_year_count=comparable_year_count,
     )
     return _regional_paths_from_static(
         output_dir,
@@ -458,6 +473,64 @@ def regional_annual_observed_incidence_payload(
     }
 
 
+def regional_nearest_comparable_years_payload(
+    annual_forecast_path: Path,
+    *,
+    allowed_county_fips: set[str] | None = None,
+) -> dict[str, list[dict[str, object]]]:
+    with annual_forecast_path.open(encoding="utf-8", newline="") as handle:
+        rows = [
+            row
+            for row in csv.DictReader(handle)
+            if row.get("model_name") == "analog_year_county_incidence"
+            and (
+                allowed_county_fips is None
+                or str(row.get("county_fips", "")).zfill(5) in allowed_county_fips
+            )
+            and row.get("analog_match_origin_year")
+            and row.get("analog_match_observed_year")
+        ]
+    comparable_by_key: dict[tuple[str, int], dict[str, object]] = {}
+    for row in rows:
+        county_fips = str(row.get("county_fips", "")).zfill(5)
+        forecast_year = _required_int(row.get("forecast_year"), "forecast_year")
+        record = {
+            "analog_model_name": "analog_year_county_incidence",
+            "forecast_year": forecast_year,
+            "forecast_origin_year": _required_int(
+                row.get("forecast_origin_year"),
+                "forecast_origin_year",
+            ),
+            "forecast_horizon_years": _required_int(
+                row.get("forecast_horizon_years"),
+                "forecast_horizon_years",
+            ),
+            "match_origin_year": _required_int(
+                row.get("analog_match_origin_year"),
+                "analog_match_origin_year",
+            ),
+            "match_observed_year": _required_int(
+                row.get("analog_match_observed_year"),
+                "analog_match_observed_year",
+            ),
+            "match_distance": _float_value(row.get("analog_match_distance", "")),
+            "predicted_incidence_per_100k": _float_value(
+                row.get("predicted_incidence_per_100k", "")
+            ),
+            "basis": "horizon-matched reported-incidence history",
+        }
+        key = (county_fips, forecast_year)
+        current = comparable_by_key.get(key)
+        if current is None or record["match_distance"] < current["match_distance"]:
+            comparable_by_key[key] = record
+    comparable_by_county: dict[str, list[dict[str, object]]] = {}
+    for county_fips, _forecast_year in sorted(comparable_by_key):
+        comparable_by_county.setdefault(county_fips, []).append(
+            comparable_by_key[(county_fips, _forecast_year)]
+        )
+    return comparable_by_county
+
+
 def _regional_annual_observed_incidence_record(row: dict[str, str]) -> dict[str, object]:
     flags = split_quality_flags(row.get("feature_quality_flags", ""))
     population = _optional_int(row.get("population"))
@@ -556,6 +629,7 @@ def _augment_manifest_with_regional_assets(
     annual_incidence_count: int,
     spatial_regime_overlays_path: Path | None,
     spatial_regime_overlay_count: int,
+    comparable_year_count: int = 0,
 ) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     files = manifest.setdefault("files", [])
@@ -575,6 +649,8 @@ def _augment_manifest_with_regional_assets(
         if spatial_regime_overlays_path.name not in files:
             files.append(spatial_regime_overlays_path.name)
         record_counts["spatial_regime_overlays"] = spatial_regime_overlay_count
+    if comparable_year_count:
+        record_counts["regional_nearest_comparable_years"] = comparable_year_count
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -607,6 +683,32 @@ def _augment_regional_source_catalog_with_annual_incidence(
     )
 
 
+def _augment_regional_source_catalog_with_comparable_years(
+    source_catalog_path: Path,
+) -> None:
+    catalog = json.loads(source_catalog_path.read_text(encoding="utf-8"))
+    sources = catalog.setdefault("sources", [])
+    source_id = "regional_nearest_comparable_years"
+    if not any(source.get("source_id") == source_id for source in sources):
+        sources.append(
+            {
+                "source_id": source_id,
+                "artifact_type": "derived forecast explanation layer",
+                "redistribution": "public derived data",
+                "notes": (
+                    "horizon-matched analog-year companion rows identify the "
+                    "nearest comparable reported-incidence history used by the "
+                    "analog research branch; this explains context and does not "
+                    "replace the selected risk-score branch."
+                ),
+            }
+        )
+    source_catalog_path.write_text(
+        json.dumps(catalog, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _augment_regional_county_metadata_with_regimes(
     county_metadata_path: Path,
     overlay_payload: dict[str, object],
@@ -621,6 +723,25 @@ def _augment_regional_county_metadata_with_regimes(
         json.dumps(metadata, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _augment_regional_county_metadata_with_comparable_years(
+    county_metadata_path: Path,
+    comparable_years: dict[str, list[dict[str, object]]],
+) -> int:
+    metadata = json.loads(county_metadata_path.read_text(encoding="utf-8"))
+    attached_count = 0
+    for county in metadata.get("counties", []):
+        county_fips = str(county.get("county_fips", "")).zfill(5)
+        county_matches = comparable_years.get(county_fips)
+        if county_matches:
+            county["nearest_comparable_years"] = county_matches
+            attached_count += len(county_matches)
+    county_metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return attached_count
 
 
 def _county_regime_memberships(

@@ -4,7 +4,7 @@ import csv
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from tickbiterisk.runtime.risk_lookup import (
@@ -475,6 +475,8 @@ def _weekly_payload(
 
 
 def _weekly_record(record: CountyWeekRiskRecord) -> dict[str, object]:
+    week_start = _mmwr_week_start(record.year, record.mmwr_week)
+    week_end = week_start + timedelta(days=6)
     return {
         "county_fips": record.county_fips,
         "county_name": record.county_name,
@@ -482,6 +484,8 @@ def _weekly_record(record: CountyWeekRiskRecord) -> dict[str, object]:
         "data_year": record.year,
         "mmwr_week": record.mmwr_week,
         "period_label": record.period_label,
+        "week_start_date": week_start.isoformat(),
+        "week_end_date": week_end.isoformat(),
         "risk_score": record.risk_score,
         "risk_category": record.risk_category,
         "risk_score_raw": record.risk_score_raw,
@@ -505,6 +509,15 @@ def _weekly_record(record: CountyWeekRiskRecord) -> dict[str, object]:
             record.backtest_assumption_flags
         ),
     }
+
+
+def _mmwr_week_start(year: int, week: int) -> date:
+    return _mmwr_year_start(year) + timedelta(days=(week - 1) * 7)
+
+
+def _mmwr_year_start(year: int) -> date:
+    jan4 = date(year, 1, 4)
+    return jan4 - timedelta(days=(jan4.weekday() + 1) % 7)
 
 
 def _county_metadata_payload(

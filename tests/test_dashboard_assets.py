@@ -115,6 +115,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         tmp_path / "regional_incidence.csv"
     )
     overlays_path = _write_regional_overlay_summary(tmp_path / "overlays.csv")
+    annual_forecast_path = _write_regional_annual_forecast_predictions(
+        tmp_path / "regional_annual_forecast_predictions.csv"
+    )
     output_dir = tmp_path / "regional-dashboard"
 
     result = write_regional_research_dashboard_assets(
@@ -124,6 +127,7 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         regional_states_geojson_path=regional_states_path,
         regional_incidence_path=regional_incidence_path,
         spatial_regime_summary_path=overlays_path,
+        regional_annual_forecast_path=annual_forecast_path,
         model_name="linear_blend_baseline",
     )
 
@@ -204,6 +208,19 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         "forecast_year": 2026,
         "forecast_origin_year": 2023,
     }
+    assert anne_arundel["nearest_comparable_years"] == [
+        {
+            "analog_model_name": "analog_year_county_incidence",
+            "forecast_year": 2026,
+            "forecast_origin_year": 2023,
+            "forecast_horizon_years": 3,
+            "match_origin_year": 2018,
+            "match_observed_year": 2021,
+            "match_distance": 2.75,
+            "predicted_incidence_per_100k": 42.5,
+            "basis": "horizon-matched reported-incidence history",
+        }
+    ]
     assert "regional_counties.geojson" in manifest["files"]
     assert "regional_states.geojson" in manifest["files"]
     assert "regional_county_incidence_annual.json" in manifest["files"]
@@ -212,9 +229,15 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert manifest["record_counts"]["regional_state_geojson_features"] == 2
     assert manifest["record_counts"]["regional_annual_observed_incidence"] == 2
     assert manifest["record_counts"]["spatial_regime_overlays"] == 1
+    assert manifest["record_counts"]["regional_nearest_comparable_years"] == 1
     assert any(
         source["source_id"] == "regional_observed_annual_incidence"
         and source["artifact_type"] == "derived observed surveillance layer"
+        for source in source_catalog["sources"]
+    )
+    assert any(
+        source["source_id"] == "regional_nearest_comparable_years"
+        and "horizon-matched analog" in source["notes"]
         for source in source_catalog["sources"]
     )
 
@@ -439,6 +462,123 @@ def _write_regional_overlay_summary(path: Path) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+def _write_regional_annual_forecast_predictions(path: Path) -> Path:
+    columns = [
+        "run_id",
+        "model_name",
+        "model_family",
+        "target_definition",
+        "feature_set",
+        "feature_profile",
+        "evaluation_mode",
+        "regional_incidence_sha256",
+        "regional_population_sha256",
+        "state_fips",
+        "state_abbr",
+        "state_name",
+        "county_fips",
+        "county_name",
+        "forecast_year",
+        "forecast_origin_year",
+        "as_of_date",
+        "data_cutoff_date",
+        "source_vintage",
+        "update_mode",
+        "forecast_horizon_years",
+        "train_start_year",
+        "train_end_year",
+        "train_year_count",
+        "forecast_population",
+        "population_source_id",
+        "population_vintage",
+        "population_feature_quality_flags",
+        "predicted_cases",
+        "predicted_incidence_per_100k",
+        "analog_match_origin_year",
+        "analog_match_observed_year",
+        "analog_match_distance",
+        "model_feature_quality_flags",
+        "forecast_assumption_flags",
+    ]
+    rows = [
+        _regional_analog_forecast_row("24003", "Anne Arundel County", "2026", "2018", "2021", "2.75", "42.5"),
+        _regional_analog_forecast_row("42001", "Adams County", "2026", "2019", "2022", "3.25", "61.2"),
+        {
+            **_regional_analog_forecast_row(
+                "24003",
+                "Anne Arundel County",
+                "2026",
+                "2010",
+                "2013",
+                "99.0",
+                "12.0",
+            ),
+            "model_name": "empirical_bayes_spatial_regime_incidence",
+        },
+    ]
+    path.write_text(
+        ",".join(columns)
+        + "\n"
+        + "\n".join(
+            ",".join(f'"{row[column]}"' for column in columns) for row in rows
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _regional_analog_forecast_row(
+    county_fips: str,
+    county_name: str,
+    forecast_year: str,
+    match_origin_year: str,
+    match_observed_year: str,
+    match_distance: str,
+    predicted_incidence: str,
+) -> dict[str, str]:
+    return {
+        "run_id": f"regional_annual_forecast_target{forecast_year}_origin2023",
+        "model_name": "analog_year_county_incidence",
+        "model_family": "analog",
+        "target_definition": "reported_lyme_incidence_per_100k",
+        "feature_set": "historical_incidence_forecast_baselines",
+        "feature_profile": "forecast_safe_horizon_matched_analog",
+        "evaluation_mode": "regional_annual_forecast_no_observed_target",
+        "regional_incidence_sha256": "a" * 64,
+        "regional_population_sha256": "b" * 64,
+        "state_fips": county_fips[:2],
+        "state_abbr": "MD" if county_fips.startswith("24") else "PA",
+        "state_name": "Maryland" if county_fips.startswith("24") else "Pennsylvania",
+        "county_fips": county_fips,
+        "county_name": county_name,
+        "forecast_year": forecast_year,
+        "forecast_origin_year": "2023",
+        "as_of_date": "2026-05-29",
+        "data_cutoff_date": "2023-12-31",
+        "source_vintage": "cdc_lyme_county_dashboard_2023",
+        "update_mode": "pre_update",
+        "forecast_horizon_years": "3",
+        "train_start_year": "2001",
+        "train_end_year": "2023",
+        "train_year_count": "23",
+        "forecast_population": "100000",
+        "population_source_id": "regional_population_linear_projection",
+        "population_vintage": "2025",
+        "population_feature_quality_flags": "forecast_denominator",
+        "predicted_cases": "42.5",
+        "predicted_incidence_per_100k": predicted_incidence,
+        "analog_match_origin_year": match_origin_year,
+        "analog_match_observed_year": match_observed_year,
+        "analog_match_distance": match_distance,
+        "model_feature_quality_flags": (
+            "analog_like_year_forecast,forecast_origin_history_only,"
+            "analog_outcome_observed_by_forecast_origin"
+        ),
+        "forecast_assumption_flags": "forecast_without_observed_target",
+    }
 
 
 def _write_regional_incidence(path: Path) -> Path:

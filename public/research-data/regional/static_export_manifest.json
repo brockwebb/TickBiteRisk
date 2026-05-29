@@ -11,11 +11,12 @@
     "regional_county_incidence_annual.json",
     "regional_spatial_regime_overlays.json"
   ],
-  "generated_at": "2026-05-29T21:03:33+00:00",
+  "generated_at": "2026-05-29T21:55:46+00:00",
   "record_counts": {
     "county_metadata": 283,
     "regional_annual_observed_incidence": 6576,
     "regional_county_geojson_features": 283,
+    "regional_nearest_comparable_years": 849,
     "regional_state_geojson_features": 6,
     "spatial_regime_overlays": 127,
     "weekly_risk": 44997

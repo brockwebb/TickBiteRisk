@@ -76,7 +76,7 @@
       "promotion_rule": "Bayesian or calibration updates are not promoted to public scores unless rolling-origin backtests show improved error or calibration."
     }
   },
-  "generated_at": "2026-05-29T21:01:38+00:00",
+  "generated_at": "2026-05-29T21:55:39+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",

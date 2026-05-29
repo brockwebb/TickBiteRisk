@@ -1316,6 +1316,13 @@ def dashboard_build_regional_research_assets(
         "--spatial-regime-overlays/--no-spatial-regime-overlays",
         help="Include derived localized spatial-regime overlay summaries.",
     ),
+    regional_annual_forecast_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional regional annual forecast predictions CSV used to attach "
+            "horizon-matched analog comparable-year context."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/public-regional-risk"),
         help="Output directory for regional research dashboard data assets.",
@@ -1365,6 +1372,13 @@ def dashboard_build_regional_research_assets(
             "Spatial regime summary file not found: "
             f"{resolved_spatial_regime_summary_path}"
         )
+    if (
+        regional_annual_forecast_path is not None
+        and not regional_annual_forecast_path.exists()
+    ):
+        raise typer.BadParameter(
+            f"Regional annual forecast file not found: {regional_annual_forecast_path}"
+        )
     try:
         outputs = write_regional_research_dashboard_assets(
             scores_path=scores_path,
@@ -1373,6 +1387,7 @@ def dashboard_build_regional_research_assets(
             regional_states_geojson_path=resolved_regional_states_geojson_path,
             regional_incidence_path=resolved_regional_incidence_path,
             spatial_regime_summary_path=resolved_spatial_regime_summary_path,
+            regional_annual_forecast_path=regional_annual_forecast_path,
             model_name=model_name,
             seasonality_source_id=seasonality_source_id,
         )

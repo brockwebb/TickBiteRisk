@@ -79,7 +79,7 @@
       "promotion_rule": "Bayesian or calibration updates are not promoted to public scores unless rolling-origin backtests show improved error or calibration."
     }
   },
-  "generated_at": "2026-05-29T21:03:33+00:00",
+  "generated_at": "2026-05-29T21:55:46+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -153,6 +153,12 @@
       "notes": "Derived county-year reported Lyme cases and incidence for historical context; reported cases are not stable true incidence and diagnostic ranks are not forecast-safe features.",
       "redistribution": "public derived data",
       "source_id": "regional_observed_annual_incidence"
+    },
+    {
+      "artifact_type": "derived forecast explanation layer",
+      "notes": "horizon-matched analog-year companion rows identify the nearest comparable reported-incidence history used by the analog research branch; this explains context and does not replace the selected risk-score branch.",
+      "redistribution": "public derived data",
+      "source_id": "regional_nearest_comparable_years"
     }
   ],
   "temporal_contract": {

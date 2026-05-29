@@ -114,6 +114,8 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert "Not a personal infection probability." in weekly["caveats"]
     assert weekly["records"][0]["county_fips"] == "24003"
     assert weekly["records"][0]["year"] == 2023
+    assert weekly["records"][0]["week_start_date"] == "2023-01-01"
+    assert weekly["records"][0]["week_end_date"] == "2023-01-07"
     assert weekly["records"][0]["risk_score"] == 7
     assert weekly["records"][0]["predicted_weekly_incidence_95_interval"] == [
         1.5,
@@ -354,6 +356,10 @@ def test_regional_static_export_preserves_multi_year_forecast_runs(
     assert weekly["record_count"] == 2
     assert weekly["year_selection"] == "all_available_years"
     assert [record["year"] for record in weekly["records"]] == [2025, 2026]
+    assert weekly["records"][0]["week_start_date"] == "2024-12-29"
+    assert weekly["records"][0]["week_end_date"] == "2025-01-04"
+    assert weekly["records"][1]["week_start_date"] == "2026-01-04"
+    assert weekly["records"][1]["week_end_date"] == "2026-01-10"
     assert weekly["selected_forecast_metadata"]["forecast_years"] == [2025, 2026]
     assert weekly["selected_forecast_metadata"]["source_prediction_run_ids"] == [
         "regional_forecast_2025",
