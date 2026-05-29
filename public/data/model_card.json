@@ -49,12 +49,80 @@
     }
   ],
   "export_type": "model_card",
+  "forecast_basis": {
+    "analog_year_definition": {
+      "current_like_year_features": [
+        "origin-year reported Lyme incidence",
+        "trailing mean reported Lyme incidence"
+      ],
+      "current_role": "comparison_or_research_branch_unless_selected",
+      "not_currently_matched_on": [
+        "daily weather",
+        "tick abundance",
+        "infected tick prevalence",
+        "observed county-month cases"
+      ]
+    },
+    "seasonal_allocation": {
+      "role": "allocates the annual county forecast across MMWR weeks; it is not observed county-week truth",
+      "scope": "national Lyme onset seasonality",
+      "source": "cdc_seasonality_week_2023"
+    },
+    "selected_branch": {
+      "data_cutoff_date": "2024-12-31",
+      "evaluation_mode": "annual_forecast_no_observed_target",
+      "feature_set": "lagged_outcome_forecast",
+      "forecast_origin_year": 2024,
+      "model_family": "ensemble",
+      "model_name": "linear_blend_baseline",
+      "source_vintage": "2024-inclusive-local",
+      "update_mode": "pre_update"
+    },
+    "signals_not_used": [
+      "observed county-week Lyme cases",
+      "observed county-month Lyme cases",
+      "observed county-week tick counts",
+      "observed county-week infected tick prevalence",
+      "individual bite outcomes"
+    ],
+    "signals_used": [
+      "prior reported Lyme incidence",
+      "trailing reported Lyme incidence",
+      "county population denominator",
+      "CDC national Lyme onset seasonality for display allocation"
+    ],
+    "target": {
+      "disease": "Lyme disease",
+      "interpretation": "reported surveillance incidence used as a proxy for relative Lyme disease pressure",
+      "metric": "reported_lyme_incidence_per_100k",
+      "spatial_grain": "county",
+      "temporal_grain": "year"
+    },
+    "uncertainty": {
+      "avoid_term": "clinical confidence interval",
+      "interpretation": "Intervals describe historical forecast residual uncertainty around reported-incidence proxy forecasts, not clinical certainty for a person or bite.",
+      "interval_method": "not_available",
+      "public_term": "forecast interval"
+    },
+    "update_policy": {
+      "bayesian_update_method": "gamma_poisson_case_multiplier",
+      "bayesian_update_status": "research_backtest_only",
+      "new_observed_data_steps": [
+        "ingest reviewed county-year surveillance data with source caveats",
+        "compare the prior forecast with the newly observed county-year outcome",
+        "record residuals by county, branch, surveillance regime, and region",
+        "refit eligible forecast branches when coverage is complete enough",
+        "regenerate forecasts, intervals, scores, and source notes"
+      ],
+      "promotion_rule": "Bayesian or calibration updates are not promoted to public scores unless rolling-origin backtests show improved error or calibration."
+    }
+  },
   "forecasting_status": {
     "public_score_role": "relative county-week Lyme risk forecast with source-lag and update diagnostics",
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-29T20:25:04+00:00",
+  "generated_at": "2026-05-29T21:01:38+00:00",
   "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality; displayed county-week values are seasonal allocation, not observed county-week data.",
   "model_name": "linear_blend_baseline",
   "not_for": [

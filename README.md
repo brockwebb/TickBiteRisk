@@ -89,9 +89,9 @@ runtime secrets or raw data access.
 
 ## quick start (regional research map)
 
-The regional research page is committed at `public/regional-research.html`, but
-its generated DE/DC/MD/PA/VA/WV bundle is intentionally ignored. After running
-the regional ETL and dashboard asset commands, materialize the local bundle with:
+The regional research page is committed at `public/regional-research.html`.
+After running the regional ETL and dashboard asset commands, refresh the local
+bundle with:
 
 ```bash
 mkdir -p public/research-data/regional
@@ -130,15 +130,23 @@ timing, but they are not observed county-month or county-week risk.
 
 ## how forecast updates work
 
-The current public score starts with a selected true 2026 annual forecast
-branch and a static CDC seasonality prior. Model-comparison outputs remain the
-historical validation evidence for that branch, while research forecast lanes
-also test historical Lyme incidence, forecast-safe ecology and habitat context,
-host and human exposure proxies, regional patterns, and surveillance caveats.
-When new information
-arrives, the update-audit layer compares it with the prior forecast, labels the
-source vintage and surveillance regime, and records whether the change looks
-like disease-pressure signal, reporting-regime signal, or an ambiguous update.
+The current public score starts with an annual county reported-incidence
+forecast from `annual_forecast_predictions.csv`, currently selecting
+`linear_blend_baseline`, and then applies CDC national Lyme onset seasonality
+as a static display allocation. The selected source preserves
+`forecast_origin_year`, `data_cutoff_date`, `source_vintage`, and `update_mode`
+so a score can explain exactly what evidence existed when it was generated.
+Model-comparison outputs remain the historical validation evidence for that
+branch, while research forecast lanes also test historical Lyme incidence,
+forecast-safe ecology and habitat context, host and human exposure proxies,
+regional patterns, and surveillance caveats. Public promotion remains a
+separate product decision even when a research branch such as
+`forecast_safe_top4_ensemble` ranks first on a backtest.
+
+When new information arrives, the update-audit layer compares it with the
+prior forecast, labels the source vintage and surveillance regime, and records
+whether the change looks like disease-pressure signal, reporting-regime signal,
+or an ambiguous update.
 
 That reconciliation is the path toward stronger Bayesian or hierarchical
 forecasting: new information should update the next forecast with its caveats
@@ -229,7 +237,7 @@ tickbiterisk etl model-backtest --model-features-path build/etl/model/model_feat
 tickbiterisk etl county-week-risk --predictions-path build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv --prediction-intervals-path build/etl/regional-annual-forecast/regional_annual_forecast_intervals.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --output-dir build/etl/regional-county-week-risk --replace
 tickbiterisk etl county-week-risk --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name linear_blend_baseline --output-dir build/etl/county-week-risk --replace
 tickbiterisk risk export-static --scores-path build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --geography-scope midatlantic_county_week --output-dir build/public-regional-risk
-tickbiterisk dashboard build-regional-research-assets --scores-path build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv --regional-counties-geojson-path build/etl/regional-county-adjacency/regional_counties.geojson --spatial-regime-summary-path build/etl/regional-annual-forecast/regional_spatial_regime_forecast_interval_summary.csv --output-dir build/public-regional-risk
+tickbiterisk dashboard build-regional-research-assets --scores-path build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv --regional-counties-geojson-path build/etl/regional-county-adjacency/regional_counties.geojson --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --spatial-regime-summary-path build/etl/regional-annual-forecast/regional_spatial_regime_forecast_interval_summary.csv --output-dir build/public-regional-risk
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest --include-annual-report-pdfs
 tickbiterisk etl ecology-sources --raw-dir data/raw/ecology --manifest-path build/etl/ecology/source_manifest.csv
@@ -343,10 +351,20 @@ deterministic `random_forest_forecast_research` lane and a research-only
 branches. It wrote 5,184 prediction rows; the top-4 ensemble ranked first at
 17.971574 MAE per 100k, while the random-forest lane ranked sixth at 20.378557.
 `annual-forecast` now reproduces the safe ridge, spatial ridge, and top-4
-branches as true target-year forecast rows when Maryland county adjacency is
-supplied. The public county-week score still selects `linear_blend_baseline`.
+branches as target-year research branch rows when Maryland county adjacency is
+supplied. The public county-week score still selects `linear_blend_baseline`;
+public promotion remains a separate product decision.
 
-Bayesian update note: `forecast-bayesian-update-backtest` tests the same update idea as a Gamma-Poisson posterior. The 2026-05-29 live run wrote 5,184 posterior-update predictions and 288 metrics, but default Bayesian updating worsened overall MAE for all 12 branches, including `forecast_safe_top4_ensemble` from 17.971574 to 22.169329 per 100k, `prior_year_incidence` from 18.21318 to 23.266222, and `linear_blend_baseline` from 18.47245 to 23.192087. These update factors are research priors for future hierarchical Bayesian design, not automatic public score corrections.
+Analog and interval note: Maryland `analog_year_forecast` is a model-comparison
+and annual-forecast like-year lane, with `model_comparison_intervals.csv`
+carrying `weighted_analog_bootstrap` interval diagnostics. Regional
+`analog_year_county_incidence` is a separate horizon-matched branch that records
+the matched origin, matched outcome, and distance, and only uses a matched
+outcome observed by the forecast origin. Regional
+`regional_annual_forecast_intervals.csv` uses rolling-origin residuals to write
+empirical prediction bands, not posterior intervals or personal-risk claims.
+
+Bayesian update note: `forecast-bayesian-update-backtest` tests the same update idea as a Gamma-Poisson posterior. The 2026-05-29 live run wrote 5,184 posterior-update predictions and 288 metrics, but default Bayesian updating worsened overall MAE for all 12 branches, including `forecast_safe_top4_ensemble` from 17.971574 to 22.169329 per 100k, `prior_year_incidence` from 18.21318 to 23.266222, and `linear_blend_baseline` from 18.47245 to 23.192087. Metric rows carry `update_gate_decision`; the current gate is `do_not_apply_to_public_forecast`, and these update factors are research priors for future hierarchical Bayesian design, not automatic public score corrections.
 
 Current regional cluster note: `model-design-matrix` can now join
 `regional_incidence_cluster_county_year.csv` with

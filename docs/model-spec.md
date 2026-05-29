@@ -2,11 +2,12 @@
 
 ## Current implemented model
 
-The implemented v0 model is a Maryland county-year Lyme incidence comparison
-framework that produces a county-week seasonal baseline for the static
-dashboard. It predicts annual Lyme incidence per 100,000 residents, compares
-several transparent branches, then distributes the selected annual branch across
-CDC Lyme onset seasonality to make a week-level public score.
+The implemented v0 model is a Maryland county-year Lyme incidence forecasting
+and comparison framework. The public score starts from an annual county
+reported-incidence forecast, currently
+`build/etl/annual-forecast/annual_forecast_predictions.csv` selecting
+`linear_blend_baseline`, then distributes the selected annual branch across CDC
+national Lyme onset seasonality to make a week-level public score.
 
 Primary artifacts:
 
@@ -28,6 +29,7 @@ Primary artifacts:
 - `build/etl/regional-incidence-clusters/regional_incidence_cluster_summary.csv`
 - `build/etl/model-comparison/model_comparison_predictions.csv`
 - `build/etl/model-comparison/model_comparison_intervals.csv`
+- `build/etl/annual-forecast/annual_forecast_predictions.csv`
 - `build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv`
 - `public/data/md_county_risk_weekly.json`
 
@@ -56,7 +58,9 @@ The comparison harness supports these current branches:
 | `ridge_lag_weather_ecology` | Experimental retrospective weather/drought/ecology branch for comparison |
 
 The selected dashboard branch is currently `linear_blend_baseline` because it
-is transparent, stable, and defensible for a first public baseline.
+is transparent, stable, and defensible for a first public forecast. Public
+promotion remains a separate product decision even when a research branch ranks
+higher on a backtest.
 
 ## Feature families
 
@@ -158,6 +162,13 @@ model-comparison lane only; it is not part of `annual-forecast` or the public
 county-week score until later validation shows a stable gain and the model can
 be explained plainly enough for the dashboard.
 
+The `analog_year_forecast` Maryland lane is a like-year forecast branch whose
+current matching basis is lagged reported-incidence history; its
+`model_comparison_intervals.csv` diagnostics use `weighted_analog_bootstrap`.
+The regional `analog_year_county_incidence` branch is distinct: it is
+horizon-matched, preserves the matched origin, matched outcome, and distance,
+and requires that matched outcome to have been observed by the forecast origin.
+
 The `forecast_safe_top4_ensemble` lane tests whether a small equal-weight blend
 can reduce variance across the strongest forecast-safe comparison branches.
 `annual-forecast` can now emit it as a target-year research branch when county
@@ -256,6 +267,19 @@ Calibration metrics now carry a gate decision. Only an overall improvement in
 both incidence and case MAE can become `candidate_review_required`; mixed or
 worse overall results are labeled `do_not_apply_to_public_forecast`, and
 year/regime subsets remain `diagnostic_subgroup_only`.
+
+`forecast-bayesian-update-backtest` is the parallel Bayesian update harness. It
+uses a Gamma-Poisson case-multiplier posterior, reports
+`update_gate_decision`, and currently remains research-only because the default
+update worsened overall MAE. Bayesian or calibration outputs are therefore not
+automatic public score corrections.
+
+Forecast uncertainty terms are deliberately plain: Maryland
+`model_comparison_intervals.csv` contains analog/bootstrap diagnostics, while
+regional `regional_annual_forecast_intervals.csv` contains residual-calibrated
+empirical prediction bands from rolling-origin regional stress residuals.
+Neither artifact is a clinical interval, per-bite estimate, or proof of
+causality.
 
 ## Public score transform
 

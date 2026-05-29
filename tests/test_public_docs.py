@@ -489,6 +489,65 @@ def test_model_spec_leads_with_implemented_comparison_model_before_research_mode
         assert token not in current_section
 
 
+def test_docs_lock_public_forecast_basis_and_branch_promotion_policy() -> None:
+    docs_text = "\n".join(
+        [
+            README.read_text(encoding="utf-8"),
+            MODEL_SPEC.read_text(encoding="utf-8"),
+            ETL_PIPELINE.read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "annual_forecast_predictions.csv",
+        "linear_blend_baseline",
+        "annual county reported-incidence forecast",
+        "CDC national Lyme onset seasonality",
+        "forecast_origin_year",
+        "data_cutoff_date",
+        "forecast_safe_top4_ensemble",
+        "research branch",
+        "public promotion remains a separate product decision",
+    ]:
+        assert token in docs_text
+
+    assert "selected true 2026 annual forecast" not in docs_text
+
+
+def test_docs_lock_analog_interval_and_bayesian_update_policy() -> None:
+    docs_text = "\n".join(
+        [
+            README.read_text(encoding="utf-8"),
+            MODEL_SPEC.read_text(encoding="utf-8"),
+            ETL_PIPELINE.read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "analog_year_forecast",
+        "weighted_analog_bootstrap",
+        "model_comparison_intervals.csv",
+        "analog_year_county_incidence",
+        "matched outcome",
+        "observed by the forecast origin",
+        "regional_annual_forecast_intervals.csv",
+        "empirical prediction bands",
+        "forecast-bayesian-update-backtest",
+        "Gamma-Poisson",
+        "update_gate_decision",
+        "do_not_apply_to_public_forecast",
+        "not automatic public score corrections",
+    ]:
+        assert token in docs_text
+
+    for token in [
+        "posterior credible interval",
+        "clinical confidence",
+        "individual infection probability",
+    ]:
+        assert token not in docs_text
+
+
 def test_srs_documents_single_bite_runtime_as_current_nonmedical_feature() -> None:
     srs = SRS.read_text(encoding="utf-8")
 

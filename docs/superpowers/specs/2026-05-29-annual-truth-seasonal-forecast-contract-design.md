@@ -68,6 +68,29 @@ acquired, they should enter as a new observed temporal layer with explicit
 source permissions, grain, caveats, and validation tests. Until then, seasonal
 allocations remain derived planning estimates.
 
+## Forecast Basis Rules
+
+Every public or regional forecast bundle must expose why the estimate was made,
+not just the score. The machine-readable model card/source catalog should name
+the target, selected branch, forecast origin, data cutoff, source vintage,
+update mode, signals used, signals not used, uncertainty method, seasonal
+allocation role, and update policy.
+
+For the current public Maryland score, the basis is an annual county
+reported-incidence forecast from `annual_forecast_predictions.csv`, currently
+selecting `linear_blend_baseline`, followed by CDC national Lyme onset
+seasonality. For the regional research preview, the current selected branch is
+`empirical_bayes_spatial_regime_incidence`, using prior reported Lyme
+incidence, trailing county history, localized spatial-regime priors, population
+denominators, and residual-calibrated empirical prediction bands.
+
+Analog-year and Bayesian-update terms must stay specific. Current like-year
+matching is based on reported-incidence history unless a future branch
+explicitly adds forecast-safe weather, tick, or ecology conditions. Gamma-Poisson
+Bayesian case-multiplier updates remain research-only until rolling-origin
+gates show improved error or calibration; they must not silently overwrite the
+public score.
+
 ## Guardrails
 
 Static public exports must include a temporal contract declaring:

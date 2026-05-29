@@ -525,14 +525,14 @@ artifacts.
     - Prediction rows intentionally omit observed target, actual, residual,
       error, and coverage columns because this artifact is a true forecast, not
       a rolling-origin evaluation table.
-    - Current public branch selection remains the transparent lagged-outcome
-      baseline:
-      `latest_observed_incidence`, `trailing_mean_incidence`,
-      `linear_blend_baseline`, and `empirical_bayes_shrinkage` stay available,
-      while ridge/spatial/top-4 branches remain research candidates. The
-      artifact is the current public annual source after the county-week seasonality
-      transform; rolling-origin model comparison remains the historical
-      validation source for the selected branch.
+    - Current public branch selection is `linear_blend_baseline`, a transparent
+      annual county reported-incidence forecast. `latest_observed_incidence`,
+      `trailing_mean_incidence`, `empirical_bayes_shrinkage`, ridge, spatial,
+      and `forecast_safe_top4_ensemble` branches remain available or research
+      candidates. Public promotion remains a separate product decision.
+    - The artifact is the current public annual source after the county-week
+      seasonality transform; rolling-origin model comparison remains the
+      historical validation source for the selected branch.
 
 17. `tickbiterisk etl model-diagnostics`
     - Summarizes comparison predictions and bootstrap intervals into research
@@ -583,11 +583,14 @@ artifacts.
     - Current live results are evidence against automatic public use: default
       Bayesian updating worsened overall MAE for all branches, while preserving
       useful posterior audit fields for future hierarchical update design.
+    - These rows are not automatic public score corrections.
 
 18. `tickbiterisk etl county-week-risk`
     - Current public 2026 run:
       `tickbiterisk etl county-week-risk --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name linear_blend_baseline --output-dir build/etl/county-week-risk --replace`.
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.
+      The public Maryland score uses `annual_forecast_predictions.csv`,
+      `linear_blend_baseline`, and CDC national Lyme onset seasonality.
       The input can be a rolling-origin model-comparison prediction table or a
       true annual forecast table with `forecast_year`.
     - Carries forecast-vintage metadata into the county-week artifact. Legacy

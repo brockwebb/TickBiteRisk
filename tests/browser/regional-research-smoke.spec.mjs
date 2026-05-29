@@ -6,6 +6,58 @@ const fixtures = {
     export_type: "regional_county_week_risk",
     model_name: "empirical_bayes_spatial_regime_incidence",
     record_count: 12,
+    forecast_basis: {
+      analog_year_definition: {
+        current_role: "comparison_or_research_branch_unless_selected",
+        current_like_year_features: [
+          "origin-year reported Lyme incidence",
+          "trailing mean reported Lyme incidence",
+        ],
+        not_currently_matched_on: [
+          "daily weather",
+          "tick abundance",
+          "infected tick prevalence",
+          "observed county-month cases",
+        ],
+      },
+      seasonal_allocation: {
+        role:
+          "allocates the annual county forecast across MMWR weeks; it is not observed county-week truth",
+        scope: "national Lyme onset seasonality",
+        source: "cdc_seasonality_week_2023",
+      },
+      selected_branch: {
+        data_cutoff_date: "2023-12-31",
+        evaluation_mode: "regional_annual_forecast_no_observed_target",
+        forecast_origin_year: 2023,
+        model_family: "empirical_bayes_spatial_regime",
+        model_name: "empirical_bayes_spatial_regime_incidence",
+        source_vintage: "cdc_lyme_county_dashboard_2023",
+        update_mode: "pre_update",
+      },
+      signals_not_used: [
+        "observed county-week Lyme cases",
+        "observed county-week tick counts",
+      ],
+      signals_used: [
+        "prior reported Lyme incidence",
+        "trailing reported Lyme incidence",
+        "county population denominator",
+        "localized spatial-regime prior incidence",
+        "empirical Bayes shrinkage toward a broader prior",
+      ],
+      target: {
+        metric: "reported_lyme_incidence_per_100k",
+      },
+      uncertainty: {
+        interval_method: "empirical_rolling_origin_residual_quantile",
+        public_term: "forecast interval",
+      },
+      update_policy: {
+        bayesian_update_method: "gamma_poisson_case_multiplier",
+        bayesian_update_status: "research_backtest_only",
+      },
+    },
     records: [
       riskRecord(2024, "24001", "Allegany County", 21, 7, "high", 1.9, [0.9, 2.8], [0.4, 4.2]),
       riskRecord(2024, "51810", "Virginia Beach city", 21, 3, "low", 0.5, [0.2, 0.8], [0.1, 1.1]),
@@ -208,6 +260,33 @@ test("regional research dashboard renders county risk, week slider, and regime i
   );
   await expect(page.locator("#regional-panel-content")).toContainText(
     "rounded and clamped to 1-10"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Why this forecast?"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Forecast origin 2023"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Data cutoff 2023-12-31"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "prior reported Lyme incidence"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "localized spatial-regime prior incidence"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Seasonal allocation"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "national Lyme onset seasonality"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Bayesian updates"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "research-only"
   );
   await expect(page.locator("#regional-panel-content")).toContainText(
     "Spatial regime 7"

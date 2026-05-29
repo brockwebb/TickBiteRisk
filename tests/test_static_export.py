@@ -61,6 +61,48 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         "source_vintage": "mdh_2024_reviewed_v1",
         "update_mode": "pre_update",
     }
+    assert weekly["forecast_basis"]["target"]["metric"] == (
+        "reported_lyme_incidence_per_100k"
+    )
+    assert weekly["forecast_basis"]["selected_branch"] == {
+        "model_name": "linear_blend_baseline",
+        "model_family": "ensemble",
+        "feature_set": "historical_outcome_baselines",
+        "evaluation_mode": "forecast_prior_year",
+        "forecast_origin_year": 2022,
+        "data_cutoff_date": "2024-12-31",
+        "source_vintage": "mdh_2024_reviewed_v1",
+        "update_mode": "pre_update",
+    }
+    assert "prior reported Lyme incidence" in weekly["forecast_basis"]["signals_used"]
+    assert "observed county-week Lyme cases" in weekly["forecast_basis"][
+        "signals_not_used"
+    ]
+    assert weekly["forecast_basis"]["analog_year_definition"] == {
+        "current_role": "comparison_or_research_branch_unless_selected",
+        "current_like_year_features": [
+            "origin-year reported Lyme incidence",
+            "trailing mean reported Lyme incidence",
+        ],
+        "not_currently_matched_on": [
+            "daily weather",
+            "tick abundance",
+            "infected tick prevalence",
+            "observed county-month cases",
+        ],
+    }
+    assert weekly["forecast_basis"]["uncertainty"]["public_term"] == (
+        "forecast interval"
+    )
+    assert weekly["forecast_basis"]["uncertainty"]["avoid_term"] == (
+        "clinical confidence interval"
+    )
+    assert weekly["forecast_basis"]["update_policy"]["bayesian_update_status"] == (
+        "research_backtest_only"
+    )
+    assert weekly["forecast_basis"]["update_policy"]["bayesian_update_method"] == (
+        "gamma_poisson_case_multiplier"
+    )
     assert (
         "Relative Maryland county seasonal Lyme forecast, not a per-bite infection probability."
         in weekly["caveats"]
@@ -116,6 +158,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert model_card["annual_prediction_source"]["source_vintage"] == (
         "mdh_2024_reviewed_v1"
     )
+    assert model_card["forecast_basis"] == weekly["forecast_basis"]
     assert model_card["validation_summary"] == {
         "run_id": "run1",
         "model_name": "linear_blend_baseline",
@@ -161,6 +204,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert source_catalog["temporal_contract"] == weekly["temporal_contract"]
     assert "seasonal allocation" in source_catalog["sources"][0]["notes"]
     assert "not observed county-week data" in source_catalog["sources"][0]["notes"]
+    assert source_catalog["forecast_basis"] == weekly["forecast_basis"]
     assert source_catalog["sources"][1]["source_id"] == "annual_prediction_branch"
     assert source_catalog["sources"][1]["run_id"] == "run1"
     assert source_catalog["sources"][1]["sha256"] == "a" * 64
@@ -190,6 +234,10 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert source_catalog["data_lag_and_update_policy"]["forecast_boundary"] == (
         "Forecast-safe branches use prior-year and trailing data; nowcast or "
         "retrospective branches must be labeled separately."
+    )
+    assert source_catalog["data_lag_and_update_policy"]["bayesian_update_boundary"] == (
+        "Gamma-Poisson Bayesian case-multiplier updates are research-only until "
+        "rolling-origin backtests show they improve forecast error or calibration."
     )
     assert any("CDC" in link["title"] for link in source_catalog["guidance_links"])
     assert manifest["files"] == [

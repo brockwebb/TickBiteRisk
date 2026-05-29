@@ -458,6 +458,7 @@ def _weekly_payload(
         "temporal_contract": TEMPORAL_CONTRACT,
         "selected_score_config": _selected_score_config(first),
         "selected_forecast_metadata": _selected_forecast_metadata(records),
+        "forecast_basis": _forecast_basis_payload(records),
         "score_scale": {
             "range": [1, 10],
             "categories": SCORE_CATEGORIES,
@@ -588,6 +589,7 @@ def _model_card_payload(
         "temporal_contract": TEMPORAL_CONTRACT,
         "explainer_placeholders": EXPLAINER_PLACEHOLDERS,
         "annual_prediction_source": _annual_prediction_source(records),
+        "forecast_basis": _forecast_basis_payload(records),
         "quality_flags": [
             "relative_seasonal_baseline",
             "static_seasonality_prior",
@@ -739,6 +741,11 @@ def _source_catalog_payload(
                 "Forecast-safe branches use prior-year and trailing data; nowcast or "
                 "retrospective branches must be labeled separately."
             ),
+            "bayesian_update_boundary": (
+                "Gamma-Poisson Bayesian case-multiplier updates are research-only "
+                "until rolling-origin backtests show they improve forecast error or "
+                "calibration."
+            ),
             "medical_boundary": (
                 "Forecasts do not diagnose disease, decide treatment, or determine "
                 "whether an individual bite caused infection."
@@ -783,6 +790,7 @@ def _source_catalog_payload(
                 "notes": "CDC national onset seasonality; not county-specific.",
             },
         ],
+        "forecast_basis": _forecast_basis_payload(records),
     }
 
 
@@ -802,6 +810,118 @@ def _annual_prediction_source(
         **_selected_forecast_metadata(selected),
         **_annual_interval_metadata(record),
     }
+
+
+def _forecast_basis_payload(
+    records: CountyWeekRiskRecord | list[CountyWeekRiskRecord],
+) -> dict[str, object]:
+    selected = records if isinstance(records, list) else [records]
+    record = selected[0]
+    return {
+        "target": {
+            "disease": "Lyme disease",
+            "metric": "reported_lyme_incidence_per_100k",
+            "spatial_grain": "county",
+            "temporal_grain": "year",
+            "interpretation": (
+                "reported surveillance incidence used as a proxy for relative "
+                "Lyme disease pressure"
+            ),
+        },
+        "selected_branch": {
+            "model_name": record.model_name,
+            "model_family": record.model_family,
+            "feature_set": record.feature_set,
+            "evaluation_mode": record.evaluation_mode,
+            "forecast_origin_year": record.forecast_origin_year,
+            "data_cutoff_date": record.data_cutoff_date,
+            "source_vintage": record.source_vintage,
+            "update_mode": record.update_mode,
+        },
+        "signals_used": _forecast_basis_signals_used(record),
+        "signals_not_used": [
+            "observed county-week Lyme cases",
+            "observed county-month Lyme cases",
+            "observed county-week tick counts",
+            "observed county-week infected tick prevalence",
+            "individual bite outcomes",
+        ],
+        "seasonal_allocation": {
+            "source": record.seasonality_source_id,
+            "role": (
+                "allocates the annual county forecast across MMWR weeks; it is "
+                "not observed county-week truth"
+            ),
+            "scope": "national Lyme onset seasonality",
+        },
+        "analog_year_definition": {
+            "current_role": "comparison_or_research_branch_unless_selected",
+            "current_like_year_features": [
+                "origin-year reported Lyme incidence",
+                "trailing mean reported Lyme incidence",
+            ],
+            "not_currently_matched_on": [
+                "daily weather",
+                "tick abundance",
+                "infected tick prevalence",
+                "observed county-month cases",
+            ],
+        },
+        "uncertainty": {
+            "public_term": "forecast interval",
+            "avoid_term": "clinical confidence interval",
+            "interval_method": (
+                record.annual_interval_method
+                if record.annual_interval_available
+                else "not_available"
+            ),
+            "interpretation": (
+                "Intervals describe historical forecast residual uncertainty "
+                "around reported-incidence proxy forecasts, not clinical "
+                "certainty for a person or bite."
+            ),
+        },
+        "update_policy": {
+            "new_observed_data_steps": [
+                "ingest reviewed county-year surveillance data with source caveats",
+                "compare the prior forecast with the newly observed county-year outcome",
+                "record residuals by county, branch, surveillance regime, and region",
+                "refit eligible forecast branches when coverage is complete enough",
+                "regenerate forecasts, intervals, scores, and source notes",
+            ],
+            "bayesian_update_status": "research_backtest_only",
+            "bayesian_update_method": "gamma_poisson_case_multiplier",
+            "promotion_rule": (
+                "Bayesian or calibration updates are not promoted to public scores "
+                "unless rolling-origin backtests show improved error or calibration."
+            ),
+        },
+    }
+
+
+def _forecast_basis_signals_used(record: CountyWeekRiskRecord) -> list[str]:
+    signals = [
+        "prior reported Lyme incidence",
+        "trailing reported Lyme incidence",
+        "county population denominator",
+        "CDC national Lyme onset seasonality for display allocation",
+    ]
+    flags = set(split_quality_flags(record.feature_quality_flags))
+    if (
+        "localized_spatial_regime_feature" in flags
+        or "forecast_safe_prior_history_spatial_regime" in flags
+        or record.model_name == "empirical_bayes_spatial_regime_incidence"
+    ):
+        signals.append("localized spatial-regime prior incidence")
+    if (
+        "regional_county_adjacency_from_geojson" in flags
+        or "spatial_neighbor_feature" in flags
+        or "forecast_safe_prior_year_neighbor_signal" in flags
+    ):
+        signals.append("prior-year adjacent-county incidence")
+    if record.model_family.startswith("empirical_bayes"):
+        signals.append("empirical Bayes shrinkage toward a broader prior")
+    return signals
 
 
 def _manifest_payload(

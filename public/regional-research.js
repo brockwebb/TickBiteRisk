@@ -680,6 +680,7 @@ function selectRegionalCounty(countyFips) {
     <p>80% empirical interval: ${regionalFormatNumber(interval80[0])} to ${regionalFormatNumber(interval80[1])} per 100k.</p>
     <p>95% empirical interval: ${regionalFormatNumber(interval95[0])} to ${regionalFormatNumber(interval95[1])} per 100k.</p>
     ${renderRegionalScaleDiagnostics(record)}
+    ${renderRegionalForecastBasis(record)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
     <p class="disclaimer">Research only. This is not a per-bite infection probability, diagnosis, treatment recommendation, or public Maryland default.</p>
@@ -707,6 +708,71 @@ function renderRegionalScaleDiagnostics(record) {
     <p>This forecast score is linear: predicted weekly incidence is divided by the regional ${regionalEscapeHtml(denominatorText)}, then rounded and clamped to 1-10.</p>
     <p>${regionalEscapeHtml(rawScoreText)}; displayed score ${regionalEscapeHtml(record.risk_score)}/10.</p>
   </section>`;
+}
+
+function renderRegionalForecastBasis(record) {
+  const basis = (regionalState.weekly && regionalState.weekly.forecast_basis) ||
+    (regionalState.modelCard && regionalState.modelCard.forecast_basis) ||
+    {};
+  const branch = basis.selected_branch || {};
+  const seasonal = basis.seasonal_allocation || {};
+  const uncertainty = basis.uncertainty || {};
+  const updatePolicy = basis.update_policy || {};
+  const forecastOrigin =
+    branch.forecast_origin_year ||
+    (regionalState.weekly &&
+      regionalState.weekly.selected_forecast_metadata &&
+      regionalState.weekly.selected_forecast_metadata.forecast_origin_year) ||
+    record.forecast_origin_year ||
+    "unknown";
+  const dataCutoff =
+    branch.data_cutoff_date ||
+    (regionalState.weekly &&
+      regionalState.weekly.selected_forecast_metadata &&
+      regionalState.weekly.selected_forecast_metadata.data_cutoff_date) ||
+    "unknown";
+  const modelName =
+    branch.model_name ||
+    record.model_name ||
+    (regionalState.weekly && regionalState.weekly.model_name) ||
+    "selected forecast branch";
+  const signalsUsed = regionalForecastBasisList(
+    basis.signals_used,
+    "prior reported Lyme incidence"
+  );
+  const signalsNotUsed = regionalForecastBasisList(
+    basis.signals_not_used,
+    "observed county-week Lyme cases"
+  );
+  const seasonalityScope =
+    seasonal.scope || "national Lyme onset seasonality";
+  const seasonalityRole =
+    seasonal.role ||
+    "allocates the annual county forecast across MMWR weeks";
+  const intervalMethod =
+    uncertainty.interval_method ||
+    record.annual_interval_method ||
+    "empirical forecast residuals";
+  const bayesianStatus = updatePolicy.bayesian_update_status === "research_backtest_only"
+    ? "research-only"
+    : regionalReadableName(updatePolicy.bayesian_update_status || "research-only");
+  const bayesianMethod =
+    updatePolicy.bayesian_update_method || "gamma_poisson_case_multiplier";
+
+  return `<section class="lineage-strip forecast-basis" aria-labelledby="regional-forecast-basis-heading">
+    <h4 id="regional-forecast-basis-heading">Why this forecast?</h4>
+    <p><b>Forecast basis:</b> ${regionalEscapeHtml(regionalReadableName(modelName))}. Forecast origin ${regionalEscapeHtml(forecastOrigin)}; Data cutoff ${regionalEscapeHtml(dataCutoff)}.</p>
+    <p><b>Signals used:</b> ${signalsUsed}</p>
+    <p><b>Not used:</b> ${signalsNotUsed}</p>
+    <p><b>Seasonal allocation:</b> ${regionalEscapeHtml(seasonalityScope)} ${regionalEscapeHtml(seasonalityRole)}.</p>
+    <p><b>Forecast interval:</b> ${regionalEscapeHtml(regionalReadableName(intervalMethod))}.</p>
+    <p><b>Bayesian updates:</b> ${regionalEscapeHtml(regionalReadableName(bayesianMethod))} is ${regionalEscapeHtml(bayesianStatus)}.</p>
+  </section>`;
+}
+
+function regionalForecastBasisList(items, fallback) {
+  const values = Array.isArray(items) && items.length ? items : [fallback];
+  return values.map((item) => regionalEscapeHtml(String(item))).join(", ");
 }
 
 function renderRegionalObservedCounty({
