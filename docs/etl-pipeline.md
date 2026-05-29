@@ -232,14 +232,18 @@ artifacts.
    - Projects the Mid-Atlantic reported-incidence panel into a target year
      without observed target-year Lyme outcomes.
    - Defaults the forecast origin to the latest coverage-complete incidence
-     year in the input panel, currently 2023 for the CDC dashboard-based
-     regional panel. Partial state-source overlay years are retained for
-     diagnostics without becoming the default origin unless explicitly
-     requested.
+     year covering the target-year forecast geography, currently 2023 for the
+     CDC dashboard-based regional panel. Partial state-source overlay years and
+     stale boundary-change geographies are retained for diagnostics without
+     becoming the default origin unless explicitly requested.
    - Uses target-year regional population denominators. Current 2026 runs use
      projected Census denominators and preserve projection flags.
    - Writes `regional_annual_forecast_runs.csv` and
      `regional_annual_forecast_predictions.csv`.
+   - Includes a horizon-matched `analog_year_county_incidence` branch. Analog
+     rows preserve the matched origin year, observed outcome year, and match
+     distance, and require the matched outcome to have been observed by the
+     forecast origin.
    - Run and prediction rows preserve `forecast_origin_year`, `as_of_date`,
      `data_cutoff_date`, `source_vintage`, and `update_mode`; when
      `source_vintage` is omitted it falls back to the regional incidence input

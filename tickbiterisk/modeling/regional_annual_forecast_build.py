@@ -65,6 +65,9 @@ REGIONAL_ANNUAL_FORECAST_PREDICTION_COLUMNS = [
     "population_feature_quality_flags",
     "predicted_cases",
     "predicted_incidence_per_100k",
+    "analog_match_origin_year",
+    "analog_match_observed_year",
+    "analog_match_distance",
     "model_feature_quality_flags",
     "forecast_assumption_flags",
 ]

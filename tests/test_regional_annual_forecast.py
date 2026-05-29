@@ -42,8 +42,9 @@ def test_build_regional_annual_forecast_emits_target_year_rows_without_actuals(
     assert result.run.update_mode == "pre_update"
     assert result.run.n_training_rows == 8
     assert result.run.n_forecast_counties == 4
-    assert result.run.n_forecast_rows == 16
+    assert result.run.n_forecast_rows == 20
     assert {row.model_name for row in result.predictions} == {
+        "analog_year_county_incidence",
         "empirical_bayes_midatlantic_incidence",
         "empirical_bayes_state_incidence",
         "latest_observed_county_incidence",
@@ -91,6 +92,24 @@ def test_build_regional_annual_forecast_emits_target_year_rows_without_actuals(
     assert eb_state.model_family == "empirical_bayes_incidence_shrinkage"
     assert eb_state.feature_profile == "state_shrunken_incidence"
 
+    analog = next(
+        row
+        for row in result.predictions
+        if row.model_name == "analog_year_county_incidence"
+        and row.county_fips == "24001"
+    )
+    assert analog.model_family == "analog"
+    assert analog.feature_profile == "forecast_safe_horizon_matched_analog"
+    assert analog.predicted_incidence_per_100k == 40.0
+    assert analog.analog_match_origin_year == 2019
+    assert analog.analog_match_observed_year == 2021
+    assert analog.analog_match_distance == 40.0
+    assert analog.train_start_year == 2018
+    assert analog.train_end_year == 2021
+    assert analog.train_year_count == 4
+    assert "analog_like_year_forecast" in analog.model_feature_quality_flags
+    assert "analog_horizon_matched_outcome" in analog.model_feature_quality_flags
+
 
 def test_build_regional_annual_forecast_defaults_origin_to_latest_complete_year(
     tmp_path: Path,
@@ -105,6 +124,55 @@ def test_build_regional_annual_forecast_defaults_origin_to_latest_complete_year(
 
     assert result.run.forecast_origin_year == 2021
     assert {row.forecast_origin_year for row in result.predictions} == {2021}
+
+
+def test_default_regional_forecast_origin_ignores_obsolete_extra_geographies(
+    tmp_path: Path,
+) -> None:
+    result = build_regional_annual_forecast(
+        regional_incidence_path=_write_incidence_panel(
+            tmp_path / "incidence.csv",
+            obsolete_extra_county=True,
+        ),
+        population_path=_write_population(tmp_path / "population.csv"),
+        target_year=2023,
+        min_train_years=2,
+        lookback_years=2,
+    )
+
+    assert result.run.forecast_origin_year == 2021
+
+
+def test_regional_annual_forecast_analog_excludes_future_outcomes(
+    tmp_path: Path,
+) -> None:
+    panel = _write_single_county_incidence_panel(
+        tmp_path / "incidence.csv",
+        [5, 15, 50, 60, 999, 1],
+    )
+
+    result = build_regional_annual_forecast(
+        regional_incidence_path=panel,
+        population_path=_write_population(tmp_path / "population.csv"),
+        target_year=2023,
+        forecast_origin_year=2021,
+        min_train_years=2,
+        lookback_years=2,
+    )
+
+    analog = next(
+        row
+        for row in result.predictions
+        if row.model_name == "analog_year_county_incidence"
+    )
+    assert analog.predicted_incidence_per_100k == 60.0
+    assert analog.analog_match_origin_year == 2019
+    assert analog.analog_match_observed_year == 2021
+    assert analog.analog_match_observed_year <= analog.forecast_origin_year
+    assert analog.predicted_incidence_per_100k != 999.0
+    assert "analog_outcome_observed_by_forecast_origin" in (
+        analog.model_feature_quality_flags
+    )
 
 
 def test_build_regional_annual_forecast_ignores_partial_overlay_year_by_default(
@@ -360,6 +428,32 @@ def test_write_regional_annual_forecast_outputs_uses_stable_schemas(
     assert outputs.predictions_path.name == "regional_annual_forecast_predictions.csv"
 
 
+def _write_single_county_incidence_panel(path: Path, values: list[int]) -> Path:
+    rows = []
+    for offset, incidence in enumerate(values):
+        rows.append(
+            _incidence_row(
+                "24",
+                "MD",
+                "Maryland",
+                "24001",
+                "Allegany County",
+                str(2018 + offset),
+                str(incidence),
+                str(float(incidence)),
+                (
+                    "regional_incidence_diagnostic,"
+                    "reported_cases_not_stable_true_incidence"
+                ),
+            )
+        )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
 def _write_incidence_panel(
     path: Path,
     *,
@@ -371,6 +465,7 @@ def _write_incidence_panel(
     partial_overlay_year: bool = False,
     high_coverage_partial_overlay_year: bool = False,
     extra_full_county: bool = False,
+    obsolete_extra_county: bool = False,
 ) -> Path:
     rows = []
     series = {
@@ -416,6 +511,20 @@ def _write_incidence_panel(
                 "2021",
                 "12",
                 "12.0",
+                "regional_incidence_diagnostic",
+            )
+        )
+    if obsolete_extra_county:
+        rows.append(
+            _incidence_row(
+                "51",
+                "VA",
+                "Virginia",
+                "51515",
+                "Obsolete city",
+                "2019",
+                "1",
+                "1.0",
                 "regional_incidence_diagnostic",
             )
         )

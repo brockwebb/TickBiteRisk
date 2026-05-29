@@ -112,7 +112,7 @@ parser evidence, and time-aware validation before it can move into a model lane.
 | `regional_incidence_stress_predictions.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate shrinkage and analog stress predictions |
 | `regional_incidence_stress_metrics.csv` | `tickbiterisk etl regional-incidence-stress` | Incidence MAE/RMSE metrics for regional historical-range baselines |
 | `regional_annual_forecast_runs.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic target-year forecast run manifest with origin, hashes, and forecast caveats |
-| `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows without observed target, residual, or error columns |
+| `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows, including horizon-matched analog branch, without observed target, residual, or error columns |
 | `regional_incidence_cluster_runs.csv` | `tickbiterisk etl regional-incidence-clusters` | Mid-Atlantic prior-incidence cluster run manifest |
 | `regional_incidence_cluster_county_year.csv` | `tickbiterisk etl regional-incidence-clusters` | Forecast-safe low/moderate/high/very-high prior-incidence band assignments |
 | `regional_incidence_cluster_summary.csv` | `tickbiterisk etl regional-incidence-clusters` | Prior cluster capacity bands and held-out actual incidence diagnostics |
@@ -192,9 +192,11 @@ parser evidence, and time-aware validation before it can move into a model lane.
 - The regional annual forecast artifact applies the same no-observed-target
   boundary to the DE/DC/MD/PA/VA/WV incidence panel. Current 2026 rows are
   trained through the latest coverage-complete regional incidence origin year,
-  2023, and use projected 2026 regional population denominators. Partial
-  state-source overlays are diagnostic unless an origin is explicitly
+  2023, for the target-year forecast geography and use projected 2026 regional
+  population denominators. Partial state-source overlays and stale
+  boundary-change geographies are diagnostic unless an origin is explicitly
   requested. Regional forecast runs and predictions carry the same
-  as-of/cutoff/source-vintage/update-mode contract.
+  as-of/cutoff/source-vintage/update-mode contract, and analog rows preserve
+  matched origin/outcome years plus match distance.
 
 Last updated: 2026-05-29.

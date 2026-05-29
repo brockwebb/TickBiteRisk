@@ -19,6 +19,13 @@ FORECAST_ASSUMPTION_FLAGS = (
 EVALUATION_MODE = "regional_annual_forecast_no_observed_target"
 TARGET_DEFINITION = "reported_lyme_incidence_per_100k"
 FEATURE_SET = "historical_incidence_forecast_baselines"
+ANALOG_MODEL_FEATURE_FLAGS = (
+    "analog_like_year_forecast,"
+    "forecast_origin_history_only,"
+    "analog_outcome_observed_by_forecast_origin,"
+    "analog_horizon_matched_outcome,"
+    "forecast_safe_prior_outcomes_only"
+)
 REQUIRED_REGIONAL_INCIDENCE_COLUMNS = {
     "state_fips",
     "state_abbr",
@@ -46,6 +53,7 @@ REQUIRED_REGIONAL_POPULATION_COLUMNS = {
 MODEL_SPECS = (
     "latest_observed_county_incidence",
     "trailing_mean_county_incidence",
+    "analog_year_county_incidence",
     "empirical_bayes_state_incidence",
     "empirical_bayes_midatlantic_incidence",
 )
@@ -122,6 +130,9 @@ class RegionalAnnualForecastPrediction:
     population_feature_quality_flags: str
     predicted_cases: float
     predicted_incidence_per_100k: float
+    analog_match_origin_year: int | None
+    analog_match_observed_year: int | None
+    analog_match_distance: float | None
     model_feature_quality_flags: str
     forecast_assumption_flags: str
 
@@ -159,6 +170,18 @@ class _PopulationRow:
     source_id: str
     vintage: int
     feature_quality_flags: str
+
+
+@dataclass(frozen=True)
+class _ModelPrediction:
+    predicted_incidence_per_100k: float
+    train_start_year: int | None = None
+    train_end_year: int | None = None
+    train_year_count: int | None = None
+    model_feature_quality_flags: str = ""
+    analog_match_origin_year: int | None = None
+    analog_match_observed_year: int | None = None
+    analog_match_distance: float | None = None
 
 
 def build_regional_annual_forecast(
@@ -201,19 +224,22 @@ def build_regional_annual_forecast(
         raise RegionalAnnualForecastInputError(
             "regional incidence panel has no usable incidence rows"
         )
-    resolved_origin_year = (
-        forecast_origin_year
-        if forecast_origin_year is not None
-        else _default_forecast_origin_year(usable_origin_rows)
-    )
-    if target_year <= resolved_origin_year:
-        raise RegionalAnnualForecastInputError(
-            "target-year must be greater than forecast-origin-year"
-        )
     population = _read_population_rows(population_path, target_year=target_year)
     if not population:
         raise RegionalAnnualForecastInputError(
             "population panel has no target-year rows"
+        )
+    resolved_origin_year = (
+        forecast_origin_year
+        if forecast_origin_year is not None
+        else _default_forecast_origin_year(
+            usable_origin_rows,
+            forecast_counties=set(population),
+        )
+    )
+    if target_year <= resolved_origin_year:
+        raise RegionalAnnualForecastInputError(
+            "target-year must be greater than forecast-origin-year"
         )
 
     regional_incidence_sha = _sha256_file(regional_incidence_path)
@@ -285,16 +311,29 @@ def build_regional_annual_forecast(
     )
 
 
-def _default_forecast_origin_year(rows: list[_IncidenceRow]) -> int:
+def _default_forecast_origin_year(
+    rows: list[_IncidenceRow],
+    *,
+    forecast_counties: set[str],
+) -> int:
     county_counts_by_year: dict[int, set[str]] = {}
     for row in rows:
-        county_counts_by_year.setdefault(row.year, set()).add(row.county_fips)
-    max_count = max(len(counties) for counties in county_counts_by_year.values())
+        if row.county_fips in forecast_counties:
+            county_counts_by_year.setdefault(row.year, set()).add(row.county_fips)
+    if not county_counts_by_year:
+        raise RegionalAnnualForecastInputError(
+            "regional incidence panel has no rows for target-year forecast counties"
+        )
+    max_count = len(forecast_counties)
     eligible_years = [
         year
         for year, counties in county_counts_by_year.items()
-        if len(counties) == max_count
+        if len(counties & forecast_counties) == max_count
     ]
+    if not eligible_years:
+        raise RegionalAnnualForecastInputError(
+            "regional incidence panel has no complete year for target-year forecast counties"
+        )
     return max(eligible_years)
 
 
@@ -339,6 +378,11 @@ def _forecast_rows(
         latest = county_history[-1]
         if latest.year != forecast_origin_year:
             continue
+        all_prior_county_history = [
+            row
+            for row in rows_by_county[county_fips]
+            if row.year <= forecast_origin_year and row.incidence_per_100k is not None
+        ]
         state_history = [
             row
             for row in regional_history
@@ -346,8 +390,12 @@ def _forecast_rows(
         ]
         model_predictions = _predict_models(
             county_history=county_history,
+            all_prior_county_history=all_prior_county_history,
             state_history=state_history,
             regional_history=regional_history,
+            target_year=target_year,
+            forecast_origin_year=forecast_origin_year,
+            lookback_years=lookback_years,
             shrinkage_strength=shrinkage_strength,
         )
         flags = _join_flags(
@@ -356,6 +404,9 @@ def _forecast_rows(
             population_row.feature_quality_flags,
         )
         for model_name in MODEL_SPECS:
+            model_prediction = model_predictions.get(model_name)
+            if model_prediction is None:
+                continue
             predictions.append(
                 _prediction_row(
                     run_id=run_id,
@@ -367,7 +418,7 @@ def _forecast_rows(
                     train_start_year=min(row.year for row in county_history),
                     train_end_year=max(row.year for row in county_history),
                     train_year_count=len(county_history),
-                    predicted_incidence=model_predictions[model_name],
+                    model_prediction=model_prediction,
                     regional_incidence_sha=regional_incidence_sha,
                     population_sha=population_sha,
                     as_of_date=as_of_date,
@@ -386,10 +437,14 @@ def _forecast_rows(
 def _predict_models(
     *,
     county_history: list[_IncidenceRow],
+    all_prior_county_history: list[_IncidenceRow],
     state_history: list[_IncidenceRow],
     regional_history: list[_IncidenceRow],
+    target_year: int,
+    forecast_origin_year: int,
+    lookback_years: int,
     shrinkage_strength: float,
-) -> dict[str, float]:
+) -> dict[str, _ModelPrediction]:
     latest = _known_incidence(county_history[-1])
     county_mean = mean(_known_incidence(row) for row in county_history)
     state_mean = (
@@ -402,22 +457,35 @@ def _predict_models(
         if regional_history
         else county_mean
     )
-    return {
-        "latest_observed_county_incidence": latest,
-        "trailing_mean_county_incidence": county_mean,
-        "empirical_bayes_state_incidence": _shrunk_mean(
-            county_mean=county_mean,
-            county_n=len(county_history),
-            prior_mean=state_mean,
-            prior_strength=shrinkage_strength,
+    predictions = {
+        "latest_observed_county_incidence": _model_prediction(latest),
+        "trailing_mean_county_incidence": _model_prediction(county_mean),
+        "empirical_bayes_state_incidence": _model_prediction(
+            _shrunk_mean(
+                county_mean=county_mean,
+                county_n=len(county_history),
+                prior_mean=state_mean,
+                prior_strength=shrinkage_strength,
+            )
         ),
-        "empirical_bayes_midatlantic_incidence": _shrunk_mean(
-            county_mean=county_mean,
-            county_n=len(county_history),
-            prior_mean=regional_mean,
-            prior_strength=shrinkage_strength,
+        "empirical_bayes_midatlantic_incidence": _model_prediction(
+            _shrunk_mean(
+                county_mean=county_mean,
+                county_n=len(county_history),
+                prior_mean=regional_mean,
+                prior_strength=shrinkage_strength,
+            )
         ),
     }
+    analog_prediction = _analog_county_prediction(
+        county_history=all_prior_county_history,
+        target_year=target_year,
+        forecast_origin_year=forecast_origin_year,
+        lookback_years=lookback_years,
+    )
+    if analog_prediction is not None:
+        predictions["analog_year_county_incidence"] = analog_prediction
+    return predictions
 
 
 def _prediction_row(
@@ -431,7 +499,7 @@ def _prediction_row(
     train_start_year: int,
     train_end_year: int,
     train_year_count: int,
-    predicted_incidence: float,
+    model_prediction: _ModelPrediction,
     regional_incidence_sha: str,
     population_sha: str,
     as_of_date: str,
@@ -440,7 +508,22 @@ def _prediction_row(
     update_mode: str,
     flags: str,
 ) -> RegionalAnnualForecastPrediction:
-    predicted_incidence = _round(max(predicted_incidence, 0.0))
+    resolved_train_start_year = (
+        model_prediction.train_start_year
+        if model_prediction.train_start_year is not None
+        else train_start_year
+    )
+    resolved_train_end_year = (
+        model_prediction.train_end_year
+        if model_prediction.train_end_year is not None
+        else train_end_year
+    )
+    resolved_train_year_count = (
+        model_prediction.train_year_count
+        if model_prediction.train_year_count is not None
+        else train_year_count
+    )
+    predicted_incidence = _round(max(model_prediction.predicted_incidence_per_100k, 0.0))
     predicted_cases = _round(predicted_incidence * population_row.population / 100000)
     return RegionalAnnualForecastPrediction(
         run_id=run_id,
@@ -464,17 +547,139 @@ def _prediction_row(
         source_vintage=source_vintage,
         update_mode=update_mode,
         forecast_horizon_years=target_year - forecast_origin_year,
-        train_start_year=train_start_year,
-        train_end_year=train_end_year,
-        train_year_count=train_year_count,
+        train_start_year=resolved_train_start_year,
+        train_end_year=resolved_train_end_year,
+        train_year_count=resolved_train_year_count,
         forecast_population=population_row.population,
         population_source_id=population_row.source_id,
         population_vintage=population_row.vintage,
         population_feature_quality_flags=population_row.feature_quality_flags,
         predicted_cases=predicted_cases,
         predicted_incidence_per_100k=predicted_incidence,
-        model_feature_quality_flags=latest.feature_quality_flags,
+        analog_match_origin_year=model_prediction.analog_match_origin_year,
+        analog_match_observed_year=model_prediction.analog_match_observed_year,
+        analog_match_distance=model_prediction.analog_match_distance,
+        model_feature_quality_flags=_join_flags(
+            latest.feature_quality_flags,
+            model_prediction.model_feature_quality_flags,
+        ),
         forecast_assumption_flags=flags,
+    )
+
+
+def _model_prediction(
+    predicted_incidence_per_100k: float,
+    *,
+    train_start_year: int | None = None,
+    train_end_year: int | None = None,
+    train_year_count: int | None = None,
+    model_feature_quality_flags: str = "",
+    analog_match_origin_year: int | None = None,
+    analog_match_observed_year: int | None = None,
+    analog_match_distance: float | None = None,
+) -> _ModelPrediction:
+    return _ModelPrediction(
+        predicted_incidence_per_100k=_round(predicted_incidence_per_100k),
+        train_start_year=train_start_year,
+        train_end_year=train_end_year,
+        train_year_count=train_year_count,
+        model_feature_quality_flags=model_feature_quality_flags,
+        analog_match_origin_year=analog_match_origin_year,
+        analog_match_observed_year=analog_match_observed_year,
+        analog_match_distance=analog_match_distance,
+    )
+
+
+def _analog_county_prediction(
+    *,
+    county_history: list[_IncidenceRow],
+    target_year: int,
+    forecast_origin_year: int,
+    lookback_years: int,
+) -> _ModelPrediction | None:
+    horizon_years = target_year - forecast_origin_year
+    if horizon_years < 1:
+        return None
+    history_by_year = {row.year: row for row in county_history}
+    current_features = _analog_feature_vector(
+        history_by_year=history_by_year,
+        origin_year=forecast_origin_year,
+        lookback_years=lookback_years,
+    )
+    if current_features is None:
+        return None
+
+    candidates = []
+    for candidate_origin_year in sorted(history_by_year):
+        if candidate_origin_year >= forecast_origin_year:
+            continue
+        observed_year = candidate_origin_year + horizon_years
+        if observed_year > forecast_origin_year:
+            continue
+        observed_row = history_by_year.get(observed_year)
+        if observed_row is None or observed_row.incidence_per_100k is None:
+            continue
+        candidate_features = _analog_feature_vector(
+            history_by_year=history_by_year,
+            origin_year=candidate_origin_year,
+            lookback_years=lookback_years,
+        )
+        if candidate_features is None:
+            continue
+        distance = _analog_distance(current_features, candidate_features)
+        candidates.append((distance, candidate_origin_year, observed_year, observed_row))
+
+    if not candidates:
+        return None
+
+    distance, origin_year, observed_year, observed_row = min(
+        candidates,
+        key=lambda item: (item[0], -item[1]),
+    )
+    train_years = [row.year for row in county_history]
+    return _model_prediction(
+        _known_incidence(observed_row),
+        train_start_year=min(train_years),
+        train_end_year=max(train_years),
+        train_year_count=len(train_years),
+        model_feature_quality_flags=ANALOG_MODEL_FEATURE_FLAGS,
+        analog_match_origin_year=origin_year,
+        analog_match_observed_year=observed_year,
+        analog_match_distance=_round(distance),
+    )
+
+
+def _analog_feature_vector(
+    *,
+    history_by_year: dict[int, _IncidenceRow],
+    origin_year: int,
+    lookback_years: int,
+) -> tuple[float, float] | None:
+    origin = history_by_year.get(origin_year)
+    if origin is None or origin.incidence_per_100k is None:
+        return None
+    trailing_values = [
+        _known_incidence(history_by_year[year])
+        for year in range(origin_year - lookback_years + 1, origin_year + 1)
+        if year in history_by_year
+        and history_by_year[year].incidence_per_100k is not None
+    ]
+    if not trailing_values:
+        return None
+    return (_known_incidence(origin), mean(trailing_values))
+
+
+def _analog_distance(
+    current_features: tuple[float, float],
+    candidate_features: tuple[float, float],
+) -> float:
+    return sum(
+        abs(current_value - candidate_value)
+        for current_value, candidate_value in zip(
+            current_features,
+            candidate_features,
+            strict=True,
+        )
     )
 
 
@@ -571,6 +776,8 @@ def _shrunk_mean(
 
 
 def _model_family(model_name: str) -> str:
+    if model_name.startswith("analog_"):
+        return "analog"
     if model_name.startswith("empirical_bayes_"):
         return "empirical_bayes_incidence_shrinkage"
     return "county_incidence_baseline"
@@ -580,6 +787,7 @@ def _feature_profile(model_name: str) -> str:
     return {
         "latest_observed_county_incidence": "latest_observed_origin_incidence",
         "trailing_mean_county_incidence": "trailing_county_incidence",
+        "analog_year_county_incidence": "forecast_safe_horizon_matched_analog",
         "empirical_bayes_state_incidence": "state_shrunken_incidence",
         "empirical_bayes_midatlantic_incidence": "midatlantic_shrunken_incidence",
     }[model_name]
