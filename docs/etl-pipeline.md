@@ -231,6 +231,12 @@ artifacts.
      `regional_county_adjacency_from_geojson`, `spatial_neighbor_feature`,
      `forecast_safe_prior_year_neighbor_signal`, and `not_public_default`
      flags.
+   - When `--regional-spatial-regimes-path` points to
+     `regional_spatial_regime_county_year.csv`, also emits
+     `empirical_bayes_spatial_regime_incidence` using only the regime
+     artifact's `feature_*` prior-history fields. Same-year `diagnostic_*`
+     regime outcomes are never model inputs, and stale regime artifacts are
+     rejected when their incidence-panel hash does not match the stress input.
      These are research diagnostics over reported incidence per 100k, not
      public forecasts or latent true disease estimates.
 
@@ -291,6 +297,22 @@ artifacts.
      support for treating counties as observation cells in a continuous
      regional forecast surface, not disease truth, exposure truth, or a public
      Maryland default.
+
+1i-5. `tickbiterisk etl regional-spatial-regimes`
+   - Typical run:
+     `tickbiterisk etl regional-spatial-regimes --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-adjacency-path build/etl/regional-county-adjacency/regional_county_adjacency.csv --output-dir build/etl/regional-spatial-regimes`.
+   - Assigns county-years to localized spatial regimes using only prior
+     reported-incidence level and trend over adjacency-supported county edges.
+   - Builds regime features from prior-history coverage rather than target-year
+     outcome availability, so partial reporting years do not remove useful
+     adjacent counties from a forecast-safe feature regime.
+   - Writes `regional_spatial_regime_runs.csv`,
+     `regional_spatial_regime_county_year.csv`, and
+     `regional_spatial_regime_summary.csv`.
+   - County-year rows keep forecast-safe regime priors under `feature_*` fields
+     and held-out evaluation outcomes under `diagnostic_*` fields. This is a
+     transparent risk-regime research artifact, not an observed target-year
+     outcome, public Maryland branch, or latent true infection rate.
 
 1j. `tickbiterisk etl regional-incidence-clusters`
    - Assigns county-years to low, moderate, high, and very-high regional

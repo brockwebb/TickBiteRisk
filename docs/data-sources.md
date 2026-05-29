@@ -112,8 +112,11 @@ parser evidence, and time-aware validation before it can move into a model lane.
 | `regional_outcome_stress_predictions.csv` | `tickbiterisk etl regional-outcome-stress` | Mid-Atlantic outcome-only capacity-share stress predictions |
 | `regional_outcome_stress_metrics.csv` | `tickbiterisk etl regional-outcome-stress` | Case-count MAE/RMSE metrics for regional historical-range baselines |
 | `regional_incidence_stress_runs.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate stress run manifest |
-| `regional_incidence_stress_predictions.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate shrinkage, analog, random-forest, and optional prior-year spatial-neighbor stress predictions |
+| `regional_incidence_stress_predictions.csv` | `tickbiterisk etl regional-incidence-stress` | Mid-Atlantic incidence-rate shrinkage, analog, random-forest, optional prior-year spatial-neighbor, and optional localized spatial-regime stress predictions |
 | `regional_incidence_stress_metrics.csv` | `tickbiterisk etl regional-incidence-stress` | Incidence MAE/RMSE metrics for regional historical-range baselines |
+| `regional_spatial_regime_runs.csv` | `tickbiterisk etl regional-spatial-regimes` | Localized spatial regime run manifest with incidence and adjacency hashes |
+| `regional_spatial_regime_county_year.csv` | `tickbiterisk etl regional-spatial-regimes` | Forecast-safe localized spatial regime county-year assignments and prior-history features |
+| `regional_spatial_regime_summary.csv` | `tickbiterisk etl regional-spatial-regimes` | Localized spatial regime annual summaries with feature priors and diagnostic held-out outcomes |
 | `regional_annual_forecast_runs.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic target-year forecast run manifest with origin, hashes, and forecast caveats |
 | `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows, including horizon-matched analog branch, without observed target, residual, or error columns |
 | `regional_forecast_capacity_runs.csv` | `tickbiterisk etl regional-forecast-capacity` | Mid-Atlantic forecast-capacity diagnostic run manifest |

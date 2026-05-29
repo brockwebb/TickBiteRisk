@@ -380,6 +380,13 @@ from tickbiterisk.modeling.regional_incidence_clusters import (
 from tickbiterisk.modeling.regional_incidence_clusters_build import (
     write_regional_incidence_cluster_outputs,
 )
+from tickbiterisk.modeling.regional_spatial_regimes import (
+    RegionalSpatialRegimeInputError,
+    build_regional_spatial_regimes,
+)
+from tickbiterisk.modeling.regional_spatial_regimes_build import (
+    write_regional_spatial_regime_outputs,
+)
 from tickbiterisk.modeling.spatial_neighbors import (
     build_county_adjacency_from_geojson,
     write_county_adjacency_output,
@@ -3625,6 +3632,14 @@ def regional_incidence_stress(
             "research branches."
         ),
     ),
+    regional_spatial_regimes_path: Path | None = typer.Option(
+        None,
+        "--regional-spatial-regimes-path",
+        help=(
+            "Optional regional spatial regime county-year CSV for localized "
+            "spatial-regime research branches."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/regional-incidence-stress"),
         help="Output directory for regional incidence stress artifacts.",
@@ -3637,6 +3652,14 @@ def regional_incidence_stress(
     if regional_adjacency_path is not None and not regional_adjacency_path.exists():
         raise typer.BadParameter(
             f"Regional adjacency file not found: {regional_adjacency_path}"
+        )
+    if (
+        regional_spatial_regimes_path is not None
+        and not regional_spatial_regimes_path.exists()
+    ):
+        raise typer.BadParameter(
+            "Regional spatial regimes file not found: "
+            f"{regional_spatial_regimes_path}"
         )
     if min_train_years < 1:
         raise typer.BadParameter("min-train-years must be at least 1")
@@ -3670,6 +3693,7 @@ def regional_incidence_stress(
             random_forest_max_features=random_forest_max_features,
             random_forest_random_state=random_forest_random_state,
             regional_adjacency_path=regional_adjacency_path,
+            regional_spatial_regimes_path=regional_spatial_regimes_path,
         )
     except RegionalIncidenceStressInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -3895,6 +3919,99 @@ def regional_incidence_clusters(
     )
     typer.echo(
         f"Wrote {len(result.summary_rows)} regional incidence cluster summary row(s) "
+        f"to {outputs.summary_path}"
+    )
+
+
+@etl_app.command("regional-spatial-regimes")
+def regional_spatial_regimes(
+    regional_incidence_path: Path = typer.Option(
+        Path("build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv"),
+        help="Input Mid-Atlantic Lyme incidence county-year panel.",
+    ),
+    regional_adjacency_path: Path = typer.Option(
+        Path("build/etl/regional-county-adjacency/regional_county_adjacency.csv"),
+        help="Input regional county adjacency CSV.",
+    ),
+    start_year: int = typer.Option(
+        2007,
+        help="First held-out year for forecast-safe spatial regime assignment.",
+    ),
+    end_year: int | None = typer.Option(
+        None,
+        help="Last held-out year to assign. Defaults to max year in input.",
+    ),
+    min_train_years: int = typer.Option(
+        3,
+        help="Minimum prior county years required for regime assignment.",
+    ),
+    lookback_years: int = typer.Option(
+        3,
+        help="Number of prior years used for regime assignment.",
+    ),
+    max_prior_mean_difference: float = typer.Option(
+        25.0,
+        help="Maximum allowed adjacent-county prior mean incidence difference.",
+    ),
+    max_prior_year_difference: float = typer.Option(
+        25.0,
+        help="Maximum allowed adjacent-county prior-year incidence difference.",
+    ),
+    max_trend_difference: float = typer.Option(
+        25.0,
+        help="Maximum allowed adjacent-county prior trend incidence difference.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-spatial-regimes"),
+        help="Output directory for regional spatial regime artifacts.",
+    ),
+) -> None:
+    if not regional_incidence_path.exists():
+        raise typer.BadParameter(
+            f"Regional incidence panel not found: {regional_incidence_path}"
+        )
+    if not regional_adjacency_path.exists():
+        raise typer.BadParameter(
+            f"Regional adjacency file not found: {regional_adjacency_path}"
+        )
+    if min_train_years < 1:
+        raise typer.BadParameter("min-train-years must be at least 1")
+    if lookback_years < min_train_years:
+        raise typer.BadParameter(
+            "lookback-years must be greater than or equal to min-train-years"
+        )
+    for label, value in {
+        "max-prior-mean-difference": max_prior_mean_difference,
+        "max-prior-year-difference": max_prior_year_difference,
+        "max-trend-difference": max_trend_difference,
+    }.items():
+        if not math.isfinite(value) or value < 0:
+            raise typer.BadParameter(f"{label} must be finite and non-negative")
+    if end_year is not None and start_year > end_year:
+        raise typer.BadParameter("start-year must be less than or equal to end-year")
+
+    try:
+        result = build_regional_spatial_regimes(
+            regional_incidence_path=regional_incidence_path,
+            regional_adjacency_path=regional_adjacency_path,
+            start_year=start_year,
+            end_year=end_year,
+            min_train_years=min_train_years,
+            lookback_years=lookback_years,
+            max_prior_mean_difference=max_prior_mean_difference,
+            max_prior_year_difference=max_prior_year_difference,
+            max_trend_difference=max_trend_difference,
+        )
+    except RegionalSpatialRegimeInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_regional_spatial_regime_outputs(result, output_dir)
+    typer.echo(f"Wrote 1 regional spatial regime run row(s) to {outputs.runs_path}")
+    typer.echo(
+        f"Wrote {len(result.county_year_rows)} regional spatial regime "
+        f"county-year row(s) to {outputs.county_year_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.summary_rows)} regional spatial regime summary row(s) "
         f"to {outputs.summary_path}"
     )
 

@@ -36,6 +36,12 @@ RANDOM_FOREST_MODEL_FEATURE_FLAGS = (
     "reported_incidence_history_only,"
     "not_public_maryland_default"
 )
+SPATIAL_REGIME_MODEL_FEATURE_FLAGS = (
+    "localized_spatial_regime_feature,"
+    "forecast_safe_prior_history_spatial_regime,"
+    "forecast_safe_prior_outcomes_only,"
+    "not_public_default"
+)
 SPATIAL_NEIGHBOR_MODEL_FEATURE_FLAGS = (
     "regional_county_adjacency_from_geojson,"
     "spatial_neighbor_feature,"
@@ -73,6 +79,8 @@ class RegionalIncidenceStressRun:
     regional_incidence_sha256: str
     regional_adjacency_path: str | None
     regional_adjacency_sha256: str | None
+    regional_spatial_regimes_path: str | None
+    regional_spatial_regimes_sha256: str | None
     start_year: int
     end_year: int
     min_train_years: int
@@ -201,6 +209,7 @@ def build_regional_incidence_stress(
     random_forest_max_features: str = RANDOM_FOREST_MAX_FEATURES,
     random_forest_random_state: int = RANDOM_FOREST_RANDOM_STATE,
     regional_adjacency_path: Path | None = None,
+    regional_spatial_regimes_path: Path | None = None,
 ) -> RegionalIncidenceStressResult:
     if min_train_years < 1:
         raise RegionalIncidenceStressInputError("min_train_years must be at least 1")
@@ -255,15 +264,28 @@ def build_regional_incidence_stress(
     incidence_by_county_year = {
         (row.county_fips, row.year): row.incidence_per_100k for row in rows
     }
-    try:
-        county_neighbors = read_county_neighbors(regional_adjacency_path)
-    except CountyAdjacencyInputError as exc:
-        raise RegionalIncidenceStressInputError(str(exc)) from exc
     source_file_sha256 = _sha256_file(regional_incidence_path)
     regional_adjacency_sha256 = (
         None if regional_adjacency_path is None else _sha256_file(regional_adjacency_path)
     )
+    try:
+        county_neighbors = read_county_neighbors(regional_adjacency_path)
+    except CountyAdjacencyInputError as exc:
+        raise RegionalIncidenceStressInputError(str(exc)) from exc
+    spatial_regimes = _read_spatial_regimes(
+        regional_spatial_regimes_path,
+        expected_source_file_sha256=source_file_sha256,
+        expected_regional_adjacency_sha256=regional_adjacency_sha256,
+    )
+    regional_spatial_regimes_sha256 = (
+        None
+        if regional_spatial_regimes_path is None
+        else _sha256_file(regional_spatial_regimes_path)
+    )
     spatial_run_suffix = "_spatialneighbors" if regional_adjacency_path is not None else ""
+    regime_run_suffix = (
+        "_spatialregimes" if regional_spatial_regimes_path is not None else ""
+    )
     run_id = (
         f"regional_incidence_stress_start{start_year}_end{resolved_end_year}_"
         f"mintrain{min_train_years}_lookback{lookback_years}_"
@@ -271,6 +293,7 @@ def build_regional_incidence_stress(
         f"rf{random_forest_n_estimators}_leaf{random_forest_min_samples_leaf}_"
         f"max{random_forest_max_features}_seed{random_forest_random_state}"
         f"{spatial_run_suffix}"
+        f"{regime_run_suffix}"
     )
 
     predictions = []
@@ -364,6 +387,16 @@ def build_regional_incidence_stress(
                 model_predictions["spatial_prior_year_neighbor_incidence"] = (
                     spatial_neighbor_prediction
                 )
+            spatial_regime_prediction = _spatial_regime_prediction(
+                row=row,
+                county_history=county_history,
+                spatial_regime=spatial_regimes.get((row.county_fips, row.year)),
+                shrinkage_strength=shrinkage_strength,
+            )
+            if spatial_regime_prediction is not None:
+                model_predictions["empirical_bayes_spatial_regime_incidence"] = (
+                    spatial_regime_prediction
+                )
             flags = _combined_flags(row.feature_quality_flags, COMPARISON_ASSUMPTION_FLAGS)
             for model_name, model_prediction in model_predictions.items():
                 predictions.append(
@@ -393,6 +426,12 @@ def build_regional_incidence_stress(
             None if regional_adjacency_path is None else str(regional_adjacency_path)
         ),
         regional_adjacency_sha256=regional_adjacency_sha256,
+        regional_spatial_regimes_path=(
+            None
+            if regional_spatial_regimes_path is None
+            else str(regional_spatial_regimes_path)
+        ),
+        regional_spatial_regimes_sha256=regional_spatial_regimes_sha256,
         start_year=start_year,
         end_year=resolved_end_year,
         min_train_years=min_train_years,
@@ -446,6 +485,65 @@ def _read_incidence_rows(path: Path) -> list[_IncidenceRow]:
             ],
             key=lambda row: (row.county_fips, row.year),
         )
+
+
+def _read_spatial_regimes(
+    path: Path | None,
+    *,
+    expected_source_file_sha256: str,
+    expected_regional_adjacency_sha256: str | None,
+) -> dict[tuple[str, int], dict[str, str]]:
+    if path is None:
+        return {}
+    required_columns = {
+        "source_file_sha256",
+        "regional_adjacency_sha256",
+        "county_fips",
+        "year",
+        "spatial_regime_id",
+        "feature_regime_trailing_mean_incidence_per_100k",
+        "model_feature_quality_flags",
+    }
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = set(reader.fieldnames or [])
+        missing_columns = required_columns - fieldnames
+        if missing_columns:
+            raise RegionalIncidenceStressInputError(
+                "missing required regional spatial regime column(s): "
+                f"{', '.join(sorted(missing_columns))}"
+            )
+        regimes = {}
+        for row in reader:
+            source_file_sha256 = str(row["source_file_sha256"])
+            if source_file_sha256 != expected_source_file_sha256:
+                raise RegionalIncidenceStressInputError(
+                    "regional spatial regime source_file_sha256 does not match "
+                    "regional incidence panel"
+                )
+            regional_adjacency_sha256 = str(row["regional_adjacency_sha256"])
+            if (
+                expected_regional_adjacency_sha256 is not None
+                and regional_adjacency_sha256 != expected_regional_adjacency_sha256
+            ):
+                raise RegionalIncidenceStressInputError(
+                    "regional spatial regime regional_adjacency_sha256 does not "
+                    "match regional adjacency input"
+                )
+            regimes[(str(row["county_fips"]).zfill(5), int(row["year"]))] = {
+                "source_file_sha256": source_file_sha256,
+                "regional_adjacency_sha256": regional_adjacency_sha256,
+                "county_fips": str(row["county_fips"]).zfill(5),
+                "year": str(row["year"]),
+                "spatial_regime_id": str(row["spatial_regime_id"]),
+                "feature_regime_trailing_mean_incidence_per_100k": str(
+                    row["feature_regime_trailing_mean_incidence_per_100k"]
+                ),
+                "model_feature_quality_flags": str(
+                    row.get("model_feature_quality_flags", "")
+                ),
+            }
+        return regimes
 
 
 def _group_by_county(rows: list[_IncidenceRow]) -> dict[str, list[_IncidenceRow]]:
@@ -833,6 +931,37 @@ def _spatial_prior_year_neighbor_prediction(
     )
 
 
+def _spatial_regime_prediction(
+    *,
+    row: _IncidenceRow,
+    county_history: list[_IncidenceRow],
+    spatial_regime: dict[str, str] | None,
+    shrinkage_strength: float,
+) -> _ModelPrediction | None:
+    if spatial_regime is None:
+        return None
+    regime_mean = _parse_optional_float(
+        spatial_regime.get("feature_regime_trailing_mean_incidence_per_100k", "")
+    )
+    if regime_mean is None:
+        return None
+    county_mean = mean(_known_incidence(prior) for prior in county_history)
+    predicted_incidence = _shrunk_mean(
+        county_mean=county_mean,
+        county_n=len(county_history),
+        prior_mean=regime_mean,
+        prior_strength=shrinkage_strength,
+    )
+    return _model_prediction(
+        predicted_incidence_per_100k=predicted_incidence,
+        population=row.population,
+        model_feature_quality_flags=_combined_flags(
+            spatial_regime.get("model_feature_quality_flags", ""),
+            SPATIAL_REGIME_MODEL_FEATURE_FLAGS,
+        ),
+    )
+
+
 def _regional_random_forest_feature_vector(
     *,
     row: _IncidenceRow,
@@ -1017,6 +1146,8 @@ def _model_family(model_name: str) -> str:
         return "random_forest_incidence"
     if model_name.startswith("spatial_"):
         return "spatial_neighbor_incidence"
+    if model_name == "empirical_bayes_spatial_regime_incidence":
+        return "empirical_bayes_spatial_regime"
     if model_name.startswith("analog_"):
         return "analog"
     if model_name.startswith("empirical_bayes_"):

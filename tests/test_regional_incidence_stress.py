@@ -1,7 +1,11 @@
 import csv
+import hashlib
 from pathlib import Path
 
+import pytest
+
 from tickbiterisk.modeling.regional_incidence_stress import (
+    RegionalIncidenceStressInputError,
     build_regional_incidence_stress,
 )
 from tickbiterisk.modeling.regional_incidence_stress_build import (
@@ -159,6 +163,68 @@ def test_regional_incidence_stress_spatial_neighbor_uses_prior_year_only(
     assert len(result.run.regional_adjacency_sha256 or "") == 64
 
 
+def test_regional_incidence_stress_uses_spatial_regime_prior_not_diagnostic_actual(
+    tmp_path: Path,
+) -> None:
+    panel = _write_incidence_panel(tmp_path / "incidence.csv")
+    regimes = _write_spatial_regimes(
+        tmp_path / "regional_spatial_regimes.csv",
+        source_file_sha256=_sha256_file(panel),
+    )
+
+    result = build_regional_incidence_stress(
+        regional_incidence_path=panel,
+        regional_spatial_regimes_path=regimes,
+        start_year=2021,
+        min_train_years=2,
+        lookback_years=2,
+        shrinkage_strength=2.0,
+        random_forest_n_estimators=5,
+    )
+
+    spatial_regime = next(
+        row
+        for row in result.predictions
+        if row.model_name == "empirical_bayes_spatial_regime_incidence"
+        and row.county_fips == "24001"
+    )
+    assert spatial_regime.predicted_incidence_per_100k == 27.5
+    assert spatial_regime.predicted_incidence_per_100k != 999.0
+    assert spatial_regime.model_family == "empirical_bayes_spatial_regime"
+    assert "localized_spatial_regime_feature" in (
+        spatial_regime.model_feature_quality_flags
+    )
+    assert "forecast_safe_prior_history_spatial_regime" in (
+        spatial_regime.model_feature_quality_flags
+    )
+    assert "not_public_default" in spatial_regime.model_feature_quality_flags
+    assert result.run.regional_spatial_regimes_path == str(regimes)
+    assert len(result.run.regional_spatial_regimes_sha256 or "") == 64
+
+
+def test_regional_incidence_stress_rejects_spatial_regime_source_mismatch(
+    tmp_path: Path,
+) -> None:
+    panel = _write_incidence_panel(tmp_path / "incidence.csv")
+    regimes = _write_spatial_regimes(
+        tmp_path / "regional_spatial_regimes.csv",
+        source_file_sha256="not_the_incidence_panel_hash",
+    )
+
+    with pytest.raises(
+        RegionalIncidenceStressInputError,
+        match="source_file_sha256",
+    ):
+        build_regional_incidence_stress(
+            regional_incidence_path=panel,
+            regional_spatial_regimes_path=regimes,
+            start_year=2021,
+            min_train_years=2,
+            lookback_years=2,
+            random_forest_n_estimators=5,
+        )
+
+
 def test_build_regional_incidence_stress_skips_missing_target_incidence(
     tmp_path: Path,
 ) -> None:
@@ -255,6 +321,57 @@ def _write_regional_adjacency(path: Path) -> Path:
         writer.writeheader()
         writer.writerows(rows)
     return path
+
+
+def _write_spatial_regimes(
+    path: Path,
+    *,
+    source_file_sha256: str = "source123",
+    regional_adjacency_sha256: str = "adjacency123",
+) -> Path:
+    rows = [
+        {
+            "source_file_sha256": source_file_sha256,
+            "regional_adjacency_sha256": regional_adjacency_sha256,
+            "county_fips": "24001",
+            "year": "2021",
+            "spatial_regime_id": "2021_regime_01",
+            "feature_regime_trailing_mean_incidence_per_100k": "30",
+            "diagnostic_actual_regime_incidence_per_100k": "999",
+            "model_feature_quality_flags": (
+                "localized_spatial_regime_feature,"
+                "forecast_safe_prior_history_spatial_regime,"
+                "not_public_default"
+            ),
+        },
+        {
+            "source_file_sha256": source_file_sha256,
+            "regional_adjacency_sha256": regional_adjacency_sha256,
+            "county_fips": "24003",
+            "year": "2021",
+            "spatial_regime_id": "2021_regime_02",
+            "feature_regime_trailing_mean_incidence_per_100k": "5",
+            "diagnostic_actual_regime_incidence_per_100k": "999",
+            "model_feature_quality_flags": (
+                "localized_spatial_regime_feature,"
+                "forecast_safe_prior_history_spatial_regime,"
+                "not_public_default"
+            ),
+        },
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _write_incidence_panel(path: Path, *, missing_target: bool = False) -> Path:
