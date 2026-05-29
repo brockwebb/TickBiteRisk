@@ -7,6 +7,8 @@ const regionalState = {
   sourceCatalog: null,
   selectedCounty: null,
   selectedWeek: 1,
+  stateFilter: "",
+  countySearch: "",
   byCountyWeek: new Map(),
   recordsByCounty: new Map(),
   metadataByCounty: new Map(),
@@ -41,6 +43,12 @@ async function initRegionalResearch() {
   document
     .getElementById("week-slider")
     .addEventListener("input", handleWeekSliderInput);
+  document
+    .getElementById("state-filter")
+    .addEventListener("change", handleRegionalListFilterChange);
+  document
+    .getElementById("county-search")
+    .addEventListener("input", handleRegionalListFilterChange);
 
   try {
     const [weekly, counties, countyMetadata, overlays, modelCard, sourceCatalog] =
@@ -63,6 +71,7 @@ async function initRegionalResearch() {
     indexRegionalMetadata(countyMetadata.counties || []);
     indexRegionalOverlays(overlays.records || []);
     setRegionalWeekBounds(weekly.records || []);
+    renderRegionalStateFilter();
     selectDefaultRegionalCounty();
     renderRegionalMap();
     renderRegionalCountyList();
@@ -151,6 +160,15 @@ function handleWeekSliderInput(event) {
   renderRegionalMap();
   renderRegionalCountyList();
   selectRegionalCounty(regionalState.selectedCounty);
+}
+
+function handleRegionalListFilterChange() {
+  regionalState.stateFilter = document.getElementById("state-filter").value;
+  regionalState.countySearch = document
+    .getElementById("county-search")
+    .value.trim()
+    .toLowerCase();
+  renderRegionalCountyList();
 }
 
 function updateRegionalWeekLabel() {
@@ -244,12 +262,47 @@ function regionalCountyPath(feature, bounds, width, height) {
 
 function renderRegionalCountyList() {
   const list = document.getElementById("regional-county-list");
-  const features = regionalState.counties ? regionalState.counties.features || [] : [];
+  const features = filteredRegionalFeatures();
   list.innerHTML = features.map(regionalCountyListButton).join("");
   list.querySelectorAll("button[data-county]").forEach((button) => {
     button.addEventListener("click", () => selectRegionalCounty(button.dataset.county));
   });
+  renderRegionalListStatus(features.length);
   updateRegionalSelectedControls();
+}
+
+function filteredRegionalFeatures() {
+  const features = regionalState.counties ? regionalState.counties.features || [] : [];
+  return features.filter((feature) => {
+    const props = feature.properties || {};
+    const stateMatches =
+      !regionalState.stateFilter || props.state_abbr === regionalState.stateFilter;
+    const searchText = `${props.county_name || ""} ${props.county_fips || ""}`.toLowerCase();
+    const searchMatches =
+      !regionalState.countySearch || searchText.includes(regionalState.countySearch);
+    return stateMatches && searchMatches;
+  });
+}
+
+function renderRegionalStateFilter() {
+  const select = document.getElementById("state-filter");
+  const features = regionalState.counties ? regionalState.counties.features || [] : [];
+  const states = Array.from(
+    new Set(features.map((feature) => feature.properties && feature.properties.state_abbr))
+  )
+    .filter(Boolean)
+    .sort();
+  select.innerHTML =
+    '<option value="">All states</option>' +
+    states
+      .map((stateAbbr) => `<option value="${regionalEscapeHtml(stateAbbr)}">${regionalEscapeHtml(stateAbbr)}</option>`)
+      .join("");
+}
+
+function renderRegionalListStatus(count) {
+  const status = document.getElementById("regional-list-status");
+  const noun = count === 1 ? "county" : "counties";
+  status.textContent = `${count} ${noun} shown`;
 }
 
 function regionalCountyListButton(feature) {

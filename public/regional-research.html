@@ -96,6 +96,17 @@
 
       <section class="county-list-section regional-county-list-section" aria-labelledby="regional-list-title">
         <h2 id="regional-list-title">County list</h2>
+        <div class="regional-list-filters">
+          <label for="state-filter">State</label>
+          <select id="state-filter">
+            <option value="">All states</option>
+          </select>
+          <label for="county-search">County</label>
+          <input id="county-search" type="search" autocomplete="off" />
+          <p id="regional-list-status" aria-live="polite" class="muted">
+            Loading county list...
+          </p>
+        </div>
         <div id="regional-county-list" class="county-list regional-county-list"></div>
       </section>
 

@@ -203,6 +203,16 @@ test("regional research dashboard renders county risk, week slider, and regime i
     "Virginia Beach city weekly forecast window"
   );
 
+  await page.locator("#state-filter").selectOption("MD");
+  await expect(page.locator("#regional-list-status")).toContainText("2 counties shown");
+  await expect(page.locator("#regional-county-list button[data-county]")).toHaveCount(2);
+  await page.locator("#county-search").fill("Garrett");
+  await expect(page.locator("#regional-list-status")).toContainText("1 county shown");
+  await expect(page.locator("#regional-county-list button[data-county]")).toHaveCount(1);
+  await expect(page.locator("#regional-county-list")).toContainText("Garrett County");
+  await page.locator('button[data-county="24023"]').click();
+  await expect(page.locator("#regional-panel-content")).toContainText("Garrett County");
+
   await expect(page.locator("#regional-source-content")).toContainText(
     "Forecast-safe branches use prior-year"
   );
