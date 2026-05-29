@@ -121,6 +121,9 @@ parser evidence, and time-aware validation before it can move into a model lane.
 | `regional_annual_forecast_predictions.csv` | `tickbiterisk etl regional-annual-forecast` | Mid-Atlantic county-year forecast rows, including horizon-matched analog and optional localized spatial-regime branches, without observed target, residual, or error columns |
 | `regional_forecast_capacity_runs.csv` | `tickbiterisk etl regional-forecast-capacity` | Mid-Atlantic forecast-capacity diagnostic run manifest |
 | `regional_forecast_capacity_summary.csv` | `tickbiterisk etl regional-forecast-capacity` | State and Mid-Atlantic forecast totals compared with historical reported-incidence ranges |
+| `regional_forecast_observed_fit_runs.csv` | `tickbiterisk etl regional-forecast-observed-fit` | Post-forecast regional forecast-vs-observed fit run manifest for state-source overlays |
+| `regional_forecast_observed_fit_comparisons.csv` | `tickbiterisk etl regional-forecast-observed-fit` | County-level forecast/observed residual rows for one selected state/year/model overlay |
+| `regional_forecast_observed_fit_summary.csv` | `tickbiterisk etl regional-forecast-observed-fit` | State overlay fit summary with MAE/RMSE/bias, caveated as diagnostic rather than training truth |
 | `regional_incidence_cluster_runs.csv` | `tickbiterisk etl regional-incidence-clusters` | Mid-Atlantic prior-incidence cluster run manifest |
 | `regional_incidence_cluster_county_year.csv` | `tickbiterisk etl regional-incidence-clusters` | Forecast-safe low/moderate/high/very-high prior-incidence band assignments |
 | `regional_incidence_cluster_summary.csv` | `tickbiterisk etl regional-incidence-clusters` | Prior cluster capacity bands and held-out actual incidence diagnostics |
@@ -210,8 +213,13 @@ parser evidence, and time-aware validation before it can move into a model lane.
 - The regional forecast-capacity artifact compares 2026 forecast branch totals
   with historical reported-case and incidence ranges using only years at or
   before the forecast origin and complete historical rows for the same forecast
-  county set. It is a control-limit review tool, not an observed 2026 outcome
-  or latent true disease-capacity estimate.
+  county set. It is a review/control-limit diagnostic, not an observed
+  target-year evaluation.
+- The regional forecast observed-fit artifact compares one selected forecast
+  branch to a later state-source overlay, currently PA 2024. It records
+  county-level residuals and state summary metrics but carries partial-overlay,
+  post-forecast diagnostic, not-regional-truth, not-training-feature, and
+  not-public-default flags.
 - The regional county adjacency artifact uses current Census TIGERweb county
   geometry for DE/DC/MD/PA/VA/WV. It treats state as display/rollup metadata
   and keeps cross-border neighbors, but it is still a county-aggregation

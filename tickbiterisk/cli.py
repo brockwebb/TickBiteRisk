@@ -366,6 +366,13 @@ from tickbiterisk.modeling.regional_forecast_capacity import (
 from tickbiterisk.modeling.regional_forecast_capacity_build import (
     write_regional_forecast_capacity_outputs,
 )
+from tickbiterisk.modeling.regional_forecast_observed_fit import (
+    RegionalForecastObservedFitInputError,
+    build_regional_forecast_observed_fit,
+)
+from tickbiterisk.modeling.regional_forecast_observed_fit_build import (
+    write_regional_forecast_observed_fit_outputs,
+)
 from tickbiterisk.modeling.regional_outcome_stress import (
     RegionalOutcomeStressInputError,
     build_regional_outcome_stress,
@@ -4172,6 +4179,75 @@ def regional_forecast_capacity(
     typer.echo(
         f"Wrote {len(result.capacity_summary)} regional forecast capacity row(s) "
         f"to {outputs.capacity_summary_path}"
+    )
+
+
+@etl_app.command("regional-forecast-observed-fit")
+def regional_forecast_observed_fit(
+    forecast_predictions_path: Path = typer.Option(
+        Path(
+            "build/etl/regional-annual-forecast-multiyear/"
+            "regional_annual_forecast_predictions.csv"
+        ),
+        help="Input regional annual forecast predictions CSV.",
+    ),
+    regional_incidence_path: Path = typer.Option(
+        Path("build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv"),
+        help="Input Mid-Atlantic Lyme incidence county-year panel.",
+    ),
+    forecast_year: int = typer.Option(
+        2024,
+        help="Forecast year with an observed state overlay to compare.",
+    ),
+    state_abbr: str = typer.Option(
+        "PA",
+        help="Observed state overlay abbreviation to compare.",
+    ),
+    model_name: str = typer.Option(
+        "empirical_bayes_spatial_regime_incidence",
+        help="Regional forecast model branch to compare against observed rows.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-forecast-observed-fit"),
+        help="Output directory for regional forecast-vs-observed fit artifacts.",
+    ),
+) -> None:
+    if not forecast_predictions_path.exists():
+        raise typer.BadParameter(
+            f"Regional forecast predictions not found: {forecast_predictions_path}"
+        )
+    if not regional_incidence_path.exists():
+        raise typer.BadParameter(
+            f"Regional incidence panel not found: {regional_incidence_path}"
+        )
+    if forecast_year < 1:
+        raise typer.BadParameter("forecast-year must be positive")
+    if not state_abbr.strip():
+        raise typer.BadParameter("state-abbr is required")
+    if not model_name.strip():
+        raise typer.BadParameter("model-name is required")
+
+    try:
+        result = build_regional_forecast_observed_fit(
+            forecast_predictions_path=forecast_predictions_path,
+            regional_incidence_path=regional_incidence_path,
+            forecast_year=forecast_year,
+            state_abbr=state_abbr,
+            model_name=model_name,
+        )
+    except RegionalForecastObservedFitInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_regional_forecast_observed_fit_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote 1 regional forecast observed-fit run row(s) to {outputs.runs_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.comparisons)} regional forecast observed-fit "
+        f"comparison row(s) to {outputs.comparisons_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.summary)} regional forecast observed-fit summary row(s) "
+        f"to {outputs.summary_path}"
     )
 
 

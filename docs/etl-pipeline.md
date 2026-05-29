@@ -287,7 +287,23 @@ artifacts.
      target-year outcome, public Maryland branch, or latent true disease
      capacity estimate.
 
-1i-4. `tickbiterisk etl regional-county-adjacency`
+1i-4. `tickbiterisk etl regional-forecast-observed-fit`
+   - Typical PA 2024 overlay run:
+     `tickbiterisk etl regional-forecast-observed-fit --forecast-predictions-path build/etl/regional-annual-forecast-multiyear/regional_annual_forecast_predictions.csv --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --forecast-year 2024 --state-abbr PA --model-name empirical_bayes_spatial_regime_incidence --output-dir build/etl/regional-forecast-observed-fit`.
+   - Joins one selected regional annual forecast branch to a later observed
+     state-source overlay for the same state/year/county rows.
+   - Writes `regional_forecast_observed_fit_runs.csv`,
+     `regional_forecast_observed_fit_comparisons.csv`, and
+     `regional_forecast_observed_fit_summary.csv`.
+   - The live PA 2024 spatial-regime diagnostic compares 67 observed PA
+     counties with the origin-2023 forecast: predicted 9,415.098301 cases
+     versus 16,620 observed state-source cases, with 123.037986 case MAE and
+     84.387219 incidence MAE per 100k.
+   - This is post-forecast goodness-of-fit context for a partial state overlay,
+     not regional truth, not a training feature, not automatic calibration, and
+     not the public Maryland default.
+
+1i-5. `tickbiterisk etl regional-county-adjacency`
    - Typical run:
      `tickbiterisk etl regional-county-adjacency --fetch-census-geojson --output-dir build/etl/regional-county-adjacency`.
    - Fetches the official keyless Census TIGERweb county layer for DE, DC, MD,
@@ -304,7 +320,7 @@ artifacts.
      regional forecast surface, not disease truth, exposure truth, or a public
      Maryland default.
 
-1i-5. `tickbiterisk etl regional-spatial-regimes`
+1i-6. `tickbiterisk etl regional-spatial-regimes`
    - Typical run:
      `tickbiterisk etl regional-spatial-regimes --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-adjacency-path build/etl/regional-county-adjacency/regional_county_adjacency.csv --output-dir build/etl/regional-spatial-regimes`.
    - Assigns county-years to localized spatial regimes using only prior
