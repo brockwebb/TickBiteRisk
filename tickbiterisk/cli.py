@@ -11,7 +11,10 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import typer
 
-from tickbiterisk.dashboard_assets import write_dashboard_assets
+from tickbiterisk.dashboard_assets import (
+    write_dashboard_assets,
+    write_regional_research_dashboard_assets,
+)
 from tickbiterisk.etl.acs_exposure import (
     ACS_TABLE_BASED_SUMMARY_FILE_CITATION_URL,
     AcsExposureInputError,
@@ -1274,6 +1277,76 @@ def dashboard_build_assets(
     typer.echo(f"Wrote dashboard assets to {output_dir}")
     typer.echo(f"Wrote {outputs.weekly_risk_path}")
     typer.echo(f"Wrote {outputs.county_geojson_path}")
+
+
+@dashboard_app.command("build-regional-research-assets")
+def dashboard_build_regional_research_assets(
+    scores_path: Path = typer.Option(
+        Path("build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv"),
+        help="Regional county-week seasonal risk forecast CSV.",
+    ),
+    regional_counties_geojson_path: Path = typer.Option(
+        Path("build/etl/regional-county-adjacency/regional_counties.geojson"),
+        help="Regional county-equivalent GeoJSON from regional-county-adjacency.",
+    ),
+    spatial_regime_summary_path: Path | None = typer.Option(
+        Path(
+            "build/etl/regional-annual-forecast/"
+            "regional_spatial_regime_forecast_interval_summary.csv"
+        ),
+        help="Optional regional spatial-regime interval summary CSV.",
+    ),
+    spatial_regime_overlays: bool = typer.Option(
+        True,
+        "--spatial-regime-overlays/--no-spatial-regime-overlays",
+        help="Include derived localized spatial-regime overlay summaries.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/public-regional-risk"),
+        help="Output directory for regional research dashboard data assets.",
+    ),
+    model_name: str = typer.Option(
+        "empirical_bayes_spatial_regime_incidence",
+        help="Regional risk score model branch to export.",
+    ),
+    seasonality_source_id: str = typer.Option(
+        "cdc_seasonality_week_2023",
+        help="Weekly seasonality source_id to export.",
+    ),
+) -> None:
+    if not scores_path.exists():
+        raise typer.BadParameter(f"Risk score file not found: {scores_path}")
+    if not regional_counties_geojson_path.exists():
+        raise typer.BadParameter(
+            f"Regional county GeoJSON file not found: {regional_counties_geojson_path}"
+        )
+    resolved_spatial_regime_summary_path = (
+        spatial_regime_summary_path if spatial_regime_overlays else None
+    )
+    if (
+        resolved_spatial_regime_summary_path is not None
+        and not resolved_spatial_regime_summary_path.exists()
+    ):
+        raise typer.BadParameter(
+            "Spatial regime summary file not found: "
+            f"{resolved_spatial_regime_summary_path}"
+        )
+    try:
+        outputs = write_regional_research_dashboard_assets(
+            scores_path=scores_path,
+            output_dir=output_dir,
+            regional_counties_geojson_path=regional_counties_geojson_path,
+            spatial_regime_summary_path=resolved_spatial_regime_summary_path,
+            model_name=model_name,
+            seasonality_source_id=seasonality_source_id,
+        )
+    except StaticExportInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Wrote regional research dashboard assets to {output_dir}")
+    typer.echo(f"Wrote {outputs.weekly_risk_path}")
+    typer.echo(f"Wrote {outputs.county_geojson_path}")
+    if outputs.spatial_regime_overlays_path is not None:
+        typer.echo(f"Wrote {outputs.spatial_regime_overlays_path}")
 
 
 @etl_app.command("weather-locations")

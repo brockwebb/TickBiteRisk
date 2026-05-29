@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import csv
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,9 +10,11 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from tickbiterisk.runtime.static_export import (
+    MIDATLANTIC_GEOGRAPHY_SCOPE,
     StaticRiskExportPaths,
     export_static_risk_data,
 )
+from tickbiterisk.runtime.risk_lookup import split_quality_flags
 
 
 TIGERWEB_COUNTIES_URL = (
@@ -29,6 +32,18 @@ class DashboardAssetPaths:
     source_catalog_path: Path
     export_manifest_path: Path
     county_geojson_path: Path
+
+
+@dataclass(frozen=True)
+class RegionalResearchDashboardAssetPaths:
+    output_dir: Path
+    weekly_risk_path: Path
+    county_metadata_path: Path
+    model_card_path: Path
+    source_catalog_path: Path
+    export_manifest_path: Path
+    county_geojson_path: Path
+    spatial_regime_overlays_path: Path | None
 
 
 def write_dashboard_assets(
@@ -72,6 +87,69 @@ def write_dashboard_assets(
         feature_count=len(normalized_geojson["features"]),
     )
     return _paths_from_static(output_dir, static_paths, county_geojson_path)
+
+
+def write_regional_research_dashboard_assets(
+    *,
+    scores_path: Path,
+    output_dir: Path,
+    regional_counties_geojson_path: Path,
+    spatial_regime_summary_path: Path | None = None,
+    model_name: str = "empirical_bayes_spatial_regime_incidence",
+    seasonality_source_id: str = "cdc_seasonality_week_2023",
+    benchmark_quantile: float | None = None,
+    headroom_multiplier: float | None = None,
+    score_denominator: float | None = None,
+    source_prediction_run_id: str | None = None,
+    source_prediction_sha256: str | None = None,
+    source_seasonality_sha256: str | None = None,
+) -> RegionalResearchDashboardAssetPaths:
+    static_paths = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=output_dir,
+        model_name=model_name,
+        seasonality_source_id=seasonality_source_id,
+        benchmark_quantile=benchmark_quantile,
+        headroom_multiplier=headroom_multiplier,
+        score_denominator=score_denominator,
+        source_prediction_run_id=source_prediction_run_id,
+        source_prediction_sha256=source_prediction_sha256,
+        source_seasonality_sha256=source_seasonality_sha256,
+        geography_scope=MIDATLANTIC_GEOGRAPHY_SCOPE,
+    )
+    raw_geojson = json.loads(regional_counties_geojson_path.read_text(encoding="utf-8"))
+    normalized_geojson = normalize_regional_county_geojson(raw_geojson)
+    county_geojson_path = output_dir / "regional_counties.geojson"
+    county_geojson_path.write_text(
+        json.dumps(normalized_geojson, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    overlay_path = None
+    overlay_count = 0
+    if spatial_regime_summary_path is not None:
+        overlay_payload = regional_spatial_regime_overlay_payload(
+            spatial_regime_summary_path,
+            model_name=model_name,
+        )
+        overlay_path = output_dir / "regional_spatial_regime_overlays.json"
+        overlay_path.write_text(
+            json.dumps(overlay_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        overlay_count = int(overlay_payload["record_count"])
+    _augment_manifest_with_regional_assets(
+        static_paths.export_manifest_path,
+        county_geojson_path=county_geojson_path,
+        feature_count=len(normalized_geojson["features"]),
+        spatial_regime_overlays_path=overlay_path,
+        spatial_regime_overlay_count=overlay_count,
+    )
+    return _regional_paths_from_static(
+        output_dir,
+        static_paths,
+        county_geojson_path,
+        overlay_path,
+    )
 
 
 def fetch_maryland_county_geojson() -> dict[str, Any]:
@@ -134,6 +212,76 @@ def normalize_maryland_county_geojson(
     }
 
 
+def normalize_regional_county_geojson(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    features = []
+    for feature in payload.get("features", []):
+        properties = feature.get("properties", {})
+        county_fips = str(
+            properties.get("county_fips")
+            or properties.get("GEOID")
+            or properties.get("source_geoid")
+            or ""
+        ).zfill(5)
+        state_fips = str(properties.get("state_fips") or county_fips[:2]).zfill(2)
+        county_name = str(properties.get("county_name") or properties.get("NAME") or "")
+        geometry = feature.get("geometry")
+        if len(county_fips) != 5 or len(state_fips) != 2 or not geometry:
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "county_fips": county_fips,
+                    "county_name": county_name,
+                    "state_fips": state_fips,
+                    "state_abbr": _state_abbr(state_fips),
+                },
+                "geometry": geometry,
+            }
+        )
+    features.sort(key=lambda item: item["properties"]["county_fips"])
+    if not features:
+        raise ValueError("Expected at least one regional county feature")
+    return {
+        "type": "FeatureCollection",
+        "metadata": {
+            "scope": "midatlantic_county_equivalent",
+            "states": ["DE", "DC", "MD", "PA", "VA", "WV"],
+            "feature_count": len(features),
+            "research_only": True,
+            "not_public_maryland_default": True,
+        },
+        "features": features,
+    }
+
+
+def regional_spatial_regime_overlay_payload(
+    summary_path: Path,
+    *,
+    model_name: str,
+) -> dict[str, object]:
+    with summary_path.open(encoding="utf-8", newline="") as handle:
+        rows = [
+            row
+            for row in csv.DictReader(handle)
+            if row.get("model_name") == model_name
+        ]
+    records = [_spatial_regime_overlay_record(row) for row in rows]
+    return {
+        "schema_version": "regional-spatial-regime-overlays-v1",
+        "export_type": "regional_spatial_regime_overlays",
+        "model_name": model_name,
+        "record_count": len(records),
+        "research_status": {
+            "research_only": True,
+            "not_public_maryland_default": True,
+        },
+        "records": records,
+    }
+
+
 def _paths_from_static(
     output_dir: Path,
     static_paths: StaticRiskExportPaths,
@@ -147,6 +295,24 @@ def _paths_from_static(
         source_catalog_path=static_paths.source_catalog_path,
         export_manifest_path=static_paths.export_manifest_path,
         county_geojson_path=county_geojson_path,
+    )
+
+
+def _regional_paths_from_static(
+    output_dir: Path,
+    static_paths: StaticRiskExportPaths,
+    county_geojson_path: Path,
+    spatial_regime_overlays_path: Path | None,
+) -> RegionalResearchDashboardAssetPaths:
+    return RegionalResearchDashboardAssetPaths(
+        output_dir=output_dir,
+        weekly_risk_path=static_paths.weekly_risk_path,
+        county_metadata_path=static_paths.county_metadata_path,
+        model_card_path=static_paths.model_card_path,
+        source_catalog_path=static_paths.source_catalog_path,
+        export_manifest_path=static_paths.export_manifest_path,
+        county_geojson_path=county_geojson_path,
+        spatial_regime_overlays_path=spatial_regime_overlays_path,
     )
 
 
@@ -166,3 +332,80 @@ def _augment_manifest_with_county_geojson(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _augment_manifest_with_regional_assets(
+    manifest_path: Path,
+    *,
+    county_geojson_path: Path,
+    feature_count: int,
+    spatial_regime_overlays_path: Path | None,
+    spatial_regime_overlay_count: int,
+) -> None:
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files = manifest.setdefault("files", [])
+    if county_geojson_path.name not in files:
+        files.append(county_geojson_path.name)
+    record_counts = manifest.setdefault("record_counts", {})
+    record_counts["regional_county_geojson_features"] = feature_count
+    if spatial_regime_overlays_path is not None:
+        if spatial_regime_overlays_path.name not in files:
+            files.append(spatial_regime_overlays_path.name)
+        record_counts["spatial_regime_overlays"] = spatial_regime_overlay_count
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _spatial_regime_overlay_record(row: dict[str, str]) -> dict[str, object]:
+    return {
+        "run_id": str(row["run_id"]),
+        "region_id": str(row["region_id"]),
+        "region_name": str(row["region_name"]),
+        "spatial_regime_rank": _int_value(row["spatial_regime_rank"]),
+        "spatial_regime_feature_year": _int_value(row["spatial_regime_feature_year"]),
+        "forecast_year": _int_value(row["forecast_year"]),
+        "forecast_origin_year": _int_value(row["forecast_origin_year"]),
+        "n_counties": _int_value(row["n_counties"]),
+        "county_fips_list": [
+            value.strip()
+            for value in str(row["county_fips_list"]).split(",")
+            if value.strip()
+        ],
+        "forecast_population": _int_value(row["forecast_population"]),
+        "predicted_total_cases": _float_value(row["predicted_total_cases"]),
+        "predicted_incidence_per_100k": _float_value(
+            row["predicted_incidence_per_100k"]
+        ),
+        "predicted_incidence_80_interval": [
+            _float_value(row["lower_80_incidence_per_100k"]),
+            _float_value(row["upper_80_incidence_per_100k"]),
+        ],
+        "predicted_incidence_95_interval": [
+            _float_value(row["lower_95_incidence_per_100k"]),
+            _float_value(row["upper_95_incidence_per_100k"]),
+        ],
+        "summary_assumption_flags": split_quality_flags(
+            row.get("summary_assumption_flags", "")
+        ),
+    }
+
+
+def _state_abbr(state_fips: str) -> str:
+    return {
+        "10": "DE",
+        "11": "DC",
+        "24": "MD",
+        "42": "PA",
+        "51": "VA",
+        "54": "WV",
+    }.get(state_fips, state_fips)
+
+
+def _int_value(value: str) -> int:
+    return int(str(value).replace(",", "").strip())
+
+
+def _float_value(value: str) -> float:
+    return float(str(value).replace(",", "").strip())

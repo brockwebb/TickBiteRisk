@@ -197,6 +197,7 @@ tickbiterisk etl model-backtest --model-features-path build/etl/model/model_feat
 tickbiterisk etl county-week-risk --predictions-path build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv --prediction-intervals-path build/etl/regional-annual-forecast/regional_annual_forecast_intervals.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --output-dir build/etl/regional-county-week-risk --replace
 tickbiterisk etl county-week-risk --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name linear_blend_baseline --output-dir build/etl/county-week-risk --replace
 tickbiterisk risk export-static --scores-path build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --geography-scope midatlantic_county_week --output-dir build/public-regional-risk
+tickbiterisk dashboard build-regional-research-assets --scores-path build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv --regional-counties-geojson-path build/etl/regional-county-adjacency/regional_counties.geojson --spatial-regime-summary-path build/etl/regional-annual-forecast/regional_spatial_regime_forecast_interval_summary.csv --output-dir build/public-regional-risk
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest --include-annual-report-pdfs
 tickbiterisk etl ecology-sources --raw-dir data/raw/ecology --manifest-path build/etl/ecology/source_manifest.csv
@@ -290,6 +291,13 @@ midatlantic_county_week` writes a research-only JSON bundle with
 source catalog, and manifest files. The regional bundle is explicitly tagged
 `research_only` and `not_public_maryland_default`; the default export still
 writes the Maryland public contract.
+
+Regional dashboard asset note: `dashboard build-regional-research-assets` adds
+`regional_counties.geojson` and selected-model
+`regional_spatial_regime_overlays.json` beside the regional risk JSON. The live
+research bundle currently includes 14,999 county-week risk records, 283
+county-equivalent map features, and 127 localized spatial-regime overlay rows
+for `empirical_bayes_spatial_regime_incidence`.
 
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only

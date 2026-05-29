@@ -5,7 +5,9 @@ from tests.test_runtime_risk_lookup import _write_scores
 from tickbiterisk.dashboard_assets import (
     TIGERWEB_COUNTIES_URL,
     normalize_maryland_county_geojson,
+    normalize_regional_county_geojson,
     write_dashboard_assets,
+    write_regional_research_dashboard_assets,
 )
 
 
@@ -65,6 +67,66 @@ def test_write_dashboard_assets_writes_risk_json_and_geojson(
     )
 
 
+def test_normalize_regional_county_geojson_keeps_state_and_county_fields() -> None:
+    normalized = normalize_regional_county_geojson(_regional_geojson())
+
+    assert normalized["type"] == "FeatureCollection"
+    assert normalized["metadata"]["feature_count"] == 2
+    assert normalized["metadata"]["scope"] == "midatlantic_county_equivalent"
+    assert normalized["features"][0]["properties"] == {
+        "county_fips": "24003",
+        "county_name": "Anne Arundel County",
+        "state_fips": "24",
+        "state_abbr": "MD",
+    }
+
+
+def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    regional_geojson_path = tmp_path / "regional_counties.geojson"
+    regional_geojson_path.write_text(
+        json.dumps(_regional_geojson()),
+        encoding="utf-8",
+    )
+    overlays_path = _write_regional_overlay_summary(tmp_path / "overlays.csv")
+    output_dir = tmp_path / "regional-dashboard"
+
+    result = write_regional_research_dashboard_assets(
+        scores_path=scores_path,
+        output_dir=output_dir,
+        regional_counties_geojson_path=regional_geojson_path,
+        spatial_regime_summary_path=overlays_path,
+        model_name="linear_blend_baseline",
+    )
+
+    assert result.weekly_risk_path.name == "regional_county_risk_weekly.json"
+    assert result.county_geojson_path.name == "regional_counties.geojson"
+    assert result.spatial_regime_overlays_path is not None
+    assert result.spatial_regime_overlays_path.name == (
+        "regional_spatial_regime_overlays.json"
+    )
+
+    weekly = json.loads(result.weekly_risk_path.read_text(encoding="utf-8"))
+    counties = json.loads(result.county_geojson_path.read_text(encoding="utf-8"))
+    overlays = json.loads(
+        result.spatial_regime_overlays_path.read_text(encoding="utf-8")
+    )
+    manifest = json.loads(result.export_manifest_path.read_text(encoding="utf-8"))
+
+    assert weekly["scope"] == "midatlantic_county_week"
+    assert weekly["research_status"]["research_only"] is True
+    assert counties["metadata"]["feature_count"] == 2
+    assert overlays["record_count"] == 1
+    assert overlays["records"][0]["region_id"] == "2024_regime_01"
+    assert overlays["records"][0]["county_fips_list"] == ["24003", "42001"]
+    assert "regional_counties.geojson" in manifest["files"]
+    assert "regional_spatial_regime_overlays.json" in manifest["files"]
+    assert manifest["record_counts"]["regional_county_geojson_features"] == 2
+    assert manifest["record_counts"]["spatial_regime_overlays"] == 1
+
+
 def _fixture_geojson() -> dict:
     county_rows = [
         ("24001", "Allegany County"),
@@ -99,6 +161,87 @@ def _fixture_geojson() -> dict:
             for index, (county_fips, county_name) in enumerate(county_rows)
         ],
     }
+
+
+def _regional_geojson() -> dict:
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {
+                    "county_fips": "24003",
+                    "county_name": "Anne Arundel County",
+                    "state_fips": "24",
+                    "source_geoid": "24003",
+                },
+                "geometry": {"type": "Point", "coordinates": [-76.6, 39.0]},
+            },
+            {
+                "type": "Feature",
+                "properties": {
+                    "county_fips": "42001",
+                    "county_name": "Adams County",
+                    "state_fips": "42",
+                    "source_geoid": "42001",
+                },
+                "geometry": {"type": "Point", "coordinates": [-77.2, 39.9]},
+            },
+        ],
+    }
+
+
+def _write_regional_overlay_summary(path: Path) -> Path:
+    columns = [
+        "run_id",
+        "model_name",
+        "region_id",
+        "region_name",
+        "spatial_regime_rank",
+        "spatial_regime_feature_year",
+        "forecast_year",
+        "forecast_origin_year",
+        "n_counties",
+        "county_fips_list",
+        "forecast_population",
+        "predicted_total_cases",
+        "predicted_incidence_per_100k",
+        "lower_80_incidence_per_100k",
+        "upper_80_incidence_per_100k",
+        "lower_95_incidence_per_100k",
+        "upper_95_incidence_per_100k",
+        "summary_assumption_flags",
+    ]
+    row = {
+        "run_id": "overlay-run",
+        "model_name": "linear_blend_baseline",
+        "region_id": "2024_regime_01",
+        "region_name": "Spatial regime 1",
+        "spatial_regime_rank": "1",
+        "spatial_regime_feature_year": "2024",
+        "forecast_year": "2026",
+        "forecast_origin_year": "2023",
+        "n_counties": "2",
+        "county_fips_list": "24003,42001",
+        "forecast_population": "210000",
+        "predicted_total_cases": "12.5",
+        "predicted_incidence_per_100k": "5.952381",
+        "lower_80_incidence_per_100k": "3.0",
+        "upper_80_incidence_per_100k": "8.0",
+        "lower_95_incidence_per_100k": "1.0",
+        "upper_95_incidence_per_100k": "10.0",
+        "summary_assumption_flags": (
+            "localized_spatial_regime_research,not_public_default"
+        ),
+    }
+    path.write_text(
+        ",".join(columns)
+        + "\n"
+        + ",".join(f'"{row[column]}"' for column in columns)
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def _write_model_summary(path: Path) -> Path:
