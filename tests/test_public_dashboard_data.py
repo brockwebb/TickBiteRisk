@@ -192,6 +192,9 @@ def test_model_card_matches_weekly_export_metadata() -> None:
     assert validation["run_id"].startswith("model_compare_")
     assert validation["rank_by_mae"] == 2
     assert validation["n_predictions"] == 432
+    assert validation["validation_role"] == "historical_model_comparison"
+    assert validation["validation_match_type"] == "annual_forecast_model_name"
+    assert validation["forecast_model_name"] == "linear_blend_baseline"
     assert validation["mae_incidence_per_100k"] == 18.47245
     assert validation["rmse_incidence_per_100k"] == 29.737192
     assert validation["pearson_correlation"] == 0.771554

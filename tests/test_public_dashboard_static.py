@@ -297,7 +297,8 @@ def test_dashboard_javascript_renders_model_lineage_in_county_panel() -> None:
         "function renderModelLineage",
         "annual_prediction_source",
         "Model source",
-        "model-comparison run",
+        "forecast source run",
+        "annual_forecast_",
         "model_family",
         "evaluation_mode",
         "weather_mode",
@@ -306,6 +307,27 @@ def test_dashboard_javascript_renders_model_lineage_in_county_panel() -> None:
         "${renderModelLineage(record)}",
     ]:
         assert token in js
+
+    assert "model-comparison run" not in js
+
+
+def test_dashboard_javascript_distinguishes_forecast_source_from_validation_evidence() -> None:
+    js = (PUBLIC_DIR / "app.js").read_text(encoding="utf-8")
+
+    for token in [
+        "function validationContextLabel",
+        "validation_role",
+        "validation_match_type",
+        "forecast_model_name",
+        "historical model comparison",
+        "annual forecast model-name match",
+        "source.notes || source.public_notes",
+        "historical backtests are separate validation evidence",
+    ]:
+        assert token in js
+
+    assert "Annual Maryland Lyme forecast selected from prior-year validation." not in js
+    assert "Selected annual forecast rows from prior-year validation" not in js
 
 
 def test_dashboard_javascript_escapes_panel_values_and_sanitizes_links() -> None:

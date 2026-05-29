@@ -53,7 +53,7 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-29T00:13:30+00:00",
+  "generated_at": "2026-05-29T00:18:05+00:00",
   "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
   "model_name": "linear_blend_baseline",
   "not_for": [
@@ -78,12 +78,15 @@
       "intervention_history_unmodeled",
       "surveillance_reporting_sensitive"
     ],
+    "forecast_model_name": "linear_blend_baseline",
     "mae_incidence_per_100k": 18.47245,
     "model_name": "linear_blend_baseline",
     "n_predictions": 432,
     "pearson_correlation": 0.771554,
     "rank_by_mae": 2,
     "rmse_incidence_per_100k": 29.737192,
-    "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0"
+    "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
+    "validation_match_type": "annual_forecast_model_name",
+    "validation_role": "historical_model_comparison"
   }
 }

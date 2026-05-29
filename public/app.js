@@ -528,16 +528,16 @@ function biteCaveats(record, input) {
 function renderModelLineage(record) {
   const annualSource =
     (state.modelCard && state.modelCard.annual_prediction_source) || {};
+  const lineageSource = Object.keys(annualSource).length ? annualSource : record;
   const sourceCatalog = state.sourceCatalog || {};
   const modelName =
     annualSource.model_name || record.model_name || (state.weekly && state.weekly.model_name) || "unknown model";
   const modelFamily = annualSource.model_family || record.model_family || "model";
-  const evaluationMode = annualSource.evaluation_mode || record.evaluation_mode || "";
+  const validationSummary =
+    (state.modelCard && state.modelCard.validation_summary) || {};
+  const evaluationMode = validationContextLabel(validationSummary, lineageSource);
   const weatherMode = annualSource.weather_mode || record.weather_mode || "";
-  const sourceLabel =
-    annualSource.run_id || sourceCatalog.source_prediction_run_id
-      ? "model-comparison run"
-      : "model-comparison output";
+  const sourceLabel = annualSourceLabel(lineageSource, sourceCatalog);
 
   return `<section class="lineage-strip" aria-labelledby="lineage-heading">
     <h4 id="lineage-heading">Model source</h4>
@@ -560,6 +560,19 @@ function renderModelLineage(record) {
       </div>
     </dl>
   </section>`;
+}
+
+function annualSourceLabel(annualSource, sourceCatalog) {
+  const source = annualSource || {};
+  const catalog = sourceCatalog || {};
+  const runId = source.run_id || catalog.source_prediction_run_id || "";
+  if (
+    String(runId).startsWith("annual_forecast_") ||
+    source.evaluation_mode === "annual_forecast_no_observed_target"
+  ) {
+    return "forecast source run";
+  }
+  return runId ? "validation source run" : "forecast source";
 }
 
 function readableModelName(value) {
@@ -656,7 +669,7 @@ function sourceChainItems(sourceRows) {
       title: "Selected annual forecast",
       description:
         readablePublicSourceNote(annualPrediction) ||
-        "Annual Maryland Lyme forecast selected from prior-year validation.",
+        "Selected annual no-observed-target forecast rows; historical backtests are separate validation evidence.",
     },
     {
       title: "CDC Lyme onset seasonality",
@@ -688,15 +701,16 @@ function readableSourceTitle(sourceId) {
 }
 
 function readablePublicSourceNote(source) {
+  source = source || {};
   const notes = {
     annual_prediction_branch:
-      "Selected annual forecast rows from prior-year validation; not raw surveillance data.",
+      "Selected annual no-observed-target forecast rows; historical backtests are separate validation evidence, not the forecast source.",
     county_week_seasonal_risk_baseline:
       "Derived from the selected annual forecast and CDC onset seasonality prior.",
     cdc_seasonality_week_2023:
       "CDC national onset seasonality prior; not county-specific.",
   };
-  return notes[source.source_id] || source.public_notes || "Public derived forecast input.";
+  return source.notes || source.public_notes || notes[source.source_id] || "Public derived forecast input.";
 }
 
 function renderValidationSummary() {
@@ -704,11 +718,10 @@ function renderValidationSummary() {
   const modelCard = state.modelCard || {};
   const annualSource = modelCard.annual_prediction_source || {};
   const validation = modelCard.validation_summary || {};
-  const selectedModel = readableModelName(annualSource.model_name || modelCard.model_name);
-  const evaluationMode =
-    annualSource.evaluation_mode === "rolling_origin_prior_years"
-      ? "rolling-origin prior-years validation"
-      : readableModelName(annualSource.evaluation_mode || "not specified");
+  const selectedModel = readableModelName(
+    validation.forecast_model_name || annualSource.model_name || modelCard.model_name
+  );
+  const evaluationMode = validationContextLabel(validation, annualSource);
   const weatherMode = readableWeatherMode(annualSource.weather_mode || "");
   const outcomeItems = validationOutcomeItems(selectedModel, evaluationMode, validation);
   const limitItems = validationLimitItems(modelCard, weatherMode);
@@ -771,6 +784,29 @@ function renderForecastExplainer() {
   `;
 }
 
+function validationContextLabel(validation, annualSource) {
+  const role = validation && validation.validation_role;
+  const matchType = validation && validation.validation_match_type;
+  if (role === "historical_model_comparison") {
+    if (matchType === "annual_forecast_model_name") {
+      return "historical model comparison (annual forecast model-name match)";
+    }
+    if (matchType === "selected_prediction_run") {
+      return "historical model comparison (selected prediction run)";
+    }
+    return "historical model comparison";
+  }
+
+  const source = annualSource || {};
+  if (source.evaluation_mode === "rolling_origin_prior_years") {
+    return "rolling-origin prior-years validation";
+  }
+  if (source.evaluation_mode === "annual_forecast_no_observed_target") {
+    return "annual forecast without observed target";
+  }
+  return readableModelName(source.evaluation_mode || "not specified");
+}
+
 function validationOutcomeItems(selectedModel, evaluationMode, validation) {
   return [
     {
@@ -796,7 +832,7 @@ function validationOutcomeItems(selectedModel, evaluationMode, validation) {
       ),
     },
     {
-      label: "Backtest frame",
+      label: "Validation evidence",
       value: evaluationMode || "rolling-origin prior-years validation",
     },
     {

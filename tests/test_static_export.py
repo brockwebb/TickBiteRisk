@@ -104,6 +104,9 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         "mae_incidence_per_100k": 18.24,
         "rmse_incidence_per_100k": 29.54,
         "pearson_correlation": 0.76,
+        "validation_role": "historical_model_comparison",
+        "validation_match_type": "selected_prediction_run",
+        "forecast_model_name": "linear_blend_baseline",
         "comparison_assumption_flags": [
             "observational_not_causal",
             "intervention_history_unmodeled",
@@ -327,6 +330,12 @@ def test_export_static_risk_data_uses_model_validation_for_true_forecast_source(
     )
     assert model_card["validation_summary"]["run_id"] == "run1"
     assert model_card["validation_summary"]["model_name"] == "linear_blend_baseline"
+    assert model_card["validation_summary"]["validation_match_type"] == (
+        "annual_forecast_model_name"
+    )
+    assert model_card["validation_summary"]["forecast_model_name"] == (
+        "linear_blend_baseline"
+    )
 
 
 def test_export_static_risk_data_keeps_blank_optional_validation_metrics_null(
@@ -354,6 +363,7 @@ def test_export_static_risk_data_keeps_blank_optional_validation_metrics_null(
     assert validation["mae_incidence_per_100k"] is None
     assert validation["rmse_incidence_per_100k"] is None
     assert validation["pearson_correlation"] is None
+    assert validation["validation_role"] == "historical_model_comparison"
 
 
 def _write_ambiguous_scores(path: Path) -> Path:

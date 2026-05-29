@@ -452,21 +452,34 @@ def _validation_summary_payload(
                 row.get("run_id") == selected.source_prediction_run_id
                 and row.get("model_name") == selected.model_name
             ):
-                return _model_summary_payload_from_row(row)
+                return _model_summary_payload_from_row(
+                    row,
+                    forecast_model_name=selected.model_name,
+                    validation_match_type="selected_prediction_run",
+                )
             if row.get("model_name") == selected.model_name:
                 model_name_matches.append(row)
     if (
         selected.source_prediction_run_id.startswith("annual_forecast_")
         and len(model_name_matches) == 1
     ):
-        return _model_summary_payload_from_row(model_name_matches[0])
+        return _model_summary_payload_from_row(
+            model_name_matches[0],
+            forecast_model_name=selected.model_name,
+            validation_match_type="annual_forecast_model_name",
+        )
     raise StaticExportInputError(
         "No model comparison summary row matched selected run_id="
         f"{selected.source_prediction_run_id} and model_name={selected.model_name}"
     )
 
 
-def _model_summary_payload_from_row(row: dict[str, str]) -> dict[str, object]:
+def _model_summary_payload_from_row(
+    row: dict[str, str],
+    *,
+    forecast_model_name: str,
+    validation_match_type: str,
+) -> dict[str, object]:
     return {
         "run_id": str(row["run_id"]),
         "model_name": str(row["model_name"]),
@@ -479,6 +492,9 @@ def _model_summary_payload_from_row(row: dict[str, str]) -> dict[str, object]:
             row.get("rmse_incidence_per_100k")
         ),
         "pearson_correlation": _optional_float(row.get("pearson_correlation")),
+        "validation_role": "historical_model_comparison",
+        "validation_match_type": validation_match_type,
+        "forecast_model_name": forecast_model_name,
         "comparison_assumption_flags": split_quality_flags(
             row.get("comparison_assumption_flags", "")
         ),
