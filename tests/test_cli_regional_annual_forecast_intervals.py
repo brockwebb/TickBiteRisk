@@ -44,8 +44,10 @@ def test_regional_annual_forecast_intervals_command_writes_outputs(
 
     assert result.exit_code == 0
     assert "regional_annual_forecast_intervals.csv" in result.stdout
+    assert "regional_annual_forecast_interval_summary.csv" in result.stdout
     assert (output_dir / "regional_annual_forecast_interval_runs.csv").exists()
     assert (output_dir / "regional_annual_forecast_intervals.csv").exists()
+    assert (output_dir / "regional_annual_forecast_interval_summary.csv").exists()
     with (output_dir / "regional_annual_forecast_intervals.csv").open(
         encoding="utf-8",
         newline="",

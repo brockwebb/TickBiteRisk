@@ -3905,6 +3905,10 @@ def regional_annual_forecast_intervals(
         f"Wrote {len(result.intervals)} regional annual forecast interval row(s) "
         f"to {outputs.intervals_path}"
     )
+    typer.echo(
+        f"Wrote {len(result.summary)} regional annual forecast interval summary "
+        f"row(s) to {outputs.summary_path}"
+    )
 
 
 @etl_app.command("regional-forecast-capacity")

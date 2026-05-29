@@ -17,6 +17,7 @@ from tickbiterisk.modeling.regional_annual_forecast_build import (
 from tickbiterisk.modeling.regional_annual_forecast_intervals import (
     REGIONAL_ANNUAL_FORECAST_INTERVAL_COLUMNS,
     REGIONAL_ANNUAL_FORECAST_INTERVAL_RUN_COLUMNS,
+    REGIONAL_ANNUAL_FORECAST_INTERVAL_SUMMARY_COLUMNS,
     RegionalAnnualForecastIntervalInputError,
     build_regional_annual_forecast_intervals,
     write_regional_annual_forecast_interval_outputs,
@@ -70,6 +71,59 @@ def test_regional_annual_forecast_intervals_use_prior_origin_residuals(
     assert result.run.n_interval_rows == 20
     assert result.run.residual_test_start_year == 2020
     assert result.run.residual_test_end_year == 2021
+
+
+def test_regional_annual_forecast_intervals_build_state_and_regional_summaries(
+    tmp_path: Path,
+) -> None:
+    forecast_predictions = _write_forecast_predictions(tmp_path)
+    incidence_sha = _sha256_file(tmp_path / "incidence.csv")
+    stress_predictions = _write_stress_predictions(
+        tmp_path / "stress_predictions.csv",
+        source_file_sha256=incidence_sha,
+    )
+
+    result = build_regional_annual_forecast_intervals(
+        forecast_predictions_path=forecast_predictions,
+        regional_incidence_stress_predictions_path=stress_predictions,
+        min_residual_count=2,
+    )
+
+    assert len(result.summary) == 15
+    maryland = next(
+        row
+        for row in result.summary
+        if row.model_name == "latest_observed_county_incidence"
+        and row.geography_level == "state"
+        and row.region_id == "24"
+    )
+    assert maryland.region_name == "Maryland"
+    assert maryland.n_counties == 2
+    assert maryland.forecast_population == 200000
+    assert maryland.predicted_total_cases == 44.0
+    assert maryland.predicted_incidence_per_100k == 22.0
+    assert maryland.lower_80_cases == 35.2
+    assert maryland.median_cases == 44.0
+    assert maryland.upper_80_cases == 60.0
+    assert maryland.lower_95_cases == 33.55
+    assert maryland.upper_95_cases == 63.0
+    assert maryland.lower_80_incidence_per_100k == 17.6
+    assert maryland.upper_95_incidence_per_100k == 31.5
+    assert maryland.residual_count_min == 2
+    assert maryland.residual_count_max == 2
+    assert "summed_county_empirical_intervals" in maryland.summary_assumption_flags
+    assert "not_public_default" in maryland.summary_assumption_flags
+
+    midatlantic = next(
+        row
+        for row in result.summary
+        if row.model_name == "latest_observed_county_incidence"
+        and row.geography_level == "midatlantic"
+    )
+    assert midatlantic.region_id == "midatlantic"
+    assert midatlantic.region_name == "DE/DC/MD/PA/VA/WV"
+    assert midatlantic.n_counties == 4
+    assert midatlantic.forecast_population == 420000
 
 
 def test_regional_annual_forecast_intervals_reject_source_hash_mismatch(
@@ -157,8 +211,13 @@ def test_write_regional_annual_forecast_interval_outputs_uses_stable_schemas(
         assert next(csv.reader(handle)) == REGIONAL_ANNUAL_FORECAST_INTERVAL_RUN_COLUMNS
     with outputs.intervals_path.open(newline="", encoding="utf-8") as handle:
         assert next(csv.reader(handle)) == REGIONAL_ANNUAL_FORECAST_INTERVAL_COLUMNS
+    with outputs.summary_path.open(newline="", encoding="utf-8") as handle:
+        assert next(csv.reader(handle)) == (
+            REGIONAL_ANNUAL_FORECAST_INTERVAL_SUMMARY_COLUMNS
+        )
     assert outputs.runs_path.name == "regional_annual_forecast_interval_runs.csv"
     assert outputs.intervals_path.name == "regional_annual_forecast_intervals.csv"
+    assert outputs.summary_path.name == "regional_annual_forecast_interval_summary.csv"
 
 
 def _write_forecast_predictions(tmp_path: Path) -> Path:

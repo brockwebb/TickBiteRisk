@@ -20,6 +20,11 @@ INTERVAL_FEATURE_FLAGS = (
     "residual_test_year_lte_forecast_origin,"
     "not_public_default"
 )
+SUMMARY_ASSUMPTION_FLAGS = (
+    "summed_county_empirical_intervals,"
+    "planning_aggregate_not_joint_posterior,"
+    "not_public_default"
+)
 EXPECTED_STRESS_FEATURE_SET = (
     "historical_incidence_shrinkage_analog_random_forest_baselines"
 )
@@ -134,6 +139,42 @@ REGIONAL_ANNUAL_FORECAST_INTERVAL_COLUMNS = [
     "interval_assumption_flags",
 ]
 
+REGIONAL_ANNUAL_FORECAST_INTERVAL_SUMMARY_COLUMNS = [
+    "run_id",
+    "source_forecast_run_id",
+    "model_name",
+    "model_family",
+    "target_definition",
+    "feature_set",
+    "feature_profile",
+    "evaluation_mode",
+    "geography_level",
+    "region_id",
+    "region_name",
+    "forecast_year",
+    "forecast_origin_year",
+    "interval_method",
+    "n_counties",
+    "forecast_population",
+    "predicted_total_cases",
+    "predicted_incidence_per_100k",
+    "lower_80_cases",
+    "median_cases",
+    "upper_80_cases",
+    "lower_95_cases",
+    "upper_95_cases",
+    "lower_80_incidence_per_100k",
+    "median_incidence_per_100k",
+    "upper_80_incidence_per_100k",
+    "lower_95_incidence_per_100k",
+    "upper_95_incidence_per_100k",
+    "residual_count_min",
+    "residual_count_max",
+    "residual_test_start_year",
+    "residual_test_end_year",
+    "summary_assumption_flags",
+]
+
 
 class RegionalAnnualForecastIntervalInputError(ValueError):
     """Raised when regional annual forecast interval inputs are invalid."""
@@ -209,16 +250,55 @@ class RegionalAnnualForecastInterval:
 
 
 @dataclass(frozen=True)
+class RegionalAnnualForecastIntervalSummary:
+    run_id: str
+    source_forecast_run_id: str
+    model_name: str
+    model_family: str
+    target_definition: str
+    feature_set: str
+    feature_profile: str
+    evaluation_mode: str
+    geography_level: str
+    region_id: str
+    region_name: str
+    forecast_year: int
+    forecast_origin_year: int
+    interval_method: str
+    n_counties: int
+    forecast_population: int
+    predicted_total_cases: float
+    predicted_incidence_per_100k: float
+    lower_80_cases: float
+    median_cases: float
+    upper_80_cases: float
+    lower_95_cases: float
+    upper_95_cases: float
+    lower_80_incidence_per_100k: float
+    median_incidence_per_100k: float
+    upper_80_incidence_per_100k: float
+    lower_95_incidence_per_100k: float
+    upper_95_incidence_per_100k: float
+    residual_count_min: int
+    residual_count_max: int
+    residual_test_start_year: int
+    residual_test_end_year: int
+    summary_assumption_flags: str
+
+
+@dataclass(frozen=True)
 class RegionalAnnualForecastIntervalResult:
     run_id: str
     run: RegionalAnnualForecastIntervalRun
     intervals: list[RegionalAnnualForecastInterval]
+    summary: list[RegionalAnnualForecastIntervalSummary]
 
 
 @dataclass(frozen=True)
 class RegionalAnnualForecastIntervalOutputPaths:
     runs_path: Path
     intervals_path: Path
+    summary_path: Path
 
 
 @dataclass(frozen=True)
@@ -384,20 +464,22 @@ def build_regional_annual_forecast_intervals(
         n_interval_rows=len(intervals),
         interval_assumption_flags=INTERVAL_ASSUMPTION_FLAGS,
     )
+    intervals = sorted(
+        intervals,
+        key=lambda row: (
+            row.source_forecast_run_id,
+            row.model_name,
+            row.forecast_year,
+            row.forecast_origin_year,
+            row.state_fips,
+            row.county_fips,
+        ),
+    )
     return RegionalAnnualForecastIntervalResult(
         run_id=run_id,
         run=run,
-        intervals=sorted(
-            intervals,
-            key=lambda row: (
-                row.source_forecast_run_id,
-                row.model_name,
-                row.forecast_year,
-                row.forecast_origin_year,
-                row.state_fips,
-                row.county_fips,
-            ),
-        ),
+        intervals=intervals,
+        summary=_summary_rows(intervals),
     )
 
 
@@ -408,6 +490,7 @@ def write_regional_annual_forecast_interval_outputs(
     output_dir.mkdir(parents=True, exist_ok=True)
     runs_path = output_dir / "regional_annual_forecast_interval_runs.csv"
     intervals_path = output_dir / "regional_annual_forecast_intervals.csv"
+    summary_path = output_dir / "regional_annual_forecast_interval_summary.csv"
     _write_records(
         runs_path,
         [asdict(result.run)],
@@ -418,10 +501,146 @@ def write_regional_annual_forecast_interval_outputs(
         [asdict(row) for row in result.intervals],
         REGIONAL_ANNUAL_FORECAST_INTERVAL_COLUMNS,
     )
+    _write_records(
+        summary_path,
+        [asdict(row) for row in result.summary],
+        REGIONAL_ANNUAL_FORECAST_INTERVAL_SUMMARY_COLUMNS,
+    )
     return RegionalAnnualForecastIntervalOutputPaths(
         runs_path=runs_path,
         intervals_path=intervals_path,
+        summary_path=summary_path,
     )
+
+
+def _summary_rows(
+    intervals: list[RegionalAnnualForecastInterval],
+) -> list[RegionalAnnualForecastIntervalSummary]:
+    groups: dict[tuple[str, str, str], list[RegionalAnnualForecastInterval]] = {}
+    for interval in intervals:
+        for geography_level, region_id in _summary_regions(interval):
+            groups.setdefault(
+                (interval.model_name, geography_level, region_id),
+                [],
+            ).append(interval)
+
+    rows = [
+        _summary_row(
+            geography_level=geography_level,
+            region_id=region_id,
+            intervals=rows,
+        )
+        for (_model_name, geography_level, region_id), rows in sorted(groups.items())
+    ]
+    return sorted(
+        rows,
+        key=lambda row: (
+            row.model_name,
+            row.forecast_year,
+            row.forecast_origin_year,
+            row.geography_level,
+            row.region_id,
+        ),
+    )
+
+
+def _summary_row(
+    *,
+    geography_level: str,
+    region_id: str,
+    intervals: list[RegionalAnnualForecastInterval],
+) -> RegionalAnnualForecastIntervalSummary:
+    first = intervals[0]
+    forecast_population = sum(row.forecast_population for row in intervals)
+    predicted_total_cases = _round(sum(row.predicted_cases for row in intervals))
+    lower_80_cases = _round(sum(row.lower_80_cases for row in intervals))
+    median_cases = _round(sum(row.median_cases for row in intervals))
+    upper_80_cases = _round(sum(row.upper_80_cases for row in intervals))
+    lower_95_cases = _round(sum(row.lower_95_cases for row in intervals))
+    upper_95_cases = _round(sum(row.upper_95_cases for row in intervals))
+    return RegionalAnnualForecastIntervalSummary(
+        run_id=first.run_id,
+        source_forecast_run_id=first.source_forecast_run_id,
+        model_name=first.model_name,
+        model_family=first.model_family,
+        target_definition=first.target_definition,
+        feature_set=first.feature_set,
+        feature_profile=first.feature_profile,
+        evaluation_mode=first.evaluation_mode,
+        geography_level=geography_level,
+        region_id=region_id,
+        region_name=_summary_region_name(
+            geography_level,
+            region_id,
+            intervals,
+        ),
+        forecast_year=first.forecast_year,
+        forecast_origin_year=first.forecast_origin_year,
+        interval_method="summed_county_empirical_residual_intervals",
+        n_counties=len({row.county_fips for row in intervals}),
+        forecast_population=forecast_population,
+        predicted_total_cases=predicted_total_cases,
+        predicted_incidence_per_100k=_cases_to_incidence(
+            predicted_total_cases,
+            forecast_population,
+        ),
+        lower_80_cases=lower_80_cases,
+        median_cases=median_cases,
+        upper_80_cases=upper_80_cases,
+        lower_95_cases=lower_95_cases,
+        upper_95_cases=upper_95_cases,
+        lower_80_incidence_per_100k=_cases_to_incidence(
+            lower_80_cases,
+            forecast_population,
+        ),
+        median_incidence_per_100k=_cases_to_incidence(
+            median_cases,
+            forecast_population,
+        ),
+        upper_80_incidence_per_100k=_cases_to_incidence(
+            upper_80_cases,
+            forecast_population,
+        ),
+        lower_95_incidence_per_100k=_cases_to_incidence(
+            lower_95_cases,
+            forecast_population,
+        ),
+        upper_95_incidence_per_100k=_cases_to_incidence(
+            upper_95_cases,
+            forecast_population,
+        ),
+        residual_count_min=min(row.residual_count for row in intervals),
+        residual_count_max=max(row.residual_count for row in intervals),
+        residual_test_start_year=min(row.residual_test_start_year for row in intervals),
+        residual_test_end_year=max(row.residual_test_end_year for row in intervals),
+        summary_assumption_flags=_join_flags(
+            SUMMARY_ASSUMPTION_FLAGS,
+            *(row.interval_assumption_flags for row in intervals),
+        ),
+    )
+
+
+def _summary_regions(
+    interval: RegionalAnnualForecastInterval,
+) -> tuple[tuple[str, str], tuple[str, str]]:
+    return (
+        ("state", interval.state_fips),
+        ("midatlantic", "midatlantic"),
+    )
+
+
+def _summary_region_name(
+    geography_level: str,
+    region_id: str,
+    intervals: list[RegionalAnnualForecastInterval],
+) -> str:
+    if geography_level == "midatlantic":
+        return "DE/DC/MD/PA/VA/WV"
+    if geography_level == "state":
+        state_names = {row.state_name for row in intervals if row.state_fips == region_id}
+        if len(state_names) == 1:
+            return next(iter(state_names))
+    return region_id
 
 
 def _interval_row(
@@ -748,6 +967,12 @@ def _quantile(values: list[float], probability: float) -> float:
 
 def _incidence_to_cases(incidence: float, population: int) -> float:
     return _round(incidence * population / 100000)
+
+
+def _cases_to_incidence(cases: float, population: int) -> float:
+    if population <= 0:
+        return 0.0
+    return _round(cases / population * 100000)
 
 
 def _bounded_incidence(value: float) -> float:
