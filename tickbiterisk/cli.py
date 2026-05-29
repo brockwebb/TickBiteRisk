@@ -2506,6 +2506,13 @@ def annual_forecast(
         Path("build/etl/regional-population/midatlantic_county_population_year.csv"),
         help="County-year population panel containing the forecast target year.",
     ),
+    county_adjacency_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional county adjacency CSV for target-year spatial forecast "
+            "features."
+        ),
+    ),
     target_year: int = typer.Option(
         2026,
         help="Future forecast year to score.",
@@ -2517,6 +2524,10 @@ def annual_forecast(
     min_train_years: int = typer.Option(
         5,
         help="Minimum prior county years required for annual forecast.",
+    ),
+    ridge_alpha: float = typer.Option(
+        1.0,
+        help="Ridge regularization strength for annual forecast ridge branches.",
     ),
     shrinkage_strength: float = typer.Option(
         5.0,
@@ -2551,12 +2562,18 @@ def annual_forecast(
         )
     if not population_path.exists():
         raise typer.BadParameter(f"Population file not found: {population_path}")
+    if county_adjacency_path is not None and not county_adjacency_path.exists():
+        raise typer.BadParameter(
+            f"County adjacency file not found: {county_adjacency_path}"
+        )
     if target_year <= forecast_origin_year:
         raise typer.BadParameter(
             "target-year must be greater than forecast-origin-year"
         )
     if min_train_years < 1:
         raise typer.BadParameter("min-train-years must be at least 1")
+    if ridge_alpha <= 0:
+        raise typer.BadParameter("ridge-alpha must be greater than 0")
     if shrinkage_strength < 0:
         raise typer.BadParameter("shrinkage-strength must be non-negative")
     _validate_forecast_update_mode(update_mode)
@@ -2565,9 +2582,11 @@ def annual_forecast(
         result = build_annual_forecast(
             design_matrix_path=design_matrix_path,
             population_path=population_path,
+            county_adjacency_path=county_adjacency_path,
             target_year=target_year,
             forecast_origin_year=forecast_origin_year,
             min_train_years=min_train_years,
+            ridge_alpha=ridge_alpha,
             shrinkage_strength=shrinkage_strength,
             as_of_date=as_of_date,
             data_cutoff_date=data_cutoff_date,

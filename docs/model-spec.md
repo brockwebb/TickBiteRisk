@@ -127,10 +127,11 @@ After adding MEI.v2, regional prior-incidence clusters, prior-year age
 structure, and a simple top-4 comparison ensemble to the research lanes,
 `forecast_safe_top4_ensemble` ranked first at 17.971574 MAE per 100k, ahead of
 `prior_year_incidence` at 18.21318 and `linear_blend_baseline` at 18.47245.
-The ensemble is intentionally model-comparison-only for now because it depends
-on safe-ridge and spatial-ridge comparison outputs that are not yet reproduced
-as true target-year annual forecast rows. `random_forest_forecast_research`
-ranked at 20.378557 MAE per 100k, `analog_year_forecast` ranked at 21.778584,
+The ensemble is now reproduced by `annual-forecast` as a true target-year
+research branch when Maryland county adjacency is supplied, using refreshed
+origin-year lag and neighbor features rather than validation-only rows.
+`random_forest_forecast_research` ranked at 20.378557 MAE per 100k,
+`analog_year_forecast` ranked at 21.778584,
 `ridge_forecast_ecology` ranked at 23.763644, `ridge_forecast_regional` ranked
 at 24.728232, and `ridge_lag_weather_ecology` ranked at 25.233508 in the same
 run. The random-forest lane is deterministic (`random_state=1337`) and uses
@@ -158,10 +159,10 @@ county-week score until later validation shows a stable gain and the model can
 be explained plainly enough for the dashboard.
 
 The `forecast_safe_top4_ensemble` lane tests whether a small equal-weight blend
-can reduce variance across the strongest forecast-safe comparison branches. It
-is not part of `annual-forecast` yet; promoting it requires a target-year
-feature contract for the ridge and spatial components so future 2026 forecast
-rows are not built from stale validation-only inputs.
+can reduce variance across the strongest forecast-safe comparison branches.
+`annual-forecast` can now emit it as a target-year research branch when county
+adjacency is supplied. Public promotion remains a separate product decision:
+the current public county-week forecast still selects `linear_blend_baseline`.
 
 The `regional-outcome-stress` diagnostic is separate from the Maryland
 incidence comparison. It tests whether state or Mid-Atlantic capacity-share

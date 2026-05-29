@@ -117,7 +117,8 @@ def test_operational_runbook_documents_2026_forecast_refresh_procedure() -> None
     for token in [
         "2026 public forecast refresh",
         "tickbiterisk etl annual-forecast",
-        "--as-of-date 2026-05-28",
+        "--county-adjacency-path build/etl/county-adjacency/md_county_adjacency.csv",
+        "--as-of-date 2026-05-29",
         "--data-cutoff-date 2024-12-31",
         "--source-vintage 2024-inclusive-local",
         "annual_forecast_predictions.csv",

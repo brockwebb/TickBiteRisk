@@ -443,8 +443,9 @@ artifacts.
     - Adds `forecast_safe_top4_ensemble` as a research-only equal-weight blend
       of prior-year incidence, `linear_blend_baseline`, `ridge_forecast_safe`,
       and `ridge_forecast_spatial` when spatial features are present. This
-      branch is a comparison diagnostic only and is not wired into
-      `annual-forecast` or the public county-week score.
+      branch is reproduced by `annual-forecast` as a target-year research
+      branch when Maryland county adjacency is supplied, but it is not the
+      public county-week score.
     - Writes `model_comparison_runs.csv`,
       `model_comparison_predictions.csv`,
       `model_comparison_intervals.csv`, `model_comparison_metrics.csv`, and
@@ -452,13 +453,15 @@ artifacts.
 
 16b. `tickbiterisk etl annual-forecast`
     - Typical 2026 run:
-      `tickbiterisk etl annual-forecast --design-matrix-path build/etl/model/model_design_matrix_county_year.csv --population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --forecast-origin-year 2024 --as-of-date 2026-05-28 --data-cutoff-date 2024-12-31 --source-vintage 2024-inclusive-local --update-mode pre_update --output-dir build/etl/annual-forecast`.
+      `tickbiterisk etl annual-forecast --design-matrix-path build/etl/model/model_design_matrix_county_year.csv --population-path build/etl/regional-population/midatlantic_county_population_year.csv --county-adjacency-path build/etl/county-adjacency/md_county_adjacency.csv --target-year 2026 --forecast-origin-year 2024 --as-of-date 2026-05-29 --data-cutoff-date 2024-12-31 --source-vintage 2024-inclusive-local --update-mode pre_update --output-dir build/etl/annual-forecast`.
     - Trains transparent annual forecast branches through the declared
       `forecast_origin_year` and scores a later `target_year` without
       requiring observed target-year Lyme outcomes. The branch set includes
-      lagged outcome, empirical-Bayes shrinkage, and a forecast-safe
-      `analog_year_forecast` like-years hedge based only on lagged incidence
-      history features.
+      lagged outcome, empirical-Bayes shrinkage, a forecast-safe
+      `analog_year_forecast` like-years hedge, `ridge_forecast_safe`, and,
+      when county adjacency is supplied, `ridge_forecast_spatial` and
+      `forecast_safe_top4_ensemble`. Spatial features are refreshed from
+      origin-year neighbor outcomes rather than copied from validation rows.
     - Uses a target-year population panel for the forecast denominator. Current
       2026 runs use projected denominators from official Vintage 2025 Census
       rows and preserve explicit forecast/projection flags.
@@ -470,10 +473,12 @@ artifacts.
     - Prediction rows intentionally omit observed target, actual, residual,
       error, and coverage columns because this artifact is a true forecast, not
       a rolling-origin evaluation table.
-    - Current branches are transparent lagged-outcome baselines:
+    - Current public branch selection remains the transparent lagged-outcome
+      baseline:
       `latest_observed_incidence`, `trailing_mean_incidence`,
-      `linear_blend_baseline`, and `empirical_bayes_shrinkage`. The artifact is
-      the current public annual source after the county-week seasonality
+      `linear_blend_baseline`, and `empirical_bayes_shrinkage` stay available,
+      while ridge/spatial/top-4 branches remain research candidates. The
+      artifact is the current public annual source after the county-week seasonality
       transform; rolling-origin model comparison remains the historical
       validation source for the selected branch.
 

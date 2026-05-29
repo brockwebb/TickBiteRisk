@@ -50,9 +50,10 @@ branch, then export static JSON.
 tickbiterisk etl annual-forecast \
   --design-matrix-path build/etl/model/model_design_matrix_county_year.csv \
   --population-path build/etl/regional-population/midatlantic_county_population_year.csv \
+  --county-adjacency-path build/etl/county-adjacency/md_county_adjacency.csv \
   --target-year 2026 \
   --forecast-origin-year 2024 \
-  --as-of-date 2026-05-28 \
+  --as-of-date 2026-05-29 \
   --data-cutoff-date 2024-12-31 \
   --source-vintage 2024-inclusive-local \
   --update-mode pre_update \
