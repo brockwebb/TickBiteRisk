@@ -242,6 +242,51 @@ def test_export_static_risk_data_can_write_regional_research_scope(
     ]
 
 
+def test_regional_static_export_preserves_multi_year_forecast_runs(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_csv(
+        tmp_path / "scores.csv",
+        [
+            {
+                **_score_row("42001", "Adams County", "2025", "1", "6"),
+                "source_prediction_run_id": "regional_forecast_2025",
+            },
+            {
+                **_score_row("42001", "Adams County", "2026", "1", "7"),
+                "source_prediction_run_id": "regional_forecast_2026",
+            },
+        ],
+    )
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "regional-data",
+        geography_scope="midatlantic_county_week",
+    )
+
+    weekly = _read_json(outputs.weekly_risk_path)
+    counties = _read_json(outputs.county_metadata_path)
+    model_card = _read_json(outputs.model_card_path)
+    source_catalog = _read_json(outputs.source_catalog_path)
+
+    assert weekly["record_count"] == 2
+    assert weekly["year_selection"] == "all_available_years"
+    assert [record["year"] for record in weekly["records"]] == [2025, 2026]
+    assert weekly["selected_forecast_metadata"]["forecast_years"] == [2025, 2026]
+    assert weekly["selected_forecast_metadata"]["source_prediction_run_ids"] == [
+        "regional_forecast_2025",
+        "regional_forecast_2026",
+    ]
+    assert counties["counties"][0]["available_years"] == [2025, 2026]
+    assert model_card["annual_prediction_source"]["forecast_years"] == [2025, 2026]
+    assert model_card["annual_prediction_source"]["source_prediction_run_ids"] == [
+        "regional_forecast_2025",
+        "regional_forecast_2026",
+    ]
+    assert source_catalog["sources"][1]["forecast_years"] == [2025, 2026]
+
+
 def test_export_static_risk_data_rejects_unknown_geography_scope(
     tmp_path: Path,
 ) -> None:

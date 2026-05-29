@@ -145,10 +145,11 @@ def export_static_risk_data(
         source_prediction_run_id=source_prediction_run_id,
         source_prediction_sha256=source_prediction_sha256,
         source_seasonality_sha256=source_seasonality_sha256,
+        geography=geography,
     )
     source_records = selected
     _validate_duplicate_keys(source_records)
-    selected = _latest_records_by_county_week(selected)
+    selected = _display_records(selected, geography=geography)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = StaticRiskExportPaths(
@@ -301,6 +302,7 @@ def _select_records(
     source_prediction_run_id: str | None,
     source_prediction_sha256: str | None,
     source_seasonality_sha256: str | None,
+    geography: _GeographyScope,
 ) -> list[CountyWeekRiskRecord]:
     selected = [
         record
@@ -345,19 +347,7 @@ def _select_records(
     if not selected:
         raise StaticExportInputError("No static export rows matched the selectors")
 
-    branches = {
-        (
-            record.model_name,
-            record.seasonality_source_id,
-            record.benchmark_quantile,
-            record.headroom_multiplier,
-            record.score_denominator,
-            record.source_prediction_run_id,
-            record.source_prediction_sha256,
-            record.source_seasonality_sha256,
-        )
-        for record in selected
-    }
+    branches = {_score_branch_key(record, geography) for record in selected}
     if len(branches) > 1:
         raise StaticExportInputError(
             "Multiple static export score branches found; provide selectors for "
@@ -369,6 +359,24 @@ def _select_records(
     )
 
 
+def _score_branch_key(
+    record: CountyWeekRiskRecord,
+    geography: _GeographyScope,
+) -> tuple[object, ...]:
+    key = (
+        record.model_name,
+        record.seasonality_source_id,
+        record.benchmark_quantile,
+        record.headroom_multiplier,
+        record.score_denominator,
+        record.source_prediction_sha256,
+        record.source_seasonality_sha256,
+    )
+    if geography.scope == MIDATLANTIC_GEOGRAPHY_SCOPE:
+        return key
+    return (*key, record.source_prediction_run_id)
+
+
 def _validate_duplicate_keys(records: list[CountyWeekRiskRecord]) -> None:
     seen = set()
     for record in records:
@@ -378,6 +386,16 @@ def _validate_duplicate_keys(records: list[CountyWeekRiskRecord]) -> None:
                 "Duplicate county/year/MMWR week rows found after selectors"
             )
         seen.add(key)
+
+
+def _display_records(
+    records: list[CountyWeekRiskRecord],
+    *,
+    geography: _GeographyScope,
+) -> list[CountyWeekRiskRecord]:
+    if geography.scope == MIDATLANTIC_GEOGRAPHY_SCOPE:
+        return sorted(records, key=lambda row: (row.county_fips, row.year, row.mmwr_week))
+    return _latest_records_by_county_week(records)
 
 
 def _latest_records_by_county_week(
@@ -416,9 +434,9 @@ def _weekly_payload(
         "model_name": first.model_name,
         "seasonality_source_id": first.seasonality_source_id,
         "record_count": len(records),
-        "year_selection": "latest_available_per_county_mmwr_week",
+        "year_selection": _year_selection(geography),
         "selected_score_config": _selected_score_config(first),
-        "selected_forecast_metadata": _selected_forecast_metadata(first),
+        "selected_forecast_metadata": _selected_forecast_metadata(records),
         "score_scale": {
             "range": [1, 10],
             "categories": SCORE_CATEGORIES,
@@ -545,7 +563,7 @@ def _model_card_payload(
         },
         **_research_status_field(geography),
         "explainer_placeholders": EXPLAINER_PLACEHOLDERS,
-        "annual_prediction_source": _annual_prediction_source(first),
+        "annual_prediction_source": _annual_prediction_source(records),
         "quality_flags": [
             "relative_seasonal_baseline",
             "static_seasonality_prior",
@@ -723,7 +741,7 @@ def _source_catalog_payload(
                 "model_family": first.model_family,
                 "evaluation_mode": first.evaluation_mode,
                 "weather_mode": first.weather_mode,
-                **_selected_forecast_metadata(first),
+                **_selected_forecast_metadata(records),
                 **_annual_interval_metadata(first),
                 "notes": (
                     "Selected annual no-observed-target forecast rows; "
@@ -742,7 +760,11 @@ def _source_catalog_payload(
     }
 
 
-def _annual_prediction_source(record: CountyWeekRiskRecord) -> dict[str, object]:
+def _annual_prediction_source(
+    records: CountyWeekRiskRecord | list[CountyWeekRiskRecord],
+) -> dict[str, object]:
+    selected = records if isinstance(records, list) else [records]
+    record = selected[0]
     return {
         "artifact_type": "annual_prediction_branch",
         "run_id": record.source_prediction_run_id,
@@ -751,7 +773,7 @@ def _annual_prediction_source(record: CountyWeekRiskRecord) -> dict[str, object]
         "model_family": record.model_family,
         "evaluation_mode": record.evaluation_mode,
         "weather_mode": record.weather_mode,
-        **_selected_forecast_metadata(record),
+        **_selected_forecast_metadata(selected),
         **_annual_interval_metadata(record),
     }
 
@@ -817,7 +839,11 @@ def _selected_score_config(record: CountyWeekRiskRecord) -> dict[str, object]:
     return config
 
 
-def _selected_forecast_metadata(record: CountyWeekRiskRecord) -> dict[str, object]:
+def _selected_forecast_metadata(
+    records: CountyWeekRiskRecord | list[CountyWeekRiskRecord],
+) -> dict[str, object]:
+    selected = records if isinstance(records, list) else [records]
+    record = selected[0]
     metadata = {
         "forecast_origin_year": record.forecast_origin_year,
         "as_of_date": record.as_of_date,
@@ -825,10 +851,34 @@ def _selected_forecast_metadata(record: CountyWeekRiskRecord) -> dict[str, objec
         "source_vintage": record.source_vintage,
         "update_mode": record.update_mode,
     }
+    forecast_years = sorted({row.year for row in selected})
+    run_ids = _ordered_unique_run_ids(selected)
+    if len(forecast_years) > 1:
+        metadata["forecast_years"] = forecast_years
+    if len(run_ids) > 1:
+        metadata["source_prediction_run_ids"] = run_ids
     if record.annual_interval_available:
         metadata["annual_interval_available"] = True
         metadata["annual_interval_method"] = record.annual_interval_method
     return metadata
+
+
+def _ordered_unique_run_ids(records: list[CountyWeekRiskRecord]) -> list[str]:
+    first_year_by_run_id: dict[str, int] = {}
+    for record in records:
+        first_year_by_run_id.setdefault(record.source_prediction_run_id, record.year)
+    return [
+        run_id
+        for run_id, _ in sorted(
+            first_year_by_run_id.items(), key=lambda item: (item[1], item[0])
+        )
+    ]
+
+
+def _year_selection(geography: _GeographyScope) -> str:
+    if geography.scope == MIDATLANTIC_GEOGRAPHY_SCOPE:
+        return "all_available_years"
+    return "latest_available_per_county_mmwr_week"
 
 
 def _annual_interval_metadata(record: CountyWeekRiskRecord) -> dict[str, object]:
