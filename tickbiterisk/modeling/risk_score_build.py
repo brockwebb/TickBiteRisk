@@ -11,6 +11,7 @@ SEASONAL_RISK_SCORE_COLUMNS = [
     "source_prediction_run_id",
     "source_prediction_sha256",
     "source_seasonality_sha256",
+    "source_prediction_interval_sha256",
     "model_name",
     "model_family",
     "target_definition",
@@ -29,6 +30,8 @@ SEASONAL_RISK_SCORE_COLUMNS = [
     "period_label",
     "predicted_annual_incidence_per_100k",
     "predicted_annual_cases",
+    "annual_interval_method",
+    "annual_interval_available",
     "seasonal_mean_share",
     "seasonal_lower_80_share",
     "seasonal_upper_80_share",
@@ -65,6 +68,7 @@ RISK_SCORE_SCALE_COLUMNS = [
     "n_score_rows",
     "source_prediction_sha256",
     "source_seasonality_sha256",
+    "source_prediction_interval_sha256",
     "scale_quality_flags",
 ]
 
@@ -162,6 +166,7 @@ def _dedupe_score_records(
                 key[5],
                 float(key[6]),
                 float(key[7]),
+                key[10],
             ),
         )
     ]
@@ -174,7 +179,7 @@ def _dedupe_scale_records(records: list[dict[str, object]]) -> list[dict[str, ob
 
 def _score_key(
     record: dict[str, object]
-) -> tuple[str, str, str, str, str, str, str, str, str, str]:
+) -> tuple[str, str, str, str, str, str, str, str, str, str, str]:
     return (
         str(record["county_fips"]).zfill(5),
         str(record["model_name"]),
@@ -186,16 +191,20 @@ def _score_key(
         str(record["headroom_multiplier"]),
         str(record["source_prediction_sha256"]),
         str(record["source_seasonality_sha256"]),
+        str(record.get("source_prediction_interval_sha256", "")),
     )
 
 
-def _scale_key(record: dict[str, object]) -> tuple[str, str, str, str, str, str, str]:
+def _scale_key(
+    record: dict[str, object],
+) -> tuple[str, str, str, str, str, str, str, str]:
     return (
         str(record["model_name"]),
         str(record["grain"]),
         str(record["seasonality_source_id"]),
         str(record["source_prediction_sha256"]),
         str(record["source_seasonality_sha256"]),
+        str(record.get("source_prediction_interval_sha256", "")),
         str(record["benchmark_quantile"]),
         str(record["headroom_multiplier"]),
     )

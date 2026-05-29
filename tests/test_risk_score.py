@@ -174,6 +174,67 @@ def test_build_seasonal_risk_scores_reads_regional_annual_forecast_predictions(
     assert "not_public_default" in first.feature_quality_flags
 
 
+def test_build_seasonal_risk_scores_can_apply_annual_prediction_intervals(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_regional_annual_forecast_predictions(
+        tmp_path / "regional_annual_forecast_predictions.csv"
+    )
+    intervals_path = _write_regional_annual_forecast_intervals(
+        tmp_path / "regional_annual_forecast_intervals.csv"
+    )
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+
+    result = build_seasonal_risk_scores(
+        predictions_path=predictions_path,
+        prediction_intervals_path=intervals_path,
+        seasonality_baseline_path=seasonality_path,
+        model_name="empirical_bayes_spatial_regime_incidence",
+    )
+
+    first = result.rows[0]
+    assert len(first.source_prediction_interval_sha256) == 64
+    assert result.scale.source_prediction_interval_sha256 == (
+        first.source_prediction_interval_sha256
+    )
+    assert first.annual_interval_available is True
+    assert first.annual_interval_method == "empirical_rolling_origin_residual_quantile"
+    assert first.predicted_weekly_incidence_per_100k == 5.0
+    assert first.lower_80_weekly_incidence_per_100k == 2.0
+    assert first.upper_80_weekly_incidence_per_100k == 14.0
+    assert first.lower_95_weekly_incidence_per_100k == 1.2
+    assert first.upper_95_weekly_incidence_per_100k == 27.0
+    assert "annual_forecast_interval_applied" in first.feature_quality_flags
+    assert "empirical_rolling_origin_residual_interval" in (
+        first.backtest_assumption_flags
+    )
+
+
+def test_build_seasonal_risk_scores_rejects_missing_requested_annual_interval(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_regional_annual_forecast_predictions(
+        tmp_path / "regional_annual_forecast_predictions.csv"
+    )
+    intervals_path = _write_regional_annual_forecast_intervals(
+        tmp_path / "regional_annual_forecast_intervals.csv",
+        omitted_county_fips="42001",
+    )
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+
+    try:
+        build_seasonal_risk_scores(
+            predictions_path=predictions_path,
+            prediction_intervals_path=intervals_path,
+            seasonality_baseline_path=seasonality_path,
+            model_name="empirical_bayes_spatial_regime_incidence",
+        )
+    except RiskScoreInputError as exc:
+        assert "missing annual prediction interval" in str(exc)
+    else:
+        raise AssertionError("Expected missing annual interval to fail")
+
+
 def test_build_seasonal_risk_scores_keeps_legacy_inputs_backward_compatible(
     tmp_path: Path,
 ) -> None:
@@ -566,6 +627,41 @@ def _write_regional_annual_forecast_predictions(path: Path) -> Path:
             ),
         ],
     )
+
+
+def _write_regional_annual_forecast_intervals(
+    path: Path,
+    *,
+    omitted_county_fips: str | None = None,
+) -> Path:
+    rows = []
+    for county_fips, county_name, lower, median, upper, lower_95, upper_95 in [
+        ("24001", "Allegany County", "40.0", "50.0", "70.0", "30.0", "90.0"),
+        ("42001", "Adams County", "20.0", "30.0", "45.0", "10.0", "60.0"),
+    ]:
+        if county_fips == omitted_county_fips:
+            continue
+        rows.append(
+            {
+                "source_forecast_run_id": "regional-forecast-run",
+                "model_name": "empirical_bayes_spatial_regime_incidence",
+                "county_fips": county_fips,
+                "county_name": county_name,
+                "forecast_year": "2026",
+                "forecast_origin_year": "2023",
+                "interval_method": "empirical_rolling_origin_residual_quantile",
+                "lower_80_incidence_per_100k": lower,
+                "median_incidence_per_100k": median,
+                "upper_80_incidence_per_100k": upper,
+                "lower_95_incidence_per_100k": lower_95,
+                "upper_95_incidence_per_100k": upper_95,
+                "interval_assumption_flags": (
+                    "empirical_rolling_origin_residual_interval,"
+                    "forecast_without_observed_target"
+                ),
+            }
+        )
+    return _write_csv(path, rows)
 
 
 def _prediction_row(

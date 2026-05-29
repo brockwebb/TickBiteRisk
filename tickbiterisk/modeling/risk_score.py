@@ -47,6 +47,7 @@ class SeasonalRiskScore:
     source_prediction_run_id: str
     source_prediction_sha256: str
     source_seasonality_sha256: str
+    source_prediction_interval_sha256: str
     model_name: str
     model_family: str
     target_definition: str
@@ -65,6 +66,8 @@ class SeasonalRiskScore:
     period_label: str
     predicted_annual_incidence_per_100k: float
     predicted_annual_cases: float
+    annual_interval_method: str
+    annual_interval_available: bool
     seasonal_mean_share: float
     seasonal_lower_80_share: float
     seasonal_upper_80_share: float
@@ -102,6 +105,7 @@ class RiskScoreScale:
     n_score_rows: int
     source_prediction_sha256: str
     source_seasonality_sha256: str
+    source_prediction_interval_sha256: str
     scale_quality_flags: str
 
 
@@ -150,9 +154,25 @@ class _SeasonalityInput:
     feature_quality_flags: str
 
 
+@dataclass(frozen=True)
+class _PredictionIntervalInput:
+    source_forecast_run_id: str
+    model_name: str
+    county_fips: str
+    forecast_year: int
+    interval_method: str
+    lower_80_incidence_per_100k: float
+    median_incidence_per_100k: float
+    upper_80_incidence_per_100k: float
+    lower_95_incidence_per_100k: float
+    upper_95_incidence_per_100k: float
+    interval_assumption_flags: str
+
+
 def build_seasonal_risk_scores(
     *,
     predictions_path: Path,
+    prediction_intervals_path: Path | None = None,
     seasonality_baseline_path: Path,
     model_name: str = "linear_blend_baseline",
     seasonality_source_id: str = "cdc_seasonality_week_2023",
@@ -165,6 +185,9 @@ def build_seasonal_risk_scores(
         raise RiskScoreInputError("headroom_multiplier must be greater than 0")
 
     prediction_sha256 = _sha256_file(predictions_path)
+    prediction_interval_sha256 = (
+        "" if prediction_intervals_path is None else _sha256_file(prediction_intervals_path)
+    )
     seasonality_sha256 = _sha256_file(seasonality_baseline_path)
     predictions = [
         row
@@ -175,6 +198,11 @@ def build_seasonal_risk_scores(
         raise RiskScoreInputError(
             f"No annual predictions found for model_name={model_name}"
         )
+    prediction_intervals = (
+        None
+        if prediction_intervals_path is None
+        else _read_prediction_intervals(prediction_intervals_path)
+    )
     seasonality_rows = _read_weekly_lyme_seasonality(
         seasonality_baseline_path,
         seasonality_source_id=seasonality_source_id,
@@ -187,28 +215,36 @@ def build_seasonal_risk_scores(
 
     pending_rows = []
     for prediction in predictions:
+        prediction_interval = _prediction_interval_for(
+            prediction,
+            prediction_intervals,
+        )
         for seasonality in seasonality_rows:
             weekly_incidence = (
                 prediction.predicted_incidence_per_100k * seasonality.mean_share
             )
-            pending_rows.append((prediction, seasonality, weekly_incidence))
+            pending_rows.append(
+                (prediction, prediction_interval, seasonality, weekly_incidence)
+            )
     benchmark = _nearest_rank(
-        [weekly_incidence for _, _, weekly_incidence in pending_rows],
+        [weekly_incidence for _, _, _, weekly_incidence in pending_rows],
         benchmark_quantile,
     )
     denominator = benchmark * headroom_multiplier
     rows = [
         _risk_score_row(
             prediction=prediction,
+            prediction_interval=prediction_interval,
             seasonality=seasonality,
             weekly_incidence=weekly_incidence,
             denominator=denominator,
             benchmark_quantile=benchmark_quantile,
             headroom_multiplier=headroom_multiplier,
             prediction_sha256=prediction_sha256,
+            prediction_interval_sha256=prediction_interval_sha256,
             seasonality_sha256=seasonality_sha256,
         )
-        for prediction, seasonality, weekly_incidence in pending_rows
+        for prediction, prediction_interval, seasonality, weekly_incidence in pending_rows
     ]
     rows = sorted(rows, key=lambda row: (row.county_fips, row.year, row.mmwr_week))
     scale = RiskScoreScale(
@@ -223,6 +259,7 @@ def build_seasonal_risk_scores(
         n_score_rows=len(rows),
         source_prediction_sha256=prediction_sha256,
         source_seasonality_sha256=seasonality_sha256,
+        source_prediction_interval_sha256=prediction_interval_sha256,
         scale_quality_flags=_scale_quality_flags(predictions),
     )
     return SeasonalRiskScoreResult(
@@ -236,21 +273,44 @@ def build_seasonal_risk_scores(
 def _risk_score_row(
     *,
     prediction: _PredictionInput,
+    prediction_interval: _PredictionIntervalInput | None,
     seasonality: _SeasonalityInput,
     weekly_incidence: float,
     denominator: float,
     benchmark_quantile: float,
     headroom_multiplier: float,
     prediction_sha256: str,
+    prediction_interval_sha256: str,
     seasonality_sha256: str,
 ) -> SeasonalRiskScore:
     raw_score = 0.0 if denominator <= 0 else 10 * weekly_incidence / denominator
     score = _risk_score(raw_score)
     model_feature_quality_flags = _score_model_feature_quality_flags(prediction)
+    annual_lower_80 = (
+        prediction.predicted_incidence_per_100k
+        if prediction_interval is None
+        else prediction_interval.lower_80_incidence_per_100k
+    )
+    annual_upper_80 = (
+        prediction.predicted_incidence_per_100k
+        if prediction_interval is None
+        else prediction_interval.upper_80_incidence_per_100k
+    )
+    annual_lower_95 = (
+        prediction.predicted_incidence_per_100k
+        if prediction_interval is None
+        else prediction_interval.lower_95_incidence_per_100k
+    )
+    annual_upper_95 = (
+        prediction.predicted_incidence_per_100k
+        if prediction_interval is None
+        else prediction_interval.upper_95_incidence_per_100k
+    )
     return SeasonalRiskScore(
         source_prediction_run_id=prediction.run_id,
         source_prediction_sha256=prediction_sha256,
         source_seasonality_sha256=seasonality_sha256,
+        source_prediction_interval_sha256=prediction_interval_sha256,
         model_name=prediction.model_name,
         model_family=prediction.model_family,
         target_definition=prediction.target_definition,
@@ -271,6 +331,10 @@ def _risk_score_row(
             prediction.predicted_incidence_per_100k
         ),
         predicted_annual_cases=_round(prediction.predicted_cases),
+        annual_interval_method=(
+            "" if prediction_interval is None else prediction_interval.interval_method
+        ),
+        annual_interval_available=prediction_interval is not None,
         seasonal_mean_share=_round(seasonality.mean_share),
         seasonal_lower_80_share=_round(seasonality.lower_80_share),
         seasonal_upper_80_share=_round(seasonality.upper_80_share),
@@ -278,16 +342,16 @@ def _risk_score_row(
         seasonal_upper_95_share=_round(seasonality.upper_95_share),
         predicted_weekly_incidence_per_100k=_round(weekly_incidence),
         lower_80_weekly_incidence_per_100k=_round(
-            prediction.predicted_incidence_per_100k * seasonality.lower_80_share
+            annual_lower_80 * seasonality.lower_80_share
         ),
         upper_80_weekly_incidence_per_100k=_round(
-            prediction.predicted_incidence_per_100k * seasonality.upper_80_share
+            annual_upper_80 * seasonality.upper_80_share
         ),
         lower_95_weekly_incidence_per_100k=_round(
-            prediction.predicted_incidence_per_100k * seasonality.lower_95_share
+            annual_lower_95 * seasonality.lower_95_share
         ),
         upper_95_weekly_incidence_per_100k=_round(
-            prediction.predicted_incidence_per_100k * seasonality.upper_95_share
+            annual_upper_95 * seasonality.upper_95_share
         ),
         predicted_weekly_cases=_round(
             prediction.predicted_cases * seasonality.mean_share
@@ -304,9 +368,13 @@ def _risk_score_row(
         feature_quality_flags=_join_flags(
             RISK_SCORE_FEATURE_FLAGS,
             model_feature_quality_flags,
+            "annual_forecast_interval_applied" if prediction_interval else "",
             seasonality.feature_quality_flags,
         ),
-        backtest_assumption_flags=prediction.backtest_assumption_flags,
+        backtest_assumption_flags=_join_flags(
+            prediction.backtest_assumption_flags,
+            "" if prediction_interval is None else prediction_interval.interval_assumption_flags,
+        ),
     )
 
 
@@ -367,6 +435,97 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
         )
         for row in rows
     ]
+
+
+def _read_prediction_intervals(path: Path) -> dict[tuple[str, str, str, int], _PredictionIntervalInput]:
+    required_columns = [
+        "source_forecast_run_id",
+        "model_name",
+        "county_fips",
+        "forecast_year",
+        "interval_method",
+        "lower_80_incidence_per_100k",
+        "median_incidence_per_100k",
+        "upper_80_incidence_per_100k",
+        "lower_95_incidence_per_100k",
+        "upper_95_incidence_per_100k",
+    ]
+    rows = _read_csv(path, required_columns=required_columns)
+    intervals = {}
+    for row in rows:
+        interval = _PredictionIntervalInput(
+            source_forecast_run_id=row["source_forecast_run_id"],
+            model_name=row["model_name"],
+            county_fips=str(row["county_fips"]).zfill(5),
+            forecast_year=_parse_int(row["forecast_year"], "forecast_year"),
+            interval_method=row["interval_method"],
+            lower_80_incidence_per_100k=_parse_float(
+                row["lower_80_incidence_per_100k"],
+                "lower_80_incidence_per_100k",
+            ),
+            median_incidence_per_100k=_parse_float(
+                row["median_incidence_per_100k"],
+                "median_incidence_per_100k",
+            ),
+            upper_80_incidence_per_100k=_parse_float(
+                row["upper_80_incidence_per_100k"],
+                "upper_80_incidence_per_100k",
+            ),
+            lower_95_incidence_per_100k=_parse_float(
+                row["lower_95_incidence_per_100k"],
+                "lower_95_incidence_per_100k",
+            ),
+            upper_95_incidence_per_100k=_parse_float(
+                row["upper_95_incidence_per_100k"],
+                "upper_95_incidence_per_100k",
+            ),
+            interval_assumption_flags=row.get("interval_assumption_flags", ""),
+        )
+        key = _prediction_interval_key(
+            interval.source_forecast_run_id,
+            interval.model_name,
+            interval.county_fips,
+            interval.forecast_year,
+        )
+        if key in intervals:
+            raise RiskScoreInputError(
+                "duplicate annual prediction interval row for "
+                f"{interval.source_forecast_run_id}, {interval.model_name}, "
+                f"{interval.county_fips}, {interval.forecast_year}"
+            )
+        intervals[key] = interval
+    return intervals
+
+
+def _prediction_interval_for(
+    prediction: _PredictionInput,
+    intervals: dict[tuple[str, str, str, int], _PredictionIntervalInput] | None,
+) -> _PredictionIntervalInput | None:
+    if intervals is None:
+        return None
+    key = _prediction_interval_key(
+        prediction.run_id,
+        prediction.model_name,
+        prediction.county_fips,
+        prediction.year,
+    )
+    interval = intervals.get(key)
+    if interval is None:
+        raise RiskScoreInputError(
+            "missing annual prediction interval for "
+            f"{prediction.run_id}, {prediction.model_name}, "
+            f"{prediction.county_fips}, {prediction.year}"
+        )
+    return interval
+
+
+def _prediction_interval_key(
+    run_id: str,
+    model_name: str,
+    county_fips: str,
+    year: int,
+) -> tuple[str, str, str, int]:
+    return (run_id, model_name, str(county_fips).zfill(5), int(year))
 
 
 def _default_weather_mode(row: dict[str, str]) -> str:

@@ -2920,6 +2920,13 @@ def county_week_risk(
             "comparison, or legacy backtest outputs."
         ),
     ),
+    prediction_intervals_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional annual prediction interval CSV to propagate into weekly "
+            "risk bands."
+        ),
+    ),
     seasonality_baseline_path: Path = typer.Option(
         Path("build/etl/seasonality/seasonality_baseline.csv"),
         help="Input CDC Lyme seasonality baseline CSV.",
@@ -2961,10 +2968,15 @@ def county_week_risk(
         raise typer.BadParameter(
             f"Seasonality baseline file not found: {seasonality_baseline_path}"
         )
+    if prediction_intervals_path is not None and not prediction_intervals_path.exists():
+        raise typer.BadParameter(
+            f"Annual prediction intervals file not found: {prediction_intervals_path}"
+        )
 
     try:
         result = build_seasonal_risk_scores(
             predictions_path=predictions_path,
+            prediction_intervals_path=prediction_intervals_path,
             seasonality_baseline_path=seasonality_baseline_path,
             model_name=model_name,
             seasonality_source_id=seasonality_source_id,

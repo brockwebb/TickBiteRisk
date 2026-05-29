@@ -82,6 +82,43 @@ def test_county_week_risk_command_accepts_generic_predictions_path(
     assert "surveillance_reporting_sensitive" in rows[0]["backtest_assumption_flags"]
 
 
+def test_county_week_risk_command_accepts_prediction_intervals(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_predictions(tmp_path / "predictions.csv")
+    intervals_path = _write_prediction_intervals(tmp_path / "intervals.csv")
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "county-week-risk",
+            "--predictions-path",
+            str(predictions_path),
+            "--prediction-intervals-path",
+            str(intervals_path),
+            "--seasonality-baseline-path",
+            str(seasonality_path),
+            "--model-name",
+            "prior_year_incidence",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    with (output_dir / "county_week_seasonal_risk_baseline.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["annual_interval_available"] == "True"
+    assert rows[0]["annual_interval_method"] == "empirical_residual_interval"
+    assert rows[0]["source_prediction_interval_sha256"]
+
+
 def test_county_week_risk_command_selects_seasonality_source(
     tmp_path: Path,
 ) -> None:
@@ -233,6 +270,16 @@ def _write_model_comparison_predictions(path: Path) -> Path:
     )
 
 
+def _write_prediction_intervals(path: Path) -> Path:
+    return _write_csv(
+        path,
+        [
+            _prediction_interval_row("24001", "County 24001", "10.0", "30.0"),
+            _prediction_interval_row("24003", "County 24003", "70.0", "120.0"),
+        ],
+    )
+
+
 def _prediction_row(
     county_fips: str,
     county_name: str,
@@ -253,6 +300,28 @@ def _prediction_row(
         "predicted_incidence_per_100k": predicted_incidence,
         "model_feature_quality_flags": "",
         "backtest_assumption_flags": "observational_not_causal",
+    }
+
+
+def _prediction_interval_row(
+    county_fips: str,
+    county_name: str,
+    lower_80_incidence: str,
+    upper_80_incidence: str,
+) -> dict[str, str]:
+    return {
+        "source_forecast_run_id": "run1",
+        "model_name": "prior_year_incidence",
+        "county_fips": county_fips,
+        "county_name": county_name,
+        "forecast_year": "2020",
+        "interval_method": "empirical_residual_interval",
+        "lower_80_incidence_per_100k": lower_80_incidence,
+        "median_incidence_per_100k": "20.0",
+        "upper_80_incidence_per_100k": upper_80_incidence,
+        "lower_95_incidence_per_100k": lower_80_incidence,
+        "upper_95_incidence_per_100k": upper_80_incidence,
+        "interval_assumption_flags": "empirical_rolling_origin_residual_interval",
     }
 
 
