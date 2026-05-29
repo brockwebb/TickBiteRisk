@@ -515,6 +515,31 @@ h1 {
   margin: 0.75rem 0;
 }
 
+.regional-regime-counties {
+  margin: 0.75rem 0;
+}
+
+.regional-regime-counties h4 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.regional-regime-counties ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.regional-regime-counties li {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.15rem 0.5rem;
+}
+
 .regional-regime-metrics dt {
   color: var(--muted);
   font-size: 0.8rem;

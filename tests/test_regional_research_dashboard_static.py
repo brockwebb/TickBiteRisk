@@ -41,6 +41,7 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function renderRegionalMap",
         "function selectRegionalCounty",
         "function renderRegionalRegime",
+        "function regionalRegimeCountyNames",
         "function renderRegionalForecastChart",
         "function regionalCountyWeekRecords",
         "function handleRegionalListFilterChange",
@@ -54,6 +55,7 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "not public Maryland default",
         "95% empirical interval",
         "Regime 95% interval",
+        "Regime counties",
     ]:
         assert token in js
 

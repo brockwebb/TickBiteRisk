@@ -394,9 +394,17 @@ function renderRegionalRegime(metadata) {
   }
   const interval80 = overlay.predicted_incidence_80_interval || [0, 0];
   const interval95 = overlay.predicted_incidence_95_interval || [0, 0];
+  const countyNames = regionalRegimeCountyNames(overlay);
+  const countyItems = countyNames
+    .map((countyName) => `<li>${regionalEscapeHtml(countyName)}</li>`)
+    .join("");
   target.innerHTML = `<h3 id="regional-regime-title">Localized spatial regime</h3>
     <p><b>${regionalEscapeHtml(overlay.region_name || overlay.region_id)}</b></p>
     <p>${regionalEscapeHtml(overlay.n_counties)} counties in this localized research cluster.</p>
+    <section class="regional-regime-counties" aria-labelledby="regional-regime-counties-title">
+      <h4 id="regional-regime-counties-title">Regime counties</h4>
+      <ul>${countyItems}</ul>
+    </section>
     <dl class="regional-regime-metrics">
       <div>
         <dt>Regime incidence</dt>
@@ -412,6 +420,24 @@ function renderRegionalRegime(metadata) {
       </div>
     </dl>
     <p class="muted">States remain display and reporting rollups; this regime is a localized research grouping.</p>`;
+}
+
+function regionalRegimeCountyNames(overlay) {
+  const countyFipsList = overlay.county_fips_list || [];
+  const countyNames = countyFipsList.map((countyFips) => {
+    const feature = findRegionalCountyFeature(countyFips);
+    const metadata = regionalState.metadataByCounty.get(countyFips);
+    const countyName =
+      (feature && feature.properties && feature.properties.county_name) ||
+      (metadata && metadata.county_name) ||
+      countyFips;
+    const stateAbbr = feature && feature.properties && feature.properties.state_abbr;
+    return stateAbbr ? `${countyName}, ${stateAbbr}` : countyName;
+  });
+  if (countyNames.length <= 8) {
+    return countyNames;
+  }
+  return [...countyNames.slice(0, 8), `${countyNames.length - 8} more counties`];
 }
 
 function renderRegionalFlagCaveats(record) {

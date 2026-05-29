@@ -167,6 +167,9 @@ test("regional research dashboard renders county risk, week slider, and regime i
     "Spatial regime 7"
   );
   await expect(page.locator("#regional-regime-panel")).toContainText("2 counties");
+  await expect(page.locator("#regional-regime-panel")).toContainText("Regime counties");
+  await expect(page.locator("#regional-regime-panel")).toContainText("Allegany County");
+  await expect(page.locator("#regional-regime-panel")).toContainText("Garrett County");
   await expect(page.locator("#regional-regime-panel")).toContainText(
     "Regime 95% interval: 8.20 to 31.50 per 100k"
   );
@@ -199,6 +202,7 @@ test("regional research dashboard renders county risk, week slider, and regime i
   );
   await expect(page.locator("#regional-panel-content")).toContainText("VA");
   await expect(page.locator("#regional-regime-panel")).toContainText("Spatial regime 2");
+  await expect(page.locator("#regional-regime-panel")).toContainText("Virginia Beach city");
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "Virginia Beach city weekly forecast window"
   );
