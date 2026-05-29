@@ -57,30 +57,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24001",
       "county_name": "Allegany County",
       "max_risk_score": 10,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -140,30 +123,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24003",
       "county_name": "Anne Arundel County",
-      "max_risk_score": 5,
+      "max_risk_score": 4,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -223,30 +189,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24005",
       "county_name": "Baltimore County",
       "max_risk_score": 6,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -306,30 +255,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24009",
       "county_name": "Calvert County",
-      "max_risk_score": 10,
+      "max_risk_score": 8,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -389,30 +321,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24011",
       "county_name": "Caroline County",
-      "max_risk_score": 10,
+      "max_risk_score": 7,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -472,30 +387,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24013",
       "county_name": "Carroll County",
       "max_risk_score": 10,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -555,30 +453,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24015",
       "county_name": "Cecil County",
       "max_risk_score": 10,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -638,30 +519,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24017",
       "county_name": "Charles County",
-      "max_risk_score": 5,
+      "max_risk_score": 4,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -721,30 +585,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24019",
       "county_name": "Dorchester County",
-      "max_risk_score": 5,
+      "max_risk_score": 4,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -804,30 +651,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24021",
       "county_name": "Frederick County",
-      "max_risk_score": 10,
+      "max_risk_score": 9,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -887,30 +717,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24023",
       "county_name": "Garrett County",
       "max_risk_score": 10,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -970,30 +783,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24025",
       "county_name": "Harford County",
-      "max_risk_score": 9,
+      "max_risk_score": 8,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1053,30 +849,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24027",
       "county_name": "Howard County",
       "max_risk_score": 10,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1136,30 +915,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24029",
       "county_name": "Kent County",
       "max_risk_score": 10,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1219,30 +981,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24031",
       "county_name": "Montgomery County",
-      "max_risk_score": 3,
+      "max_risk_score": 5,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1302,30 +1047,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24033",
       "county_name": "Prince George's County",
-      "max_risk_score": 1,
+      "max_risk_score": 2,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1385,30 +1113,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24035",
       "county_name": "Queen Anne's County",
       "max_risk_score": 10,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1468,30 +1179,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24037",
       "county_name": "St. Mary's County",
-      "max_risk_score": 8,
+      "max_risk_score": 5,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1551,30 +1245,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24039",
       "county_name": "Somerset County",
-      "max_risk_score": 6,
+      "max_risk_score": 9,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1634,30 +1311,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24041",
       "county_name": "Talbot County",
-      "max_risk_score": 9,
+      "max_risk_score": 10,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1717,30 +1377,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24043",
       "county_name": "Washington County",
-      "max_risk_score": 10,
+      "max_risk_score": 8,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1800,30 +1443,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24045",
       "county_name": "Wicomico County",
       "max_risk_score": 4,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1883,30 +1509,13 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24047",
       "county_name": "Worcester County",
-      "max_risk_score": 7,
+      "max_risk_score": 5,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     },
     {
@@ -1966,36 +1575,19 @@
         53
       ],
       "available_years": [
-        2024
+        2026
       ],
       "county_fips": "24510",
       "county_name": "Baltimore city",
-      "max_risk_score": 1,
+      "max_risk_score": 2,
       "source_available_years": [
-        2007,
-        2008,
-        2009,
-        2010,
-        2011,
-        2012,
-        2013,
-        2014,
-        2015,
-        2016,
-        2017,
-        2018,
-        2019,
-        2020,
-        2021,
-        2022,
-        2023,
-        2024
+        2026
       ]
     }
   ],
   "county_count": 24,
   "export_type": "md_county_metadata",
-  "generated_at": "2026-05-29T00:00:16+00:00",
+  "generated_at": "2026-05-29T00:13:30+00:00",
   "geography": "MD county/jurisdiction",
   "schema_version": "county-week-risk-static-v1"
 }

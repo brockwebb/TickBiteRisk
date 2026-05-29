@@ -445,34 +445,44 @@ def _validation_summary_payload(
         raise StaticExportInputError(
             f"Model comparison summary file not found: {model_summary_path}"
         )
+    model_name_matches = []
     with model_summary_path.open(newline="", encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             if (
                 row.get("run_id") == selected.source_prediction_run_id
                 and row.get("model_name") == selected.model_name
             ):
-                return {
-                    "run_id": str(row["run_id"]),
-                    "model_name": str(row["model_name"]),
-                    "rank_by_mae": _optional_int(row.get("rank_by_mae")),
-                    "n_predictions": _optional_int(row.get("n_predictions")),
-                    "mae_incidence_per_100k": _optional_float(
-                        row.get("mae_incidence_per_100k")
-                    ),
-                    "rmse_incidence_per_100k": _optional_float(
-                        row.get("rmse_incidence_per_100k")
-                    ),
-                    "pearson_correlation": _optional_float(
-                        row.get("pearson_correlation")
-                    ),
-                    "comparison_assumption_flags": split_quality_flags(
-                        row.get("comparison_assumption_flags", "")
-                    ),
-                }
+                return _model_summary_payload_from_row(row)
+            if row.get("model_name") == selected.model_name:
+                model_name_matches.append(row)
+    if (
+        selected.source_prediction_run_id.startswith("annual_forecast_")
+        and len(model_name_matches) == 1
+    ):
+        return _model_summary_payload_from_row(model_name_matches[0])
     raise StaticExportInputError(
         "No model comparison summary row matched selected run_id="
         f"{selected.source_prediction_run_id} and model_name={selected.model_name}"
     )
+
+
+def _model_summary_payload_from_row(row: dict[str, str]) -> dict[str, object]:
+    return {
+        "run_id": str(row["run_id"]),
+        "model_name": str(row["model_name"]),
+        "rank_by_mae": _optional_int(row.get("rank_by_mae")),
+        "n_predictions": _optional_int(row.get("n_predictions")),
+        "mae_incidence_per_100k": _optional_float(
+            row.get("mae_incidence_per_100k")
+        ),
+        "rmse_incidence_per_100k": _optional_float(
+            row.get("rmse_incidence_per_100k")
+        ),
+        "pearson_correlation": _optional_float(row.get("pearson_correlation")),
+        "comparison_assumption_flags": split_quality_flags(
+            row.get("comparison_assumption_flags", "")
+        ),
+    }
 
 
 def _source_catalog_payload(
@@ -540,8 +550,9 @@ def _source_catalog_payload(
                 "weather_mode": first.weather_mode,
                 **_selected_forecast_metadata(first),
                 "notes": (
-                    "Selected annual forecast rows from prior-year validation; "
-                    "not raw surveillance data."
+                    "Selected annual no-observed-target forecast rows; "
+                    "historical backtests are separate validation evidence, "
+                    "not the forecast source."
                 ),
             },
             {

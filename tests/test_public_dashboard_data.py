@@ -109,6 +109,22 @@ def test_weekly_records_cover_all_mmwr_weeks_for_each_county() -> None:
     assert len(keys) == EXPECTED_COUNTY_COUNT * len(EXPECTED_MMWR_WEEKS)
 
 
+def test_public_weekly_records_are_2026_true_forecast_rows() -> None:
+    weekly = load_public_json("md_county_risk_weekly.json")
+
+    assert {record["year"] for record in weekly["records"]} == {2026}
+    assert weekly["selected_score_config"]["source_prediction_run_id"].startswith(
+        "annual_forecast_target2026_origin2024"
+    )
+    assert weekly["selected_forecast_metadata"] == {
+        "forecast_origin_year": 2024,
+        "as_of_date": "2026-05-28",
+        "data_cutoff_date": "2024-12-31",
+        "source_vintage": "2024-inclusive-local",
+        "update_mode": "pre_update",
+    }
+
+
 def test_weekly_risk_scores_and_categories_are_in_dashboard_ranges() -> None:
     weekly = load_public_json("md_county_risk_weekly.json")
 
@@ -165,7 +181,7 @@ def test_model_card_matches_weekly_export_metadata() -> None:
         "annual_prediction_branch"
     )
     assert model_card["annual_prediction_source"]["run_id"].startswith(
-        "model_compare_"
+        "annual_forecast_target2026_origin2024"
     )
     assert model_card["annual_prediction_source"]["sha256"] == (
         weekly["selected_score_config"]["source_prediction_sha256"]
@@ -173,7 +189,7 @@ def test_model_card_matches_weekly_export_metadata() -> None:
     assert "Selected annual forecast" in model_card["method_summary"]
     validation = model_card["validation_summary"]
     assert validation["model_name"] == weekly["model_name"]
-    assert validation["run_id"] == weekly["selected_score_config"]["source_prediction_run_id"]
+    assert validation["run_id"].startswith("model_compare_")
     assert validation["rank_by_mae"] == 2
     assert validation["n_predictions"] == 432
     assert validation["mae_incidence_per_100k"] == 18.47245
@@ -196,8 +212,8 @@ def test_public_weekly_export_surfaces_probable_only_state_source_caveats() -> N
     assert "human_exposure_context_only" not in all_flags
     assert "not_tick_bite_counts" not in all_flags
     assert "missing_mast_acorn_prior_year" not in all_flags
-    assert weekly["selected_score_config"]["source_prediction_run_id"].endswith(
-        "end2024_mintrain5_ridge1p0_shrink5p0"
+    assert weekly["selected_score_config"]["source_prediction_run_id"].startswith(
+        "annual_forecast_target2026_origin2024"
     )
 
 
@@ -219,7 +235,9 @@ def test_source_catalog_exposes_selected_annual_prediction_branch() -> None:
     assert annual_prediction["sha256"] == (
         weekly["selected_score_config"]["source_prediction_sha256"]
     )
-    assert annual_prediction["notes"].startswith("Selected annual forecast rows")
+    assert annual_prediction["notes"].startswith("Selected annual no-observed-target")
+    assert "no-observed-target" in annual_prediction["notes"]
+    assert "prior-year validation" not in annual_prediction["notes"]
     seasonality = next(
         source
         for source in source_catalog["sources"]

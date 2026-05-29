@@ -139,6 +139,8 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert source_catalog["sources"][1]["model_name"] == "linear_blend_baseline"
     assert source_catalog["sources"][1]["forecast_origin_year"] == 2022
     assert source_catalog["sources"][1]["update_mode"] == "pre_update"
+    assert "no-observed-target" in source_catalog["sources"][1]["notes"]
+    assert "prior-year validation" not in source_catalog["sources"][1]["notes"]
     assert source_catalog["sources"][2]["artifact_type"] == "derived seasonality prior"
     public_notes = " ".join(source["notes"] for source in source_catalog["sources"])
     assert "model-comparison" not in public_notes
@@ -285,6 +287,46 @@ def test_export_static_risk_data_rejects_missing_model_summary_match(
         assert "No model comparison summary row matched" in str(exc)
     else:
         raise AssertionError("Expected missing summary match export to fail")
+
+
+def test_export_static_risk_data_uses_model_validation_for_true_forecast_source(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_csv(
+        tmp_path / "scores.csv",
+        [
+            {
+                **_score_row("24003", "Anne Arundel County", "2026", "1", "7"),
+                "source_prediction_run_id": (
+                    "annual_forecast_target2026_origin2024_mintrain5_shrink5p0"
+                ),
+                "evaluation_mode": "annual_forecast_no_observed_target",
+                "forecast_origin_year": "2024",
+                "as_of_date": "2026-05-28",
+                "data_cutoff_date": "2024-12-31",
+                "source_vintage": "2024-inclusive-local",
+            },
+        ],
+    )
+    model_summary_path = _write_model_summary(tmp_path / "model_summary.csv")
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "public-data",
+        model_summary_path=model_summary_path,
+    )
+
+    model_card = _read_json(outputs.model_card_path)
+
+    assert model_card["annual_prediction_source"]["run_id"].startswith(
+        "annual_forecast_target2026"
+    )
+    assert model_card["annual_prediction_source"]["forecast_origin_year"] == 2024
+    assert model_card["annual_prediction_source"]["source_vintage"] == (
+        "2024-inclusive-local"
+    )
+    assert model_card["validation_summary"]["run_id"] == "run1"
+    assert model_card["validation_summary"]["model_name"] == "linear_blend_baseline"
 
 
 def test_export_static_risk_data_keeps_blank_optional_validation_metrics_null(

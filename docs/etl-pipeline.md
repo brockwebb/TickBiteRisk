@@ -364,7 +364,9 @@ artifacts.
     - Current branches are transparent lagged-outcome baselines:
       `latest_observed_incidence`, `trailing_mean_incidence`,
       `linear_blend_baseline`, and `empirical_bayes_shrinkage`. The artifact is
-      a 2026 forecast scaffold and not yet the public dashboard default.
+      the current public annual source after the county-week seasonality
+      transform; rolling-origin model comparison remains the historical
+      validation source for the selected branch.
 
 17. `tickbiterisk etl model-diagnostics`
     - Summarizes comparison predictions and bootstrap intervals into research
@@ -397,6 +399,8 @@ artifacts.
       results remain `diagnostic_subgroup_only`.
 
 18. `tickbiterisk etl county-week-risk`
+    - Current public 2026 run:
+      `tickbiterisk etl county-week-risk --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name linear_blend_baseline --output-dir build/etl/county-week-risk --replace`.
     - Applies CDC weekly Lyme seasonality to the selected annual model branch.
       The input can be a rolling-origin model-comparison prediction table or a
       true annual forecast table with `forecast_year`.
