@@ -170,6 +170,26 @@ def test_public_docs_catalog_massachusetts_syndromic_ed_sidecar() -> None:
         assert token in docs_text
 
 
+def test_public_docs_catalog_new_jersey_reportable_tickborne_sidecar() -> None:
+    docs_text = "\n".join(
+        [
+            README.read_text(encoding="utf-8"),
+            DATA_SOURCES.read_text(encoding="utf-8"),
+            Path("docs/data-manifest.md").read_text(encoding="utf-8"),
+            ETL_PIPELINE.read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "nj-doh-reportable-tickborne",
+        "nj_doh_reportable_tickborne_county_year.csv",
+        "New Jersey DOH reportable tickborne",
+        "2022 Lyme laboratory-based surveillance",
+        "not a confirmed disease truth label",
+    ]:
+        assert token in docs_text
+
+
 def test_readme_contribution_checks_match_configured_tooling() -> None:
     readme = README.read_text(encoding="utf-8")
     contribute = readme.split("## contribute", maxsplit=1)[1].split(

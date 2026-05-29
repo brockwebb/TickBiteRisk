@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, NSSP coverage, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, New Jersey DOH reportable tickborne, NSSP coverage, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -84,6 +84,23 @@ artifacts.
      confirmed disease truth label, and not model input in this slice.
    - The source combines Dukes and Nantucket in one row; the ETL preserves that
      combined geography instead of assigning it to one county FIPS.
+
+1b4. `tickbiterisk etl nj-doh-reportable-tickborne`
+   - Reads ignored local New Jersey DOH 2024 Reportable Communicable Disease
+     Report and Technical Notes PDFs downloaded from the official Reportable
+     Disease Statistics page.
+   - Extracts supported tickborne rows for state total and New Jersey counties:
+     alpha-gal syndrome, babesiosis, ehrlichiosis/anaplasmosis subcategories,
+     Lyme disease, Powassan, spotted fever group rickettsiosis, and tularemia.
+   - Writes `nj_doh_reportable_tickborne_county_year.csv` and
+     `acquisition_provenance.csv`.
+   - These rows are Northeast extension state-source context only. They are not
+     a confirmed disease truth label, not public-default, and not model input in
+     this slice.
+   - The Technical Notes are preserved in provenance because they document 2022
+     Lyme laboratory-based surveillance, 2024 anaplasmosis/ehrlichiosis
+     reporting changes, alpha-gal undercount caveats, and low-count
+     interpretation limits.
 
 1c. `tickbiterisk etl regional-population`
    - Pulls keyless static Census county population CSVs for DE, DC, MD, PA,

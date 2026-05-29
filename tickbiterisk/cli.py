@@ -128,6 +128,13 @@ from tickbiterisk.etl.mass_dph_syndromic_ed import (
 from tickbiterisk.etl.mass_dph_syndromic_ed_build import (
     write_mass_dph_syndromic_ed_output,
 )
+from tickbiterisk.etl.nj_reportable_tickborne import (
+    NewJerseyReportableTickborneCountyYear,
+    parse_nj_doh_reportable_tickborne_pdf,
+)
+from tickbiterisk.etl.nj_reportable_tickborne_build import (
+    write_nj_doh_reportable_tickborne_output,
+)
 from tickbiterisk.etl.regional_lyme import (
     RegionalLymeCountyYear,
     parse_cdc_midatlantic_county_dashboard,
@@ -796,6 +803,24 @@ MASS_DPH_SYNDROMIC_ED_SOURCE_METADATA = [
         "report_period_end": "2026-04-30",
     },
 ]
+NJ_DOH_REPORTABLE_TICKBORNE_METADATA = {
+    "filename": "new_jersey_doh_reportable_disease_statistics_2024.pdf",
+    "technical_notes_filename": (
+        "new_jersey_doh_reportable_disease_technical_notes_2024.pdf"
+    ),
+    "source_id": "nj_doh_reportable_tickborne_2024_pdf",
+    "source_name": "New Jersey DOH 2024 reportable disease statistics, tickborne rows",
+    "source_url": (
+        "https://www.nj.gov/health/cd/documents/reportable_disease/"
+        "web_statistics_2024.pdf"
+    ),
+    "technical_notes_url": (
+        "https://www.nj.gov/health/cd/documents/reportable_disease/"
+        "technical_notes_2024.pdf"
+    ),
+    "citation_url": "https://www.nj.gov/health/cd/statistics/reportable-disease-stats/",
+    "parser_method": "parse_nj_doh_reportable_tickborne_pdf:pypdfium_text_reportable_rows",
+}
 
 
 @etl_app.command("check")
@@ -2971,6 +2996,62 @@ def mass_dph_syndromic_ed(
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
+@etl_app.command("nj-doh-reportable-tickborne")
+def nj_doh_reportable_tickborne(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/lyme/new-jersey"),
+        help="Raw directory containing NJ DOH reportable disease PDFs.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/nj-doh-reportable-tickborne"),
+        help="Output directory for NJ DOH reportable tickborne artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
+) -> None:
+    stats_pdf_path = raw_dir / str(NJ_DOH_REPORTABLE_TICKBORNE_METADATA["filename"])
+    technical_notes_path = raw_dir / str(
+        NJ_DOH_REPORTABLE_TICKBORNE_METADATA["technical_notes_filename"]
+    )
+    if not stats_pdf_path.exists():
+        raise typer.BadParameter(
+            f"New Jersey DOH reportable disease statistics PDF not found: {stats_pdf_path}"
+        )
+    if not technical_notes_path.exists():
+        raise typer.BadParameter(
+            f"New Jersey DOH technical notes PDF not found: {technical_notes_path}"
+        )
+
+    rows = parse_nj_doh_reportable_tickborne_pdf(
+        stats_pdf_path,
+        source_id=str(NJ_DOH_REPORTABLE_TICKBORNE_METADATA["source_id"]),
+        source_url=str(NJ_DOH_REPORTABLE_TICKBORNE_METADATA["source_url"]),
+    )
+    output_path = write_nj_doh_reportable_tickborne_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _nj_doh_reportable_tickborne_provenance_records(
+            rows=rows,
+            stats_pdf_path=stats_pdf_path,
+            technical_notes_path=technical_notes_path,
+            output_path=output_path,
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(rows)} New Jersey DOH reportable tickborne row(s) to "
+        f"{output_path}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
 @etl_app.command("regional-lyme-outcomes")
 def regional_lyme_outcomes(
     raw_dir: Path = typer.Option(
@@ -4844,6 +4925,91 @@ def _mass_dph_syndromic_ed_acquisition_command(
             "tickbiterisk",
             "etl",
             "mass-dph-syndromic-ed",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _nj_doh_reportable_tickborne_provenance_records(
+    *,
+    rows: list[NewJerseyReportableTickborneCountyYear],
+    stats_pdf_path: Path,
+    technical_notes_path: Path,
+    output_path: Path,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    metadata = NJ_DOH_REPORTABLE_TICKBORNE_METADATA
+    return [
+        AcquisitionProvenanceRecord(
+            source_id=str(metadata["source_id"]),
+            source_name=str(metadata["source_name"]),
+            source_url=str(metadata["source_url"]),
+            citation_url=str(metadata["citation_url"]),
+            acquisition_command=_nj_doh_reportable_tickborne_acquisition_command(
+                raw_dir=raw_dir,
+                output_dir=output_dir,
+                manifest_path=manifest_path,
+            ),
+            acquisition_procedure=(
+                "Read the ignored local New Jersey DOH 2024 Reportable "
+                "Communicable Disease Report PDF, keep only the supported "
+                "tickborne disease rows for state total and county "
+                "jurisdictions, and attach the official 2024 Technical Notes "
+                "PDF for surveillance caveats."
+            ),
+            request_method="LOCAL_FILE_READ",
+            request_description=(
+                "Read local raw New Jersey DOH reportable disease statistics "
+                f"PDF {stats_pdf_path.name} and technical notes PDF "
+                f"{technical_notes_path.name}; source URLs are "
+                f"{metadata['source_url']} and {metadata['technical_notes_url']}."
+            ),
+            derived_artifact_paths=[stats_pdf_path, technical_notes_path, output_path],
+            derived_artifact_path_labels=[
+                stats_pdf_path.name,
+                technical_notes_path.name,
+                output_path.name,
+            ],
+            row_count=len(rows),
+            parser_method=str(metadata["parser_method"]),
+            extraction_quality="accepted_tickborne_reportable_rows_only",
+            access_notes=(
+                "Public New Jersey DOH PDFs reached from the official "
+                "Reportable Disease Statistics page; no secret or credential "
+                "required. Raw PDFs remain in ignored storage."
+            ),
+            modeling_caveats=(
+                "New Jersey state-source Northeast extension sidecar only; "
+                "reported cases are not stable true incidence, not a "
+                "confirmed disease truth label, not public-default, and not "
+                "model input in this slice. Technical notes specify 2022 Lyme "
+                "laboratory-based surveillance increased expected counts; "
+                "2024 anaplasmosis/ehrlichiosis reporting changed; alpha-gal "
+                "voluntary reporting may underestimate actual cases; values "
+                "less than five need accompanying interpretation."
+            ),
+        )
+    ]
+
+
+def _nj_doh_reportable_tickborne_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "nj-doh-reportable-tickborne",
             "--raw-dir",
             _public_provenance_path(raw_dir),
             "--output-dir",
