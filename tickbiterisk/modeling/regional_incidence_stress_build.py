@@ -51,6 +51,9 @@ REGIONAL_INCIDENCE_STRESS_PREDICTION_COLUMNS = [
     "actual_cases",
     "actual_population",
     "predicted_cases",
+    "analog_match_origin_year",
+    "analog_match_observed_year",
+    "analog_match_distance",
     "model_feature_quality_flags",
     "comparison_assumption_flags",
 ]

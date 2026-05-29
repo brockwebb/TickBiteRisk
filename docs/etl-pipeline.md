@@ -220,10 +220,11 @@ artifacts.
    - Writes `regional_incidence_stress_runs.csv`,
      `regional_incidence_stress_predictions.csv`, and
      `regional_incidence_stress_metrics.csv`.
-   - Compares prior-year county incidence, trailing county incidence, and
-     state/Mid-Atlantic empirical-Bayes shrinkage baselines as transparent
-     historical-range tests. These are research diagnostics over reported
-     incidence per 100k, not public forecasts or latent true disease estimates.
+   - Compares prior-year county incidence, trailing county incidence,
+     forecast-safe analog/like-year incidence, and state/Mid-Atlantic
+     empirical-Bayes shrinkage baselines as transparent historical-range tests.
+     These are research diagnostics over reported incidence per 100k, not
+     public forecasts or latent true disease estimates.
 
 1i-2. `tickbiterisk etl regional-annual-forecast`
    - Typical 2026 run:

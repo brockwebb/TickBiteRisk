@@ -27,6 +27,7 @@ def test_build_regional_incidence_stress_compares_shrinkage_baselines(
 
     model_names = {row.model_name for row in result.predictions}
     assert model_names == {
+        "analog_year_county_incidence",
         "empirical_bayes_midatlantic_incidence",
         "empirical_bayes_state_incidence",
         "prior_year_county_incidence",
@@ -63,6 +64,38 @@ def test_build_regional_incidence_stress_compares_shrinkage_baselines(
     assert result.run.n_predictions == len(result.predictions)
 
 
+def test_regional_incidence_stress_analog_uses_only_prior_known_outcomes(
+    tmp_path: Path,
+) -> None:
+    panel = _write_single_county_incidence_panel(
+        tmp_path / "incidence.csv",
+        [5, 15, 50, 999],
+    )
+
+    result = build_regional_incidence_stress(
+        regional_incidence_path=panel,
+        start_year=2021,
+        min_train_years=2,
+        lookback_years=2,
+    )
+
+    analog = next(
+        row
+        for row in result.predictions
+        if row.model_name == "analog_year_county_incidence"
+    )
+    assert analog.model_family == "analog"
+    assert analog.actual_incidence_per_100k == 999.0
+    assert analog.predicted_incidence_per_100k == 50.0
+    assert analog.analog_match_origin_year == 2019
+    assert analog.analog_match_observed_year == 2020
+    assert analog.analog_match_observed_year < analog.test_year
+    assert "analog_like_year_hindcast" in analog.model_feature_quality_flags
+    assert "forecast_safe_prior_outcomes_only" in (
+        analog.model_feature_quality_flags
+    )
+
+
 def test_build_regional_incidence_stress_skips_missing_target_incidence(
     tmp_path: Path,
 ) -> None:
@@ -96,6 +129,41 @@ def test_write_regional_incidence_stress_outputs_uses_stable_schemas(
         assert next(csv.reader(handle)) == REGIONAL_INCIDENCE_STRESS_PREDICTION_COLUMNS
     with outputs.metrics_path.open(newline="", encoding="utf-8") as handle:
         assert next(csv.reader(handle)) == REGIONAL_INCIDENCE_STRESS_METRIC_COLUMNS
+
+
+def _write_single_county_incidence_panel(path: Path, values: list[int]) -> Path:
+    rows = []
+    for offset, incidence in enumerate(values):
+        year = 2018 + offset
+        rows.append(
+            {
+                "state_fips": "24",
+                "state_abbr": "MD",
+                "state_name": "Maryland",
+                "county_fips": "24001",
+                "county_name": "Allegany County",
+                "year": str(year),
+                "total_cases": str(incidence),
+                "population": "100000",
+                "incidence_per_100k": str(incidence),
+                "diagnostic_midatlantic_incidence_rank": "",
+                "diagnostic_midatlantic_incidence_percentile": "",
+                "diagnostic_midatlantic_incidence_tier": "",
+                "diagnostic_prior_year_midatlantic_incidence_rank": "",
+                "diagnostic_midatlantic_incidence_rank_change": "",
+                "lyme_panel_sha256": "lyme123",
+                "population_panel_sha256": "pop123",
+                "feature_quality_flags": (
+                    "regional_incidence_diagnostic,"
+                    "reported_cases_not_stable_true_incidence"
+                ),
+            }
+        )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
 
 
 def _write_incidence_panel(path: Path, *, missing_target: bool = False) -> Path:

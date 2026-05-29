@@ -17,7 +17,13 @@ COMPARISON_ASSUMPTION_FLAGS = (
 )
 EVALUATION_MODE = "rolling_origin_prior_years"
 TARGET_DEFINITION = "reported_lyme_incidence_per_100k"
-FEATURE_SET = "historical_incidence_shrinkage_baselines"
+FEATURE_SET = "historical_incidence_shrinkage_and_analog_baselines"
+ANALOG_MODEL_FEATURE_FLAGS = (
+    "analog_like_year_hindcast,"
+    "forecast_origin_prior_year_only,"
+    "analog_outcome_observed_before_test_year,"
+    "forecast_safe_prior_outcomes_only"
+)
 REQUIRED_REGIONAL_INCIDENCE_COLUMNS = {
     "state_fips",
     "state_abbr",
@@ -80,6 +86,9 @@ class RegionalIncidenceStressPrediction:
     actual_cases: int
     actual_population: int | None
     predicted_cases: float | None
+    analog_match_origin_year: int | None
+    analog_match_observed_year: int | None
+    analog_match_distance: float | None
     model_feature_quality_flags: str
     comparison_assumption_flags: str
 
@@ -132,6 +141,13 @@ class _IncidenceRow:
 class _ModelPrediction:
     predicted_incidence_per_100k: float
     predicted_cases: float | None
+    train_start_year: int | None = None
+    train_end_year: int | None = None
+    train_year_count: int | None = None
+    model_feature_quality_flags: str = ""
+    analog_match_origin_year: int | None = None
+    analog_match_observed_year: int | None = None
+    analog_match_distance: float | None = None
 
 
 def build_regional_incidence_stress(
@@ -210,6 +226,11 @@ def build_regional_incidence_stress(
             prior_year_row = rows_by_county_year.get((row.county_fips, test_year - 1))
             if prior_year_row is None or prior_year_row.incidence_per_100k is None:
                 continue
+            all_prior_county_history = [
+                prior
+                for prior in rows_by_county[row.county_fips]
+                if prior.year < test_year and prior.incidence_per_100k is not None
+            ]
             state_history = [
                 prior
                 for prior in rows
@@ -233,6 +254,8 @@ def build_regional_incidence_stress(
                 row=row,
                 county_history=county_history,
                 prior_year_row=prior_year_row,
+                all_prior_county_history=all_prior_county_history,
+                test_year=test_year,
                 state_history=state_history,
                 regional_history=regional_history,
                 shrinkage_strength=shrinkage_strength,
@@ -246,9 +269,9 @@ def build_regional_incidence_stress(
                         row=row,
                         model_prediction=model_prediction,
                         source_file_sha256=source_file_sha256,
-                        train_start_year=train_start_year,
-                        train_end_year=train_end_year,
-                        train_year_count=len(county_history),
+                        default_train_start_year=train_start_year,
+                        default_train_end_year=train_end_year,
+                        default_train_year_count=len(county_history),
                         flags=flags,
                     )
                 )
@@ -335,6 +358,8 @@ def _predict_incidence_baselines(
     row: _IncidenceRow,
     county_history: list[_IncidenceRow],
     prior_year_row: _IncidenceRow,
+    all_prior_county_history: list[_IncidenceRow],
+    test_year: int,
     state_history: list[_IncidenceRow],
     regional_history: list[_IncidenceRow],
     shrinkage_strength: float,
@@ -362,7 +387,7 @@ def _predict_incidence_baselines(
         prior_mean=regional_mean,
         prior_strength=shrinkage_strength,
     )
-    return {
+    predictions = {
         "prior_year_county_incidence": _model_prediction(
             predicted_incidence_per_100k=_known_incidence(prior_year_row),
             population=row.population,
@@ -380,6 +405,14 @@ def _predict_incidence_baselines(
             population=row.population,
         ),
     }
+    analog_prediction = _analog_county_prediction(
+        row=row,
+        county_history=all_prior_county_history,
+        test_year=test_year,
+    )
+    if analog_prediction is not None:
+        predictions["analog_year_county_incidence"] = analog_prediction
+    return predictions
 
 
 def _prediction_row(
@@ -389,14 +422,29 @@ def _prediction_row(
     row: _IncidenceRow,
     model_prediction: _ModelPrediction,
     source_file_sha256: str,
-    train_start_year: int,
-    train_end_year: int,
-    train_year_count: int,
+    default_train_start_year: int,
+    default_train_end_year: int,
+    default_train_year_count: int,
     flags: str,
 ) -> RegionalIncidenceStressPrediction:
     actual_incidence = _known_incidence(row)
     residual_incidence = _round(
         actual_incidence - model_prediction.predicted_incidence_per_100k
+    )
+    train_start_year = (
+        model_prediction.train_start_year
+        if model_prediction.train_start_year is not None
+        else default_train_start_year
+    )
+    train_end_year = (
+        model_prediction.train_end_year
+        if model_prediction.train_end_year is not None
+        else default_train_end_year
+    )
+    train_year_count = (
+        model_prediction.train_year_count
+        if model_prediction.train_year_count is not None
+        else default_train_year_count
     )
     return RegionalIncidenceStressPrediction(
         run_id=run_id,
@@ -422,7 +470,13 @@ def _prediction_row(
         actual_cases=row.total_cases,
         actual_population=row.population,
         predicted_cases=model_prediction.predicted_cases,
-        model_feature_quality_flags=row.feature_quality_flags,
+        analog_match_origin_year=model_prediction.analog_match_origin_year,
+        analog_match_observed_year=model_prediction.analog_match_observed_year,
+        analog_match_distance=model_prediction.analog_match_distance,
+        model_feature_quality_flags=_combined_flags(
+            row.feature_quality_flags,
+            model_prediction.model_feature_quality_flags,
+        ),
         comparison_assumption_flags=flags,
     )
 
@@ -528,6 +582,13 @@ def _model_prediction(
     *,
     predicted_incidence_per_100k: float,
     population: int | None,
+    train_start_year: int | None = None,
+    train_end_year: int | None = None,
+    train_year_count: int | None = None,
+    model_feature_quality_flags: str = "",
+    analog_match_origin_year: int | None = None,
+    analog_match_observed_year: int | None = None,
+    analog_match_distance: float | None = None,
 ) -> _ModelPrediction:
     predicted_incidence = _round(predicted_incidence_per_100k)
     predicted_cases = (
@@ -538,10 +599,108 @@ def _model_prediction(
     return _ModelPrediction(
         predicted_incidence_per_100k=predicted_incidence,
         predicted_cases=predicted_cases,
+        train_start_year=train_start_year,
+        train_end_year=train_end_year,
+        train_year_count=train_year_count,
+        model_feature_quality_flags=model_feature_quality_flags,
+        analog_match_origin_year=analog_match_origin_year,
+        analog_match_observed_year=analog_match_observed_year,
+        analog_match_distance=analog_match_distance,
+    )
+
+
+def _analog_county_prediction(
+    *,
+    row: _IncidenceRow,
+    county_history: list[_IncidenceRow],
+    test_year: int,
+) -> _ModelPrediction | None:
+    history_by_year = {prior.year: prior for prior in county_history}
+    current_origin_year = test_year - 1
+    current_features = _analog_feature_vector(
+        history_by_year=history_by_year,
+        origin_year=current_origin_year,
+    )
+    if current_features is None:
+        return None
+
+    candidates = []
+    for candidate_origin_year in sorted(history_by_year):
+        if candidate_origin_year >= current_origin_year:
+            continue
+        observed_year = candidate_origin_year + 1
+        if observed_year >= test_year:
+            continue
+        observed_row = history_by_year.get(observed_year)
+        if observed_row is None or observed_row.incidence_per_100k is None:
+            continue
+        candidate_features = _analog_feature_vector(
+            history_by_year=history_by_year,
+            origin_year=candidate_origin_year,
+        )
+        if candidate_features is None:
+            continue
+        distance = _analog_distance(current_features, candidate_features)
+        candidates.append((distance, candidate_origin_year, observed_year, observed_row))
+
+    if not candidates:
+        return None
+
+    distance, origin_year, observed_year, observed_row = min(
+        candidates,
+        key=lambda item: (item[0], -item[1]),
+    )
+    train_years = [prior.year for prior in county_history]
+    return _model_prediction(
+        predicted_incidence_per_100k=_known_incidence(observed_row),
+        population=row.population,
+        train_start_year=min(train_years),
+        train_end_year=max(train_years),
+        train_year_count=len(train_years),
+        model_feature_quality_flags=ANALOG_MODEL_FEATURE_FLAGS,
+        analog_match_origin_year=origin_year,
+        analog_match_observed_year=observed_year,
+        analog_match_distance=_round(distance),
+    )
+
+
+def _analog_feature_vector(
+    *,
+    history_by_year: dict[int, _IncidenceRow],
+    origin_year: int,
+    trailing_years: int = 3,
+) -> tuple[float, float] | None:
+    origin = history_by_year.get(origin_year)
+    if origin is None or origin.incidence_per_100k is None:
+        return None
+    trailing_values = [
+        _known_incidence(history_by_year[year])
+        for year in range(origin_year - trailing_years + 1, origin_year + 1)
+        if year in history_by_year
+        and history_by_year[year].incidence_per_100k is not None
+    ]
+    if not trailing_values:
+        return None
+    return (_known_incidence(origin), mean(trailing_values))
+
+
+def _analog_distance(
+    current_features: tuple[float, float],
+    candidate_features: tuple[float, float],
+) -> float:
+    return sum(
+        abs(current_value - candidate_value)
+        for current_value, candidate_value in zip(
+            current_features,
+            candidate_features,
+            strict=True,
+        )
     )
 
 
 def _model_family(model_name: str) -> str:
+    if model_name.startswith("analog_"):
+        return "analog"
     if model_name.startswith("empirical_bayes_"):
         return "empirical_bayes_incidence_shrinkage"
     return "county_incidence_baseline"
