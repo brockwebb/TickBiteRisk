@@ -209,6 +209,42 @@ def test_export_static_risk_data_can_select_score_branch(tmp_path: Path) -> None
     assert weekly["records"][0]["risk_score"] == 8
 
 
+def test_export_static_risk_data_includes_annual_interval_metadata(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_csv(
+        tmp_path / "scores.csv",
+        [
+            {
+                **_score_row("24003", "Anne Arundel County", "2023", "1", "7"),
+                "source_prediction_interval_sha256": "d" * 64,
+                "annual_interval_method": "empirical_residual_interval",
+                "annual_interval_available": "True",
+            }
+        ],
+    )
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "public-data",
+    )
+
+    weekly = _read_json(outputs.weekly_risk_path)
+    model_card = _read_json(outputs.model_card_path)
+    source_catalog = _read_json(outputs.source_catalog_path)
+
+    assert weekly["selected_score_config"]["source_prediction_interval_sha256"] == (
+        "d" * 64
+    )
+    assert weekly["selected_forecast_metadata"]["annual_interval_available"] is True
+    assert weekly["selected_forecast_metadata"]["annual_interval_method"] == (
+        "empirical_residual_interval"
+    )
+    assert model_card["annual_prediction_source"]["interval_sha256"] == "d" * 64
+    assert model_card["annual_prediction_source"]["annual_interval_available"] is True
+    assert source_catalog["sources"][1]["interval_sha256"] == "d" * 64
+
+
 def test_export_static_risk_data_rejects_ambiguous_score_denominator(
     tmp_path: Path,
 ) -> None:

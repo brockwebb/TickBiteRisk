@@ -77,6 +77,7 @@ class CountyWeekRiskRecord:
     source_prediction_run_id: str
     source_prediction_sha256: str
     source_seasonality_sha256: str
+    source_prediction_interval_sha256: str
     model_name: str
     model_family: str
     target_definition: str
@@ -95,6 +96,8 @@ class CountyWeekRiskRecord:
     period_label: str
     predicted_annual_incidence_per_100k: float
     predicted_annual_cases: float
+    annual_interval_method: str
+    annual_interval_available: bool
     seasonal_mean_share: float
     seasonal_lower_80_share: float
     seasonal_upper_80_share: float
@@ -331,6 +334,13 @@ class RiskLookupStore:
                 "source_prediction_run_id": record.source_prediction_run_id,
                 "source_prediction_sha256": record.source_prediction_sha256,
                 "source_seasonality_sha256": record.source_seasonality_sha256,
+                "source_prediction_interval_sha256": (
+                    record.source_prediction_interval_sha256
+                ),
+                "annual_interval_method": record.annual_interval_method,
+                "annual_interval_available": (
+                    "true" if record.annual_interval_available else "false"
+                ),
                 "forecast_origin_year": (
                     "" if record.forecast_origin_year is None
                     else str(record.forecast_origin_year)
@@ -388,6 +398,10 @@ def _score_record_from_row(row: dict[str, str]) -> CountyWeekRiskRecord:
         source_prediction_run_id=row["source_prediction_run_id"],
         source_prediction_sha256=row["source_prediction_sha256"],
         source_seasonality_sha256=row["source_seasonality_sha256"],
+        source_prediction_interval_sha256=row.get(
+            "source_prediction_interval_sha256",
+            "",
+        ),
         model_name=row["model_name"],
         model_family=row["model_family"],
         target_definition=row["target_definition"],
@@ -418,6 +432,10 @@ def _score_record_from_row(row: dict[str, str]) -> CountyWeekRiskRecord:
         predicted_annual_cases=_parse_float(
             row["predicted_annual_cases"],
             "predicted_annual_cases",
+        ),
+        annual_interval_method=row.get("annual_interval_method", ""),
+        annual_interval_available=_parse_bool(
+            row.get("annual_interval_available", ""),
         ),
         seasonal_mean_share=_parse_float(row["seasonal_mean_share"], "seasonal_mean_share"),
         seasonal_lower_80_share=_parse_float(
@@ -543,6 +561,10 @@ def _parse_float(value: str, field_name: str) -> float:
         return float(str(value).replace(",", "").strip())
     except ValueError as exc:
         raise RiskLookupInputError(f"{field_name} must be numeric") from exc
+
+
+def _parse_bool(value: str) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes"}
 
 
 def _split_flags(value: str) -> list[str]:

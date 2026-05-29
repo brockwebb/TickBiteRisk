@@ -187,6 +187,35 @@ def test_lookup_exposes_forecast_vintage_metadata(tmp_path: Path) -> None:
     assert response.source_metadata["update_mode"] == "pre_update"
 
 
+def test_lookup_exposes_annual_interval_metadata_when_available(
+    tmp_path: Path,
+) -> None:
+    path = _write_csv(
+        tmp_path / "scores.csv",
+        [
+            {
+                **_score_row("24003", "Anne Arundel County", "2023", "1", "7"),
+                "source_prediction_interval_sha256": "d" * 64,
+                "annual_interval_method": "empirical_residual_interval",
+                "annual_interval_available": "True",
+            }
+        ],
+    )
+    store = RiskLookupStore.from_csv(path)
+
+    response = store.lookup(
+        county_fips="24003",
+        query_date="2023-01-01",
+        model_name="linear_blend_baseline",
+    )
+
+    assert response.source_metadata["source_prediction_interval_sha256"] == "d" * 64
+    assert response.source_metadata["annual_interval_method"] == (
+        "empirical_residual_interval"
+    )
+    assert response.source_metadata["annual_interval_available"] == "true"
+
+
 def test_lookup_rejects_unknown_county(tmp_path: Path) -> None:
     scores_path = _write_scores(tmp_path / "scores.csv")
     store = RiskLookupStore.from_csv(scores_path)

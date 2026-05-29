@@ -606,6 +606,7 @@ def _source_catalog_payload(
                 "evaluation_mode": first.evaluation_mode,
                 "weather_mode": first.weather_mode,
                 **_selected_forecast_metadata(first),
+                **_annual_interval_metadata(first),
                 "notes": (
                     "Selected annual no-observed-target forecast rows; "
                     "historical backtests are separate validation evidence, "
@@ -633,6 +634,7 @@ def _annual_prediction_source(record: CountyWeekRiskRecord) -> dict[str, object]
         "evaluation_mode": record.evaluation_mode,
         "weather_mode": record.weather_mode,
         **_selected_forecast_metadata(record),
+        **_annual_interval_metadata(record),
     }
 
 
@@ -678,7 +680,7 @@ def _county_geojson_feature_count(path: Path) -> int:
 
 
 def _selected_score_config(record: CountyWeekRiskRecord) -> dict[str, object]:
-    return {
+    config = {
         "model_name": record.model_name,
         "seasonality_source_id": record.seasonality_source_id,
         "benchmark_quantile": record.benchmark_quantile,
@@ -688,15 +690,34 @@ def _selected_score_config(record: CountyWeekRiskRecord) -> dict[str, object]:
         "source_prediction_sha256": record.source_prediction_sha256,
         "source_seasonality_sha256": record.source_seasonality_sha256,
     }
+    if record.annual_interval_available:
+        config["source_prediction_interval_sha256"] = (
+            record.source_prediction_interval_sha256
+        )
+    return config
 
 
 def _selected_forecast_metadata(record: CountyWeekRiskRecord) -> dict[str, object]:
-    return {
+    metadata = {
         "forecast_origin_year": record.forecast_origin_year,
         "as_of_date": record.as_of_date,
         "data_cutoff_date": record.data_cutoff_date,
         "source_vintage": record.source_vintage,
         "update_mode": record.update_mode,
+    }
+    if record.annual_interval_available:
+        metadata["annual_interval_available"] = True
+        metadata["annual_interval_method"] = record.annual_interval_method
+    return metadata
+
+
+def _annual_interval_metadata(record: CountyWeekRiskRecord) -> dict[str, object]:
+    if not record.annual_interval_available:
+        return {}
+    return {
+        "annual_interval_available": True,
+        "annual_interval_method": record.annual_interval_method,
+        "interval_sha256": record.source_prediction_interval_sha256,
     }
 
 
