@@ -57,6 +57,61 @@ def test_static_export_command_writes_public_json_files(tmp_path: Path) -> None:
     assert (output_dir / "static_export_manifest.json").exists()
 
 
+def test_static_export_command_accepts_regional_research_scope(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+    output_dir = tmp_path / "regional-data"
+
+    result = runner.invoke(
+        app,
+        [
+            "risk",
+            "export-static",
+            "--scores-path",
+            str(scores_path),
+            "--output-dir",
+            str(output_dir),
+            "--geography-scope",
+            "midatlantic_county_week",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (output_dir / "regional_county_risk_weekly.json").exists()
+    assert (output_dir / "regional_county_metadata.json").exists()
+    weekly = json.loads(
+        (output_dir / "regional_county_risk_weekly.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert weekly["scope"] == "midatlantic_county_week"
+
+
+def test_static_export_command_rejects_regional_scope_default_public_output(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_scores(tmp_path / "scores.csv")
+
+    result = runner.invoke(
+        app,
+        [
+            "risk",
+            "export-static",
+            "--scores-path",
+            str(scores_path),
+            "--geography-scope",
+            "midatlantic_county_week",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Regional research export requires" in result.output
+    assert "non-public" in result.output
+    assert "output-dir" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_static_export_command_fails_cleanly_when_scores_missing(
     tmp_path: Path,
 ) -> None:

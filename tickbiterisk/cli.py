@@ -1124,6 +1124,13 @@ def risk_export_static(
         None,
         help="Optional source seasonality SHA-256 selector.",
     ),
+    geography_scope: str = typer.Option(
+        "maryland_county_week",
+        help=(
+            "Static export geography scope. Use maryland_county_week for the "
+            "public default or midatlantic_county_week for regional research."
+        ),
+    ),
     model_summary_path: Path | None = typer.Option(
         None,
         help="Optional model comparison summary CSV for public validation metrics.",
@@ -1134,6 +1141,13 @@ def risk_export_static(
     if model_summary_path is not None and not model_summary_path.exists():
         raise typer.BadParameter(
             f"Model comparison summary file not found: {model_summary_path}"
+        )
+    if (
+        geography_scope == "midatlantic_county_week"
+        and output_dir == Path("public/data")
+    ):
+        raise typer.BadParameter(
+            "Regional research export requires an explicit non-public output-dir"
         )
     try:
         outputs = export_static_risk_data(
@@ -1147,6 +1161,7 @@ def risk_export_static(
             source_prediction_run_id=source_prediction_run_id,
             source_prediction_sha256=source_prediction_sha256,
             source_seasonality_sha256=source_seasonality_sha256,
+            geography_scope=geography_scope,
             model_summary_path=model_summary_path,
         )
     except StaticExportInputError as exc:

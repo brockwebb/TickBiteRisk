@@ -18,6 +18,8 @@ from tickbiterisk.runtime.risk_lookup import (
 
 
 STATIC_EXPORT_SCHEMA_VERSION = "county-week-risk-static-v1"
+MARYLAND_GEOGRAPHY_SCOPE = "maryland_county_week"
+MIDATLANTIC_GEOGRAPHY_SCOPE = "midatlantic_county_week"
 
 PUBLIC_CAVEATS = [
     "Informational and educational only; not medical advice.",
@@ -86,6 +88,25 @@ class StaticExportInputError(ValueError):
 
 
 @dataclass(frozen=True)
+class _GeographyScope:
+    scope: str
+    weekly_export_type: str
+    county_export_type: str
+    weekly_filename: str
+    county_metadata_filename: str
+    geography_label: str
+    product_framing: str
+    score_interpretation: str
+    relative_risk_caveat: str
+    research_only: bool = False
+    not_public_maryland_default: bool = False
+    state: str | None = None
+    state_fips: str | None = None
+    region: str | None = None
+    region_state_fips: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class StaticRiskExportPaths:
     weekly_risk_path: Path
     county_metadata_path: Path
@@ -107,7 +128,9 @@ def export_static_risk_data(
     source_prediction_sha256: str | None = None,
     source_seasonality_sha256: str | None = None,
     model_summary_path: Path | None = None,
+    geography_scope: str = MARYLAND_GEOGRAPHY_SCOPE,
 ) -> StaticRiskExportPaths:
+    geography = _geography_scope(geography_scope)
     try:
         records = read_county_week_risk_records(scores_path)
     except RiskLookupInputError as exc:
@@ -129,8 +152,8 @@ def export_static_risk_data(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = StaticRiskExportPaths(
-        weekly_risk_path=output_dir / "md_county_risk_weekly.json",
-        county_metadata_path=output_dir / "md_county_metadata.json",
+        weekly_risk_path=output_dir / geography.weekly_filename,
+        county_metadata_path=output_dir / geography.county_metadata_filename,
         model_card_path=output_dir / "model_card.json",
         source_catalog_path=output_dir / "source_catalog.json",
         export_manifest_path=output_dir / "static_export_manifest.json",
@@ -140,27 +163,32 @@ def export_static_risk_data(
         selected,
         generated_at=generated_at,
         input_sha256=_sha256_file(scores_path),
+        geography=geography,
     )
     county_payload = _county_metadata_payload(
         selected,
         source_records=source_records,
         generated_at=generated_at,
+        geography=geography,
     )
     model_card_payload = _model_card_payload(
         selected,
         generated_at=generated_at,
         model_summary_path=model_summary_path,
+        geography=geography,
     )
     source_catalog_payload = _source_catalog_payload(
         selected,
         generated_at=generated_at,
         input_sha256=_sha256_file(scores_path),
+        geography=geography,
     )
     manifest_payload = _manifest_payload(
         paths,
         weekly_payload=weekly_payload,
         county_payload=county_payload,
         generated_at=generated_at,
+        geography=geography,
     )
 
     _write_json(paths.weekly_risk_path, weekly_payload)
@@ -169,6 +197,97 @@ def export_static_risk_data(
     _write_json(paths.source_catalog_path, source_catalog_payload)
     _write_json(paths.export_manifest_path, manifest_payload)
     return paths
+
+
+def _geography_scope(scope: str) -> _GeographyScope:
+    if scope == MARYLAND_GEOGRAPHY_SCOPE:
+        return _GeographyScope(
+            scope=MARYLAND_GEOGRAPHY_SCOPE,
+            weekly_export_type="md_county_risk_weekly",
+            county_export_type="md_county_metadata",
+            weekly_filename="md_county_risk_weekly.json",
+            county_metadata_filename="md_county_metadata.json",
+            geography_label="MD county/jurisdiction",
+            product_framing=(
+                "Lyme risk forecasting tool for Maryland county-week conditions"
+            ),
+            score_interpretation=(
+                "Relative seasonal Lyme forecast on a 1-10 Maryland scale; not a "
+                "per-bite infection probability."
+            ),
+            relative_risk_caveat=(
+                "Relative Maryland county-week Lyme forecast, not a per-bite "
+                "infection probability."
+            ),
+            state="MD",
+            state_fips="24",
+        )
+    if scope == MIDATLANTIC_GEOGRAPHY_SCOPE:
+        return _GeographyScope(
+            scope=MIDATLANTIC_GEOGRAPHY_SCOPE,
+            weekly_export_type="regional_county_risk_weekly",
+            county_export_type="regional_county_metadata",
+            weekly_filename="regional_county_risk_weekly.json",
+            county_metadata_filename="regional_county_metadata.json",
+            geography_label="DE/DC/MD/PA/VA/WV county-equivalent",
+            product_framing=(
+                "Lyme risk forecasting tool for DE/DC/MD/PA/VA/WV "
+                "county-week conditions"
+            ),
+            score_interpretation=(
+                "Relative seasonal Lyme forecast on a 1-10 regional scale; not "
+                "a per-bite infection probability."
+            ),
+            relative_risk_caveat=(
+                "Relative regional county-week Lyme forecast, not a per-bite "
+                "infection probability."
+            ),
+            research_only=True,
+            not_public_maryland_default=True,
+            region="DE/DC/MD/PA/VA/WV",
+            region_state_fips=("10", "11", "24", "42", "51", "54"),
+        )
+    raise StaticExportInputError(
+        f"Unsupported static export geography_scope: {scope}"
+    )
+
+
+def _weekly_geography_payload(
+    geography: _GeographyScope,
+    records: list[CountyWeekRiskRecord],
+) -> dict[str, object]:
+    jurisdiction_count = len({record.county_fips for record in records})
+    if geography.region is not None:
+        return {
+            "region": geography.region,
+            "state_fips": list(geography.region_state_fips),
+            "jurisdiction_count": jurisdiction_count,
+        }
+    return {
+        "state": geography.state,
+        "state_fips": geography.state_fips,
+        "jurisdiction_count": jurisdiction_count,
+    }
+
+
+def _public_caveats(geography: _GeographyScope) -> list[str]:
+    return [
+        geography.relative_risk_caveat
+        if caveat.startswith("Relative Maryland county-week")
+        else caveat
+        for caveat in PUBLIC_CAVEATS
+    ]
+
+
+def _research_status_field(geography: _GeographyScope) -> dict[str, object]:
+    if not geography.research_only and not geography.not_public_maryland_default:
+        return {}
+    return {
+        "research_status": {
+            "research_only": geography.research_only,
+            "not_public_maryland_default": geography.not_public_maryland_default,
+        }
+    }
 
 
 def _select_records(
@@ -278,18 +397,15 @@ def _weekly_payload(
     *,
     generated_at: str,
     input_sha256: str,
+    geography: _GeographyScope,
 ) -> dict[str, object]:
     first = records[0]
     return {
         "schema_version": STATIC_EXPORT_SCHEMA_VERSION,
-        "export_type": "md_county_risk_weekly",
+        "export_type": geography.weekly_export_type,
         "generated_at": generated_at,
-        "scope": "maryland_county_week",
-        "geography": {
-            "state": "MD",
-            "state_fips": "24",
-            "jurisdiction_count": len({record.county_fips for record in records}),
-        },
+        "scope": geography.scope,
+        "geography": _weekly_geography_payload(geography, records),
         "disease": "lyme",
         "grain": "mmwr_week",
         "date_system": {
@@ -311,7 +427,8 @@ def _weekly_payload(
             "headroom_multiplier": first.headroom_multiplier,
         },
         "input_artifact_sha256": input_sha256,
-        "caveats": PUBLIC_CAVEATS,
+        **_research_status_field(geography),
+        "caveats": _public_caveats(geography),
         "guidance_links": GUIDANCE_LINKS,
         "records": [_weekly_record(record) for record in records],
     }
@@ -355,6 +472,7 @@ def _county_metadata_payload(
     *,
     source_records: list[CountyWeekRiskRecord],
     generated_at: str,
+    geography: _GeographyScope,
 ) -> dict[str, object]:
     grouped: dict[str, list[CountyWeekRiskRecord]] = {}
     for record in records:
@@ -377,10 +495,11 @@ def _county_metadata_payload(
         )
     return {
         "schema_version": STATIC_EXPORT_SCHEMA_VERSION,
-        "export_type": "md_county_metadata",
+        "export_type": geography.county_export_type,
         "generated_at": generated_at,
-        "geography": "MD county/jurisdiction",
+        "geography": geography.geography_label,
         "county_count": len(counties),
+        **_research_status_field(geography),
         "counties": counties,
     }
 
@@ -390,6 +509,7 @@ def _model_card_payload(
     *,
     generated_at: str,
     model_summary_path: Path | None,
+    geography: _GeographyScope,
 ) -> dict[str, object]:
     first = records[0]
     payload: dict[str, object] = {
@@ -398,13 +518,8 @@ def _model_card_payload(
         "generated_at": generated_at,
         "model_name": first.model_name,
         "target_definition": "lyme_incidence_per_100k",
-        "product_framing": (
-            "Lyme risk forecasting tool for Maryland county-week conditions"
-        ),
-        "score_interpretation": (
-            "Relative seasonal Lyme forecast on a 1-10 Maryland scale; not a "
-            "per-bite infection probability."
-        ),
+        "product_framing": geography.product_framing,
+        "score_interpretation": geography.score_interpretation,
         "not_for": [
             "per-bite infection probability",
             "diagnosis",
@@ -428,6 +543,7 @@ def _model_card_payload(
                 "considered for future reviewed estimates."
             ),
         },
+        **_research_status_field(geography),
         "explainer_placeholders": EXPLAINER_PLACEHOLDERS,
         "annual_prediction_source": _annual_prediction_source(first),
         "quality_flags": [
@@ -435,7 +551,7 @@ def _model_card_payload(
             "static_seasonality_prior",
             "not_weather_adjusted",
         ],
-        "caveats": PUBLIC_CAVEATS,
+        "caveats": _public_caveats(geography),
     }
     if model_summary_path is not None:
         payload["validation_summary"] = _validation_summary_payload(
@@ -547,6 +663,7 @@ def _source_catalog_payload(
     *,
     generated_at: str,
     input_sha256: str,
+    geography: _GeographyScope,
 ) -> dict[str, object]:
     first = records[0]
     return {
@@ -557,6 +674,7 @@ def _source_catalog_payload(
         "source_prediction_sha256": first.source_prediction_sha256,
         "source_seasonality_sha256": first.source_seasonality_sha256,
         "input_artifact_sha256": input_sha256,
+        **_research_status_field(geography),
         "guidance_links": GUIDANCE_LINKS,
         "data_lag_and_update_policy": {
             "summary": (
@@ -644,6 +762,7 @@ def _manifest_payload(
     weekly_payload: dict[str, object],
     county_payload: dict[str, object],
     generated_at: str,
+    geography: _GeographyScope,
 ) -> dict[str, object]:
     files = [
         paths.weekly_risk_path.name,
@@ -657,7 +776,7 @@ def _manifest_payload(
         "county_metadata": int(county_payload["county_count"]),
     }
     county_geojson_path = paths.export_manifest_path.parent / "md_counties.geojson"
-    if county_geojson_path.exists():
+    if geography.scope == MARYLAND_GEOGRAPHY_SCOPE and county_geojson_path.exists():
         files.append(county_geojson_path.name)
         record_counts["county_geojson_features"] = _county_geojson_feature_count(
             county_geojson_path
@@ -666,6 +785,7 @@ def _manifest_payload(
         "schema_version": STATIC_EXPORT_SCHEMA_VERSION,
         "export_type": "static_export_manifest",
         "generated_at": generated_at,
+        **_research_status_field(geography),
         "files": files,
         "record_counts": record_counts,
     }

@@ -177,6 +177,114 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert manifest["record_counts"]["weekly_risk"] == 2
 
 
+def test_export_static_risk_data_can_write_regional_research_scope(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_csv(
+        tmp_path / "scores.csv",
+        [
+            _score_row("24003", "Anne Arundel County", "2026", "1", "7"),
+            _score_row("42001", "Adams County", "2026", "1", "6"),
+        ],
+    )
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "regional-data",
+        geography_scope="midatlantic_county_week",
+    )
+
+    assert outputs.weekly_risk_path.name == "regional_county_risk_weekly.json"
+    assert outputs.county_metadata_path.name == "regional_county_metadata.json"
+
+    weekly = _read_json(outputs.weekly_risk_path)
+    counties = _read_json(outputs.county_metadata_path)
+    model_card = _read_json(outputs.model_card_path)
+    manifest = _read_json(outputs.export_manifest_path)
+
+    assert weekly["export_type"] == "regional_county_risk_weekly"
+    assert weekly["scope"] == "midatlantic_county_week"
+    assert weekly["research_status"] == {
+        "research_only": True,
+        "not_public_maryland_default": True,
+    }
+    assert weekly["geography"] == {
+        "region": "DE/DC/MD/PA/VA/WV",
+        "state_fips": ["10", "11", "24", "42", "51", "54"],
+        "jurisdiction_count": 2,
+    }
+    assert (
+        "Relative regional county-week Lyme forecast, not a per-bite infection probability."
+        in weekly["caveats"]
+    )
+    assert not any("Relative Maryland" in caveat for caveat in weekly["caveats"])
+    assert counties["export_type"] == "regional_county_metadata"
+    assert counties["geography"] == "DE/DC/MD/PA/VA/WV county-equivalent"
+    assert counties["research_status"] == {
+        "research_only": True,
+        "not_public_maryland_default": True,
+    }
+    assert model_card["product_framing"] == (
+        "Lyme risk forecasting tool for DE/DC/MD/PA/VA/WV county-week conditions"
+    )
+    assert model_card["research_status"] == {
+        "research_only": True,
+        "not_public_maryland_default": True,
+    }
+    assert "regional scale" in model_card["score_interpretation"]
+    assert manifest["research_status"] == {
+        "research_only": True,
+        "not_public_maryland_default": True,
+    }
+    assert manifest["files"][:2] == [
+        "regional_county_risk_weekly.json",
+        "regional_county_metadata.json",
+    ]
+
+
+def test_export_static_risk_data_rejects_unknown_geography_scope(
+    tmp_path: Path,
+) -> None:
+    try:
+        export_static_risk_data(
+            scores_path=_write_scores(tmp_path / "scores.csv"),
+            output_dir=tmp_path / "public-data",
+            geography_scope="planetary_tick_week",
+        )
+    except StaticExportInputError as exc:
+        assert "Unsupported static export geography_scope" in str(exc)
+    else:
+        raise AssertionError("Expected unknown geography scope to fail")
+
+
+def test_regional_static_export_manifest_ignores_maryland_geojson(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "regional-data"
+    output_dir.mkdir()
+    (output_dir / "md_counties.geojson").write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "metadata": {"feature_count": 24},
+                "features": [{"type": "Feature"} for _ in range(24)],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    outputs = export_static_risk_data(
+        scores_path=_write_scores(tmp_path / "scores.csv"),
+        output_dir=output_dir,
+        geography_scope="midatlantic_county_week",
+    )
+
+    manifest = _read_json(outputs.export_manifest_path)
+
+    assert "md_counties.geojson" not in manifest["files"]
+    assert "county_geojson_features" not in manifest["record_counts"]
+
+
 def test_export_static_risk_data_requires_unambiguous_score_branch(
     tmp_path: Path,
 ) -> None:

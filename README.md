@@ -196,6 +196,7 @@ tickbiterisk etl forecast-bayesian-update-backtest --predictions-path build/etl/
 tickbiterisk etl model-backtest --model-features-path build/etl/model/model_features_county_year.csv --output-dir build/etl/backtest
 tickbiterisk etl county-week-risk --predictions-path build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv --prediction-intervals-path build/etl/regional-annual-forecast/regional_annual_forecast_intervals.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --output-dir build/etl/regional-county-week-risk --replace
 tickbiterisk etl county-week-risk --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name linear_blend_baseline --output-dir build/etl/county-week-risk --replace
+tickbiterisk risk export-static --scores-path build/etl/regional-county-week-risk/county_week_seasonal_risk_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --geography-scope midatlantic_county_week --output-dir build/public-regional-risk
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest --include-annual-report-pdfs
 tickbiterisk etl ecology-sources --raw-dir data/raw/ecology --manifest-path build/etl/ecology/source_manifest.csv
@@ -282,6 +283,13 @@ as regional rather than Maryland-relative. The 2026-05-29 live research run for
 the regional annual forecast interval artifact propagated into weekly interval
 bands. This is a transparent regional risk-score lane, not the Maryland public
 default.
+
+Regional static risk export note: `risk export-static --geography-scope
+midatlantic_county_week` writes a research-only JSON bundle with
+`regional_county_risk_weekly.json`, `regional_county_metadata.json`, model card,
+source catalog, and manifest files. The regional bundle is explicitly tagged
+`research_only` and `not_public_maryland_default`; the default export still
+writes the Maryland public contract.
 
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only
