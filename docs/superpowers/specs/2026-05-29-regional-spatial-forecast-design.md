@@ -8,6 +8,16 @@ Virginia. Counties are observation units and public reporting units, not
 ecological boundaries. State is retained for source caveats, rollups, labels,
 and display, but state borders do not constrain model features.
 
+The ultimate product abstraction is **risk**: a transparent, open-source,
+plain-language score built from real data and expressed on a well-defined
+scale. Intermediate artifacts can expose reported incidence, population
+denominators, adjacency, clusters, regimes, model comparisons, and caveats so
+the score remains auditable. Public language must avoid claiming individual
+infection probability or medical advice. Internally, "baseline infection rate"
+is treated as shorthand for reported-incidence or relative disease-pressure
+baselines because the available surveillance data are reported cases, not true
+infection prevalence.
+
 ## Spatial Model Concept
 
 The ecological process is treated as a continuous regional surface observed
@@ -22,6 +32,25 @@ across state lines. For example, a Maryland county can have Pennsylvania,
 Delaware, Virginia, West Virginia, or District of Columbia neighbors when the
 geometry shares a boundary segment.
 
+Immediate-neighbor averages are only a first diagnostic. The more important
+modeling idea is **localized spatial regimes**: contiguous or near-contiguous
+sets of counties whose prior reported-incidence histories move together more
+strongly than they move with the broader state or region. Western Maryland and
+surrounding Appalachian counties in Pennsylvania and West Virginia may form a
+more meaningful prior-risk regime than all of Maryland. Coastal and southeast
+Virginia localities may form a different low-baseline or differently timed
+regime than northern or western Virginia. These regimes should compete with
+state-level empirical-Bayes baselines rather than being forced into state
+boundaries.
+
+Localized regimes should be learned from adjacency plus forecast-safe prior
+history. County pairs should be connected only when they are spatially adjacent
+or otherwise explicitly supported by a regional geography rule and have similar
+prior incidence level/trend, ecology, or surveillance-context signals. The
+first implementation lane can use prior reported-incidence level and trend
+similarity because those data are already available; later lanes can add habitat,
+weather, host, population, and exposure context.
+
 ## Forecast-Safe Rules
 
 Spatial forecast features must be based only on information available at the
@@ -29,9 +58,29 @@ forecast origin. Neighbor incidence for forecast year Y is built from origin
 year Y-1 or earlier outcomes, never same-year target outcomes and never
 validation-row artifacts copied forward.
 
+Spatial-regime assignment for a held-out year Y must also be learned only from
+years before Y. If a regime appears to move together in 2021, that fact cannot
+be used to forecast 2021 unless it was already visible from 2020 and earlier
+history. Diagnostic outputs may include same-year held-out outcomes for
+evaluation, but model feature columns and forecast branches must keep those
+diagnostics separated from forecast-safe features.
+
+Uncertainty should be preserved around risk estimates. Confidence or prediction
+intervals are expected to start wide because official county surveillance lags
+and reporting regimes are noisy; they can narrow and update as newer official,
+state-source, or near-real-time proxy data become available. Late-arriving data
+should update the forecast with provenance and caveats rather than rewriting
+history as if the late data had been known at the original forecast origin.
+
 The regional public/product default remains separate from research branches.
 Cross-border spatial features are research diagnostics until rolling-origin
 tests show stable improvement and a separate public branch decision is made.
+
+Promotion criteria should be about the risk product, not about a model sounding
+sophisticated. A localized spatial-regime branch is valuable when it improves
+or clarifies risk estimates against county-only, state, Mid-Atlantic, analog,
+Bayesian/shrinkage, and random-forest lanes while remaining explainable and
+forecast-safe.
 
 ## Source And Provenance
 
@@ -47,3 +96,11 @@ does not yet promote a public forecast branch, and it does not change the
 Maryland static dashboard score. Later slices can join this graph into regional
 incidence stress tests, regional annual forecasts, and cluster/capacity
 diagnostics.
+
+The next modeling slice should move beyond immediate-neighbor averaging by
+materializing forecast-safe localized spatial regimes and testing a
+spatial-regime empirical-Bayes branch. The expected comparison is whether a
+localized regime prior is more useful than state-level shrinkage for reported
+incidence and risk estimation, especially in cross-border ecological areas such
+as Western Maryland/Pennsylvania/West Virginia versus coastal and southeast
+Virginia/Delmarva areas.
