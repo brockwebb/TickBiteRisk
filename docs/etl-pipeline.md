@@ -224,6 +224,13 @@ artifacts.
      forecast-safe analog/like-year incidence, deterministic random forest over
      prior county/state/regional incidence history, and state/Mid-Atlantic
      empirical-Bayes shrinkage baselines as transparent historical-range tests.
+   - When `--regional-adjacency-path` points to
+     `regional_county_adjacency.csv`, also emits an optional
+     `spatial_prior_year_neighbor_incidence` branch that uses only adjacent
+     counties' incidence from the prior observed year. This spatial lane carries
+     `regional_county_adjacency_from_geojson`, `spatial_neighbor_feature`,
+     `forecast_safe_prior_year_neighbor_signal`, and `not_public_default`
+     flags.
      These are research diagnostics over reported incidence per 100k, not
      public forecasts or latent true disease estimates.
 

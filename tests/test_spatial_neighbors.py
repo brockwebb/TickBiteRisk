@@ -2,8 +2,13 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
+
 from tickbiterisk.modeling.spatial_neighbors import (
     build_county_adjacency_from_geojson,
+    CountyAdjacencyInputError,
+    read_county_neighbors,
+    summarize_neighbor_incidence,
     write_county_adjacency_output,
     write_regional_county_adjacency_output,
 )
@@ -72,6 +77,97 @@ def test_write_regional_county_adjacency_output_preserves_cross_state_edges(
     } == {"regional_county_adjacency_from_geojson"}
 
 
+def test_read_county_neighbors_orders_dedupes_and_skips_self_edges(
+    tmp_path: Path,
+) -> None:
+    adjacency = tmp_path / "regional_county_adjacency.csv"
+    _write_adjacency_csv(
+        adjacency,
+        [
+            ("24001", "42001"),
+            ("24001", "42001"),
+            ("24001", "24001"),
+            ("42001", "24001"),
+            ("42001", "54001"),
+        ],
+    )
+
+    neighbors = read_county_neighbors(adjacency)
+
+    assert neighbors == {
+        "24001": ["42001"],
+        "42001": ["24001", "54001"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("county_fips", "neighbor_county_fips"),
+    [
+        ("", "42001"),
+        ("24001", "bad"),
+    ],
+)
+def test_read_county_neighbors_rejects_malformed_fips_values(
+    tmp_path: Path,
+    county_fips: str,
+    neighbor_county_fips: str,
+) -> None:
+    adjacency = tmp_path / "regional_county_adjacency.csv"
+    _write_adjacency_csv(adjacency, [(county_fips, neighbor_county_fips)])
+
+    with pytest.raises(CountyAdjacencyInputError, match="invalid county adjacency"):
+        read_county_neighbors(adjacency)
+
+
+def test_summarize_neighbor_incidence_uses_only_requested_years(
+    tmp_path: Path,
+) -> None:
+    adjacency = tmp_path / "regional_county_adjacency.csv"
+    _write_adjacency_csv(adjacency, [("24001", "42001")])
+    neighbors = read_county_neighbors(adjacency)
+
+    summary = summarize_neighbor_incidence(
+        county_fips="24001",
+        years=[2020],
+        county_neighbors=neighbors,
+        incidence_by_county_year={
+            ("42001", 2020): 50.0,
+            ("42001", 2021): 999.0,
+        },
+    )
+
+    assert summary.mean_incidence_per_100k == 50.0
+    assert summary.max_incidence_per_100k == 50.0
+    assert summary.neighbor_count == 1
+    assert summary.start_year == 2020
+    assert summary.end_year == 2020
+    assert summary.year_count == 1
+    assert summary.missing_neighbor_incidence is False
+
+
+def test_summarize_neighbor_incidence_marks_missing_without_neighbor_history(
+    tmp_path: Path,
+) -> None:
+    adjacency = tmp_path / "regional_county_adjacency.csv"
+    _write_adjacency_csv(adjacency, [("24001", "42001")])
+    neighbors = read_county_neighbors(adjacency)
+
+    summary = summarize_neighbor_incidence(
+        county_fips="24001",
+        years=[2020],
+        county_neighbors=neighbors,
+        incidence_by_county_year={("42001", 2021): 999.0},
+    )
+
+    assert summary.mean_incidence_per_100k == 0.0
+    assert summary.max_incidence_per_100k == 0.0
+    assert summary.neighbor_count == 0
+    assert summary.start_year is None
+    assert summary.end_year is None
+    assert summary.year_count == 0
+    assert summary.missing_neighbor_incidence is True
+
+
 def _county_geojson() -> dict[str, object]:
     return {
         "type": "FeatureCollection",
@@ -106,3 +202,22 @@ def _feature(county_fips: str, county_name: str, ring: list[list[float]]) -> dic
             "coordinates": [ring],
         },
     }
+
+
+def _write_adjacency_csv(path: Path, pairs: list[tuple[str, str]]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "county_fips",
+                "neighbor_county_fips",
+            ],
+        )
+        writer.writeheader()
+        for county_fips, neighbor_county_fips in pairs:
+            writer.writerow(
+                {
+                    "county_fips": county_fips,
+                    "neighbor_county_fips": neighbor_county_fips,
+                }
+            )

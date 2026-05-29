@@ -175,9 +175,9 @@ tickbiterisk etl regional-signals --regional-lyme-path build/etl/regional-lyme/m
 tickbiterisk etl regional-hotspots --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --output-dir build/etl/regional-hotspots
 tickbiterisk etl regional-incidence --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --output-dir build/etl/regional-incidence
 tickbiterisk etl regional-outcome-stress --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --output-dir build/etl/regional-outcome-stress
-tickbiterisk etl regional-incidence-stress --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --output-dir build/etl/regional-incidence-stress
-tickbiterisk etl regional-annual-forecast --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --as-of-date 2026-05-28 --data-cutoff-date 2023-12-31 --source-vintage cdc_lyme_county_dashboard_2023 --update-mode pre_update --output-dir build/etl/regional-annual-forecast
 tickbiterisk etl regional-county-adjacency --fetch-census-geojson --output-dir build/etl/regional-county-adjacency
+tickbiterisk etl regional-incidence-stress --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-adjacency-path build/etl/regional-county-adjacency/regional_county_adjacency.csv --output-dir build/etl/regional-incidence-stress
+tickbiterisk etl regional-annual-forecast --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --as-of-date 2026-05-28 --data-cutoff-date 2023-12-31 --source-vintage cdc_lyme_county_dashboard_2023 --update-mode pre_update --output-dir build/etl/regional-annual-forecast
 tickbiterisk etl regional-incidence-clusters --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --output-dir build/etl/regional-incidence-clusters
 tickbiterisk etl provenance-audit --root-dir build/etl
 tickbiterisk etl nssp-coverage --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/nssp-coverage
@@ -224,6 +224,15 @@ That lets spatial model lanes treat counties as observation cells of a
 continuous regional surface rather than as state-isolated units. The 2026-05-29
 live smoke wrote 283 normalized county-equivalent features and 1,474 directed
 neighbor rows, including 184 directed cross-state edges.
+
+Regional spatial stress note: when `regional-incidence-stress` is run with
+`--regional-adjacency-path build/etl/regional-county-adjacency/regional_county_adjacency.csv`,
+it emits `spatial_prior_year_neighbor_incidence` from adjacent counties'
+prior-year reported incidence only. The 2026-05-29 live adjacency run wrote
+34,164 prediction rows and 175 metric rows; the spatial branch had 28.03462
+MAE per 100k, behind prior-year county, random forest, trailing mean, and
+analog branches, so it remains a diagnostic research lane rather than a
+promoted regional annual forecast branch.
 
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only

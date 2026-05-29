@@ -13,6 +13,8 @@ REGIONAL_INCIDENCE_STRESS_RUN_COLUMNS = [
     "run_id",
     "regional_incidence_path",
     "regional_incidence_sha256",
+    "regional_adjacency_path",
+    "regional_adjacency_sha256",
     "start_year",
     "end_year",
     "min_train_years",

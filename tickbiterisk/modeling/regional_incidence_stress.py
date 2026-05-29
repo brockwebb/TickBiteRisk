@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
 
+from tickbiterisk.modeling.spatial_neighbors import (
+    CountyAdjacencyInputError,
+    read_county_neighbors,
+    summarize_neighbor_incidence,
+)
+
 
 COMPARISON_ASSUMPTION_FLAGS = (
     "observational_not_causal,"
@@ -29,6 +35,13 @@ RANDOM_FOREST_MODEL_FEATURE_FLAGS = (
     "forecast_safe_prior_outcomes_only,"
     "reported_incidence_history_only,"
     "not_public_maryland_default"
+)
+SPATIAL_NEIGHBOR_MODEL_FEATURE_FLAGS = (
+    "regional_county_adjacency_from_geojson,"
+    "spatial_neighbor_feature,"
+    "forecast_safe_prior_year_neighbor_signal,"
+    "forecast_safe_prior_outcomes_only,"
+    "not_public_default"
 )
 RANDOM_FOREST_N_ESTIMATORS = 200
 RANDOM_FOREST_MIN_SAMPLES_LEAF = 3
@@ -58,6 +71,8 @@ class RegionalIncidenceStressRun:
     run_id: str
     regional_incidence_path: str
     regional_incidence_sha256: str
+    regional_adjacency_path: str | None
+    regional_adjacency_sha256: str | None
     start_year: int
     end_year: int
     min_train_years: int
@@ -185,6 +200,7 @@ def build_regional_incidence_stress(
     random_forest_min_samples_leaf: int = RANDOM_FOREST_MIN_SAMPLES_LEAF,
     random_forest_max_features: str = RANDOM_FOREST_MAX_FEATURES,
     random_forest_random_state: int = RANDOM_FOREST_RANDOM_STATE,
+    regional_adjacency_path: Path | None = None,
 ) -> RegionalIncidenceStressResult:
     if min_train_years < 1:
         raise RegionalIncidenceStressInputError("min_train_years must be at least 1")
@@ -236,13 +252,25 @@ def build_regional_incidence_stress(
     rows_by_county = _group_by_county(rows)
     rows_by_year = _group_by_year(rows)
     rows_by_county_year = {(row.county_fips, row.year): row for row in rows}
+    incidence_by_county_year = {
+        (row.county_fips, row.year): row.incidence_per_100k for row in rows
+    }
+    try:
+        county_neighbors = read_county_neighbors(regional_adjacency_path)
+    except CountyAdjacencyInputError as exc:
+        raise RegionalIncidenceStressInputError(str(exc)) from exc
     source_file_sha256 = _sha256_file(regional_incidence_path)
+    regional_adjacency_sha256 = (
+        None if regional_adjacency_path is None else _sha256_file(regional_adjacency_path)
+    )
+    spatial_run_suffix = "_spatialneighbors" if regional_adjacency_path is not None else ""
     run_id = (
         f"regional_incidence_stress_start{start_year}_end{resolved_end_year}_"
         f"mintrain{min_train_years}_lookback{lookback_years}_"
         f"shrinkage{_slug_float(shrinkage_strength)}_"
         f"rf{random_forest_n_estimators}_leaf{random_forest_min_samples_leaf}_"
         f"max{random_forest_max_features}_seed{random_forest_random_state}"
+        f"{spatial_run_suffix}"
     )
 
     predictions = []
@@ -326,6 +354,16 @@ def build_regional_incidence_stress(
                 model_predictions["random_forest_regional_incidence"] = (
                     random_forest_prediction
                 )
+            spatial_neighbor_prediction = _spatial_prior_year_neighbor_prediction(
+                row=row,
+                test_year=test_year,
+                county_neighbors=county_neighbors,
+                incidence_by_county_year=incidence_by_county_year,
+            )
+            if spatial_neighbor_prediction is not None:
+                model_predictions["spatial_prior_year_neighbor_incidence"] = (
+                    spatial_neighbor_prediction
+                )
             flags = _combined_flags(row.feature_quality_flags, COMPARISON_ASSUMPTION_FLAGS)
             for model_name, model_prediction in model_predictions.items():
                 predictions.append(
@@ -351,6 +389,10 @@ def build_regional_incidence_stress(
         run_id=run_id,
         regional_incidence_path=str(regional_incidence_path),
         regional_incidence_sha256=source_file_sha256,
+        regional_adjacency_path=(
+            None if regional_adjacency_path is None else str(regional_adjacency_path)
+        ),
+        regional_adjacency_sha256=regional_adjacency_sha256,
         start_year=start_year,
         end_year=resolved_end_year,
         min_train_years=min_train_years,
@@ -764,6 +806,33 @@ def _regional_random_forest_prediction(
     )
 
 
+def _spatial_prior_year_neighbor_prediction(
+    *,
+    row: _IncidenceRow,
+    test_year: int,
+    county_neighbors: dict[str, list[str]],
+    incidence_by_county_year: dict[tuple[str, int], float | None],
+) -> _ModelPrediction | None:
+    if not county_neighbors:
+        return None
+    summary = summarize_neighbor_incidence(
+        county_fips=row.county_fips,
+        years=[test_year - 1],
+        county_neighbors=county_neighbors,
+        incidence_by_county_year=incidence_by_county_year,
+    )
+    if summary.missing_neighbor_incidence:
+        return None
+    return _model_prediction(
+        predicted_incidence_per_100k=summary.mean_incidence_per_100k,
+        population=row.population,
+        train_start_year=summary.start_year,
+        train_end_year=summary.end_year,
+        train_year_count=summary.year_count,
+        model_feature_quality_flags=SPATIAL_NEIGHBOR_MODEL_FEATURE_FLAGS,
+    )
+
+
 def _regional_random_forest_feature_vector(
     *,
     row: _IncidenceRow,
@@ -946,6 +1015,8 @@ def _analog_distance(
 def _model_family(model_name: str) -> str:
     if model_name.startswith("random_forest_"):
         return "random_forest_incidence"
+    if model_name.startswith("spatial_"):
+        return "spatial_neighbor_incidence"
     if model_name.startswith("analog_"):
         return "analog"
     if model_name.startswith("empirical_bayes_"):

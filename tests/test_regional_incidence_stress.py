@@ -120,6 +120,45 @@ def test_regional_incidence_stress_analog_uses_only_prior_known_outcomes(
     )
 
 
+def test_regional_incidence_stress_spatial_neighbor_uses_prior_year_only(
+    tmp_path: Path,
+) -> None:
+    panel = _write_incidence_panel(tmp_path / "incidence.csv")
+    adjacency = _write_regional_adjacency(tmp_path / "regional_adjacency.csv")
+
+    result = build_regional_incidence_stress(
+        regional_incidence_path=panel,
+        regional_adjacency_path=adjacency,
+        start_year=2021,
+        min_train_years=2,
+        lookback_years=2,
+        random_forest_n_estimators=5,
+    )
+
+    spatial = next(
+        row
+        for row in result.predictions
+        if row.model_name == "spatial_prior_year_neighbor_incidence"
+        and row.county_fips == "24001"
+    )
+    assert spatial.predicted_incidence_per_100k == 20.0
+    assert spatial.predicted_incidence_per_100k != 30.0
+    assert spatial.train_start_year == 2020
+    assert spatial.train_end_year == 2020
+    assert spatial.train_year_count == 1
+    assert spatial.model_family == "spatial_neighbor_incidence"
+    assert "regional_county_adjacency_from_geojson" in (
+        spatial.model_feature_quality_flags
+    )
+    assert "spatial_neighbor_feature" in spatial.model_feature_quality_flags
+    assert "forecast_safe_prior_year_neighbor_signal" in (
+        spatial.model_feature_quality_flags
+    )
+    assert "not_public_default" in spatial.model_feature_quality_flags
+    assert result.run.regional_adjacency_path == str(adjacency)
+    assert len(result.run.regional_adjacency_sha256 or "") == 64
+
+
 def test_build_regional_incidence_stress_skips_missing_target_incidence(
     tmp_path: Path,
 ) -> None:
@@ -183,6 +222,34 @@ def _write_single_county_incidence_panel(path: Path, values: list[int]) -> Path:
                 ),
             }
         )
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_regional_adjacency(path: Path) -> Path:
+    rows = [
+        {
+            "county_fips": "24001",
+            "county_name": "Allegany County",
+            "neighbor_county_fips": "42001",
+            "neighbor_county_name": "Adams County",
+            "shared_boundary_segment_count": "1",
+            "adjacency_method": "shared_boundary_segment",
+            "feature_quality_flags": "regional_county_adjacency_from_geojson",
+        },
+        {
+            "county_fips": "42001",
+            "county_name": "Adams County",
+            "neighbor_county_fips": "24001",
+            "neighbor_county_name": "Allegany County",
+            "shared_boundary_segment_count": "1",
+            "adjacency_method": "shared_boundary_segment",
+            "feature_quality_flags": "regional_county_adjacency_from_geojson",
+        },
+    ]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()

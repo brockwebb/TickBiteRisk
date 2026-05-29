@@ -3616,6 +3616,15 @@ def regional_incidence_stress(
         REGIONAL_RF_RANDOM_STATE,
         help="Random seed for the regional random forest incidence lane.",
     ),
+    regional_adjacency_path: Path | None = typer.Option(
+        None,
+        "--regional-adjacency-path",
+        "--county-adjacency-path",
+        help=(
+            "Optional regional county adjacency CSV for spatial-neighbor "
+            "research branches."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/regional-incidence-stress"),
         help="Output directory for regional incidence stress artifacts.",
@@ -3624,6 +3633,10 @@ def regional_incidence_stress(
     if not regional_incidence_path.exists():
         raise typer.BadParameter(
             f"Regional incidence panel not found: {regional_incidence_path}"
+        )
+    if regional_adjacency_path is not None and not regional_adjacency_path.exists():
+        raise typer.BadParameter(
+            f"Regional adjacency file not found: {regional_adjacency_path}"
         )
     if min_train_years < 1:
         raise typer.BadParameter("min-train-years must be at least 1")
@@ -3656,6 +3669,7 @@ def regional_incidence_stress(
             random_forest_min_samples_leaf=random_forest_min_samples_leaf,
             random_forest_max_features=random_forest_max_features,
             random_forest_random_state=random_forest_random_state,
+            regional_adjacency_path=regional_adjacency_path,
         )
     except RegionalIncidenceStressInputError as exc:
         raise typer.BadParameter(str(exc)) from exc

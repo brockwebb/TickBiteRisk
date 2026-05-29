@@ -5,6 +5,7 @@ import json
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
+from statistics import mean
 from typing import Any
 
 
@@ -30,6 +31,21 @@ class CountyAdjacency:
     shared_boundary_segment_count: int
     adjacency_method: str
     feature_quality_flags: str
+
+
+class CountyAdjacencyInputError(ValueError):
+    """Raised when county adjacency inputs are invalid."""
+
+
+@dataclass(frozen=True)
+class NeighborIncidenceSummary:
+    mean_incidence_per_100k: float
+    max_incidence_per_100k: float
+    neighbor_count: int
+    start_year: int | None
+    end_year: int | None
+    year_count: int
+    missing_neighbor_incidence: bool
 
 
 def build_county_adjacency_from_geojson(
@@ -127,6 +143,74 @@ def _write_adjacency_output(
     return output_path
 
 
+def read_county_neighbors(path: Path | None) -> dict[str, list[str]]:
+    if path is None:
+        return {}
+    if not path.exists():
+        raise CountyAdjacencyInputError(f"county adjacency file not found: {path}")
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = set(reader.fieldnames or [])
+        missing_columns = {"county_fips", "neighbor_county_fips"} - fieldnames
+        if missing_columns:
+            raise CountyAdjacencyInputError(
+                "missing required county adjacency column(s): "
+                f"{', '.join(sorted(missing_columns))}"
+            )
+        neighbors: dict[str, set[str]] = {}
+        for row in reader:
+            county_fips = _normalize_county_fips(row["county_fips"], "county_fips")
+            neighbor_county_fips = _normalize_county_fips(
+                row["neighbor_county_fips"],
+                "neighbor_county_fips",
+            )
+            if county_fips == neighbor_county_fips:
+                continue
+            neighbors.setdefault(county_fips, set()).add(neighbor_county_fips)
+    return {
+        county_fips: sorted(county_neighbors)
+        for county_fips, county_neighbors in sorted(neighbors.items())
+    }
+
+
+def summarize_neighbor_incidence(
+    *,
+    county_fips: str,
+    years: list[int],
+    county_neighbors: dict[str, list[str]],
+    incidence_by_county_year: dict[tuple[str, int], float | None],
+) -> NeighborIncidenceSummary:
+    selected_years = sorted({int(year) for year in years})
+    values = []
+    years_with_values = set()
+    for neighbor_fips in county_neighbors.get(str(county_fips).zfill(5), []):
+        for year in selected_years:
+            incidence = incidence_by_county_year.get((neighbor_fips, year))
+            if incidence is None:
+                continue
+            values.append(float(incidence))
+            years_with_values.add(year)
+    if not values:
+        return NeighborIncidenceSummary(
+            mean_incidence_per_100k=0.0,
+            max_incidence_per_100k=0.0,
+            neighbor_count=0,
+            start_year=None,
+            end_year=None,
+            year_count=0,
+            missing_neighbor_incidence=True,
+        )
+    return NeighborIncidenceSummary(
+        mean_incidence_per_100k=_round(mean(values)),
+        max_incidence_per_100k=_round(max(values)),
+        neighbor_count=len(values),
+        start_year=min(years_with_values),
+        end_year=max(years_with_values),
+        year_count=len(years_with_values),
+        missing_neighbor_incidence=False,
+    )
+
+
 def _adjacency_row(
     county_fips: str,
     neighbor_county_fips: str,
@@ -167,3 +251,16 @@ def _geometry_segments(
 
 def _point(raw_point: list[float]) -> tuple[float, float]:
     return (round(float(raw_point[0]), 6), round(float(raw_point[1]), 6))
+
+
+def _normalize_county_fips(value: str, column_name: str) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value or not raw_value.isdigit() or len(raw_value) > 5:
+        raise CountyAdjacencyInputError(
+            f"invalid county adjacency {column_name}: {value}"
+        )
+    return raw_value.zfill(5)
+
+
+def _round(value: float) -> float:
+    return round(float(value), 6)
