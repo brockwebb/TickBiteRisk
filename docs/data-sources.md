@@ -22,6 +22,7 @@ boundary clearly allow redistribution.
 | `cdc_lyme_seasonality` | CDC Lyme onset by MMWR week and month | National week/month | Static seasonal allocation from annual predictions to county-week forecast | active_etl |
 | `noaa_ghcnd` | NOAA daily station observations | Station-day to county-week/year | Weather feature candidates and backtesting inputs | active_etl |
 | `census_county_reference` | Census Gazetteer county file | County | County names, FIPS, land/water area, internal points | active_etl |
+| `census_tigerweb_midatlantic_counties` | Census TIGERweb county geometry for DE/DC/MD/PA/VA/WV | County/county-equivalent GeoJSON | Regional cross-border shared-boundary adjacency graph | active_etl_spatial_support_not_public_default |
 | `census_population` | Census PEP/intercensal population APIs and county totals CSV | County-year | Incidence denominators and per-capita feature normalization through 2025 | active_etl |
 | `census_regional_age_sex` | Census PEP county age/sex static CSVs | County-year | Mid-Atlantic age-structure context for exposure research; not tick-bite counts | active_etl_candidate_feature |
 | `acs_residential_exposure_context` | ACS 5-year table-based summary files B01001/B25024/B25003 | County-year ACS vintage | 2023-2024 Mid-Atlantic residential form, tenure, age, and density exposure-context proxy; not tick-bite counts | active_etl_2023_2024_candidate_feature_not_public_default |
@@ -92,6 +93,8 @@ parser evidence, and time-aware validation before it can move into a model lane.
 | `midatlantic_county_population_year.csv` | `tickbiterisk etl regional-population` | DE/DC/MD/PA/VA/WV county-year population denominators for regional rate diagnostics, with flagged 2026 forecast projections |
 | `midatlantic_age_demographics_county_year.csv` | `tickbiterisk etl regional-demographics` | DE/DC/MD/PA/VA/WV county-year age-structure context through 2024 |
 | `midatlantic_acs_exposure_county_year.csv` | `tickbiterisk etl acs-exposure` | DE/DC/MD/PA/VA/WV 2023-2024 ACS residential-form, tenure, age, and density exposure-context proxy |
+| `regional_counties.geojson` | `tickbiterisk etl regional-county-adjacency --fetch-census-geojson` | Normalized DE/DC/MD/PA/VA/WV county-equivalent geometry for regional spatial support |
+| `regional_county_adjacency.csv` | `tickbiterisk etl regional-county-adjacency --fetch-census-geojson` | Cross-border shared-boundary county-neighbor graph for regional spatial pressure diagnostics and forecast research |
 | `county_reference.csv` | `tickbiterisk etl county-reference` | County FIPS, names, land area, and internal points |
 | `weather_features_weekly.csv` | `tickbiterisk etl noaa-weather-features` | Weekly weather predictors and quality flags |
 | `model_features_county_year.csv` | `tickbiterisk etl model-features` | Model-ready joined county-year panel |
@@ -205,5 +208,9 @@ parser evidence, and time-aware validation before it can move into a model lane.
   before the forecast origin and complete historical rows for the same forecast
   county set. It is a control-limit review tool, not an observed 2026 outcome
   or latent true disease-capacity estimate.
+- The regional county adjacency artifact uses current Census TIGERweb county
+  geometry for DE/DC/MD/PA/VA/WV. It treats state as display/rollup metadata
+  and keeps cross-border neighbors, but it is still a county-aggregation
+  support graph rather than a continuous measured risk surface.
 
 Last updated: 2026-05-29.

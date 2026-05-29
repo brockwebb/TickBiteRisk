@@ -157,6 +157,14 @@ from tickbiterisk.etl.regional_demographics import (
 from tickbiterisk.etl.regional_demographics_build import (
     write_regional_age_demographics_output,
 )
+from tickbiterisk.etl.regional_county_geometry import (
+    build_regional_county_geojson_provenance,
+    build_tigerweb_county_query_url,
+    fetch_regional_county_geojson_text,
+    normalize_tigerweb_county_geojson,
+    normalize_tigerweb_county_geojson_text,
+    validate_regional_county_geojson_footprint,
+)
 from tickbiterisk.etl.regional_hotspots import build_midatlantic_hotspot_diagnostics
 from tickbiterisk.etl.regional_hotspots_build import write_regional_hotspot_outputs
 from tickbiterisk.etl.regional_incidence import build_midatlantic_incidence_panel
@@ -375,6 +383,7 @@ from tickbiterisk.modeling.regional_incidence_clusters_build import (
 from tickbiterisk.modeling.spatial_neighbors import (
     build_county_adjacency_from_geojson,
     write_county_adjacency_output,
+    write_regional_county_adjacency_output,
 )
 from tickbiterisk.modeling.risk_score import (
     RiskScoreInputError,
@@ -2388,6 +2397,85 @@ def county_adjacency(
     rows = build_county_adjacency_from_geojson(county_geojson_path)
     output_path = write_county_adjacency_output(rows, output_dir)
     typer.echo(f"Wrote {len(rows)} county adjacency row(s) to {output_path}")
+
+
+@etl_app.command("regional-county-adjacency")
+def regional_county_adjacency(
+    county_geojson_path: Path | None = typer.Option(
+        None,
+        help="Input normalized regional county GeoJSON.",
+    ),
+    fetch_census_geojson: bool = typer.Option(
+        False,
+        help="Fetch official Census TIGERweb county GeoJSON for DE/DC/MD/PA/VA/WV.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-county-adjacency"),
+        help="Output directory for regional county adjacency artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for TIGERweb acquisition provenance.",
+    ),
+) -> None:
+    if fetch_census_geojson and county_geojson_path is not None:
+        raise typer.BadParameter(
+            "Use either --fetch-census-geojson or --county-geojson-path, not both"
+        )
+    if not fetch_census_geojson:
+        if county_geojson_path is None:
+            raise typer.BadParameter(
+                "Provide --county-geojson-path or --fetch-census-geojson"
+            )
+        if not county_geojson_path.exists():
+            raise typer.BadParameter(
+                f"Regional county GeoJSON file not found: {county_geojson_path}"
+            )
+        source_url = str(county_geojson_path)
+        normalized_geojson = normalize_tigerweb_county_geojson(
+            json.loads(county_geojson_path.read_text(encoding="utf-8")),
+            source_url=source_url,
+        )
+    else:
+        source_url = build_tigerweb_county_query_url()
+        normalized_geojson = normalize_tigerweb_county_geojson_text(
+            fetch_regional_county_geojson_text(source_url),
+            source_url=source_url,
+        )
+
+    try:
+        validate_regional_county_geojson_footprint(normalized_geojson)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    normalized_geojson_path = output_dir / "regional_counties.geojson"
+    normalized_geojson_path.write_text(
+        json.dumps(normalized_geojson, sort_keys=True),
+        encoding="utf-8",
+    )
+    rows = build_county_adjacency_from_geojson(normalized_geojson_path)
+    output_path = write_regional_county_adjacency_output(rows, output_dir)
+
+    typer.echo(
+        f"Wrote {len(rows)} regional county adjacency row(s) to {output_path}"
+    )
+    if fetch_census_geojson:
+        resolved_manifest_path = (
+            provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+        )
+        provenance_output = write_acquisition_provenance_manifest(
+            [
+                build_regional_county_geojson_provenance(
+                    source_url=source_url,
+                    artifact_paths=[normalized_geojson_path, output_path],
+                    row_count=len(normalized_geojson.get("features", [])),
+                    output_dir=output_dir,
+                )
+            ],
+            manifest_path=resolved_manifest_path,
+        )
+        typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
 @etl_app.command("model-compare")

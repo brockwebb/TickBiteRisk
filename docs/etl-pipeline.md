@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, New Jersey DOH reportable tickborne, Maine JMMC tickborne county rates, NSSP coverage, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, regional county geometry, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, New Jersey DOH reportable tickborne, Maine JMMC tickborne county rates, NSSP coverage, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -267,6 +267,23 @@ artifacts.
    - This is a control-limit diagnostic for forecast review, not an observed
      target-year outcome, public Maryland branch, or latent true disease
      capacity estimate.
+
+1i-4. `tickbiterisk etl regional-county-adjacency`
+   - Typical run:
+     `tickbiterisk etl regional-county-adjacency --fetch-census-geojson --output-dir build/etl/regional-county-adjacency`.
+   - Fetches the official keyless Census TIGERweb county layer for DE, DC, MD,
+     PA, VA, and WV using a saved secret-free query URL.
+   - Normalizes TIGERweb county properties into `county_fips`, `state_fips`,
+     `county_name`, and `source_geoid` and writes `regional_counties.geojson`.
+   - Derives directed shared-boundary county-neighbor pairs across state lines
+     and writes `regional_county_adjacency.csv`.
+   - Writes `acquisition_provenance.csv` with the source query, citation URL,
+     rerunnable command, normalized geometry and adjacency checksums, parser
+     method, row count, and caveats.
+   - State is display and rollup metadata here. The adjacency graph is spatial
+     support for treating counties as observation cells in a continuous
+     regional forecast surface, not disease truth, exposure truth, or a public
+     Maryland default.
 
 1j. `tickbiterisk etl regional-incidence-clusters`
    - Assigns county-years to low, moderate, high, and very-high regional

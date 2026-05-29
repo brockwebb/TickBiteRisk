@@ -17,6 +17,8 @@ COUNTY_ADJACENCY_COLUMNS = [
     "adjacency_method",
     "feature_quality_flags",
 ]
+MARYLAND_COUNTY_ADJACENCY_FLAG = "county_adjacency_from_geojson"
+REGIONAL_COUNTY_ADJACENCY_FLAG = "regional_county_adjacency_from_geojson"
 
 
 @dataclass(frozen=True)
@@ -74,8 +76,31 @@ def write_county_adjacency_output(
     rows: list[CountyAdjacency],
     output_dir: Path,
 ) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "md_county_adjacency.csv"
+    return _write_adjacency_output(
+        rows,
+        output_dir / "md_county_adjacency.csv",
+        feature_quality_flags=MARYLAND_COUNTY_ADJACENCY_FLAG,
+    )
+
+
+def write_regional_county_adjacency_output(
+    rows: list[CountyAdjacency],
+    output_dir: Path,
+) -> Path:
+    return _write_adjacency_output(
+        rows,
+        output_dir / "regional_county_adjacency.csv",
+        feature_quality_flags=REGIONAL_COUNTY_ADJACENCY_FLAG,
+    )
+
+
+def _write_adjacency_output(
+    rows: list[CountyAdjacency],
+    output_path: Path,
+    *,
+    feature_quality_flags: str,
+) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     keyed = {
         (row.county_fips, row.neighbor_county_fips): row
         for row in rows
@@ -96,7 +121,7 @@ def write_county_adjacency_output(
                     "neighbor_county_name": row.neighbor_county_name,
                     "shared_boundary_segment_count": row.shared_boundary_segment_count,
                     "adjacency_method": row.adjacency_method,
-                    "feature_quality_flags": row.feature_quality_flags,
+                    "feature_quality_flags": feature_quality_flags,
                 }
             )
     return output_path
@@ -115,7 +140,7 @@ def _adjacency_row(
         neighbor_county_name=names_by_fips.get(neighbor_county_fips, ""),
         shared_boundary_segment_count=segment_count,
         adjacency_method="shared_boundary_segment",
-        feature_quality_flags="county_adjacency_from_geojson",
+        feature_quality_flags=MARYLAND_COUNTY_ADJACENCY_FLAG,
     )
 
 
