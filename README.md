@@ -193,6 +193,7 @@ tickbiterisk etl model-diagnostics --predictions-path build/etl/model-comparison
 tickbiterisk etl forecast-calibration-backtest --predictions-path build/etl/model-comparison/model_comparison_predictions.csv --output-dir build/etl/forecast-calibration-backtest
 tickbiterisk etl forecast-bayesian-update-backtest --predictions-path build/etl/model-comparison/model_comparison_predictions.csv --output-dir build/etl/forecast-bayesian-update-backtest
 tickbiterisk etl model-backtest --model-features-path build/etl/model/model_features_county_year.csv --output-dir build/etl/backtest
+tickbiterisk etl county-week-risk --predictions-path build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name empirical_bayes_spatial_regime_incidence --output-dir build/etl/regional-county-week-risk --replace
 tickbiterisk etl county-week-risk --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name linear_blend_baseline --output-dir build/etl/county-week-risk --replace
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest
 tickbiterisk etl deer-harvest --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/deer-harvest --include-annual-report-pdfs
@@ -259,6 +260,13 @@ wrote 1,698 interval rows for the six regional annual forecast branches. These
 are uncertainty bands around reported-incidence proxy risk pressure, not
 individual infection probabilities, medical advice, or public-default score
 intervals.
+
+Regional weekly risk note: `county-week-risk` can now read regional annual
+forecast predictions that omit weather-mode columns and labels the score scale
+as regional rather than Maryland-relative. The 2026-05-29 live research run for
+`empirical_bayes_spatial_regime_incidence` wrote 14,999 county-week rows for
+283 county-equivalents and 53 MMWR weeks to `regional-county-week-risk`. This
+is a transparent regional risk-score lane, not the Maryland public default.
 
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only

@@ -214,7 +214,7 @@ def build_seasonal_risk_scores(
     scale = RiskScoreScale(
         model_name=model_name,
         grain="mmwr_week",
-        target_definition="lyme_incidence_per_100k",
+        target_definition=_scale_target_definition(predictions),
         seasonality_source_id=seasonality_source_id,
         benchmark_quantile=benchmark_quantile,
         headroom_multiplier=headroom_multiplier,
@@ -223,7 +223,7 @@ def build_seasonal_risk_scores(
         n_score_rows=len(rows),
         source_prediction_sha256=prediction_sha256,
         source_seasonality_sha256=seasonality_sha256,
-        scale_quality_flags="relative_to_maryland_prediction_distribution",
+        scale_quality_flags=_scale_quality_flags(predictions),
     )
     return SeasonalRiskScoreResult(
         rows=rows,
@@ -318,7 +318,6 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
         "target_definition",
         "feature_set",
         "evaluation_mode",
-        "weather_mode",
         "county_fips",
         "county_name",
         "predicted_incidence_per_100k",
@@ -337,7 +336,7 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
             feature_set=row["feature_set"],
             feature_profile=row.get("feature_profile", ""),
             evaluation_mode=row["evaluation_mode"],
-            weather_mode=row["weather_mode"],
+            weather_mode=row.get("weather_mode", "") or _default_weather_mode(row),
             county_fips=str(row["county_fips"]).zfill(5),
             county_name=row["county_name"],
             year=_parse_prediction_year(row),
@@ -368,6 +367,30 @@ def _read_predictions(path: Path) -> list[_PredictionInput]:
         )
         for row in rows
     ]
+
+
+def _default_weather_mode(row: dict[str, str]) -> str:
+    if row.get("evaluation_mode") == "regional_annual_forecast_no_observed_target":
+        return "not_used_by_regional_annual_forecast"
+    if "annual_forecast" in row.get("evaluation_mode", ""):
+        return "not_used_by_annual_forecast"
+    return "unspecified"
+
+
+def _scale_target_definition(predictions: list[_PredictionInput]) -> str:
+    target_definitions = {row.target_definition for row in predictions}
+    if len(target_definitions) == 1:
+        return next(iter(target_definitions))
+    return "mixed_target_definitions"
+
+
+def _scale_quality_flags(predictions: list[_PredictionInput]) -> str:
+    if any(
+        row.evaluation_mode == "regional_annual_forecast_no_observed_target"
+        for row in predictions
+    ):
+        return "relative_to_regional_prediction_distribution,not_public_default"
+    return "relative_to_maryland_prediction_distribution"
 
 
 def _parse_prediction_year(row: dict[str, str]) -> int:

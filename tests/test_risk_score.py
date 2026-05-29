@@ -142,6 +142,38 @@ def test_build_seasonal_risk_scores_reads_annual_forecast_predictions(
     assert "drought_monitor_retro_observed" not in first.feature_quality_flags
 
 
+def test_build_seasonal_risk_scores_reads_regional_annual_forecast_predictions(
+    tmp_path: Path,
+) -> None:
+    predictions_path = _write_regional_annual_forecast_predictions(
+        tmp_path / "regional_annual_forecast_predictions.csv"
+    )
+    seasonality_path = _write_seasonality(tmp_path / "seasonality.csv")
+
+    result = build_seasonal_risk_scores(
+        predictions_path=predictions_path,
+        seasonality_baseline_path=seasonality_path,
+        model_name="empirical_bayes_spatial_regime_incidence",
+    )
+
+    assert len(result.rows) == 4
+    assert result.scale.target_definition == "reported_lyme_incidence_per_100k"
+    assert result.scale.scale_quality_flags == (
+        "relative_to_regional_prediction_distribution,not_public_default"
+    )
+    first = result.rows[0]
+    assert first.source_prediction_run_id == "regional-forecast-run"
+    assert first.model_family == "empirical_bayes_spatial_regime"
+    assert first.feature_set == "historical_incidence_forecast_baselines"
+    assert first.evaluation_mode == "regional_annual_forecast_no_observed_target"
+    assert first.weather_mode == "not_used_by_regional_annual_forecast"
+    assert first.year == 2026
+    assert first.forecast_origin_year == 2023
+    assert first.predicted_annual_cases == 50.0
+    assert "localized_spatial_regime_feature" in first.feature_quality_flags
+    assert "not_public_default" in first.feature_quality_flags
+
+
 def test_build_seasonal_risk_scores_keeps_legacy_inputs_backward_compatible(
     tmp_path: Path,
 ) -> None:
@@ -516,6 +548,26 @@ def _write_annual_forecast_predictions(path: Path) -> Path:
     )
 
 
+def _write_regional_annual_forecast_predictions(path: Path) -> Path:
+    return _write_csv(
+        path,
+        [
+            _regional_annual_forecast_prediction_row(
+                "24001",
+                "Allegany County",
+                "50.0",
+                "50.0",
+            ),
+            _regional_annual_forecast_prediction_row(
+                "42001",
+                "Adams County",
+                "30.0",
+                "30.0",
+            ),
+        ],
+    )
+
+
 def _prediction_row(
     county_fips: str,
     county_name: str,
@@ -615,6 +667,49 @@ def _annual_forecast_prediction_row(
             "forecast_without_observed_target,"
             "population_denominator_forecast,"
             "no_official_2026_census_denominator"
+        ),
+    }
+
+
+def _regional_annual_forecast_prediction_row(
+    county_fips: str,
+    county_name: str,
+    predicted_incidence: str,
+    predicted_cases: str,
+) -> dict[str, str]:
+    return {
+        "run_id": "regional-forecast-run",
+        "model_name": "empirical_bayes_spatial_regime_incidence",
+        "model_family": "empirical_bayes_spatial_regime",
+        "target_definition": "reported_lyme_incidence_per_100k",
+        "feature_set": "historical_incidence_forecast_baselines",
+        "feature_profile": "localized_spatial_regime_shrinkage",
+        "evaluation_mode": "regional_annual_forecast_no_observed_target",
+        "regional_incidence_sha256": "a" * 64,
+        "regional_population_sha256": "b" * 64,
+        "state_fips": county_fips[:2],
+        "state_abbr": "MD" if county_fips.startswith("24") else "PA",
+        "state_name": "Maryland" if county_fips.startswith("24") else "Pennsylvania",
+        "county_fips": county_fips,
+        "county_name": county_name,
+        "forecast_year": "2026",
+        "forecast_origin_year": "2023",
+        "as_of_date": "2026-05-29",
+        "data_cutoff_date": "2023-12-31",
+        "source_vintage": "cdc_lyme_county_dashboard_2023",
+        "update_mode": "pre_update",
+        "forecast_population": "100000",
+        "predicted_cases": predicted_cases,
+        "predicted_incidence_per_100k": predicted_incidence,
+        "model_feature_quality_flags": (
+            "localized_spatial_regime_feature,"
+            "forecast_safe_prior_history_spatial_regime,"
+            "not_public_default"
+        ),
+        "forecast_assumption_flags": (
+            "forecast_without_observed_target,"
+            "reported_cases_not_stable_true_incidence,"
+            "not_public_maryland_default"
         ),
     }
 
