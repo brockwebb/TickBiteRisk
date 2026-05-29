@@ -297,7 +297,8 @@ Regional dashboard asset note: `dashboard build-regional-research-assets` adds
 `regional_spatial_regime_overlays.json` beside the regional risk JSON. The live
 research bundle currently includes 14,999 county-week risk records, 283
 county-equivalent map features, and 127 localized spatial-regime overlay rows
-for `empirical_bayes_spatial_regime_incidence`.
+for `empirical_bayes_spatial_regime_incidence`; the county metadata also carries
+each county's selected spatial-regime membership for map click panels.
 
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only

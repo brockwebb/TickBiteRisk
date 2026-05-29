@@ -126,6 +126,7 @@ def write_regional_research_dashboard_assets(
     )
     overlay_path = None
     overlay_count = 0
+    overlay_payload = None
     if spatial_regime_summary_path is not None:
         overlay_payload = regional_spatial_regime_overlay_payload(
             spatial_regime_summary_path,
@@ -137,6 +138,10 @@ def write_regional_research_dashboard_assets(
             encoding="utf-8",
         )
         overlay_count = int(overlay_payload["record_count"])
+        _augment_regional_county_metadata_with_regimes(
+            static_paths.county_metadata_path,
+            overlay_payload,
+        )
     _augment_manifest_with_regional_assets(
         static_paths.export_manifest_path,
         county_geojson_path=county_geojson_path,
@@ -356,6 +361,42 @@ def _augment_manifest_with_regional_assets(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _augment_regional_county_metadata_with_regimes(
+    county_metadata_path: Path,
+    overlay_payload: dict[str, object],
+) -> None:
+    metadata = json.loads(county_metadata_path.read_text(encoding="utf-8"))
+    memberships = _county_regime_memberships(overlay_payload)
+    for county in metadata.get("counties", []):
+        membership = memberships.get(str(county.get("county_fips", "")))
+        if membership is not None:
+            county["selected_spatial_regime"] = membership
+    county_metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _county_regime_memberships(
+    overlay_payload: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    memberships = {}
+    for record in overlay_payload.get("records", []):
+        if not isinstance(record, dict):
+            continue
+        membership = {
+            "region_id": record["region_id"],
+            "region_name": record["region_name"],
+            "spatial_regime_rank": record["spatial_regime_rank"],
+            "spatial_regime_feature_year": record["spatial_regime_feature_year"],
+            "forecast_year": record["forecast_year"],
+            "forecast_origin_year": record["forecast_origin_year"],
+        }
+        for county_fips in record.get("county_fips_list", []):
+            memberships[str(county_fips)] = membership
+    return memberships
 
 
 def _spatial_regime_overlay_record(row: dict[str, str]) -> dict[str, object]:

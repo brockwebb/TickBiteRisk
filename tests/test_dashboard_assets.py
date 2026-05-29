@@ -109,6 +109,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     )
 
     weekly = json.loads(result.weekly_risk_path.read_text(encoding="utf-8"))
+    county_metadata = json.loads(
+        result.county_metadata_path.read_text(encoding="utf-8")
+    )
     counties = json.loads(result.county_geojson_path.read_text(encoding="utf-8"))
     overlays = json.loads(
         result.spatial_regime_overlays_path.read_text(encoding="utf-8")
@@ -121,6 +124,19 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert overlays["record_count"] == 1
     assert overlays["records"][0]["region_id"] == "2024_regime_01"
     assert overlays["records"][0]["county_fips_list"] == ["24003", "42001"]
+    anne_arundel = next(
+        county
+        for county in county_metadata["counties"]
+        if county["county_fips"] == "24003"
+    )
+    assert anne_arundel["selected_spatial_regime"] == {
+        "region_id": "2024_regime_01",
+        "region_name": "Spatial regime 1",
+        "spatial_regime_rank": 1,
+        "spatial_regime_feature_year": 2024,
+        "forecast_year": 2026,
+        "forecast_origin_year": 2023,
+    }
     assert "regional_counties.geojson" in manifest["files"]
     assert "regional_spatial_regime_overlays.json" in manifest["files"]
     assert manifest["record_counts"]["regional_county_geojson_features"] == 2
