@@ -91,16 +91,24 @@ adjacency CSV records source URL hash, method, and quality flags.
 
 ## Current Slice
 
-The current build slice materializes the regional county adjacency graph. It
-does not yet promote a public forecast branch, and it does not change the
-Maryland static dashboard score. Later slices can join this graph into regional
-incidence stress tests, regional annual forecasts, and cluster/capacity
-diagnostics.
+The current regional research lane now materializes the county adjacency graph,
+forecast-safe localized spatial regimes, a spatial-regime empirical-Bayes
+annual forecast branch, and empirical prediction intervals around regional
+annual forecast rows. These outputs do not yet promote a public forecast branch,
+and they do not change the Maryland static dashboard score.
 
-The next modeling slice should move beyond immediate-neighbor averaging by
-materializing forecast-safe localized spatial regimes and testing a
-spatial-regime empirical-Bayes branch. The expected comparison is whether a
-localized regime prior is more useful than state-level shrinkage for reported
+Regional annual forecast intervals are calibrated from rolling-origin regional
+incidence stress residuals. They must use only residuals whose held-out test
+year is at or before the forecast origin, must match the annual forecast source
+incidence hash, and must avoid `actual_*`, residual, error, or coverage fields
+in pre-update forecast artifacts. The interval output is an uncertainty band
+around reported-incidence proxy risk pressure, not a claim about individual
+infection probability.
+
+The next modeling slices should compare whether localized regime priors and
+their uncertainty bands are more useful than state-level shrinkage for reported
 incidence and risk estimation, especially in cross-border ecological areas such
 as Western Maryland/Pennsylvania/West Virginia versus coastal and southeast
-Virginia/Delmarva areas.
+Virginia/Delmarva areas. Aggregate state/Mid-Atlantic interval summaries can be
+built from the row-level interval artifact, but public promotion still requires
+rolling-origin evidence and a separate branch decision.

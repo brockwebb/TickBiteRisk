@@ -179,6 +179,7 @@ tickbiterisk etl regional-county-adjacency --fetch-census-geojson --output-dir b
 tickbiterisk etl regional-spatial-regimes --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-adjacency-path build/etl/regional-county-adjacency/regional_county_adjacency.csv --output-dir build/etl/regional-spatial-regimes
 tickbiterisk etl regional-incidence-stress --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-adjacency-path build/etl/regional-county-adjacency/regional_county_adjacency.csv --regional-spatial-regimes-path build/etl/regional-spatial-regimes/regional_spatial_regime_county_year.csv --output-dir build/etl/regional-incidence-stress
 tickbiterisk etl regional-annual-forecast --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --regional-spatial-regimes-path build/etl/regional-spatial-regimes/regional_spatial_regime_county_year.csv --target-year 2026 --as-of-date 2026-05-29 --data-cutoff-date 2023-12-31 --source-vintage cdc_lyme_county_dashboard_2023 --update-mode pre_update --output-dir build/etl/regional-annual-forecast
+tickbiterisk etl regional-annual-forecast-intervals --forecast-predictions-path build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv --regional-incidence-stress-predictions-path build/etl/regional-incidence-stress/regional_incidence_stress_predictions.csv --output-dir build/etl/regional-annual-forecast
 tickbiterisk etl regional-incidence-clusters --regional-incidence-path build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv --output-dir build/etl/regional-incidence-clusters
 tickbiterisk etl provenance-audit --root-dir build/etl
 tickbiterisk etl nssp-coverage --county-reference-path build/etl/county-reference/county_reference.csv --output-dir build/etl/nssp-coverage
@@ -247,6 +248,17 @@ by `regional-incidence-stress`,
 better than state and Mid-Atlantic empirical Bayes and the simple neighbor
 branch, but not better than county-history, random-forest, trailing-mean, or
 analog branches. It remains a transparent research lane for the risk score.
+
+Regional annual forecast interval note: `regional-annual-forecast-intervals`
+calibrates county-level 80% and 95% empirical prediction bands from
+rolling-origin `regional-incidence-stress` residuals at or before the forecast
+origin. It uses matching model residual branches, maps
+`latest_observed_county_incidence` to the rolling `prior_year_county_incidence`
+stress branch, and rejects source-hash mismatches. The 2026-05-29 live run
+wrote 1,698 interval rows for the six regional annual forecast branches. These
+are uncertainty bands around reported-incidence proxy risk pressure, not
+individual infection probabilities, medical advice, or public-default score
+intervals.
 
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only

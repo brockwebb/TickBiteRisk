@@ -348,6 +348,11 @@ from tickbiterisk.modeling.regional_annual_forecast import (
 from tickbiterisk.modeling.regional_annual_forecast_build import (
     write_regional_annual_forecast_outputs,
 )
+from tickbiterisk.modeling.regional_annual_forecast_intervals import (
+    RegionalAnnualForecastIntervalInputError,
+    build_regional_annual_forecast_intervals,
+    write_regional_annual_forecast_interval_outputs,
+)
 from tickbiterisk.modeling.regional_forecast_capacity import (
     RegionalForecastCapacityInputError,
     build_regional_forecast_capacity,
@@ -3844,6 +3849,61 @@ def regional_annual_forecast(
     typer.echo(
         f"Wrote {len(result.predictions)} regional annual forecast prediction row(s) "
         f"to {outputs.predictions_path}"
+    )
+
+
+@etl_app.command("regional-annual-forecast-intervals")
+def regional_annual_forecast_intervals(
+    forecast_predictions_path: Path = typer.Option(
+        Path("build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv"),
+        help="Input regional annual forecast predictions CSV.",
+    ),
+    regional_incidence_stress_predictions_path: Path = typer.Option(
+        Path("build/etl/regional-incidence-stress/regional_incidence_stress_predictions.csv"),
+        help=(
+            "Input regional incidence stress prediction CSV used for "
+            "rolling-origin residual calibration."
+        ),
+    ),
+    min_residual_count: int = typer.Option(
+        30,
+        help="Minimum prior-origin residual rows required for each forecast branch.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-annual-forecast"),
+        help="Output directory for regional annual forecast interval artifacts.",
+    ),
+) -> None:
+    if not forecast_predictions_path.exists():
+        raise typer.BadParameter(
+            f"Regional forecast predictions not found: {forecast_predictions_path}"
+        )
+    if not regional_incidence_stress_predictions_path.exists():
+        raise typer.BadParameter(
+            "Regional incidence stress predictions not found: "
+            f"{regional_incidence_stress_predictions_path}"
+        )
+    if min_residual_count < 1:
+        raise typer.BadParameter("min-residual-count must be at least 1")
+
+    try:
+        result = build_regional_annual_forecast_intervals(
+            forecast_predictions_path=forecast_predictions_path,
+            regional_incidence_stress_predictions_path=(
+                regional_incidence_stress_predictions_path
+            ),
+            min_residual_count=min_residual_count,
+        )
+    except RegionalAnnualForecastIntervalInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_regional_annual_forecast_interval_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote 1 regional annual forecast interval run row(s) to "
+        f"{outputs.runs_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.intervals)} regional annual forecast interval row(s) "
+        f"to {outputs.intervals_path}"
     )
 
 
