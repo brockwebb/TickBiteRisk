@@ -218,6 +218,8 @@ from tickbiterisk.etl.seasonality import (
 from tickbiterisk.etl.seasonality_build import write_seasonality_outputs
 from tickbiterisk.etl.sources import compute_sha256
 from tickbiterisk.etl.tick_status import (
+    DEFAULT_TICK_STATUS_STATE_FIPS,
+    MIDATLANTIC_TICK_STATUS_STATE_FIPS,
     build_tick_status_county_features,
     parse_ixodes_status,
     parse_lone_star_status,
@@ -1723,24 +1725,32 @@ def tick_status(
         Path("build/etl/tick-status"),
         help="Output directory for normalized tick status artifacts.",
     ),
+    region: str = typer.Option(
+        "maryland",
+        help="County filter: maryland or midatlantic.",
+    ),
     provenance_manifest_path: Path | None = typer.Option(
         None,
         help="Output CSV manifest for raw-source acquisition provenance.",
     ),
 ) -> None:
+    state_fips_values = _tick_status_state_fips_for_region(region)
     source_metadata, source_paths_by_id = _resolve_tick_status_sources(raw_dir)
 
     ixodes_rows = parse_ixodes_status(
         source_paths_by_id["vector"],
         source_id=source_metadata["vector"]["source_id"],
+        state_fips_values=state_fips_values,
     )
     pathogen_rows = parse_pathogen_status(
         source_paths_by_id["pathogen"],
         source_id=source_metadata["pathogen"]["source_id"],
+        state_fips_values=state_fips_values,
     )
     lone_star_rows = parse_lone_star_status(
         source_paths_by_id["lone_star"],
         source_id=source_metadata["lone_star"]["source_id"],
+        state_fips_values=state_fips_values,
     )
     feature_rows = build_tick_status_county_features(
         ixodes_rows=ixodes_rows,
@@ -1773,6 +1783,7 @@ def tick_status(
             outputs=outputs,
             raw_dir=raw_dir,
             output_dir=output_dir,
+            region=region,
             manifest_path=resolved_manifest_path,
         ),
         manifest_path=resolved_manifest_path,
@@ -1782,6 +1793,15 @@ def tick_status(
         f"{outputs.features_path}"
     )
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
+def _tick_status_state_fips_for_region(region: str) -> tuple[str, ...]:
+    region_key = region.strip().lower()
+    if region_key == "maryland":
+        return DEFAULT_TICK_STATUS_STATE_FIPS
+    if region_key == "midatlantic":
+        return MIDATLANTIC_TICK_STATUS_STATE_FIPS
+    raise typer.BadParameter("region must be one of: maryland, midatlantic")
 
 
 @etl_app.command("nssp-coverage")
@@ -4646,11 +4666,13 @@ def _tick_status_provenance_records(
     outputs: TickStatusOutputPaths,
     raw_dir: Path,
     output_dir: Path,
+    region: str,
     manifest_path: Path,
 ) -> list[AcquisitionProvenanceRecord]:
     command = _tick_status_acquisition_command(
         raw_dir=raw_dir,
         output_dir=output_dir,
+        region=region,
         manifest_path=manifest_path,
     )
     output_paths_by_kind = {
@@ -4674,8 +4696,8 @@ def _tick_status_provenance_records(
                 acquisition_command=command,
                 acquisition_procedure=(
                     "Read an ignored local CDC tick status workbook, normalize "
-                    "Maryland county status rows, and build status-only county "
-                    "feature indicators."
+                    "selected county status rows, and build status-only "
+                    "county feature indicators."
                 ),
                 request_method="LOCAL_FILE_READ",
                 request_description=(
@@ -4811,6 +4833,7 @@ def _tick_status_acquisition_command(
     *,
     raw_dir: Path,
     output_dir: Path,
+    region: str,
     manifest_path: Path,
 ) -> str:
     return _format_cli_command(
@@ -4822,6 +4845,8 @@ def _tick_status_acquisition_command(
             _public_provenance_path(raw_dir),
             "--output-dir",
             _public_provenance_path(output_dir),
+            "--region",
+            region,
             "--provenance-manifest-path",
             _public_provenance_path(manifest_path),
         ]

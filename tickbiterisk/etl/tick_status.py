@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
 
 from tickbiterisk.etl.maryland import maryland_fips_set
+
+DEFAULT_TICK_STATUS_STATE_FIPS = ("24",)
+MIDATLANTIC_TICK_STATUS_STATE_FIPS = ("10", "11", "24", "42", "51", "54")
 
 
 @dataclass(frozen=True)
@@ -55,13 +59,26 @@ def _read_excel_sheet(
     raise ValueError(f"Missing columns in {sheet_name}: {sorted(missing)}")
 
 
-def _filter_md(df: pd.DataFrame, fips_column: str) -> pd.DataFrame:
-    md = df.copy()
-    md[fips_column] = md[fips_column].astype(str).str.split(".").str[0].str.zfill(5)
-    return md[md[fips_column].isin(maryland_fips_set())].copy()
+def _filter_states(
+    df: pd.DataFrame,
+    fips_column: str,
+    state_fips_values: Iterable[str] = DEFAULT_TICK_STATUS_STATE_FIPS,
+) -> pd.DataFrame:
+    filtered = df.copy()
+    filtered[fips_column] = (
+        filtered[fips_column].astype(str).str.split(".").str[0].str.zfill(5)
+    )
+    state_fips = {str(value).zfill(2) for value in state_fips_values}
+    if state_fips == set(DEFAULT_TICK_STATUS_STATE_FIPS):
+        return filtered[filtered[fips_column].isin(maryland_fips_set())].copy()
+    return filtered[filtered[fips_column].str[:2].isin(state_fips)].copy()
 
 
-def parse_ixodes_status(path: Path, source_id: str) -> list[dict[str, object]]:
+def parse_ixodes_status(
+    path: Path,
+    source_id: str,
+    state_fips_values: Iterable[str] = DEFAULT_TICK_STATUS_STATE_FIPS,
+) -> list[dict[str, object]]:
     required = {
         "FIPSCode",
         "State",
@@ -70,7 +87,7 @@ def parse_ixodes_status(path: Path, source_id: str) -> list[dict[str, object]]:
         "Ixodes_pacificus_county_status",
     }
     df = _read_excel_sheet(path, "Ixodes records 2025", required)
-    df = _filter_md(df, "FIPSCode")
+    df = _filter_states(df, "FIPSCode", state_fips_values)
     rows: list[dict[str, object]] = []
     for record in df.to_dict(orient="records"):
         rows.append(
@@ -95,7 +112,11 @@ def parse_ixodes_status(path: Path, source_id: str) -> list[dict[str, object]]:
     return sorted(rows, key=lambda row: str(row["county_fips"]))
 
 
-def parse_pathogen_status(path: Path, source_id: str) -> list[dict[str, object]]:
+def parse_pathogen_status(
+    path: Path,
+    source_id: str,
+    state_fips_values: Iterable[str] = DEFAULT_TICK_STATUS_STATE_FIPS,
+) -> list[dict[str, object]]:
     required = {
         "FIPS_Code",
         "State",
@@ -107,7 +128,7 @@ def parse_pathogen_status(path: Path, source_id: str) -> list[dict[str, object]]
         "Powassan_virus_County_Status",
     }
     df = _read_excel_sheet(path, "Ixodes Pathogens 2025", required)
-    df = _filter_md(df, "FIPS_Code")
+    df = _filter_states(df, "FIPS_Code", state_fips_values)
     rows: list[dict[str, object]] = []
     for record in df.to_dict(orient="records"):
         rows.append(
@@ -143,7 +164,11 @@ def parse_pathogen_status(path: Path, source_id: str) -> list[dict[str, object]]
     return sorted(rows, key=lambda row: str(row["county_fips"]))
 
 
-def parse_lone_star_status(path: Path, source_id: str) -> list[dict[str, object]]:
+def parse_lone_star_status(
+    path: Path,
+    source_id: str,
+    state_fips_values: Iterable[str] = DEFAULT_TICK_STATUS_STATE_FIPS,
+) -> list[dict[str, object]]:
     workbook_variants = [
         (
             "A. americanum Records 2025",
@@ -170,7 +195,7 @@ def parse_lone_star_status(path: Path, source_id: str) -> list[dict[str, object]
         raise ValueError(
             "Missing supported A. americanum workbook shape: " + "; ".join(errors)
         )
-    df = _filter_md(df, "FIPS")
+    df = _filter_states(df, "FIPS", state_fips_values)
     rows: list[dict[str, object]] = []
     for record in df.to_dict(orient="records"):
         rows.append(

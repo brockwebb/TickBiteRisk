@@ -139,7 +139,7 @@ plain-language public pages instead of burying it in implementation notes.
 | Census PEP county age/sex estimates | Regional demographic exposure-context proxy |
 | Census ACS 5-year table summaries | Residential form, tenure, age, and density exposure-context proxy |
 | Maryland DNR deer harvest | County-season host-pressure proxy |
-| CDC tick vector/pathogen status | Static surveillance status feature candidates through 2025 |
+| CDC tick vector/pathogen status | Static surveillance status feature candidates through 2025; default Maryland, opt-in Mid-Atlantic |
 | Census building permits | Contact/land-use pressure proxy |
 | CDC NSSP coverage table | Emergency-care feed coverage feasibility only, not tick-bite counts |
 | NLCD/MRLC land cover | Habitat source acquired for deeper feature extraction |

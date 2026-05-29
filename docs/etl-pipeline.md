@@ -289,9 +289,12 @@ artifacts.
 
 11c. `tickbiterisk etl tick-status`
     - Normalizes local CDC Ixodes, pathogen, and lone-star tick status
-      workbooks into Maryland county status features. The current default
-      metadata targets CDC May 2026 workbook files covering status through
-      2025 for Ixodes/pathogens and the 2025 lone-star map data.
+      workbooks into county status features. The default region is Maryland;
+      `--region midatlantic --output-dir build/etl/tick-status-midatlantic`
+      materializes DE, DC, MD, PA, VA, and WV rows for regional research.
+      The current default metadata targets CDC May 2026 workbook files
+      covering status through 2025 for Ixodes/pathogens and the 2025 lone-star
+      map data.
     - Writes `tick_vector_status.csv`, `tick_pathogen_status.csv`,
       `lone_star_status.csv`, `tick_status_county_features.csv`, and
       `acquisition_provenance.csv` with workbook checksums, parser methods,

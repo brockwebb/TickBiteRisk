@@ -87,6 +87,41 @@ def test_parse_ixodes_status_filters_non_maryland_and_sorts_by_fips(
     assert rows[0]["ixodes_scapularis_source"] == ""
 
 
+def test_parse_ixodes_status_can_include_midatlantic_state_filter(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "ixodes.xlsx"
+    _write_excel(
+        path,
+        "Ixodes records 2025",
+        [
+            {
+                "FIPSCode": "24003",
+                "State": "MD",
+                "County": "Anne Arundel County",
+                "Ixodes_scapularis_County_Status": "Established",
+                "Ixodes_pacificus_county_status": "No records",
+            },
+            {
+                "FIPSCode": "51013",
+                "State": "VA",
+                "County": "Arlington County",
+                "Ixodes_scapularis_County_Status": "Reported",
+                "Ixodes_pacificus_county_status": "No records",
+            },
+        ],
+    )
+
+    rows = parse_ixodes_status(
+        path,
+        source_id="cdc_ixodes_county_status_2025",
+        state_fips_values={"24", "51"},
+    )
+
+    assert [row["county_fips"] for row in rows] == ["24003", "51013"]
+    assert rows[1]["ixodes_scapularis_status"] == "reported"
+
+
 def test_parse_pathogen_status_preserves_no_records_language(tmp_path: Path) -> None:
     path = tmp_path / "pathogens.xlsx"
     _write_excel(
@@ -136,6 +171,56 @@ def test_parse_pathogen_status_supports_header_on_second_row(tmp_path: Path) -> 
     assert rows[0]["county_fips"] == "24003"
 
 
+def test_parse_pathogen_status_can_include_midatlantic_state_filter(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "pathogens.xlsx"
+    _write_excel(
+        path,
+        "Ixodes Pathogens 2025",
+        [
+            {
+                "FIPS_Code": "24003",
+                "State": "MD",
+                "County": "Anne Arundel County",
+                "Borrelia_burgdorferi_sensu_stricto_County_Status": "Present",
+                "Borrelia_miyamotoi_County_Status": "Present",
+                "Anaplasma_phagocytophilum_human_active_variant_County_Status": "No records",
+                "Babesia_microti_County_Status": "No records",
+                "Powassan_virus_County_Status": "No records",
+            },
+            {
+                "FIPS_Code": "51013",
+                "State": "VA",
+                "County": "Arlington County",
+                "Borrelia_burgdorferi_sensu_stricto_County_Status": "Present",
+                "Borrelia_miyamotoi_County_Status": "No records",
+                "Anaplasma_phagocytophilum_human_active_variant_County_Status": "No records",
+                "Babesia_microti_County_Status": "No records",
+                "Powassan_virus_County_Status": "No records",
+            },
+            {
+                "FIPS_Code": "01001",
+                "State": "AL",
+                "County": "Autauga County",
+                "Borrelia_burgdorferi_sensu_stricto_County_Status": "No records",
+                "Borrelia_miyamotoi_County_Status": "No records",
+                "Anaplasma_phagocytophilum_human_active_variant_County_Status": "No records",
+                "Babesia_microti_County_Status": "No records",
+                "Powassan_virus_County_Status": "No records",
+            },
+        ],
+    )
+
+    rows = parse_pathogen_status(
+        path,
+        source_id="cdc_ixodes_pathogen_status_2025",
+        state_fips_values={"24", "51"},
+    )
+
+    assert [row["county_fips"] for row in rows] == ["24003", "51013"]
+
+
 def test_parse_lone_star_status(tmp_path: Path) -> None:
     path = tmp_path / "lone-star.xlsx"
     _write_excel(
@@ -177,6 +262,50 @@ def test_parse_lone_star_status_supports_2025_workbook_shape(tmp_path: Path) -> 
     rows = parse_lone_star_status(path, source_id="cdc_lone_star_status_2025")
     assert rows[0]["county_fips"] == "24003"
     assert rows[0]["amblyomma_americanum_status"] == "established"
+
+
+def test_parse_lone_star_status_can_include_midatlantic_state_filter(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "lone-star-2025.xlsx"
+    _write_excel(
+        path,
+        "A. americanum Records 2025",
+        [
+            {
+                "FIPS": "24003",
+                "State": "MD",
+                "County": "Anne Arundel County",
+                "2025 County Status of A. americanum": "Established",
+                "Source": "CDC map",
+                "Source Comments": "",
+            },
+            {
+                "FIPS": "51013",
+                "State": "VA",
+                "County": "Arlington County",
+                "2025 County Status of A. americanum": "Reported",
+                "Source": "CDC map",
+                "Source Comments": "",
+            },
+            {
+                "FIPS": "01001",
+                "State": "AL",
+                "County": "Autauga County",
+                "2025 County Status of A. americanum": "No records",
+                "Source": "CDC map",
+                "Source Comments": "",
+            },
+        ],
+    )
+
+    rows = parse_lone_star_status(
+        path,
+        source_id="cdc_lone_star_status_2025",
+        state_fips_values={"24", "51"},
+    )
+
+    assert [row["county_fips"] for row in rows] == ["24003", "51013"]
 
 
 def test_build_tick_status_county_features_combines_sources_and_flags_limits() -> None:

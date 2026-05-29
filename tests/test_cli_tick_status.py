@@ -150,20 +150,106 @@ def test_tick_status_command_accepts_legacy_raw_workbook_filenames(
     ]
 
 
-def _write_tick_status_workbooks(raw_dir: Path) -> None:
-    _write_ixodes(raw_dir / "cdc_ixodes_county_status_2026.xlsx")
-    _write_pathogens(raw_dir / "cdc_ixodes_pathogen_status_2026.xlsx")
-    pd.DataFrame(
+def test_tick_status_command_can_write_midatlantic_rows(tmp_path: Path) -> None:
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _write_tick_status_workbooks(raw_dir, include_va=True)
+
+    result = runner.invoke(
+        app,
         [
+            "etl",
+            "tick-status",
+            "--raw-dir",
+            str(raw_dir),
+            "--region",
+            "midatlantic",
+            "--output-dir",
+            str(tmp_path / "out"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 2 tick status feature row(s)" in result.stdout
+    with (tmp_path / "out" / "tick_status_county_features.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert [row["county_fips"] for row in rows] == ["24003", "51013"]
+    with (tmp_path / "out" / "acquisition_provenance.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        provenance_rows = list(csv.DictReader(handle))
+    assert {row["row_count"] for row in provenance_rows} == {"2"}
+    assert all(
+        "--region midatlantic" in row["acquisition_command"]
+        for row in provenance_rows
+    )
+    assert all(
+        "selected county status rows" in row["acquisition_procedure"]
+        for row in provenance_rows
+    )
+
+
+def test_tick_status_command_rejects_unknown_region_without_outputs(
+    tmp_path: Path,
+) -> None:
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    _write_tick_status_workbooks(raw_dir)
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "tick-status",
+            "--raw-dir",
+            str(raw_dir),
+            "--region",
+            "national",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "region must be one of: maryland, midatlantic" in result.output
+    assert "Traceback" not in result.output
+    assert not output_dir.exists()
+
+
+def _write_tick_status_workbooks(raw_dir: Path, *, include_va: bool = False) -> None:
+    _write_ixodes(raw_dir / "cdc_ixodes_county_status_2026.xlsx", include_va=include_va)
+    _write_pathogens(
+        raw_dir / "cdc_ixodes_pathogen_status_2026.xlsx",
+        include_va=include_va,
+    )
+    lone_star_rows = [
+        {
+            "FIPS": "24003",
+            "State": "MD",
+            "County": "Anne Arundel County",
+            "2025 County Status of A. americanum": "Established",
+            "Source": "CDC map",
+            "Source Comments": "",
+        }
+    ]
+    if include_va:
+        lone_star_rows.append(
             {
-                "FIPS": "24003",
-                "State": "MD",
-                "County": "Anne Arundel County",
-                "2025 County Status of A. americanum": "Established",
+                "FIPS": "51013",
+                "State": "VA",
+                "County": "Arlington County",
+                "2025 County Status of A. americanum": "Reported",
                 "Source": "CDC map",
                 "Source Comments": "",
             }
-        ]
+        )
+    pd.DataFrame(
+        lone_star_rows
     ).to_excel(
         raw_dir / "cdc_lone_star_status_2025.xlsx",
         sheet_name="A. americanum Records 2025",
@@ -171,40 +257,65 @@ def _write_tick_status_workbooks(raw_dir: Path) -> None:
     )
 
 
-def _write_pathogens(path: Path) -> None:
-    pd.DataFrame(
-        [
+def _write_pathogens(path: Path, *, include_va: bool = False) -> None:
+    rows = [
+        {
+            "FIPS_Code": "24003",
+            "State": "MD",
+            "County": "Anne Arundel County",
+            "Borrelia_burgdorferi_sensu_stricto_County_Status": "Present",
+            "Borrelia_mayonii_County_Status": "No records",
+            "Borrelia_miyamotoi_County_Status": "No records",
+            "Anaplasma_phagocytophilum_human_active_variant_County_Status": "Present",
+            "Ehrlichia_muris_eauclairensis_County_Status": "No records",
+            "Babesia_microti_County_Status": "No records",
+            "Powassan_virus_County_Status": "No records",
+        }
+    ]
+    if include_va:
+        rows.append(
             {
-                "FIPS_Code": "24003",
-                "State": "MD",
-                "County": "Anne Arundel County",
+                "FIPS_Code": "51013",
+                "State": "VA",
+                "County": "Arlington County",
                 "Borrelia_burgdorferi_sensu_stricto_County_Status": "Present",
                 "Borrelia_mayonii_County_Status": "No records",
                 "Borrelia_miyamotoi_County_Status": "No records",
-                "Anaplasma_phagocytophilum_human_active_variant_County_Status": "Present",
+                "Anaplasma_phagocytophilum_human_active_variant_County_Status": "No records",
                 "Ehrlichia_muris_eauclairensis_County_Status": "No records",
                 "Babesia_microti_County_Status": "No records",
                 "Powassan_virus_County_Status": "No records",
             }
-        ]
-    ).to_excel(
+        )
+    pd.DataFrame(rows).to_excel(
         path,
         sheet_name="Ixodes Pathogens 2025",
         index=False,
     )
 
 
-def _write_ixodes(path: Path) -> None:
-    pd.DataFrame(
-        [
+def _write_ixodes(path: Path, *, include_va: bool = False) -> None:
+    rows = [
+        {
+            "FIPSCode": "24003",
+            "State": "MD",
+            "County": "Anne Arundel County",
+            "Ixodes_scapularis_County_Status": "Established",
+            "Ixodes_scapularis_data_source": "CDC historical record",
+            "Ixodes_pacificus_county_status": "No records",
+            "Ixodes_pacificus_data_source": "",
+        }
+    ]
+    if include_va:
+        rows.append(
             {
-                "FIPSCode": "24003",
-                "State": "MD",
-                "County": "Anne Arundel County",
-                "Ixodes_scapularis_County_Status": "Established",
+                "FIPSCode": "51013",
+                "State": "VA",
+                "County": "Arlington County",
+                "Ixodes_scapularis_County_Status": "Reported",
                 "Ixodes_scapularis_data_source": "CDC historical record",
                 "Ixodes_pacificus_county_status": "No records",
                 "Ixodes_pacificus_data_source": "",
             }
-        ]
-    ).to_excel(path, sheet_name="Ixodes records 2025", index=False)
+        )
+    pd.DataFrame(rows).to_excel(path, sheet_name="Ixodes records 2025", index=False)
