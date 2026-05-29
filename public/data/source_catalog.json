@@ -7,7 +7,7 @@
     "why_forecasting": "Forecasting gives timely prevention context while county-level surveillance reports, population denominators, and reviewed source updates catch up."
   },
   "export_type": "source_catalog",
-  "generated_at": "2026-05-29T00:18:05+00:00",
+  "generated_at": "2026-05-29T00:28:07+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -22,17 +22,17 @@
       "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
     }
   ],
-  "input_artifact_sha256": "3f8e1701a0cab7d6252796fc658cb2d42e73b8d1b0bc4073c056a55e77f83236",
+  "input_artifact_sha256": "53ce17323f88076af1d3a76567ba831b0ea28f282c810a1f5e9569b7ed0d8622",
   "schema_version": "county-week-risk-static-v1",
   "source_prediction_run_id": "annual_forecast_target2026_origin2024_mintrain5_shrink5p0",
-  "source_prediction_sha256": "2beb6d66074e781385a486431ff81223a897e1940450ac8a1e82e1f7bba03ca1",
+  "source_prediction_sha256": "7638e3315ace0a395013367b5d94bcb61f98d931ed1b7a07a9ccda59f349dbc3",
   "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
   "sources": [
     {
       "artifact_type": "derived",
       "notes": "Derived from selected annual forecast rows and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
       "redistribution": "public derived data",
-      "sha256": "3f8e1701a0cab7d6252796fc658cb2d42e73b8d1b0bc4073c056a55e77f83236",
+      "sha256": "53ce17323f88076af1d3a76567ba831b0ea28f282c810a1f5e9569b7ed0d8622",
       "source_id": "county_week_seasonal_risk_baseline"
     },
     {
@@ -46,7 +46,7 @@
       "notes": "Selected annual no-observed-target forecast rows; historical backtests are separate validation evidence, not the forecast source.",
       "redistribution": "public derived data",
       "run_id": "annual_forecast_target2026_origin2024_mintrain5_shrink5p0",
-      "sha256": "2beb6d66074e781385a486431ff81223a897e1940450ac8a1e82e1f7bba03ca1",
+      "sha256": "7638e3315ace0a395013367b5d94bcb61f98d931ed1b7a07a9ccda59f349dbc3",
       "source_id": "annual_prediction_branch",
       "source_vintage": "2024-inclusive-local",
       "update_mode": "pre_update",

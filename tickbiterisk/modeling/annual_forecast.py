@@ -6,12 +6,16 @@ from pathlib import Path
 from statistics import mean
 
 from tickbiterisk.modeling.model_compare import (
+    ANALOG_FEATURE_PROFILE,
+    FORECAST_SAFE_WEATHER_MODE,
     LAGGED_WEATHER_MODE,
     ModelComparisonInputError,
     TARGET_DEFINITION,
     _DesignRow,
+    _analog_prediction,
     _empirical_bayes_prediction,
     _has_training_depth,
+    _is_trailing_mean_incidence_feature,
     _read_design_rows,
     _round,
 )
@@ -48,7 +52,19 @@ FORECAST_MODEL_SPECS = (
         "empirical_bayes",
         "county_history_with_state_shrinkage",
     ),
+    (
+        "analog_year_forecast",
+        "analog",
+        ANALOG_FEATURE_PROFILE,
+    ),
 )
+ANNUAL_ANALOG_EXACT_FEATURES = {
+    "feature_prior_year_lyme_incidence_per_100k",
+    "feature_trailing_history_years",
+    "feature_missing_prior_year_lyme_incidence",
+    "feature_state_prior_year_lyme_incidence_per_100k",
+    "feature_missing_state_prior_year_lyme_incidence",
+}
 FORECAST_ORIGIN_ASSUMPTION_FLAG_ALLOWLIST = {
     "covid_reporting_disruption",
     "lyme_case_definition_change",
@@ -166,7 +182,7 @@ def build_annual_forecast(
         allowed = ", ".join(sorted(ALLOWED_UPDATE_MODES))
         raise AnnualForecastInputError(f"update_mode must be one of: {allowed}")
 
-    rows, _feature_columns = _read_training_design_rows(design_matrix_path)
+    rows, feature_columns = _read_training_design_rows(design_matrix_path)
     train_rows = [row for row in rows if row.year <= forecast_origin_year]
     if not train_rows:
         raise AnnualForecastInputError("no training rows at or before forecast origin")
@@ -201,6 +217,7 @@ def build_annual_forecast(
         for model_name, model_family, feature_profile, predicted in _forecast_models(
             row=row,
             train_rows=train_rows,
+            feature_columns=feature_columns,
             shrinkage_strength=shrinkage_strength,
         ):
             predictions.append(
@@ -256,10 +273,12 @@ def _forecast_models(
     *,
     row: _DesignRow,
     train_rows: list[_DesignRow],
+    feature_columns: list[str],
     shrinkage_strength: float,
 ) -> list[tuple[str, str, str, float]]:
     latest = row.features.get("feature_prior_year_lyme_incidence_per_100k", 0.0)
     trailing = _county_trailing_mean(row, train_rows)
+    analog_columns = _annual_analog_feature_columns(feature_columns)
     values = {
         "latest_observed_incidence": latest,
         "trailing_mean_incidence": trailing,
@@ -269,10 +288,20 @@ def _forecast_models(
             train_rows,
             shrinkage_strength,
         ),
+        "analog_year_forecast": _analog_prediction(row, train_rows, analog_columns),
     }
     return [
         (model_name, model_family, feature_profile, values[model_name])
         for model_name, model_family, feature_profile in FORECAST_MODEL_SPECS
+    ]
+
+
+def _annual_analog_feature_columns(feature_columns: list[str]) -> list[str]:
+    return [
+        column
+        for column in feature_columns
+        if column in ANNUAL_ANALOG_EXACT_FEATURES
+        or _is_trailing_mean_incidence_feature(column)
     ]
 
 
@@ -374,7 +403,11 @@ def _forecast_prediction_row(
         feature_set=FORECAST_FEATURE_SET,
         feature_profile=feature_profile,
         evaluation_mode=FORECAST_EVALUATION_MODE,
-        weather_mode=LAGGED_WEATHER_MODE,
+        weather_mode=(
+            FORECAST_SAFE_WEATHER_MODE
+            if feature_profile == ANALOG_FEATURE_PROFILE
+            else LAGGED_WEATHER_MODE
+        ),
         design_matrix_sha256=design_matrix_sha,
         population_sha256=population_sha,
         county_fips=row.county_fips,

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from tickbiterisk.modeling import annual_forecast
 from tickbiterisk.modeling.annual_forecast import (
     AnnualForecastInputError,
     build_annual_forecast,
@@ -39,10 +40,11 @@ def test_build_annual_forecast_emits_target_year_rows_without_actuals(
     assert result.run.data_cutoff_date == "2024-12-31"
     assert result.run.source_vintage == "mdh_2024_reviewed_v1"
     assert result.run.update_mode == "pre_update"
-    assert result.run.n_forecast_rows == 8
+    assert result.run.n_forecast_rows == 10
     assert "forecast_without_observed_target" in result.run.forecast_assumption_flags
     assert {row.model_name for row in result.predictions} == {
         "empirical_bayes_shrinkage",
+        "analog_year_forecast",
         "latest_observed_incidence",
         "linear_blend_baseline",
         "trailing_mean_incidence",
@@ -85,6 +87,17 @@ def test_build_annual_forecast_emits_target_year_rows_without_actuals(
     )
     assert blend.predicted_incidence_per_100k == 32.5
     assert blend.feature_profile == "latest_observed_trailing_blend"
+
+    analog = next(
+        row
+        for row in result.predictions
+        if row.model_name == "analog_year_forecast"
+        and row.county_fips == "24001"
+    )
+    assert analog.model_family == "analog"
+    assert analog.feature_profile == "forecast_safe_analog_years"
+    assert analog.weather_mode == "not_used_by_forecast_safe_model"
+    assert analog.predicted_incidence_per_100k == 20.0
 
 
 def test_build_annual_forecast_requires_future_target_year(tmp_path: Path) -> None:
@@ -135,7 +148,55 @@ def test_build_annual_forecast_requires_county_depth_and_origin_row(
 
     assert {row.county_fips for row in result.predictions} == {"24001", "24003"}
     assert result.run.n_forecast_counties == 2
-    assert result.run.n_forecast_rows == 8
+    assert result.run.n_forecast_rows == 10
+
+
+def test_build_annual_forecast_limits_analog_to_lagged_history_features(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    matrix = _write_design_matrix(
+        tmp_path / "design_matrix.csv",
+        include_extra_analog_candidates=True,
+    )
+    population = _write_population(tmp_path / "population.csv")
+    captured_columns = []
+    original_analog_prediction = annual_forecast._analog_prediction
+
+    def capturing_analog_prediction(row, train_rows, feature_columns):
+        captured_columns.append(tuple(feature_columns))
+        return original_analog_prediction(row, train_rows, feature_columns)
+
+    monkeypatch.setattr(
+        annual_forecast,
+        "_analog_prediction",
+        capturing_analog_prediction,
+    )
+
+    build_annual_forecast(
+        design_matrix_path=matrix,
+        population_path=population,
+        target_year=2026,
+        forecast_origin_year=2024,
+        min_train_years=2,
+    )
+
+    assert captured_columns
+    assert all(
+        "feature_prior_year_lyme_incidence_per_100k" in columns
+        for columns in captured_columns
+    )
+    assert all("feature_trailing_history_years" in columns for columns in captured_columns)
+    assert all("feature_year" not in columns for columns in captured_columns)
+    assert all("feature_forest_pct" not in columns for columns in captured_columns)
+    assert all(
+        "feature_regional_prior_year_midatlantic_total_cases" not in columns
+        for columns in captured_columns
+    )
+    assert all(
+        "feature_neighbor_prior_year_lyme_incidence_mean" not in columns
+        for columns in captured_columns
+    )
 
 
 def test_write_annual_forecast_outputs_uses_stable_schemas(tmp_path: Path) -> None:
@@ -166,6 +227,7 @@ def _write_design_matrix(
     *,
     sparse_county: bool = False,
     stale_county: bool = False,
+    include_extra_analog_candidates: bool = False,
 ) -> Path:
     rows = []
     county_values = {
@@ -175,25 +237,37 @@ def _write_design_matrix(
     for county_fips, values in county_values.items():
         for offset, incidence in enumerate(values):
             year = 2021 + offset
-            rows.append(
-                {
-                    "county_fips": county_fips,
-                    "county_name": f"County {county_fips}",
-                    "year": str(year),
-                    "target_total_cases": str(incidence),
-                    "target_lyme_incidence_per_100k": str(float(incidence)),
-                    "target_population": "100000",
-                    "feature_prior_year_lyme_incidence_per_100k": str(
-                        float(values[offset - 1] if offset else 0)
-                    ),
-                    "feature_trailing_history_years": str(offset),
-                    "model_feature_quality_flags": (
-                        "mdh_probable_only_2024,drought_monitor_retro_observed"
-                        if year == 2024
-                        else ""
-                    ),
-                }
-            )
+            row = {
+                "county_fips": county_fips,
+                "county_name": f"County {county_fips}",
+                "year": str(year),
+                "target_total_cases": str(incidence),
+                "target_lyme_incidence_per_100k": str(float(incidence)),
+                "target_population": "100000",
+                "feature_prior_year_lyme_incidence_per_100k": str(
+                    float(values[offset - 1] if offset else 0)
+                ),
+                "feature_trailing_history_years": str(offset),
+                "model_feature_quality_flags": (
+                    "mdh_probable_only_2024,drought_monitor_retro_observed"
+                    if year == 2024
+                    else ""
+                ),
+            }
+            if include_extra_analog_candidates:
+                row.update(
+                    {
+                        "feature_year": str(float(year)),
+                        "feature_forest_pct": str(float(40 + offset)),
+                        "feature_neighbor_prior_year_lyme_incidence_mean": str(
+                            float(incidence / 2)
+                        ),
+                        "feature_regional_prior_year_midatlantic_total_cases": str(
+                            float(1000 + incidence)
+                        ),
+                    }
+                )
+            rows.append(row)
     if sparse_county:
         rows.append(
             {

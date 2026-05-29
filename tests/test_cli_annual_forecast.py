@@ -59,6 +59,11 @@ def test_annual_forecast_command_writes_run_and_predictions(tmp_path: Path) -> N
     assert {row["data_cutoff_date"] for row in rows} == {"2024-12-31"}
     assert {row["source_vintage"] for row in rows} == {"mdh_2024_reviewed_v1"}
     assert {row["update_mode"] for row in rows} == {"pre_update"}
+    assert "analog_year_forecast" in {row["model_name"] for row in rows}
+    analog = next(row for row in rows if row["model_name"] == "analog_year_forecast")
+    assert analog["model_family"] == "analog"
+    assert analog["feature_profile"] == "forecast_safe_analog_years"
+    assert analog["weather_mode"] == "not_used_by_forecast_safe_model"
     assert "actual_cases" not in rows[0]
     assert "residual_cases" not in rows[0]
     assert any(

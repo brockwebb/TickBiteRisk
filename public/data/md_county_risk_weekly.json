@@ -17,7 +17,7 @@
   },
   "disease": "lyme",
   "export_type": "md_county_risk_weekly",
-  "generated_at": "2026-05-29T00:18:05+00:00",
+  "generated_at": "2026-05-29T00:28:07+00:00",
   "geography": {
     "jurisdiction_count": 24,
     "state": "MD",
@@ -38,7 +38,7 @@
       "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
     }
   ],
-  "input_artifact_sha256": "3f8e1701a0cab7d6252796fc658cb2d42e73b8d1b0bc4073c056a55e77f83236",
+  "input_artifact_sha256": "53ce17323f88076af1d3a76567ba831b0ea28f282c810a1f5e9569b7ed0d8622",
   "model_name": "linear_blend_baseline",
   "record_count": 1272,
   "records": [
@@ -66220,7 +66220,7 @@
     "score_denominator": 4.673833,
     "seasonality_source_id": "cdc_seasonality_week_2023",
     "source_prediction_run_id": "annual_forecast_target2026_origin2024_mintrain5_shrink5p0",
-    "source_prediction_sha256": "2beb6d66074e781385a486431ff81223a897e1940450ac8a1e82e1f7bba03ca1",
+    "source_prediction_sha256": "7638e3315ace0a395013367b5d94bcb61f98d931ed1b7a07a9ccda59f349dbc3",
     "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74"
   },
   "year_selection": "latest_available_per_county_mmwr_week"

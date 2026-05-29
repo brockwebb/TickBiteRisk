@@ -1587,7 +1587,7 @@
   ],
   "county_count": 24,
   "export_type": "md_county_metadata",
-  "generated_at": "2026-05-29T00:18:05+00:00",
+  "generated_at": "2026-05-29T00:28:07+00:00",
   "geography": "MD county/jurisdiction",
   "schema_version": "county-week-risk-static-v1"
 }

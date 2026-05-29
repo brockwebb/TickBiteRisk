@@ -347,9 +347,12 @@ artifacts.
 16b. `tickbiterisk etl annual-forecast`
     - Typical 2026 run:
       `tickbiterisk etl annual-forecast --design-matrix-path build/etl/model/model_design_matrix_county_year.csv --population-path build/etl/regional-population/midatlantic_county_population_year.csv --target-year 2026 --forecast-origin-year 2024 --as-of-date 2026-05-28 --data-cutoff-date 2024-12-31 --source-vintage 2024-inclusive-local --update-mode pre_update --output-dir build/etl/annual-forecast`.
-    - Trains transparent lagged-outcome annual forecast branches through the
-      declared `forecast_origin_year` and scores a later `target_year` without
-      requiring observed target-year Lyme outcomes.
+    - Trains transparent annual forecast branches through the declared
+      `forecast_origin_year` and scores a later `target_year` without
+      requiring observed target-year Lyme outcomes. The branch set includes
+      lagged outcome, empirical-Bayes shrinkage, and a forecast-safe
+      `analog_year_forecast` like-years hedge based only on lagged incidence
+      history features.
     - Uses a target-year population panel for the forecast denominator. Current
       2026 runs use projected denominators from official Vintage 2025 Census
       rows and preserve explicit forecast/projection flags.

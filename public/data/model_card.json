@@ -8,7 +8,7 @@
     "model_family": "ensemble",
     "model_name": "linear_blend_baseline",
     "run_id": "annual_forecast_target2026_origin2024_mintrain5_shrink5p0",
-    "sha256": "2beb6d66074e781385a486431ff81223a897e1940450ac8a1e82e1f7bba03ca1",
+    "sha256": "7638e3315ace0a395013367b5d94bcb61f98d931ed1b7a07a9ccda59f349dbc3",
     "source_vintage": "2024-inclusive-local",
     "update_mode": "pre_update",
     "weather_mode": "not_used_by_lagged_model"
@@ -53,7 +53,7 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-29T00:18:05+00:00",
+  "generated_at": "2026-05-29T00:28:07+00:00",
   "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
   "model_name": "linear_blend_baseline",
   "not_for": [
