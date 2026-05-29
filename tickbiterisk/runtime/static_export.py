@@ -64,6 +64,14 @@ EXPLAINER_PLACEHOLDERS = [
     },
 ]
 
+PUBLIC_VALIDATION_MODEL_NAMES = {
+    "prior_year_incidence",
+    "trailing_mean_incidence",
+    "linear_blend_baseline",
+    "empirical_bayes_shrinkage",
+    "analog_year_forecast",
+}
+
 SCORE_CATEGORIES = {
     "1-2": "very_low",
     "3-4": "low",
@@ -445,20 +453,20 @@ def _validation_summary_payload(
         raise StaticExportInputError(
             f"Model comparison summary file not found: {model_summary_path}"
         )
-    model_name_matches = []
     with model_summary_path.open(newline="", encoding="utf-8") as handle:
-        for row in csv.DictReader(handle):
-            if (
-                row.get("run_id") == selected.source_prediction_run_id
-                and row.get("model_name") == selected.model_name
-            ):
-                return _model_summary_payload_from_row(
-                    row,
-                    forecast_model_name=selected.model_name,
-                    validation_match_type="selected_prediction_run",
-                )
-            if row.get("model_name") == selected.model_name:
-                model_name_matches.append(row)
+        rows = list(csv.DictReader(handle))
+    model_name_matches = [row for row in rows if row.get("model_name") == selected.model_name]
+    for row in rows:
+        if (
+            row.get("run_id") == selected.source_prediction_run_id
+            and row.get("model_name") == selected.model_name
+        ):
+            return _model_summary_payload_from_row(
+                row,
+                forecast_model_name=selected.model_name,
+                validation_match_type="selected_prediction_run",
+                summary_rows=rows,
+            )
     if (
         selected.source_prediction_run_id.startswith("annual_forecast_")
         and len(model_name_matches) == 1
@@ -467,6 +475,7 @@ def _validation_summary_payload(
             model_name_matches[0],
             forecast_model_name=selected.model_name,
             validation_match_type="annual_forecast_model_name",
+            summary_rows=rows,
         )
     raise StaticExportInputError(
         "No model comparison summary row matched selected run_id="
@@ -479,11 +488,12 @@ def _model_summary_payload_from_row(
     *,
     forecast_model_name: str,
     validation_match_type: str,
+    summary_rows: list[dict[str, str]] | None = None,
 ) -> dict[str, object]:
     return {
         "run_id": str(row["run_id"]),
         "model_name": str(row["model_name"]),
-        "rank_by_mae": _optional_int(row.get("rank_by_mae")),
+        "rank_by_mae": _public_validation_rank_by_mae(row, summary_rows),
         "n_predictions": _optional_int(row.get("n_predictions")),
         "mae_incidence_per_100k": _optional_float(
             row.get("mae_incidence_per_100k")
@@ -499,6 +509,37 @@ def _model_summary_payload_from_row(
             row.get("comparison_assumption_flags", "")
         ),
     }
+
+
+def _public_validation_rank_by_mae(
+    row: dict[str, str],
+    summary_rows: list[dict[str, str]] | None,
+) -> int | None:
+    fallback_rank = _optional_int(row.get("rank_by_mae"))
+    if row.get("model_name") not in PUBLIC_VALIDATION_MODEL_NAMES:
+        return fallback_rank
+    if summary_rows is None:
+        return fallback_rank
+    run_id = row.get("run_id")
+    ranked_rows = [
+        candidate
+        for candidate in summary_rows
+        if candidate.get("run_id") == run_id
+        and candidate.get("model_name") in PUBLIC_VALIDATION_MODEL_NAMES
+        and _optional_float(candidate.get("mae_incidence_per_100k")) is not None
+    ]
+    if not ranked_rows:
+        return fallback_rank
+    ranked_rows.sort(
+        key=lambda candidate: (
+            _optional_float(candidate.get("mae_incidence_per_100k")),
+            str(candidate.get("model_name", "")),
+        )
+    )
+    for index, candidate in enumerate(ranked_rows, start=1):
+        if candidate is row:
+            return index
+    return fallback_rank
 
 
 def _source_catalog_payload(

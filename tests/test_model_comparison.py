@@ -1,6 +1,7 @@
 import csv
 import math
 from pathlib import Path
+from statistics import mean
 
 from tickbiterisk.modeling import model_compare
 from tickbiterisk.modeling.model_compare import (
@@ -38,6 +39,7 @@ def test_run_model_comparison_uses_prior_year_training_windows(
     assert model_names == {
         "analog_year_forecast",
         "empirical_bayes_shrinkage",
+        "forecast_safe_top4_ensemble",
         "linear_blend_baseline",
         "prior_year_incidence",
         "random_forest_forecast_research",
@@ -125,6 +127,37 @@ def test_run_model_comparison_includes_empirical_bayes_and_metrics(
     assert random_forest.feature_profile == "forecast_safe_lagged_ecology_spatial_regional"
     assert random_forest.weather_mode == "not_used_by_forecast_safe_model"
     assert random_forest.predicted_incidence_per_100k >= 0
+    top4 = next(
+        row
+        for row in result.predictions
+        if row.model_name == "forecast_safe_top4_ensemble"
+        and row.county_fips == "24001"
+        and row.test_year == 2021
+    )
+    expected_top4 = mean(
+        [
+            20.0,
+            17.5,
+            next(
+                row.predicted_incidence_per_100k
+                for row in result.predictions
+                if row.model_name == "ridge_forecast_safe"
+                and row.county_fips == "24001"
+                and row.test_year == 2021
+            ),
+            next(
+                row.predicted_incidence_per_100k
+                for row in result.predictions
+                if row.model_name == "ridge_forecast_spatial"
+                and row.county_fips == "24001"
+                and row.test_year == 2021
+            ),
+        ]
+    )
+    assert top4.model_family == "ensemble"
+    assert top4.feature_profile == "forecast_safe_top4_blend"
+    assert top4.weather_mode == "not_used_by_forecast_safe_model"
+    assert top4.predicted_incidence_per_100k == round(expected_top4, 6)
     ecology_ridge = next(
         row for row in result.predictions if row.model_name == "ridge_forecast_ecology"
     )
@@ -166,6 +199,7 @@ def test_run_model_comparison_omits_spatial_lane_without_spatial_features(
     model_names = {row.model_name for row in result.predictions}
     assert "analog_year_forecast" in model_names
     assert "ridge_forecast_spatial" not in model_names
+    assert "forecast_safe_top4_ensemble" not in model_names
     assert "ridge_forecast_safe" in model_names
 
 

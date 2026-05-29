@@ -27,6 +27,7 @@ ANALOG_NEIGHBOR_COUNT = 5
 ANALOG_FEATURE_PROFILE = "forecast_safe_analog_years"
 ANALOG_INTERVAL_METHOD = "weighted_analog_bootstrap"
 RANDOM_FOREST_FEATURE_PROFILE = "forecast_safe_lagged_ecology_spatial_regional"
+FORECAST_SAFE_TOP4_ENSEMBLE_PROFILE = "forecast_safe_top4_blend"
 RANDOM_FOREST_N_ESTIMATORS = 200
 RANDOM_FOREST_MIN_SAMPLES_LEAF = 3
 RANDOM_FOREST_MAX_FEATURES = "sqrt"
@@ -718,6 +719,7 @@ def _predict_models(
         "feature_prior_year_lyme_incidence_per_100k", 0.0
     )
     trailing_prediction = _county_trailing_mean(row, train_rows)
+    blend_prediction = mean([prior_prediction, trailing_prediction])
     predictions = [
         (
             "prior_year_incidence",
@@ -735,7 +737,7 @@ def _predict_models(
             "linear_blend_baseline",
             "ensemble",
             "lagged_outcome_blend",
-            mean([prior_prediction, trailing_prediction]),
+            blend_prediction,
         ),
         (
             "empirical_bayes_shrinkage",
@@ -811,6 +813,21 @@ def _predict_models(
                 "regularized_linear",
                 "forecast_safe_lagged_spatial",
                 spatial_ridge_prediction,
+            )
+        )
+        predictions.append(
+            (
+                "forecast_safe_top4_ensemble",
+                "ensemble",
+                FORECAST_SAFE_TOP4_ENSEMBLE_PROFILE,
+                mean(
+                    [
+                        prior_prediction,
+                        blend_prediction,
+                        forecast_ridge_prediction,
+                        spatial_ridge_prediction,
+                    ]
+                ),
             )
         )
     if any(column in FORECAST_REGIONAL_EXACT_FEATURES for column in feature_columns):

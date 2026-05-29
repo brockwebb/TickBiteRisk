@@ -338,6 +338,41 @@ def test_export_static_risk_data_uses_model_validation_for_true_forecast_source(
     )
 
 
+def test_export_static_risk_data_reranks_public_validation_without_research_lanes(
+    tmp_path: Path,
+) -> None:
+    scores_path = _write_csv(
+        tmp_path / "scores.csv",
+        [
+            {
+                **_score_row("24003", "Anne Arundel County", "2026", "1", "7"),
+                "source_prediction_run_id": (
+                    "annual_forecast_target2026_origin2024_mintrain5_shrink5p0"
+                ),
+                "evaluation_mode": "annual_forecast_no_observed_target",
+            },
+        ],
+    )
+    model_summary_path = _write_model_summary_with_research_winner(
+        tmp_path / "model_summary.csv"
+    )
+
+    outputs = export_static_risk_data(
+        scores_path=scores_path,
+        output_dir=tmp_path / "public-data",
+        model_summary_path=model_summary_path,
+    )
+
+    model_card = _read_json(outputs.model_card_path)
+
+    assert model_card["validation_summary"]["model_name"] == "linear_blend_baseline"
+    assert model_card["validation_summary"]["mae_incidence_per_100k"] == 18.47
+    assert model_card["validation_summary"]["rank_by_mae"] == 2
+    assert model_card["validation_summary"]["validation_match_type"] == (
+        "annual_forecast_model_name"
+    )
+
+
 def test_export_static_risk_data_keeps_blank_optional_validation_metrics_null(
     tmp_path: Path,
 ) -> None:
@@ -403,6 +438,41 @@ def _write_model_summary(
                     f"{mae_incidence_per_100k},{rmse_incidence_per_100k},"
                     f"{pearson_correlation},"
                     "\"observational_not_causal,intervention_history_unmodeled\""
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_model_summary_with_research_winner(path: Path) -> Path:
+    path.write_text(
+        "\n".join(
+            [
+                (
+                    "run_id,rank_by_mae,model_name,model_family,feature_profile,"
+                    "n_predictions,mae_incidence_per_100k,rmse_incidence_per_100k,"
+                    "pearson_correlation,comparison_assumption_flags"
+                ),
+                (
+                    "run1,1,forecast_safe_top4_ensemble,ensemble,"
+                    "forecast_safe_top4_blend,432,17.97,29.0,0.78,"
+                    "\"observational_not_causal\""
+                ),
+                (
+                    "run1,2,prior_year_incidence,baseline,lagged_outcome,432,"
+                    "18.21,30.0,0.77,\"observational_not_causal\""
+                ),
+                (
+                    "run1,3,linear_blend_baseline,ensemble,lagged_outcome_blend,"
+                    "432,18.47,31.0,0.76,\"observational_not_causal\""
+                ),
+                (
+                    "run1,4,ridge_forecast_safe,regularized_linear,"
+                    "forecast_safe_lagged,432,18.89,32.0,0.75,"
+                    "\"observational_not_causal\""
                 ),
             ]
         )

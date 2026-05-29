@@ -440,6 +440,11 @@ artifacts.
       manifest, and excludes same-year weather/drought, regional diagnostics,
       cluster IDs, actual cluster outcomes, tick-status proxies, and
       source/caveat flags.
+    - Adds `forecast_safe_top4_ensemble` as a research-only equal-weight blend
+      of prior-year incidence, `linear_blend_baseline`, `ridge_forecast_safe`,
+      and `ridge_forecast_spatial` when spatial features are present. This
+      branch is a comparison diagnostic only and is not wired into
+      `annual-forecast` or the public county-week score.
     - Writes `model_comparison_runs.csv`,
       `model_comparison_predictions.csv`,
       `model_comparison_intervals.csv`, `model_comparison_metrics.csv`, and
@@ -538,6 +543,10 @@ artifacts.
 
 19. `tickbiterisk risk export-static`
     - Selects one unambiguous model/source/scale branch for public use.
+    - When a model-comparison summary contains research-only branches, public
+      `rank_by_mae` metadata is re-ranked within annual-forecast-eligible
+      validation branches so research diagnostics do not silently shift the
+      public model card.
     - Exposes the selected forecast metadata in `md_county_risk_weekly.json`,
       `model_card.json`, and `source_catalog.json` so public static bundles are
       auditable by forecast origin and source vintage.

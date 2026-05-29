@@ -51,6 +51,7 @@ The comparison harness supports these current branches:
 | `ridge_forecast_regional` | Regularized model adding timing-safe prior-year/trailing Mid-Atlantic reported-case signals and prior-incidence cluster bands |
 | `analog_year_forecast` | Forecast-safe analog-year lane with matched historical conditions and bootstrap interval diagnostics |
 | `random_forest_forecast_research` | Research-only nonlinear lane using forecast-safe lagged, ecology/exposure, spatial, and regional features |
+| `forecast_safe_top4_ensemble` | Research-only equal-weight blend of prior-year incidence, the simple blend, safe ridge, and spatial ridge when spatial features exist |
 | `ridge_forecast_ecology` | Regularized model including timing-safe ecology candidates |
 | `ridge_lag_weather_ecology` | Experimental retrospective weather/drought/ecology branch for comparison |
 
@@ -122,9 +123,14 @@ incidence. It ranked behind the simple blend and conservative safe ridge, with
 MAE 19.005867 per 100k in the current 2024-inclusive run, so it remains a
 diagnostic research lane. The regional and population-growth additions also
 remain research lanes unless a future validation slice shows stable improvement.
-After adding MEI.v2, regional prior-incidence clusters, and prior-year age
-structure to the research lanes, `random_forest_forecast_research` ranked at
-20.378557 MAE per 100k, `analog_year_forecast` ranked at 21.778584,
+After adding MEI.v2, regional prior-incidence clusters, prior-year age
+structure, and a simple top-4 comparison ensemble to the research lanes,
+`forecast_safe_top4_ensemble` ranked first at 17.971574 MAE per 100k, ahead of
+`prior_year_incidence` at 18.21318 and `linear_blend_baseline` at 18.47245.
+The ensemble is intentionally model-comparison-only for now because it depends
+on safe-ridge and spatial-ridge comparison outputs that are not yet reproduced
+as true target-year annual forecast rows. `random_forest_forecast_research`
+ranked at 20.378557 MAE per 100k, `analog_year_forecast` ranked at 21.778584,
 `ridge_forecast_ecology` ranked at 23.763644, `ridge_forecast_regional` ranked
 at 24.728232, and `ridge_lag_weather_ecology` ranked at 25.233508 in the same
 run. The random-forest lane is deterministic (`random_state=1337`) and uses
@@ -150,6 +156,12 @@ prior-incidence band features improve rolling-origin forecasts. It remains a
 model-comparison lane only; it is not part of `annual-forecast` or the public
 county-week score until later validation shows a stable gain and the model can
 be explained plainly enough for the dashboard.
+
+The `forecast_safe_top4_ensemble` lane tests whether a small equal-weight blend
+can reduce variance across the strongest forecast-safe comparison branches. It
+is not part of `annual-forecast` yet; promoting it requires a target-year
+feature contract for the ridge and spatial components so future 2026 forecast
+rows are not built from stale validation-only inputs.
 
 The `regional-outcome-stress` diagnostic is separate from the Maryland
 incidence comparison. It tests whether state or Mid-Atlantic capacity-share
