@@ -102,6 +102,89 @@ def test_regional_lyme_outcomes_command_writes_panel_and_provenance(
     assert "state 2024 overlay" in pa_provenance["modeling_caveats"]
 
 
+def test_regional_lyme_outcomes_command_writes_de_validation_sidecar(
+    tmp_path: Path,
+) -> None:
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "out"
+    raw_dir.mkdir()
+    (raw_dir / "cdc_lyme_county_dashboard_2023.csv").write_text(
+        "\n".join(
+            [
+                "Ctyname,stname,ststatus,stcode,ctycode,Cases2023",
+                "Kent County,Delaware,High Incidence,10,1,45",
+                "New Castle County,Delaware,High Incidence,10,3,203",
+                "Sussex County,Delaware,High Incidence,10,5,101",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    de_path = raw_dir / "delaware_dhss_lyme_data_2019_2023.html"
+    de_path.write_text(
+        """
+        <table>
+          <tr><td></td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>INCIDENT RATE PER 100,000 POPULATION</td></tr>
+          <tr><td>YEAR</td><td>NEW CASTLE COUNTY</td><td>KENT COUNTY</td><td>SUSSEX COUNTY</td><td>DELAWARE</td><td>DELAWARE</td></tr>
+          <tr><td>2023</td><td>213</td><td>53</td><td>83</td><td>349</td><td>33.8</td></tr>
+        </table>
+        """,
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "regional-lyme-outcomes",
+            "--raw-dir",
+            str(raw_dir),
+            "--output-dir",
+            str(output_dir),
+            "--de-lyme-html-path",
+            str(de_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Wrote 3 Mid-Atlantic Lyme county-year outcome row(s)" in result.stdout
+    assert "Wrote 3 regional state-source validation row(s)" in result.stdout
+
+    with (output_dir / "midatlantic_lyme_county_year.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        panel_rows = list(csv.DictReader(handle))
+    assert len(panel_rows) == 3
+    assert {row["source_id"] for row in panel_rows} == {
+        "cdc_lyme_county_dashboard_2023"
+    }
+
+    with (output_dir / "regional_lyme_state_source_validation.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        validation_rows = list(csv.DictReader(handle))
+    assert len(validation_rows) == 3
+    assert {row["source_id"] for row in validation_rows} == {
+        "delaware_dhss_lyme_table"
+    }
+    assert all(
+        "state_source_validation_only" in row["feature_quality_flags"]
+        for row in validation_rows
+    )
+
+    with (output_dir / "acquisition_provenance.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        provenance_rows = list(csv.DictReader(handle))
+    assert [row["source_id"] for row in provenance_rows] == [
+        "cdc_lyme_county_dashboard_2023",
+        "delaware_dhss_lyme_table",
+    ]
+    de_provenance = provenance_rows[1]
+    assert de_provenance["row_count"] == "3"
+    assert "--de-lyme-html-path" in de_provenance["acquisition_command"]
+    assert "state-source validation sidecar" in de_provenance["modeling_caveats"]
+
+
 def test_regional_lyme_outcomes_command_fails_before_writing_when_missing_dashboard(
     tmp_path: Path,
 ) -> None:

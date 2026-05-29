@@ -89,6 +89,11 @@ PENNSYLVANIA_COUNTY_FIPS = {
     "Wyoming": "42131",
     "York": "42133",
 }
+DELAWARE_COUNTY_FIPS = {
+    "KENT COUNTY": ("10001", "Kent County"),
+    "NEW CASTLE COUNTY": ("10003", "New Castle County"),
+    "SUSSEX COUNTY": ("10005", "Sussex County"),
+}
 
 
 @dataclass(frozen=True)
@@ -204,6 +209,94 @@ def parse_pa_doh_lyme_county_workbook(
     return sorted(rows, key=lambda row: (row.county_fips, row.year))
 
 
+def parse_de_dhss_lyme_county_html(
+    path: Path,
+    *,
+    source_id: str,
+) -> list[RegionalLymeCountyYear]:
+    tables = pd.read_html(path)
+    table = _find_de_dhss_lyme_table(tables)
+    header_index = _find_de_dhss_header_row(table)
+    headers = [_normalize_de_header_cell(value) for value in table.iloc[header_index]]
+    county_columns = {
+        index: DELAWARE_COUNTY_FIPS[header]
+        for index, header in enumerate(headers)
+        if header in DELAWARE_COUNTY_FIPS
+    }
+    missing_counties = set(DELAWARE_COUNTY_FIPS) - {
+        header for header in headers if header in DELAWARE_COUNTY_FIPS
+    }
+    if missing_counties:
+        raise ValueError(
+            "Missing Delaware DHSS Lyme county columns: "
+            f"{sorted(missing_counties)}"
+        )
+
+    rows: list[RegionalLymeCountyYear] = []
+    for _, record in table.iloc[header_index + 1 :].iterrows():
+        year = _de_table_year(record.iloc[0])
+        if year is None:
+            continue
+        for column_index, (county_fips, county_name) in county_columns.items():
+            case_value = record.iloc[column_index]
+            rows.append(
+                RegionalLymeCountyYear(
+                    state_fips="10",
+                    state_abbr="DE",
+                    state_name="Delaware",
+                    county_fips=county_fips,
+                    county_name=county_name,
+                    year=year,
+                    total_cases=_frequency_to_int(case_value),
+                    source_id=source_id,
+                    feature_quality_flags=",".join(
+                        _de_dhss_quality_flags(year=year, case_value=case_value)
+                    ),
+                )
+            )
+    if not rows:
+        raise ValueError("No Delaware DHSS Lyme county rows parsed from HTML")
+    return sorted(rows, key=lambda row: (row.county_fips, row.year))
+
+
+def _find_de_dhss_lyme_table(tables: list[pd.DataFrame]) -> pd.DataFrame:
+    for table in tables:
+        text = " ".join(
+            _normalize_de_header_cell(value)
+            for value in table.to_numpy().ravel().tolist()
+        )
+        if all(county in text for county in DELAWARE_COUNTY_FIPS):
+            return table
+    raise ValueError("Delaware DHSS Lyme county table not found")
+
+
+def _find_de_dhss_header_row(df: pd.DataFrame) -> int:
+    for index, row in df.iterrows():
+        values = {_normalize_de_header_cell(value) for value in row}
+        if "YEAR" in values and set(DELAWARE_COUNTY_FIPS).issubset(values):
+            return int(index)
+    raise ValueError("Delaware DHSS Lyme table header row not found")
+
+
+def _normalize_de_header_cell(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    return " ".join(str(value).strip().upper().split())
+
+
+def _de_table_year(value: object) -> int | None:
+    if pd.isna(value):
+        return None
+    text = str(value).strip().replace(",", "")
+    try:
+        year = int(float(text))
+    except ValueError:
+        return None
+    if 1900 <= year <= 2100:
+        return year
+    return None
+
+
 def _find_pa_header_row(df: pd.DataFrame, *, year_column: str) -> int:
     for index, row in df.iterrows():
         values = {str(value).strip() for value in row if not pd.isna(value)}
@@ -268,6 +361,25 @@ def _pa_quality_flags(*, year: int, case_value: object) -> list[str]:
     if year >= 2022:
         flags.append("lyme_case_definition_change")
     if _pa_case_value_is_suppressed_or_unknown(case_value):
+        flags.append("case_value_suppressed_or_unknown")
+    return flags
+
+
+def _de_dhss_quality_flags(*, year: int, case_value: object) -> list[str]:
+    flags = [
+        "regional_expansion_stress_test",
+        "de_dhss_official_county_cases",
+        "state_source_not_cdc_public_use",
+        "state_source_validation_only",
+        "not_public_maryland_default",
+        "reported_cases_not_stable_true_incidence",
+        "confirmed_and_probable_cases",
+    ]
+    if year == 2020:
+        flags.append("covid_reporting_disruption")
+    if year >= 2022:
+        flags.append("lyme_case_definition_change")
+    if _case_value_is_suppressed_or_unknown(case_value):
         flags.append("case_value_suppressed_or_unknown")
     return flags
 

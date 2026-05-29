@@ -124,6 +124,7 @@ from tickbiterisk.etl.lyme_aggregate_build import (
 from tickbiterisk.etl.regional_lyme import (
     RegionalLymeCountyYear,
     parse_cdc_midatlantic_county_dashboard,
+    parse_de_dhss_lyme_county_html,
     parse_pa_doh_lyme_county_workbook,
 )
 from tickbiterisk.etl.regional_demographics import (
@@ -138,7 +139,10 @@ from tickbiterisk.etl.regional_hotspots import build_midatlantic_hotspot_diagnos
 from tickbiterisk.etl.regional_hotspots_build import write_regional_hotspot_outputs
 from tickbiterisk.etl.regional_incidence import build_midatlantic_incidence_panel
 from tickbiterisk.etl.regional_incidence_build import write_regional_incidence_outputs
-from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
+from tickbiterisk.etl.regional_lyme_build import (
+    write_regional_lyme_output,
+    write_regional_lyme_state_validation_output,
+)
 from tickbiterisk.etl.regional_population import (
     REGIONAL_POPULATION_PROJECTION_SOURCE_ID,
     build_midatlantic_population_urls,
@@ -667,6 +671,20 @@ REGIONAL_PA_LYME_2024_SOURCE_METADATA = {
         "panel only; state-source rows are not the public Maryland default, "
         "suppressed county counts are represented as zero with flags, and "
         "reported cases are not stable true incidence."
+    ),
+}
+REGIONAL_DE_LYME_SOURCE_METADATA = {
+    "filename": "delaware_dhss_lyme_data_2019_2023.html",
+    "source_id": "delaware_dhss_lyme_table",
+    "source_name": "Delaware DHSS Lyme disease county case table, 2019-2023",
+    "source_url": "https://dhss.delaware.gov/dph/epi/tick-lyme-data/",
+    "citation_url": "https://dhss.delaware.gov/dph/epi/tick-lyme-data/",
+    "parser_method": "parse_de_dhss_lyme_county_html",
+    "modeling_caveats": (
+        "Delaware state-source validation sidecar only; rows overlap CDC "
+        "regional years and are not appended to the model input panel, not "
+        "the public Maryland default, and reported cases are not stable true "
+        "incidence."
     ),
 }
 
@@ -2736,6 +2754,14 @@ def regional_lyme_outcomes(
             "when provided, appends flagged PA 2024 state-source rows."
         ),
     ),
+    de_lyme_html_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional Delaware DHSS Lyme data HTML page; when provided, writes "
+            "flagged 2019-2023 state-source validation rows to a sidecar file "
+            "without appending overlapping years to the model panel."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/regional-lyme"),
         help="Output directory for Mid-Atlantic Lyme outcome artifacts.",
@@ -2767,7 +2793,23 @@ def regional_lyme_outcomes(
         )
         rows.extend(pa_rows)
         rows.sort(key=lambda row: (row.state_fips, row.county_fips, row.year))
+    de_validation_rows: list[RegionalLymeCountyYear] = []
+    if de_lyme_html_path is not None:
+        if not de_lyme_html_path.exists():
+            raise typer.BadParameter(
+                f"Delaware Lyme HTML source not found: {de_lyme_html_path}"
+            )
+        de_validation_rows = parse_de_dhss_lyme_county_html(
+            de_lyme_html_path,
+            source_id=str(REGIONAL_DE_LYME_SOURCE_METADATA["source_id"]),
+        )
     output_path = write_regional_lyme_output(rows, output_dir)
+    de_validation_output_path: Path | None = None
+    if de_validation_rows:
+        de_validation_output_path = write_regional_lyme_state_validation_output(
+            de_validation_rows,
+            output_dir,
+        )
     resolved_manifest_path = (
         provenance_manifest_path or output_dir / "acquisition_provenance.csv"
     )
@@ -2778,6 +2820,9 @@ def regional_lyme_outcomes(
             source_path=source_path,
             pa_rows=pa_rows,
             pa_source_path=pa_2024_workbook_path,
+            de_validation_rows=de_validation_rows,
+            de_source_path=de_lyme_html_path,
+            de_validation_output_path=de_validation_output_path,
             raw_dir=raw_dir,
             output_dir=output_dir,
             manifest_path=resolved_manifest_path,
@@ -2789,6 +2834,11 @@ def regional_lyme_outcomes(
         f"Wrote {len(rows)} Mid-Atlantic Lyme county-year outcome row(s) to "
         f"{output_path}"
     )
+    if de_validation_output_path is not None:
+        typer.echo(
+            f"Wrote {len(de_validation_rows)} regional state-source validation "
+            f"row(s) to {de_validation_output_path}"
+        )
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
@@ -4390,6 +4440,9 @@ def _regional_lyme_provenance_records(
     source_path: Path,
     pa_rows: list[RegionalLymeCountyYear],
     pa_source_path: Path | None,
+    de_validation_rows: list[RegionalLymeCountyYear],
+    de_source_path: Path | None,
+    de_validation_output_path: Path | None,
     raw_dir: Path,
     output_dir: Path,
     manifest_path: Path,
@@ -4398,6 +4451,7 @@ def _regional_lyme_provenance_records(
     command = _regional_lyme_acquisition_command(
         raw_dir=raw_dir,
         pa_source_path=pa_source_path,
+        de_source_path=de_source_path,
         output_dir=output_dir,
         manifest_path=manifest_path,
     )
@@ -4469,6 +4523,42 @@ def _regional_lyme_provenance_records(
                 ],
             )
         )
+    if de_source_path is not None and de_validation_output_path is not None:
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=REGIONAL_DE_LYME_SOURCE_METADATA["source_id"],
+                source_name=REGIONAL_DE_LYME_SOURCE_METADATA["source_name"],
+                source_url=REGIONAL_DE_LYME_SOURCE_METADATA["source_url"],
+                citation_url=REGIONAL_DE_LYME_SOURCE_METADATA["citation_url"],
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read the ignored local Delaware DHSS Lyme data HTML page, "
+                    "extract 2019-2023 county case-count rows, and write them "
+                    "to a state-source validation sidecar without appending "
+                    "overlapping years to the regional model panel."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    "Read local raw Delaware DHSS Lyme data HTML page "
+                    f"{de_source_path.name} for state-source validation."
+                ),
+                derived_artifact_paths=[de_source_path, de_validation_output_path],
+                derived_artifact_path_labels=[
+                    de_source_path.name,
+                    de_validation_output_path.name,
+                ],
+                row_count=len(de_validation_rows),
+                parser_method=REGIONAL_DE_LYME_SOURCE_METADATA["parser_method"],
+                extraction_quality="accepted_validation_only",
+                access_notes=(
+                    "Public Delaware DHSS HTML page; no secret or credential "
+                    "required. Raw HTML remains in ignored storage."
+                ),
+                modeling_caveats=REGIONAL_DE_LYME_SOURCE_METADATA[
+                    "modeling_caveats"
+                ],
+            )
+        )
     return records
 
 
@@ -4476,6 +4566,7 @@ def _regional_lyme_acquisition_command(
     *,
     raw_dir: Path,
     pa_source_path: Path | None,
+    de_source_path: Path | None,
     output_dir: Path,
     manifest_path: Path,
 ) -> str:
@@ -4491,6 +4582,13 @@ def _regional_lyme_acquisition_command(
             [
                 "--pa-2024-workbook-path",
                 _public_provenance_path(pa_source_path),
+            ]
+        )
+    if de_source_path is not None:
+        command_parts.extend(
+            [
+                "--de-lyme-html-path",
+                _public_provenance_path(de_source_path),
             ]
         )
     command_parts.extend(

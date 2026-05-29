@@ -469,6 +469,26 @@ def test_data_sources_catalog_tracks_2024_plus_regional_source_watchlist() -> No
         assert token in catalog
 
 
+def test_docs_capture_delaware_state_source_validation_sidecar() -> None:
+    docs_text = "\n".join(
+        [
+            DATA_SOURCES.read_text(encoding="utf-8"),
+            Path("docs/data-manifest.md").read_text(encoding="utf-8"),
+            ETL_PIPELINE.read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "regional_lyme_state_source_validation.csv",
+        "Delaware DHSS Lyme disease county case table, 2019-2023",
+        "--de-lyme-html-path",
+        "state-source validation sidecar",
+        "rows overlap CDC regional years",
+        "not appended to the model input panel",
+    ]:
+        assert token in docs_text
+
+
 def test_docs_capture_mid_atlantic_expansion_and_temporal_viz_candidates() -> None:
     roadmap = ROADMAP.read_text(encoding="utf-8")
     vision = VISION_SCOPE.read_text(encoding="utf-8")

@@ -105,6 +105,11 @@ artifacts.
      `--pa-2024-workbook-path`; those rows remain flagged state-source regional
      research overlays, with suppressed county values represented as zero plus
      suppression flags.
+   - Can read the Delaware DHSS 2019-2023 Lyme HTML page with
+     `--de-lyme-html-path` and write
+     `regional_lyme_state_source_validation.csv` as a state-source validation
+     sidecar. Those rows overlap CDC regional years and are not appended to the
+     model input panel.
    - Writes `midatlantic_lyme_county_year.csv` and
      `acquisition_provenance.csv`.
    - This panel is a regional expansion/stress-test artifact for hotspot,

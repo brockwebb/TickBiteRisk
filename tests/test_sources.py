@@ -105,7 +105,11 @@ def test_project_manifest_tracks_2024_plus_source_watchlist() -> None:
         assert source_id in sources_by_id
         source = sources_by_id[source_id]
         assert source.location.startswith(url_prefix)
-        assert "candidate" in source.status
+        if source_id == "delaware_dhss_lyme_table":
+            assert "etl_supported" in source.status
+            assert "not_model_input" in source.status
+        else:
+            assert "candidate" in source.status
         assert "not a confirmed disease truth label" in source.notes
 
 

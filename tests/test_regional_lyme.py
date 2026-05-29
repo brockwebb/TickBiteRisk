@@ -4,9 +4,13 @@ from pathlib import Path
 from tickbiterisk.etl.regional_lyme import (
     MIDATLANTIC_STATE_FIPS,
     parse_cdc_midatlantic_county_dashboard,
+    parse_de_dhss_lyme_county_html,
     parse_pa_doh_lyme_county_workbook,
 )
-from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
+from tickbiterisk.etl.regional_lyme_build import (
+    write_regional_lyme_output,
+    write_regional_lyme_state_validation_output,
+)
 
 
 def test_midatlantic_dashboard_parser_expands_county_year_rows_with_flags(
@@ -145,6 +149,56 @@ def test_pa_doh_workbook_parser_adds_2024_county_rows_with_state_source_flags(
     assert "case_value_suppressed_or_unknown" in rows[1].feature_quality_flags
 
 
+def test_de_dhss_html_parser_extracts_county_rows_as_validation_only(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "de_lyme.html"
+    path.write_text(
+        """
+        <html><body>
+        <h3>Lyme Disease Case Counts and Incidence Rates by Year and County, Delaware, 2019-2023</h3>
+        <table>
+          <tr><td></td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>INCIDENT RATE PER 100,000 POPULATION</td></tr>
+          <tr><td>YEAR</td><td>NEW CASTLE COUNTY</td><td>KENT COUNTY</td><td>SUSSEX COUNTY</td><td>DELAWARE</td><td>DELAWARE</td></tr>
+          <tr><td>2023</td><td>213</td><td>53</td><td>83</td><td>349</td><td>33.8</td></tr>
+          <tr><td>2022</td><td>192</td><td>54</td><td>52</td><td>298</td><td>29.3</td></tr>
+          <tr><td>2021</td><td>97</td><td>18</td><td>25</td><td>140</td><td>14.0</td></tr>
+          <tr><td>* These data include confirmed and probable cases according to national surveillance case definitions.</td><td></td><td></td><td></td><td></td><td></td></tr>
+        </table>
+        </body></html>
+        """,
+        encoding="utf-8",
+    )
+
+    rows = parse_de_dhss_lyme_county_html(
+        path,
+        source_id="delaware_dhss_lyme_table",
+    )
+
+    assert len(rows) == 9
+    assert [(row.county_fips, row.year, row.total_cases) for row in rows[:3]] == [
+        ("10001", 2021, 18),
+        ("10001", 2022, 54),
+        ("10001", 2023, 53),
+    ]
+    new_castle_2023 = next(
+        row
+        for row in rows
+        if row.county_fips == "10003" and row.year == 2023
+    )
+    assert new_castle_2023.state_abbr == "DE"
+    assert new_castle_2023.state_name == "Delaware"
+    assert new_castle_2023.county_name == "New Castle County"
+    assert "de_dhss_official_county_cases" in new_castle_2023.feature_quality_flags
+    assert "state_source_not_cdc_public_use" in new_castle_2023.feature_quality_flags
+    assert "state_source_validation_only" in new_castle_2023.feature_quality_flags
+    assert "confirmed_and_probable_cases" in new_castle_2023.feature_quality_flags
+    assert "lyme_case_definition_change" in new_castle_2023.feature_quality_flags
+    assert "reported_cases_not_stable_true_incidence" in (
+        new_castle_2023.feature_quality_flags
+    )
+
+
 def test_regional_lyme_writer_outputs_stable_csv_schema(tmp_path: Path) -> None:
     source_path = tmp_path / "county_dashboard.csv"
     source_path.write_text(
@@ -183,6 +237,38 @@ def test_regional_lyme_writer_outputs_stable_csv_schema(tmp_path: Path) -> None:
             ),
         }
     ]
+
+
+def test_regional_lyme_state_validation_writer_outputs_sidecar_csv(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "de_lyme.html"
+    path.write_text(
+        """
+        <table>
+          <tr><td></td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>CASE COUNTS</td><td>INCIDENT RATE PER 100,000 POPULATION</td></tr>
+          <tr><td>YEAR</td><td>NEW CASTLE COUNTY</td><td>KENT COUNTY</td><td>SUSSEX COUNTY</td><td>DELAWARE</td><td>DELAWARE</td></tr>
+          <tr><td>2023</td><td>213</td><td>53</td><td>83</td><td>349</td><td>33.8</td></tr>
+        </table>
+        """,
+        encoding="utf-8",
+    )
+    rows = parse_de_dhss_lyme_county_html(
+        path,
+        source_id="delaware_dhss_lyme_table",
+    )
+
+    output_path = write_regional_lyme_state_validation_output(rows, tmp_path / "out")
+
+    with output_path.open(newline="", encoding="utf-8") as handle:
+        written = list(csv.DictReader(handle))
+    assert output_path.name == "regional_lyme_state_source_validation.csv"
+    assert len(written) == 3
+    assert {row["source_id"] for row in written} == {"delaware_dhss_lyme_table"}
+    assert all(
+        "state_source_validation_only" in row["feature_quality_flags"]
+        for row in written
+    )
 
 
 def _write_pa_workbook(path: Path, rows: list[dict[str, str]]) -> None:
