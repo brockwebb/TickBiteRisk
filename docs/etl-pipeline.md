@@ -433,6 +433,12 @@ artifacts.
       signal/cluster lanes when those optional feature columns are present.
       Prior-year age structure is only in the ecology/exposure research lane,
       not the conservative public-safe baseline.
+    - Adds `random_forest_forecast_research` as a deterministic research-only
+      nonlinear lane. It uses forecast-safe lagged, ecology/exposure, spatial,
+      and regional feature selectors, records tree hyperparameters in the run
+      manifest, and excludes same-year weather/drought, regional diagnostics,
+      cluster IDs, actual cluster outcomes, tick-status proxies, and
+      source/caveat flags.
     - Writes `model_comparison_runs.csv`,
       `model_comparison_predictions.csv`,
       `model_comparison_intervals.csv`, `model_comparison_metrics.csv`, and

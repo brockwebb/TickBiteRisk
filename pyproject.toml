@@ -9,10 +9,12 @@ description = "Maryland-first tickborne disease risk data warehouse and model to
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "lxml>=5.3",
   "openpyxl>=3.1",
   "pandas>=2.2",
   "pypdfium2>=4.30",
   "pydantic>=2.7",
+  "scikit-learn>=1.5",
   "typer>=0.12",
 ]
 

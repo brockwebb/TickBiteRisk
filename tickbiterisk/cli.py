@@ -319,6 +319,10 @@ from tickbiterisk.modeling.forecast_bayesian_update_backtest_build import (
 )
 from tickbiterisk.modeling.model_compare import (
     ModelComparisonInputError,
+    RANDOM_FOREST_MAX_FEATURES,
+    RANDOM_FOREST_MIN_SAMPLES_LEAF,
+    RANDOM_FOREST_N_ESTIMATORS,
+    RANDOM_FOREST_RANDOM_STATE,
     run_model_comparison,
 )
 from tickbiterisk.modeling.model_compare_build import write_model_comparison_outputs
@@ -2408,6 +2412,22 @@ def model_compare(
         5.0,
         help="Pseudo-count strength for empirical Bayes county shrinkage.",
     ),
+    random_forest_n_estimators: int = typer.Option(
+        RANDOM_FOREST_N_ESTIMATORS,
+        help="Tree count for the random forest research comparison lane.",
+    ),
+    random_forest_min_samples_leaf: int = typer.Option(
+        RANDOM_FOREST_MIN_SAMPLES_LEAF,
+        help="Minimum leaf size for the random forest research comparison lane.",
+    ),
+    random_forest_max_features: str = typer.Option(
+        RANDOM_FOREST_MAX_FEATURES,
+        help="Max-feature strategy for the random forest research comparison lane.",
+    ),
+    random_forest_random_state: int = typer.Option(
+        RANDOM_FOREST_RANDOM_STATE,
+        help="Random seed for the random forest research comparison lane.",
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/model-comparison"),
         help="Output directory for model comparison artifacts.",
@@ -2428,6 +2448,12 @@ def model_compare(
         raise typer.BadParameter("ridge-alpha must be greater than 0")
     if shrinkage_strength < 0:
         raise typer.BadParameter("shrinkage-strength must be non-negative")
+    if random_forest_n_estimators < 1:
+        raise typer.BadParameter("random-forest-n-estimators must be at least 1")
+    if random_forest_min_samples_leaf < 1:
+        raise typer.BadParameter(
+            "random-forest-min-samples-leaf must be at least 1"
+        )
     if end_year is not None and start_year > end_year:
         raise typer.BadParameter("start-year must be less than or equal to end-year")
 
@@ -2439,6 +2465,10 @@ def model_compare(
             min_train_years=min_train_years,
             ridge_alpha=ridge_alpha,
             shrinkage_strength=shrinkage_strength,
+            random_forest_n_estimators=random_forest_n_estimators,
+            random_forest_min_samples_leaf=random_forest_min_samples_leaf,
+            random_forest_max_features=random_forest_max_features,
+            random_forest_random_state=random_forest_random_state,
         )
     except ModelComparisonInputError as exc:
         raise typer.BadParameter(str(exc)) from exc

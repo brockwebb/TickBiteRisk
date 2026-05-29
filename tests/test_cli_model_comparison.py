@@ -26,6 +26,8 @@ def test_model_compare_command_writes_runs_predictions_metrics_and_summary(
             "2021",
             "--min-train-years",
             "1",
+            "--random-forest-n-estimators",
+            "5",
             "--output-dir",
             str(output_dir),
         ],
@@ -41,6 +43,15 @@ def test_model_compare_command_writes_runs_predictions_metrics_and_summary(
     assert (output_dir / "model_comparison_metrics.csv").exists()
     assert (output_dir / "model_comparison_summary.csv").exists()
 
+    with (output_dir / "model_comparison_runs.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        runs = list(csv.DictReader(handle))
+    assert runs[0]["random_forest_n_estimators"] == "5"
+    assert runs[0]["random_forest_min_samples_leaf"] == "3"
+    assert runs[0]["random_forest_max_features"] == "sqrt"
+    assert runs[0]["random_forest_random_state"] == "1337"
+
     with (output_dir / "model_comparison_summary.csv").open(
         newline="", encoding="utf-8"
     ) as handle:
@@ -50,6 +61,7 @@ def test_model_compare_command_writes_runs_predictions_metrics_and_summary(
         "empirical_bayes_shrinkage",
         "linear_blend_baseline",
         "prior_year_incidence",
+        "random_forest_forecast_research",
         "ridge_forecast_ecology",
         "ridge_forecast_safe",
         "ridge_lag_weather_ecology",

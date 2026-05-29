@@ -26,6 +26,12 @@ ANALOG_BOOTSTRAP_ITERATIONS = 200
 ANALOG_NEIGHBOR_COUNT = 5
 ANALOG_FEATURE_PROFILE = "forecast_safe_analog_years"
 ANALOG_INTERVAL_METHOD = "weighted_analog_bootstrap"
+RANDOM_FOREST_FEATURE_PROFILE = "forecast_safe_lagged_ecology_spatial_regional"
+RANDOM_FOREST_N_ESTIMATORS = 200
+RANDOM_FOREST_MIN_SAMPLES_LEAF = 3
+RANDOM_FOREST_MAX_FEATURES = "sqrt"
+RANDOM_FOREST_RANDOM_STATE = 1337
+RANDOM_FOREST_ALLOWED_MAX_FEATURES = {"sqrt", "log2"}
 EXCLUDED_FEATURE_PREFIXES = (
     "feature_tick_",
     "feature_regional_diagnostic_",
@@ -246,6 +252,10 @@ class ModelComparisonRun:
     min_train_years: int
     ridge_alpha: float
     shrinkage_strength: float
+    random_forest_n_estimators: int
+    random_forest_min_samples_leaf: int
+    random_forest_max_features: str
+    random_forest_random_state: int
     model_names: str
     target_definition: str
     evaluation_mode: str
@@ -397,6 +407,10 @@ def run_model_comparison(
     min_train_years: int = 5,
     ridge_alpha: float = 1.0,
     shrinkage_strength: float = 5.0,
+    random_forest_n_estimators: int = RANDOM_FOREST_N_ESTIMATORS,
+    random_forest_min_samples_leaf: int = RANDOM_FOREST_MIN_SAMPLES_LEAF,
+    random_forest_max_features: str = RANDOM_FOREST_MAX_FEATURES,
+    random_forest_random_state: int = RANDOM_FOREST_RANDOM_STATE,
 ) -> ModelComparisonResult:
     if min_train_years < 1:
         raise ModelComparisonInputError("min_train_years must be at least 1")
@@ -404,6 +418,19 @@ def run_model_comparison(
         raise ModelComparisonInputError("ridge_alpha must be greater than 0")
     if shrinkage_strength < 0:
         raise ModelComparisonInputError("shrinkage_strength must be non-negative")
+    if random_forest_n_estimators < 1:
+        raise ModelComparisonInputError(
+            "random_forest_n_estimators must be at least 1"
+        )
+    if random_forest_min_samples_leaf < 1:
+        raise ModelComparisonInputError(
+            "random_forest_min_samples_leaf must be at least 1"
+        )
+    if random_forest_max_features not in RANDOM_FOREST_ALLOWED_MAX_FEATURES:
+        allowed = ", ".join(sorted(RANDOM_FOREST_ALLOWED_MAX_FEATURES))
+        raise ModelComparisonInputError(
+            "random_forest_max_features must be one of: " f"{allowed}"
+        )
 
     rows, feature_columns = _read_design_rows(design_matrix_path)
     if not rows:
@@ -428,7 +455,9 @@ def run_model_comparison(
     run_id = (
         f"model_compare_start{start_year}_end{resolved_end_year}_"
         f"mintrain{min_train_years}_ridge{_slug_float(ridge_alpha)}_"
-        f"shrink{_slug_float(shrinkage_strength)}"
+        f"shrink{_slug_float(shrinkage_strength)}_"
+        f"rf{random_forest_n_estimators}_leaf{random_forest_min_samples_leaf}_"
+        f"max{random_forest_max_features}_seed{random_forest_random_state}"
     )
     predictions: list[ModelComparisonPrediction] = []
     intervals: list[ModelComparisonInterval] = []
@@ -445,6 +474,9 @@ def run_model_comparison(
         ridge_cache: dict[
             tuple[float, tuple[str, ...]], _FittedRidgeModel
         ] = {}
+        random_forest_cache: dict[
+            tuple[int, int, str, int, tuple[str, ...]], object
+        ] = {}
         for row in test_rows:
             for model_name, model_family, profile, predicted in _predict_models(
                 row=row,
@@ -453,6 +485,11 @@ def run_model_comparison(
                 ridge_alpha=ridge_alpha,
                 shrinkage_strength=shrinkage_strength,
                 ridge_cache=ridge_cache,
+                random_forest_n_estimators=random_forest_n_estimators,
+                random_forest_min_samples_leaf=random_forest_min_samples_leaf,
+                random_forest_max_features=random_forest_max_features,
+                random_forest_random_state=random_forest_random_state,
+                random_forest_cache=random_forest_cache,
             ):
                 predictions.append(
                     _prediction_row(
@@ -493,6 +530,10 @@ def run_model_comparison(
         min_train_years=min_train_years,
         ridge_alpha=ridge_alpha,
         shrinkage_strength=shrinkage_strength,
+        random_forest_n_estimators=random_forest_n_estimators,
+        random_forest_min_samples_leaf=random_forest_min_samples_leaf,
+        random_forest_max_features=random_forest_max_features,
+        random_forest_random_state=random_forest_random_state,
         model_names=model_names,
         target_definition=TARGET_DEFINITION,
         evaluation_mode=EVALUATION_MODE,
@@ -613,6 +654,15 @@ def _is_forecast_regional_signal_feature_column(column: str) -> bool:
     )
 
 
+def _is_random_forest_forecast_feature_column(column: str) -> bool:
+    return _is_safe_feature_column(column) and (
+        _is_forecast_safe_feature_column(column)
+        or _is_forecast_ecology_feature_column(column)
+        or _is_forecast_spatial_feature_column(column)
+        or _is_forecast_regional_feature_column(column)
+    )
+
+
 def _is_regional_incidence_cluster_feature_column(column: str) -> bool:
     return column in REGIONAL_INCIDENCE_CLUSTER_EXACT_FEATURES
 
@@ -658,6 +708,11 @@ def _predict_models(
     ridge_alpha: float,
     shrinkage_strength: float,
     ridge_cache: dict[tuple[float, tuple[str, ...]], _FittedRidgeModel],
+    random_forest_n_estimators: int,
+    random_forest_min_samples_leaf: int,
+    random_forest_max_features: str,
+    random_forest_random_state: int,
+    random_forest_cache: dict[tuple[int, int, str, int, tuple[str, ...]], object],
 ) -> list[tuple[str, str, str, float]]:
     prior_prediction = row.features.get(
         "feature_prior_year_lyme_incidence_per_100k", 0.0
@@ -713,6 +768,28 @@ def _predict_models(
             "regularized_linear",
             "forecast_safe_lagged",
             forecast_ridge_prediction,
+        )
+    )
+    random_forest_columns = [
+        column
+        for column in feature_columns
+        if _is_random_forest_forecast_feature_column(column)
+    ]
+    predictions.append(
+        (
+            "random_forest_forecast_research",
+            "random_forest",
+            RANDOM_FOREST_FEATURE_PROFILE,
+            _random_forest_prediction(
+                row=row,
+                train_rows=train_rows,
+                feature_columns=random_forest_columns,
+                n_estimators=random_forest_n_estimators,
+                min_samples_leaf=random_forest_min_samples_leaf,
+                max_features=random_forest_max_features,
+                random_state=random_forest_random_state,
+                random_forest_cache=random_forest_cache,
+            ),
         )
     )
     if any(column in FORECAST_SPATIAL_EXACT_FEATURES for column in feature_columns):
@@ -1027,6 +1104,53 @@ def _ridge_prediction(
         ],
     ]
     return max(_dot(model.coefficients, x), 0.0)
+
+
+def _random_forest_prediction(
+    *,
+    row: _DesignRow,
+    train_rows: list[_DesignRow],
+    feature_columns: list[str],
+    n_estimators: int = RANDOM_FOREST_N_ESTIMATORS,
+    min_samples_leaf: int = RANDOM_FOREST_MIN_SAMPLES_LEAF,
+    max_features: str = RANDOM_FOREST_MAX_FEATURES,
+    random_state: int = RANDOM_FOREST_RANDOM_STATE,
+    random_forest_cache: dict[tuple[int, int, str, int, tuple[str, ...]], object] | None = None,
+) -> float:
+    columns = _select_varying_columns(train_rows, feature_columns)
+    if not train_rows or not columns:
+        return _county_trailing_mean(row, train_rows)
+    cache_key = (
+        n_estimators,
+        min_samples_leaf,
+        max_features,
+        random_state,
+        tuple(columns),
+    )
+    model = random_forest_cache.get(cache_key) if random_forest_cache is not None else None
+    if model is None:
+        from sklearn.ensemble import RandomForestRegressor
+
+        model = RandomForestRegressor(
+            n_estimators=n_estimators,
+            min_samples_leaf=min_samples_leaf,
+            max_features=max_features,
+            random_state=random_state,
+            n_jobs=1,
+        )
+        model.fit(
+            [
+                [train_row.features.get(column, 0.0) for column in columns]
+                for train_row in train_rows
+            ],
+            [train_row.incidence_per_100k for train_row in train_rows],
+        )
+        if random_forest_cache is not None:
+            random_forest_cache[cache_key] = model
+    prediction = model.predict(
+        [[row.features.get(column, 0.0) for column in columns]]
+    )[0]
+    return max(float(prediction), 0.0)
 
 
 def _fit_ridge_model(

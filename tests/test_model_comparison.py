@@ -3,7 +3,9 @@ import math
 from pathlib import Path
 
 from tickbiterisk.modeling import model_compare
-from tickbiterisk.modeling.model_compare import run_model_comparison
+from tickbiterisk.modeling.model_compare import (
+    run_model_comparison as _run_model_comparison,
+)
 from tickbiterisk.modeling.model_compare_build import (
     MODEL_COMPARISON_INTERVAL_COLUMNS,
     MODEL_COMPARISON_METRIC_COLUMNS,
@@ -12,6 +14,11 @@ from tickbiterisk.modeling.model_compare_build import (
     MODEL_COMPARISON_SUMMARY_COLUMNS,
     write_model_comparison_outputs,
 )
+
+
+def run_model_comparison(**kwargs):
+    kwargs.setdefault("random_forest_n_estimators", 5)
+    return _run_model_comparison(**kwargs)
 
 
 def test_run_model_comparison_uses_prior_year_training_windows(
@@ -33,6 +40,7 @@ def test_run_model_comparison_uses_prior_year_training_windows(
         "empirical_bayes_shrinkage",
         "linear_blend_baseline",
         "prior_year_incidence",
+        "random_forest_forecast_research",
         "ridge_forecast_ecology",
         "ridge_forecast_safe",
         "ridge_forecast_spatial",
@@ -57,6 +65,11 @@ def test_run_model_comparison_uses_prior_year_training_windows(
     assert len(prior.source_file_sha256) == 64
     assert "observational_not_causal" in prior.comparison_assumption_flags
     assert result.run.weather_mode == "mixed_model_specific"
+    assert result.run.random_forest_n_estimators == 5
+    assert result.run.random_forest_min_samples_leaf == 3
+    assert result.run.random_forest_max_features == "sqrt"
+    assert result.run.random_forest_random_state == 1337
+    assert model_compare.RANDOM_FOREST_N_ESTIMATORS == 200
 
 
 def test_run_model_comparison_includes_empirical_bayes_and_metrics(
@@ -103,6 +116,15 @@ def test_run_model_comparison_includes_empirical_bayes_and_metrics(
     assert forecast_ridge.model_family == "regularized_linear"
     assert forecast_ridge.feature_profile == "forecast_safe_lagged"
     assert forecast_ridge.weather_mode == "not_used_by_forecast_safe_model"
+    random_forest = next(
+        row
+        for row in result.predictions
+        if row.model_name == "random_forest_forecast_research"
+    )
+    assert random_forest.model_family == "random_forest"
+    assert random_forest.feature_profile == "forecast_safe_lagged_ecology_spatial_regional"
+    assert random_forest.weather_mode == "not_used_by_forecast_safe_model"
+    assert random_forest.predicted_incidence_per_100k >= 0
     ecology_ridge = next(
         row for row in result.predictions if row.model_name == "ridge_forecast_ecology"
     )
@@ -326,6 +348,52 @@ def test_run_model_comparison_keeps_composite_pressure_out_of_safe_ridge(
         "feature_ecological_pressure_prior_year_index" in columns
         for columns in ecology_columns
     )
+
+
+def test_random_forest_forecast_uses_forecast_research_features_only(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    matrix = _write_design_matrix(
+        tmp_path / "design_matrix.csv",
+        include_spatial=True,
+        include_regional=True,
+        include_composite=True,
+    )
+    captured_columns = []
+    original_prediction = model_compare._random_forest_prediction
+
+    def capturing_prediction(*args, **kwargs):
+        captured_columns.append(tuple(kwargs["feature_columns"]))
+        return original_prediction(*args, **kwargs)
+
+    monkeypatch.setattr(
+        model_compare,
+        "_random_forest_prediction",
+        capturing_prediction,
+    )
+
+    run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        end_year=2021,
+        min_train_years=1,
+    )
+
+    assert captured_columns
+    assert all(
+        "feature_prior_year_lyme_incidence_per_100k" in columns
+        for columns in captured_columns
+    )
+    assert all("feature_year" in columns for columns in captured_columns)
+    assert all("feature_deer_harvest_per_sqmi_prior_season" in columns for columns in captured_columns)
+    assert all("feature_neighbor_prior_year_lyme_incidence_mean" in columns for columns in captured_columns)
+    assert all("feature_regional_prior_year_midatlantic_total_cases" in columns for columns in captured_columns)
+    assert all("feature_ecological_pressure_prior_year_index" in columns for columns in captured_columns)
+    assert all("feature_weather_temp_mean_f" not in columns for columns in captured_columns)
+    assert all("feature_regional_diagnostic_midatlantic_total_cases" not in columns for columns in captured_columns)
+    assert all("feature_regional_incidence_cluster_actual_incidence_per_100k" not in columns for columns in captured_columns)
+    assert all("feature_regional_incidence_cluster_cluster_id" not in columns for columns in captured_columns)
 
 
 def test_ridge_cache_preserves_uncached_predictions(tmp_path: Path) -> None:
@@ -564,6 +632,27 @@ def test_forecast_profile_feature_selectors_avoid_same_year_leakage() -> None:
     )
     assert not model_compare._is_forecast_spatial_feature_column(
         "feature_regional_prior_year_midatlantic_total_cases"
+    )
+    assert model_compare._is_random_forest_forecast_feature_column(
+        "feature_regional_prior_year_midatlantic_total_cases"
+    )
+    assert model_compare._is_random_forest_forecast_feature_column(
+        "feature_neighbor_prior_year_lyme_incidence_mean"
+    )
+    assert model_compare._is_random_forest_forecast_feature_column(
+        "feature_ecological_pressure_prior_year_index"
+    )
+    assert not model_compare._is_random_forest_forecast_feature_column(
+        "feature_weather_temp_mean_f"
+    )
+    assert not model_compare._is_random_forest_forecast_feature_column(
+        "feature_regional_diagnostic_midatlantic_total_cases"
+    )
+    assert not model_compare._is_random_forest_forecast_feature_column(
+        "feature_regional_incidence_cluster_actual_incidence_per_100k"
+    )
+    assert not model_compare._is_random_forest_forecast_feature_column(
+        "feature_regional_incidence_cluster_cluster_id"
     )
     assert not model_compare._is_forecast_regional_feature_column(
         "feature_regional_diagnostic_midatlantic_total_cases"

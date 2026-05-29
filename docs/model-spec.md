@@ -50,6 +50,7 @@ The comparison harness supports these current branches:
 | `ridge_forecast_spatial` | Regularized model adding timing-safe prior-year neighbor incidence |
 | `ridge_forecast_regional` | Regularized model adding timing-safe prior-year/trailing Mid-Atlantic reported-case signals and prior-incidence cluster bands |
 | `analog_year_forecast` | Forecast-safe analog-year lane with matched historical conditions and bootstrap interval diagnostics |
+| `random_forest_forecast_research` | Research-only nonlinear lane using forecast-safe lagged, ecology/exposure, spatial, and regional features |
 | `ridge_forecast_ecology` | Regularized model including timing-safe ecology candidates |
 | `ridge_lag_weather_ecology` | Experimental retrospective weather/drought/ecology branch for comparison |
 
@@ -122,14 +123,17 @@ MAE 19.005867 per 100k in the current 2024-inclusive run, so it remains a
 diagnostic research lane. The regional and population-growth additions also
 remain research lanes unless a future validation slice shows stable improvement.
 After adding MEI.v2, regional prior-incidence clusters, and prior-year age
-structure to the research lanes, `analog_year_forecast` ranked at 21.778584 MAE
-per 100k, `ridge_forecast_ecology` ranked at 23.763644,
-`ridge_forecast_regional` ranked at 24.728232, and
-`ridge_lag_weather_ecology` ranked at 25.233508 in the same run. Age structure
-is limited to the ecology/exposure ridge lane, so analog-year and retrospective
-weather/ecology metrics remain scoped to their earlier feature families. That
-is useful negative evidence: these features remain available for research, but
-they do not currently justify public promotion.
+structure to the research lanes, `random_forest_forecast_research` ranked at
+20.378557 MAE per 100k, `analog_year_forecast` ranked at 21.778584,
+`ridge_forecast_ecology` ranked at 23.763644, `ridge_forecast_regional` ranked
+at 24.728232, and `ridge_lag_weather_ecology` ranked at 25.233508 in the same
+run. The random-forest lane is deterministic (`random_state=1337`) and uses
+200 trees, minimum leaf size 3, and `max_features=sqrt`. It is intentionally
+restricted to forecast-safe lagged, ecology/exposure, spatial, and regional
+features; same-year weather, same-year drought, diagnostic regional totals,
+cluster IDs, actual cluster outcomes, tick-status proxies, and source/caveat
+flags stay out. That is useful mixed evidence: the nonlinear lane beats several
+research branches but does not currently justify public promotion.
 
 ## Research lanes and diagnostics
 
@@ -139,6 +143,13 @@ county-years to historically similar lagged conditions and report transparent
 nearest-analog behavior alongside the simpler baselines. Bootstrap intervals
 are written as `model_comparison_intervals.csv` so each branch can expose
 empirical uncertainty without implying clinical precision.
+
+The `random_forest_forecast_research` lane tests whether nonlinear interactions
+among lagged outcome, ecology/exposure, neighbor, regional signal, and
+prior-incidence band features improve rolling-origin forecasts. It remains a
+model-comparison lane only; it is not part of `annual-forecast` or the public
+county-week score until later validation shows a stable gain and the model can
+be explained plainly enough for the dashboard.
 
 The `regional-outcome-stress` diagnostic is separate from the Maryland
 incidence comparison. It tests whether state or Mid-Atlantic capacity-share
