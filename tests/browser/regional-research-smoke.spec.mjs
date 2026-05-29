@@ -19,8 +19,8 @@ const fixtures = {
       not_public_maryland_default: true,
     },
     score_scale: {
-      min: 1,
-      max: 10,
+      range: [1, 10],
+      score_denominator: 4.5,
     },
     selected_forecast_metadata: {
       forecast_origin_year: 2023,
@@ -195,6 +195,15 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#regional-panel-content")).toContainText("9/10");
   await expect(page.locator("#regional-panel-content")).toContainText(
     "95% empirical interval: 0.80 to 5.40 per 100k"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Linear score"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "score denominator 4.50"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "rounded and clamped to 1-10"
   );
   await expect(page.locator("#regional-panel-content")).toContainText(
     "Spatial regime 7"

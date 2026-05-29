@@ -523,6 +523,7 @@ function selectRegionalCounty(countyFips) {
     <p>Predicted weekly incidence: ${regionalFormatNumber(record.predicted_weekly_incidence_per_100k)} per 100k.</p>
     <p>80% empirical interval: ${regionalFormatNumber(interval80[0])} to ${regionalFormatNumber(interval80[1])} per 100k.</p>
     <p>95% empirical interval: ${regionalFormatNumber(interval95[0])} to ${regionalFormatNumber(interval95[1])} per 100k.</p>
+    ${renderRegionalScaleDiagnostics(record)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
     <p class="disclaimer">Research only. This is not a per-bite infection probability, diagnosis, treatment recommendation, or public Maryland default.</p>
@@ -531,6 +532,25 @@ function selectRegionalCounty(countyFips) {
   renderRegionalForecastChart(countyFips);
   renderRegionalMap();
   updateRegionalSelectedControls();
+}
+
+function renderRegionalScaleDiagnostics(record) {
+  const scale = (regionalState.weekly && regionalState.weekly.score_scale) || {};
+  const denominator = scale.score_denominator;
+  const rawScore = record.risk_score_raw;
+  const rawScoreText =
+    rawScore === undefined || rawScore === null
+      ? "unavailable raw score"
+      : `raw score ${regionalFormatNumber(rawScore)}`;
+  const denominatorText =
+    denominator === undefined || denominator === null
+      ? "unknown score denominator"
+      : `score denominator ${regionalFormatNumber(denominator)}`;
+  return `<section class="lineage-strip scale-diagnostic" aria-labelledby="regional-scale-heading">
+    <h4 id="regional-scale-heading">Linear score</h4>
+    <p>This forecast score is linear: predicted weekly incidence is divided by the regional ${regionalEscapeHtml(denominatorText)}, then rounded and clamped to 1-10.</p>
+    <p>${regionalEscapeHtml(rawScoreText)}; displayed score ${regionalEscapeHtml(record.risk_score)}/10.</p>
+  </section>`;
 }
 
 function renderRegionalObservedCounty({
