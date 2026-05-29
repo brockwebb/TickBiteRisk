@@ -74,6 +74,26 @@
         </section>
       </aside>
 
+      <section
+        class="regional-chart-section"
+        aria-labelledby="regional-chart-title"
+      >
+        <div class="regional-map-heading">
+          <h2 id="regional-chart-title">Forecast window</h2>
+          <p id="regional-chart-summary" aria-live="polite" class="muted">
+            Select a county to chart its weekly forecast.
+          </p>
+        </div>
+        <div
+          id="regional-forecast-chart"
+          class="forecast-chart"
+          role="img"
+          aria-label="Selected county weekly forecast with empirical intervals"
+        >
+          <p class="loading">Loading forecast chart...</p>
+        </div>
+      </section>
+
       <section class="county-list-section regional-county-list-section" aria-labelledby="regional-list-title">
         <h2 id="regional-list-title">County list</h2>
         <div id="regional-county-list" class="county-list regional-county-list"></div>

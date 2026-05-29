@@ -8,6 +8,7 @@ const regionalState = {
   selectedCounty: null,
   selectedWeek: 1,
   byCountyWeek: new Map(),
+  recordsByCounty: new Map(),
   metadataByCounty: new Map(),
   overlaysByRegime: new Map(),
 };
@@ -98,11 +99,19 @@ async function fetchRegionalJson(path) {
 
 function indexRegionalRecords(records) {
   regionalState.byCountyWeek.clear();
+  regionalState.recordsByCounty.clear();
   for (const record of records) {
     regionalState.byCountyWeek.set(
       `${record.county_fips}:${record.mmwr_week}`,
       record
     );
+    if (!regionalState.recordsByCounty.has(record.county_fips)) {
+      regionalState.recordsByCounty.set(record.county_fips, []);
+    }
+    regionalState.recordsByCounty.get(record.county_fips).push(record);
+  }
+  for (const countyRecords of regionalState.recordsByCounty.values()) {
+    countyRecords.sort((left, right) => Number(left.mmwr_week) - Number(right.mmwr_week));
   }
 }
 
@@ -166,6 +175,10 @@ function getRegionalRecord(countyFips) {
   return regionalState.byCountyWeek.get(
     `${countyFips}:${regionalState.selectedWeek}`
   );
+}
+
+function regionalCountyWeekRecords(countyFips) {
+  return regionalState.recordsByCounty.get(countyFips) || [];
 }
 
 function renderRegionalMap() {
@@ -266,6 +279,7 @@ function selectRegionalCounty(countyFips) {
   if (!record) {
     panel.innerHTML = `<p>No forecast row available for ${regionalEscapeHtml(countyName)} in MMWR week ${regionalState.selectedWeek}.</p>`;
     renderRegionalRegime(metadata);
+    renderRegionalForecastChart(countyFips);
     updateRegionalSelectedControls();
     return;
   }
@@ -284,6 +298,7 @@ function selectRegionalCounty(countyFips) {
     <p class="disclaimer">Research only. This is not a per-bite infection probability, diagnosis, treatment recommendation, or public Maryland default.</p>
   </div>`;
   renderRegionalRegime(metadata);
+  renderRegionalForecastChart(countyFips);
   renderRegionalMap();
   updateRegionalSelectedControls();
 }
@@ -359,6 +374,103 @@ function renderRegionalFlagCaveats(record) {
     <h4 id="regional-flag-heading">What to know about this score</h4>
     <ul class="flag-list">${items}</ul>
   </section>`;
+}
+
+function renderRegionalForecastChart(countyFips) {
+  const target = document.getElementById("regional-forecast-chart");
+  const summary = document.getElementById("regional-chart-summary");
+  const records = regionalCountyWeekRecords(countyFips);
+  const feature = findRegionalCountyFeature(countyFips);
+  const countyName =
+    (feature && feature.properties && feature.properties.county_name) || countyFips;
+  if (!records.length) {
+    target.innerHTML = "<p>No weekly forecast rows are available for this county.</p>";
+    summary.textContent = `${countyName} weekly forecast window unavailable`;
+    return;
+  }
+
+  const width = 760;
+  const height = 260;
+  const padding = { top: 18, right: 22, bottom: 34, left: 46 };
+  const weeks = records.map((record) => Number(record.mmwr_week));
+  const minWeek = Math.min(...weeks);
+  const maxWeek = Math.max(...weeks);
+  const maxValue = Math.max(
+    1,
+    ...records.map((record) => {
+      const interval95 = record.predicted_weekly_incidence_95_interval || [0, 0];
+      return Math.max(
+        Number(record.predicted_weekly_incidence_per_100k || 0),
+        Number(interval95[1] || 0)
+      );
+    })
+  );
+  const xScale = (week) =>
+    padding.left +
+    ((Number(week) - minWeek) / Math.max(1, maxWeek - minWeek)) *
+      (width - padding.left - padding.right);
+  const yScale = (value) =>
+    height -
+    padding.bottom -
+    (Number(value || 0) / maxValue) * (height - padding.top - padding.bottom);
+  const linePath = regionalLinePath(records, xScale, yScale);
+  const band95 = regionalIntervalBandPath(
+    records,
+    "predicted_weekly_incidence_95_interval",
+    xScale,
+    yScale
+  );
+  const band80 = regionalIntervalBandPath(
+    records,
+    "predicted_weekly_incidence_80_interval",
+    xScale,
+    yScale
+  );
+  const activeRecord =
+    records.find((record) => Number(record.mmwr_week) === regionalState.selectedWeek) ||
+    records[0];
+  const activeX = xScale(activeRecord.mmwr_week);
+  const activeY = yScale(activeRecord.predicted_weekly_incidence_per_100k);
+  const activeInterval = activeRecord.predicted_weekly_incidence_95_interval || [0, 0];
+
+  target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${regionalEscapeHtml(countyName)} weekly forecast curve with empirical interval bands">
+    <path class="interval-band-95" d="${band95}"><title>95% empirical interval band</title></path>
+    <path class="interval-band-80" d="${band80}"><title>80% empirical interval band</title></path>
+    <path class="county-forecast-line" d="${linePath}"><title>Predicted weekly incidence</title></path>
+    <line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
+    <line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}"></line>
+    <circle class="active-week-marker" data-active-week="${regionalEscapeHtml(activeRecord.mmwr_week)}" cx="${activeX.toFixed(2)}" cy="${activeY.toFixed(2)}" r="5">
+      <title>MMWR week ${regionalEscapeHtml(activeRecord.mmwr_week)}: ${regionalFormatNumber(activeRecord.predicted_weekly_incidence_per_100k)} per 100k</title>
+    </circle>
+    <text class="chart-label" x="${padding.left}" y="${height - 10}">MMWR weeks ${regionalEscapeHtml(minWeek)}-${regionalEscapeHtml(maxWeek)}</text>
+    <text class="chart-label" x="${padding.left}" y="13">${regionalFormatNumber(maxValue)} per 100k</text>
+  </svg>`;
+  summary.textContent = `${countyName} weekly forecast window, MMWR weeks ${minWeek}-${maxWeek}; selected week ${activeRecord.mmwr_week} has 95% empirical interval ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k.`;
+}
+
+function regionalLinePath(records, xScale, yScale) {
+  return records
+    .map((record, index) => {
+      const x = xScale(record.mmwr_week).toFixed(2);
+      const y = yScale(record.predicted_weekly_incidence_per_100k).toFixed(2);
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+    })
+    .join(" ");
+}
+
+function regionalIntervalBandPath(records, field, xScale, yScale) {
+  const upper = records.map((record, index) => {
+    const interval = record[field] || [0, 0];
+    return `${index === 0 ? "M" : "L"} ${xScale(record.mmwr_week).toFixed(2)} ${yScale(interval[1]).toFixed(2)}`;
+  });
+  const lower = records
+    .slice()
+    .reverse()
+    .map((record) => {
+      const interval = record[field] || [0, 0];
+      return `L ${xScale(record.mmwr_week).toFixed(2)} ${yScale(interval[0]).toFixed(2)}`;
+    });
+  return `${upper.join(" ")} ${lower.join(" ")} Z`;
 }
 
 function renderRegionalSources() {

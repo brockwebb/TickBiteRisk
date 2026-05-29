@@ -170,6 +170,14 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#regional-regime-panel")).toContainText(
     "Regime 95% interval: 8.20 to 31.50 per 100k"
   );
+  await expect(page.locator("#regional-forecast-chart svg")).toBeVisible();
+  await expect(page.locator("#regional-forecast-chart .interval-band-95")).toHaveCount(1);
+  await expect(page.locator("#regional-forecast-chart .county-forecast-line")).toHaveCount(1);
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Allegany County weekly forecast window"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText("MMWR weeks 21-22");
+  await expect(page.locator("#regional-forecast-chart [data-active-week=\"21\"]")).toHaveCount(1);
   await expect(page.locator('path[data-county="24023"]')).toHaveClass(
     /is-same-regime/
   );
@@ -183,6 +191,7 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#regional-panel-content")).toContainText(
     "95% empirical interval: 0.90 to 6.20 per 100k"
   );
+  await expect(page.locator("#regional-forecast-chart [data-active-week=\"22\"]")).toHaveCount(1);
 
   await page.locator('path[data-county="51810"]').click();
   await expect(page.locator("#regional-panel-content")).toContainText(
@@ -190,6 +199,9 @@ test("regional research dashboard renders county risk, week slider, and regime i
   );
   await expect(page.locator("#regional-panel-content")).toContainText("VA");
   await expect(page.locator("#regional-regime-panel")).toContainText("Spatial regime 2");
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Virginia Beach city weekly forecast window"
+  );
 
   await expect(page.locator("#regional-source-content")).toContainText(
     "Forecast-safe branches use prior-year"
