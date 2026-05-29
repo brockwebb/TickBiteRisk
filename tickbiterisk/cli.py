@@ -124,6 +124,7 @@ from tickbiterisk.etl.lyme_aggregate_build import (
 from tickbiterisk.etl.regional_lyme import (
     RegionalLymeCountyYear,
     parse_cdc_midatlantic_county_dashboard,
+    parse_pa_doh_lyme_county_workbook,
 )
 from tickbiterisk.etl.regional_demographics import (
     CENSUS_PEP_AGE_SEX_CITATION_URL,
@@ -636,6 +637,27 @@ REGIONAL_LYME_SOURCE_METADATA = {
         "public Maryland default, not a direct exposure observation, and "
         "reported cases are not stable true incidence across surveillance "
         "regime changes."
+    ),
+}
+REGIONAL_PA_LYME_2024_SOURCE_METADATA = {
+    "filename": "pennsylvania_doh_official_lyme_by_report_2024_with_map.xlsx",
+    "source_id": "pa_doh_lyme_1980_2024_xlsx",
+    "source_name": "Pennsylvania DOH Lyme disease county case workbook through 2024",
+    "source_url": (
+        "https://www.pa.gov/content/dam/copapwp-pagov/en/health/documents/"
+        "topics/documents/diseases-and-conditions/vectorborne/"
+        "OfficialLymeByReport2024withMap.xlsx"
+    ),
+    "citation_url": (
+        "https://www.pa.gov/agencies/health/diseases-conditions/"
+        "infectious-disease/vectorborne-diseases/tick-diseases.html"
+    ),
+    "parser_method": "parse_pa_doh_lyme_county_workbook:target_year=2024",
+    "modeling_caveats": (
+        "Pennsylvania state 2024 overlay for regional expansion/stress-test "
+        "panel only; state-source rows are not the public Maryland default, "
+        "suppressed county counts are represented as zero with flags, and "
+        "reported cases are not stable true incidence."
     ),
 }
 
@@ -2615,6 +2637,13 @@ def regional_lyme_outcomes(
         Path("data/raw/lyme"),
         help="Raw directory containing the CDC Lyme county dashboard export.",
     ),
+    pa_2024_workbook_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional Pennsylvania DOH Lyme county workbook through 2024; "
+            "when provided, appends flagged PA 2024 state-source rows."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/regional-lyme"),
         help="Output directory for Mid-Atlantic Lyme outcome artifacts.",
@@ -2628,10 +2657,24 @@ def regional_lyme_outcomes(
     if not source_path.exists():
         raise typer.BadParameter(f"Regional Lyme source file not found: {source_path}")
 
-    rows = parse_cdc_midatlantic_county_dashboard(
+    cdc_rows = parse_cdc_midatlantic_county_dashboard(
         source_path,
         source_id=str(REGIONAL_LYME_SOURCE_METADATA["source_id"]),
     )
+    rows = list(cdc_rows)
+    pa_rows: list[RegionalLymeCountyYear] = []
+    if pa_2024_workbook_path is not None:
+        if not pa_2024_workbook_path.exists():
+            raise typer.BadParameter(
+                f"PA 2024 Lyme workbook not found: {pa_2024_workbook_path}"
+            )
+        pa_rows = parse_pa_doh_lyme_county_workbook(
+            pa_2024_workbook_path,
+            source_id=str(REGIONAL_PA_LYME_2024_SOURCE_METADATA["source_id"]),
+            target_year=2024,
+        )
+        rows.extend(pa_rows)
+        rows.sort(key=lambda row: (row.state_fips, row.county_fips, row.year))
     output_path = write_regional_lyme_output(rows, output_dir)
     resolved_manifest_path = (
         provenance_manifest_path or output_dir / "acquisition_provenance.csv"
@@ -2639,8 +2682,10 @@ def regional_lyme_outcomes(
     provenance_output = write_acquisition_provenance_manifest(
         _regional_lyme_provenance_records(
             metadata=REGIONAL_LYME_SOURCE_METADATA,
-            rows=rows,
+            rows=cdc_rows,
             source_path=source_path,
+            pa_rows=pa_rows,
+            pa_source_path=pa_2024_workbook_path,
             raw_dir=raw_dir,
             output_dir=output_dir,
             manifest_path=resolved_manifest_path,
@@ -4251,6 +4296,8 @@ def _regional_lyme_provenance_records(
     metadata: dict[str, str],
     rows: list[RegionalLymeCountyYear],
     source_path: Path,
+    pa_rows: list[RegionalLymeCountyYear],
+    pa_source_path: Path | None,
     raw_dir: Path,
     output_dir: Path,
     manifest_path: Path,
@@ -4258,10 +4305,11 @@ def _regional_lyme_provenance_records(
 ) -> list[AcquisitionProvenanceRecord]:
     command = _regional_lyme_acquisition_command(
         raw_dir=raw_dir,
+        pa_source_path=pa_source_path,
         output_dir=output_dir,
         manifest_path=manifest_path,
     )
-    return [
+    records = [
         AcquisitionProvenanceRecord(
             source_id=metadata["source_id"],
             source_name=metadata["source_name"],
@@ -4291,27 +4339,77 @@ def _regional_lyme_provenance_records(
             modeling_caveats=metadata["modeling_caveats"],
         )
     ]
+    if pa_source_path is not None:
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=REGIONAL_PA_LYME_2024_SOURCE_METADATA["source_id"],
+                source_name=REGIONAL_PA_LYME_2024_SOURCE_METADATA["source_name"],
+                source_url=REGIONAL_PA_LYME_2024_SOURCE_METADATA["source_url"],
+                citation_url=REGIONAL_PA_LYME_2024_SOURCE_METADATA["citation_url"],
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read the ignored local Pennsylvania DOH Lyme county "
+                    "workbook, extract only 2024 county rows, and append them "
+                    "as flagged state-source rows to the regional outcome panel."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    "Read local raw Pennsylvania DOH Lyme workbook "
+                    f"{pa_source_path.name} for the 2024 regional state-source "
+                    "overlay."
+                ),
+                derived_artifact_paths=[pa_source_path, output_path],
+                derived_artifact_path_labels=[
+                    pa_source_path.name,
+                    output_path.name,
+                ],
+                row_count=len(pa_rows),
+                parser_method=REGIONAL_PA_LYME_2024_SOURCE_METADATA[
+                    "parser_method"
+                ],
+                extraction_quality="accepted_with_suppression_flags",
+                access_notes=(
+                    "Public Pennsylvania DOH workbook; no secret or credential "
+                    "required. Raw workbook remains in ignored storage."
+                ),
+                modeling_caveats=REGIONAL_PA_LYME_2024_SOURCE_METADATA[
+                    "modeling_caveats"
+                ],
+            )
+        )
+    return records
 
 
 def _regional_lyme_acquisition_command(
     *,
     raw_dir: Path,
+    pa_source_path: Path | None,
     output_dir: Path,
     manifest_path: Path,
 ) -> str:
-    return _format_cli_command(
+    command_parts = [
+        "tickbiterisk",
+        "etl",
+        "regional-lyme-outcomes",
+        "--raw-dir",
+        _public_provenance_path(raw_dir),
+    ]
+    if pa_source_path is not None:
+        command_parts.extend(
+            [
+                "--pa-2024-workbook-path",
+                _public_provenance_path(pa_source_path),
+            ]
+        )
+    command_parts.extend(
         [
-            "tickbiterisk",
-            "etl",
-            "regional-lyme-outcomes",
-            "--raw-dir",
-            _public_provenance_path(raw_dir),
             "--output-dir",
             _public_provenance_path(output_dir),
             "--provenance-manifest-path",
             _public_provenance_path(manifest_path),
         ]
     )
+    return _format_cli_command(command_parts)
 
 
 def _regional_signals_provenance_record(

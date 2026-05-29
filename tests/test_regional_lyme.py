@@ -4,6 +4,7 @@ from pathlib import Path
 from tickbiterisk.etl.regional_lyme import (
     MIDATLANTIC_STATE_FIPS,
     parse_cdc_midatlantic_county_dashboard,
+    parse_pa_doh_lyme_county_workbook,
 )
 from tickbiterisk.etl.regional_lyme_build import write_regional_lyme_output
 
@@ -113,6 +114,37 @@ def test_midatlantic_dashboard_parser_flags_suppressed_or_unknown_case_values(
     )
 
 
+def test_pa_doh_workbook_parser_adds_2024_county_rows_with_state_source_flags(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "pa_lyme.xlsx"
+    _write_pa_workbook(
+        path,
+        [
+            {"Jurisdiction": "Adams", "2024": "128", "2023": "145"},
+            {"Jurisdiction": "Montour", "2024": "*", "2023": "7"},
+        ],
+    )
+
+    rows = parse_pa_doh_lyme_county_workbook(
+        path,
+        source_id="pa_doh_lyme_1980_2024_xlsx",
+        target_year=2024,
+    )
+
+    assert [(row.county_fips, row.year, row.total_cases) for row in rows] == [
+        ("42001", 2024, 128),
+        ("42093", 2024, 0),
+    ]
+    assert rows[0].state_abbr == "PA"
+    assert rows[0].state_name == "Pennsylvania"
+    assert rows[0].county_name == "Adams County"
+    assert "pa_doh_official_county_cases" in rows[0].feature_quality_flags
+    assert "state_source_not_cdc_public_use" in rows[0].feature_quality_flags
+    assert "lyme_case_definition_change" in rows[0].feature_quality_flags
+    assert "case_value_suppressed_or_unknown" in rows[1].feature_quality_flags
+
+
 def test_regional_lyme_writer_outputs_stable_csv_schema(tmp_path: Path) -> None:
     source_path = tmp_path / "county_dashboard.csv"
     source_path.write_text(
@@ -151,3 +183,15 @@ def test_regional_lyme_writer_outputs_stable_csv_schema(tmp_path: Path) -> None:
             ),
         }
     ]
+
+
+def _write_pa_workbook(path: Path, rows: list[dict[str, str]]) -> None:
+    import pandas as pd
+
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        pd.DataFrame(rows).to_excel(
+            writer,
+            sheet_name="RedactedCountyCaseCounts",
+            startrow=2,
+            index=False,
+        )

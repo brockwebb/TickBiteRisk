@@ -101,6 +101,10 @@ artifacts.
 1d. `tickbiterisk etl regional-lyme-outcomes`
    - Reshapes the CDC county dashboard export into DE, DC, MD, PA, VA, and WV
      county/county-equivalent annual Lyme totals for 2001-2023.
+   - Can append the Pennsylvania DOH official 2024 Lyme county workbook with
+     `--pa-2024-workbook-path`; those rows remain flagged state-source regional
+     research overlays, with suppressed county values represented as zero plus
+     suppression flags.
    - Writes `midatlantic_lyme_county_year.csv` and
      `acquisition_provenance.csv`.
    - This panel is a regional expansion/stress-test artifact for hotspot,
@@ -476,4 +480,4 @@ probability or a treatment recommendation.
   comparing denominators across vintages. The regional population output also
   includes forecast-only 2026 projected denominators.
 
-Last updated: 2026-05-28.
+Last updated: 2026-05-29.

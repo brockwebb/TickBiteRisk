@@ -11,6 +11,7 @@ boundary clearly allow redistribution.
 | --- | --- | --- | --- | --- |
 | `cdc_lyme_public_use` | CDC Lyme public-use aggregated geography files | County-year | Long-run Lyme outcome spine | active_etl |
 | `cdc_lyme_dashboard_exports` | CDC county/state/region Lyme dashboard exports through 2023 | County/state/region-year | Reconciliation and validation checks | active_etl |
+| `pa_doh_lyme_1980_2024_xlsx` | Pennsylvania DOH official Lyme county workbook through 2024 | Pennsylvania county-year | Optional 2024 state-source overlay for Mid-Atlantic regional stress tests | active_etl_optional_2024_not_public_default |
 | `maryland_lyme_pdf` | Maryland Department of Health Lyme PDF, 2013-2024 | Maryland county-year | Latest Maryland 2024 outcome lane, with overlapping years kept as validation context | active_etl_latest_2024 |
 | `cdc_lyme_seasonality` | CDC Lyme onset by MMWR week and month | National week/month | Static seasonal allocation from annual predictions to county-week forecast | active_etl |
 | `noaa_ghcnd` | NOAA daily station observations | Station-day to county-week/year | Weather feature candidates and backtesting inputs | active_etl |
@@ -138,6 +139,10 @@ feature ideas to test in time-aware backtests before any public model claim.
   county outputs still stop at 2023. Those 2024 rows are flagged
   `mdh_probable_only_2024` and `state_source_not_cdc_public_use`; with Census
   2024 denominators now materialized, they enter the local model panel.
+- Pennsylvania 2024 Lyme county rows can be appended to the Mid-Atlantic
+  regional panel from the official PA DOH workbook. They are state-source
+  regional research rows, not public Maryland defaults; suppressed county
+  values are represented as zero with explicit suppression flags.
 - Census 2024-2025 county population denominators come from the official
   keyless `CO-EST2025-alldata` CSV, while older rows currently remain from the
   prior API-era pulls.
@@ -153,4 +158,4 @@ feature ideas to test in time-aware backtests before any public model claim.
   projected 2026 regional population denominators. Regional forecast runs and
   predictions carry the same as-of/cutoff/source-vintage/update-mode contract.
 
-Last updated: 2026-05-28.
+Last updated: 2026-05-29.
