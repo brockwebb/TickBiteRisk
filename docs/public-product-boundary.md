@@ -64,7 +64,8 @@ raw surveillance records.
 The first implemented runtime bridge reads the derived
 `county_week_seasonal_risk_baseline.csv` artifact and returns a JSON response for
 county/date lookups. It must keep the score framed as a relative seasonal Lyme
-forecast, not a per-bite infection probability or treatment recommendation.
+forecast derived from an annual county forecast, not observed county-week truth,
+a per-bite infection probability, or treatment recommendation.
 
 The second implemented runtime bridge, `tickbiterisk risk single-bite`, reads
 that same county-week forecast and combines it with user-supplied bite evidence:
@@ -81,6 +82,10 @@ county/MMWR week, and includes county metadata, a model card, source catalog,
 manifest, CDC guidance links, and plain-language caveats. It must not publish
 raw downloaded files, private warehouse tables, credentials, or ambiguous model
 branches.
+
+Public files must preserve the temporal-grain contract: observed Lyme outcome
+truth is county-year, forecast truth is county-year, and MMWR-week rows are
+seasonal allocations of annual forecasts using national seasonality.
 
 ## Guidance Links
 

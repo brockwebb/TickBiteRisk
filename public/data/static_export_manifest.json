@@ -8,11 +8,22 @@
     "static_export_manifest.json",
     "md_counties.geojson"
   ],
-  "generated_at": "2026-05-29T00:28:07+00:00",
+  "generated_at": "2026-05-29T20:25:04+00:00",
   "record_counts": {
     "county_geojson_features": 24,
     "county_metadata": 24,
     "weekly_risk": 1272
   },
-  "schema_version": "county-week-risk-static-v1"
+  "schema_version": "county-week-risk-static-v1",
+  "temporal_contract": {
+    "county_month_or_week_observed_truth_available": false,
+    "display_temporal_grain": "mmwr_week",
+    "display_time_role": "seasonal_allocation_of_annual_forecast",
+    "forecast_truth_spatial_grain": "county",
+    "forecast_truth_temporal_grain": "year",
+    "historical_display_policy": "Historical years are observed annual county incidence only; derived weekly or monthly allocations must not be labeled as observed historical risk.",
+    "observed_truth_spatial_grain": "county",
+    "observed_truth_temporal_grain": "year",
+    "seasonality_scope": "national"
+  }
 }

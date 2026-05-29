@@ -1,14 +1,14 @@
 {
   "annual_prediction_source": {
     "artifact_type": "annual_prediction_branch",
-    "as_of_date": "2026-05-28",
+    "as_of_date": "2026-05-29",
     "data_cutoff_date": "2024-12-31",
     "evaluation_mode": "annual_forecast_no_observed_target",
     "forecast_origin_year": 2024,
     "model_family": "ensemble",
     "model_name": "linear_blend_baseline",
-    "run_id": "annual_forecast_target2026_origin2024_mintrain5_shrink5p0",
-    "sha256": "7638e3315ace0a395013367b5d94bcb61f98d931ed1b7a07a9ccda59f349dbc3",
+    "run_id": "annual_forecast_target2026_origin2024_mintrain5_ridge1p0_shrink5p0",
+    "sha256": "e5baec566ec4f71fdcaffe2b0fd462da9bdea63e7d19a6e826550cbf745e0de6",
     "source_vintage": "2024-inclusive-local",
     "update_mode": "pre_update",
     "weather_mode": "not_used_by_lagged_model"
@@ -17,7 +17,8 @@
     "Informational and educational only; not medical advice.",
     "Does not diagnose disease or determine whether a person is infected.",
     "Not a treatment recommendation or substitute for a healthcare professional.",
-    "Relative Maryland county-week Lyme forecast, not a per-bite infection probability.",
+    "Relative Maryland county seasonal Lyme forecast, not a per-bite infection probability.",
+    "Displayed county-week values are derived seasonal allocations of annual county forecasts, not observed county-week data.",
     "Not a personal infection probability.",
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
@@ -53,8 +54,8 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-29T00:28:07+00:00",
-  "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
+  "generated_at": "2026-05-29T20:25:04+00:00",
+  "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality; displayed county-week values are seasonal allocation, not observed county-week data.",
   "model_name": "linear_blend_baseline",
   "not_for": [
     "per-bite infection probability",
@@ -62,15 +63,26 @@
     "treatment recommendation",
     "weather-adjusted forecast"
   ],
-  "product_framing": "Lyme risk forecasting tool for Maryland county-week conditions",
+  "product_framing": "Lyme risk forecasting tool for Maryland county annual disease pressure with seasonal allocation",
   "quality_flags": [
     "relative_seasonal_baseline",
     "static_seasonality_prior",
     "not_weather_adjusted"
   ],
   "schema_version": "county-week-risk-static-v1",
-  "score_interpretation": "Relative seasonal Lyme forecast on a 1-10 Maryland scale; not a per-bite infection probability.",
+  "score_interpretation": "Relative seasonal Lyme forecast on a 1-10 Maryland scale; annual county forecasts are allocated across MMWR weeks using national seasonality and are not per-bite infection probabilities.",
   "target_definition": "lyme_incidence_per_100k",
+  "temporal_contract": {
+    "county_month_or_week_observed_truth_available": false,
+    "display_temporal_grain": "mmwr_week",
+    "display_time_role": "seasonal_allocation_of_annual_forecast",
+    "forecast_truth_spatial_grain": "county",
+    "forecast_truth_temporal_grain": "year",
+    "historical_display_policy": "Historical years are observed annual county incidence only; derived weekly or monthly allocations must not be labeled as observed historical risk.",
+    "observed_truth_spatial_grain": "county",
+    "observed_truth_temporal_grain": "year",
+    "seasonality_scope": "national"
+  },
   "validation_summary": {
     "comparison_assumption_flags": [
       "observational_not_causal",
@@ -85,7 +97,7 @@
     "pearson_correlation": 0.771554,
     "rank_by_mae": 2,
     "rmse_incidence_per_100k": 29.737192,
-    "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0",
+    "run_id": "model_compare_start2007_end2024_mintrain5_ridge1p0_shrink5p0_rf200_leaf3_maxsqrt_seed1337",
     "validation_match_type": "annual_forecast_model_name",
     "validation_role": "historical_model_comparison"
   }

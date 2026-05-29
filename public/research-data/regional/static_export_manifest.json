@@ -11,7 +11,7 @@
     "regional_county_incidence_annual.json",
     "regional_spatial_regime_overlays.json"
   ],
-  "generated_at": "2026-05-29T17:33:44+00:00",
+  "generated_at": "2026-05-29T20:25:25+00:00",
   "record_counts": {
     "county_metadata": 283,
     "regional_annual_observed_incidence": 6576,
@@ -24,5 +24,16 @@
     "not_public_maryland_default": true,
     "research_only": true
   },
-  "schema_version": "county-week-risk-static-v1"
+  "schema_version": "county-week-risk-static-v1",
+  "temporal_contract": {
+    "county_month_or_week_observed_truth_available": false,
+    "display_temporal_grain": "mmwr_week",
+    "display_time_role": "seasonal_allocation_of_annual_forecast",
+    "forecast_truth_spatial_grain": "county",
+    "forecast_truth_temporal_grain": "year",
+    "historical_display_policy": "Historical years are observed annual county incidence only; derived weekly or monthly allocations must not be labeled as observed historical risk.",
+    "observed_truth_spatial_grain": "county",
+    "observed_truth_temporal_grain": "year",
+    "seasonality_scope": "national"
+  }
 }

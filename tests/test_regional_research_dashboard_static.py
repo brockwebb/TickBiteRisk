@@ -10,15 +10,16 @@ def test_regional_research_html_has_map_controls_and_research_boundaries() -> No
     for token in [
         "<title>TickBiteRisk Regional Research Forecast</title>",
         "TickBiteRisk Regional Research",
-        "Mid-Atlantic county-week Lyme risk forecast research",
+        "Mid-Atlantic annual Lyme risk forecast research",
+        "seasonal allocation",
         'id="regional-risk-map"',
         'class="controls regional-controls regional-time-toolbar"',
         'id="year-select"',
         'id="year-label" class="muted" aria-live="polite"',
         'id="year-mode-label" class="mode-pill forecast-mode"',
-        'id="week-prev"',
+        'id="week-slider"',
+        'class="week-scale"',
         'id="week-input"',
-        'id="week-next"',
         'id="week-label" class="muted" aria-live="polite"',
         'id="regional-county-panel"',
         'id="regional-panel-content" aria-live="polite"',
@@ -61,13 +62,17 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function handleRegionalListFilterChange",
         "function filteredRegionalFeatures",
         "function renderRegionalForecastProvenance",
+        "function handleWeekSliderInput",
         "function handleWeekInputChange",
-        "function adjustRegionalWeek",
+        "function syncRegionalWeekControls",
+        "function renderRegionalObservedAnnualContext",
+        "function regionalRiskFillColor",
         "forecast_safe_prior_history_spatial_regime",
         "Forecast origin",
         "Forecast year",
         "Observed historical",
         "Mixed observed/forecast",
+        "Observed annual context",
         "observed reported incidence",
         "Linear score",
         "rounded and clamped",
@@ -89,6 +94,24 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
     assert "md_counties.geojson" not in js
 
 
+def test_regional_research_javascript_keeps_historical_years_annual_only() -> None:
+    js = (PUBLIC_DIR / "regional-research.js").read_text(encoding="utf-8")
+
+    for token in [
+        "Week controls apply only to seasonal forecast years",
+        "mode === \"forecast\" || mode === \"mixed\"",
+        "Observed annual context",
+        "observed annual incidence history",
+    ]:
+        assert token in js
+
+    for token in [
+        "historical weekly risk",
+        "observed_historical_weekly",
+    ]:
+        assert token not in js
+
+
 def test_regional_research_css_has_stable_map_slider_and_regime_styles() -> None:
     css = (PUBLIC_DIR / "styles.css").read_text(encoding="utf-8")
 
@@ -97,7 +120,8 @@ def test_regional_research_css_has_stable_map_slider_and_regime_styles() -> None
         ".regional-controls",
         ".regional-time-toolbar",
         ".regional-time-grid",
-        ".week-stepper",
+        ".week-control",
+        ".week-scale",
         ".regional-map-shell",
         ".regional-regime-strip",
         ".regional-county-shape.is-same-regime",

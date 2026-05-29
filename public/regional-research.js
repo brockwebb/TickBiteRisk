@@ -56,11 +56,8 @@ async function initRegionalResearch() {
     .getElementById("week-input")
     .addEventListener("input", handleWeekInputChange);
   document
-    .getElementById("week-prev")
-    .addEventListener("click", () => adjustRegionalWeek(-1));
-  document
-    .getElementById("week-next")
-    .addEventListener("click", () => adjustRegionalWeek(1));
+    .getElementById("week-slider")
+    .addEventListener("input", handleWeekSliderInput);
   document
     .getElementById("state-filter")
     .addEventListener("change", handleRegionalListFilterChange);
@@ -207,20 +204,26 @@ function setRegionalWeekBounds(records) {
     .filter((week) => Number.isFinite(week))
     .sort((left, right) => left - right);
   const input = document.getElementById("week-input");
+  const slider = document.getElementById("week-slider");
   if (!weeks.length) {
     regionalState.selectedWeek = Number(regionalState.selectedWeek) || 1;
     input.min = "1";
     input.max = "53";
+    slider.min = "1";
+    slider.max = "53";
     input.value = String(regionalState.selectedWeek);
+    slider.value = String(regionalState.selectedWeek);
     updateRegionalWeekLabel();
     return;
   }
   input.min = String(weeks[0]);
   input.max = String(weeks[weeks.length - 1]);
+  slider.min = String(weeks[0]);
+  slider.max = String(weeks[weeks.length - 1]);
   regionalState.selectedWeek = regionalClampWeek(
     Number(regionalState.selectedWeek) || weeks[0]
   );
-  input.value = String(regionalState.selectedWeek);
+  syncRegionalWeekControls();
   updateRegionalWeekLabel();
 }
 
@@ -272,23 +275,29 @@ function handleYearSelectChange(event) {
   selectRegionalCounty(regionalState.selectedCounty);
 }
 
-function handleWeekInputChange(event) {
+function handleWeekSliderInput(event) {
   regionalState.selectedWeek = regionalClampWeek(Number(event.target.value));
-  event.target.value = String(regionalState.selectedWeek);
+  syncRegionalWeekControls();
   updateRegionalWeekLabel();
   renderRegionalMap();
   renderRegionalCountyList();
   selectRegionalCounty(regionalState.selectedCounty);
 }
 
-function adjustRegionalWeek(delta) {
+function handleWeekInputChange(event) {
+  regionalState.selectedWeek = regionalClampWeek(Number(event.target.value));
+  syncRegionalWeekControls();
+  updateRegionalWeekLabel();
+  renderRegionalMap();
+  renderRegionalCountyList();
+  selectRegionalCounty(regionalState.selectedCounty);
+}
+
+function syncRegionalWeekControls() {
   const input = document.getElementById("week-input");
-  if (input.disabled) return;
-  regionalState.selectedWeek = regionalClampWeek(
-    Number(regionalState.selectedWeek) + delta
-  );
+  const slider = document.getElementById("week-slider");
   input.value = String(regionalState.selectedWeek);
-  handleWeekInputChange({ target: input });
+  slider.value = String(regionalState.selectedWeek);
 }
 
 function handleRegionalListFilterChange() {
@@ -302,22 +311,22 @@ function handleRegionalListFilterChange() {
 
 function updateRegionalWeekLabel() {
   const input = document.getElementById("week-input");
-  const previous = document.getElementById("week-prev");
-  const next = document.getElementById("week-next");
+  const slider = document.getElementById("week-slider");
   const mode = selectedRegionalDataMode();
-  const hasForecastRows = regionalForecastRecordsForSelectedYear().length > 0;
+  const hasWeeklyRows = regionalForecastRecordsForSelectedYear().length > 0;
   const enableWeekControls =
-    hasForecastRows && (mode === "forecast" || mode === "mixed");
+    hasWeeklyRows && (mode === "forecast" || mode === "mixed");
   input.disabled = !enableWeekControls;
-  previous.disabled = !enableWeekControls;
-  next.disabled = !enableWeekControls;
+  slider.disabled = !enableWeekControls;
   if (!enableWeekControls) {
     document.getElementById("week-label").textContent =
-      "Week controls apply to forecast years";
+      "Week controls apply only to seasonal forecast years";
     return;
   }
-  const suffix =
-    mode === "mixed" ? " for forecast counties" : "";
+  let suffix = "";
+  if (mode === "mixed") {
+    suffix = " for forecast counties; observed counties remain annual";
+  }
   document.getElementById("week-label").textContent =
     `Using MMWR week ${regionalState.selectedWeek}${suffix}`;
 }
@@ -430,6 +439,10 @@ function regionalCountyAnnualRecords(countyFips) {
 
 function regionalForecastRecordsForSelectedYear() {
   return regionalForecastRecordsForYear(regionalState.selectedYear);
+}
+
+function regionalTimeControlRecordsForSelectedYear() {
+  return regionalForecastRecordsForSelectedYear();
 }
 
 function regionalForecastRecordsForYear(year) {
@@ -727,6 +740,17 @@ function renderRegionalObservedCounty({
   renderRegionalObservedHistoryChart(countyFips);
   renderRegionalMap();
   updateRegionalSelectedControls();
+}
+
+function renderRegionalObservedAnnualContext(countyFips) {
+  const annualRecord = getRegionalAnnualRecord(countyFips);
+  if (!annualRecord) {
+    return "<p>No observed annual context is available for this county.</p>";
+  }
+  return `<section class="lineage-strip" aria-labelledby="regional-observed-annual-heading">
+    <h4 id="regional-observed-annual-heading">Observed annual context</h4>
+    <p>${regionalEscapeHtml(annualRecord.year)} reported ${regionalEscapeHtml(annualRecord.reported_cases)} cases at ${regionalFormatNumber(annualRecord.incidence_per_100k)} per 100k.</p>
+  </section>`;
 }
 
 function renderRegionalCountyRegime(metadata) {
@@ -1204,6 +1228,11 @@ function regionalRiskClass(score) {
   if (score >= 5) return "risk-moderate";
   if (score >= 3) return "risk-low";
   return "risk-very-low";
+}
+
+function regionalRiskFillColor(record) {
+  if (!record) return "risk-unavailable";
+  return regionalRiskClass(record.risk_score);
 }
 
 function regionalObservedRiskClass(record) {

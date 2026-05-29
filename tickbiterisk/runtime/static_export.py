@@ -25,7 +25,8 @@ PUBLIC_CAVEATS = [
     "Informational and educational only; not medical advice.",
     "Does not diagnose disease or determine whether a person is infected.",
     "Not a treatment recommendation or substitute for a healthcare professional.",
-    "Relative Maryland county-week Lyme forecast, not a per-bite infection probability.",
+    "Relative Maryland county seasonal Lyme forecast, not a per-bite infection probability.",
+    "Displayed county-week values are derived seasonal allocations of annual county forecasts, not observed county-week data.",
     "Not a personal infection probability.",
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
@@ -80,6 +81,22 @@ SCORE_CATEGORIES = {
     "5-6": "moderate",
     "7-8": "high",
     "9-10": "very_high",
+}
+
+TEMPORAL_CONTRACT = {
+    "observed_truth_spatial_grain": "county",
+    "observed_truth_temporal_grain": "year",
+    "forecast_truth_spatial_grain": "county",
+    "forecast_truth_temporal_grain": "year",
+    "display_temporal_grain": "mmwr_week",
+    "display_time_role": "seasonal_allocation_of_annual_forecast",
+    "seasonality_scope": "national",
+    "county_month_or_week_observed_truth_available": False,
+    "historical_display_policy": (
+        "Historical years are observed annual county incidence only; derived "
+        "weekly or monthly allocations must not be labeled as observed "
+        "historical risk."
+    ),
 }
 
 
@@ -210,15 +227,17 @@ def _geography_scope(scope: str) -> _GeographyScope:
             county_metadata_filename="md_county_metadata.json",
             geography_label="MD county/jurisdiction",
             product_framing=(
-                "Lyme risk forecasting tool for Maryland county-week conditions"
+                "Lyme risk forecasting tool for Maryland county annual disease "
+                "pressure with seasonal allocation"
             ),
             score_interpretation=(
-                "Relative seasonal Lyme forecast on a 1-10 Maryland scale; not a "
-                "per-bite infection probability."
+                "Relative seasonal Lyme forecast on a 1-10 Maryland scale; "
+                "annual county forecasts are allocated across MMWR weeks using "
+                "national seasonality and are not per-bite infection probabilities."
             ),
             relative_risk_caveat=(
-                "Relative Maryland county-week Lyme forecast, not a per-bite "
-                "infection probability."
+                "Relative Maryland county seasonal Lyme forecast, not a "
+                "per-bite infection probability."
             ),
             state="MD",
             state_fips="24",
@@ -233,15 +252,16 @@ def _geography_scope(scope: str) -> _GeographyScope:
             geography_label="DE/DC/MD/PA/VA/WV county-equivalent",
             product_framing=(
                 "Lyme risk forecasting tool for DE/DC/MD/PA/VA/WV "
-                "county-week conditions"
+                "county annual disease pressure with seasonal allocation"
             ),
             score_interpretation=(
-                "Relative seasonal Lyme forecast on a 1-10 regional scale; not "
-                "a per-bite infection probability."
+                "Relative seasonal Lyme forecast on a 1-10 regional scale; "
+                "annual county forecasts are allocated across MMWR weeks using "
+                "national seasonality and are not per-bite infection probabilities."
             ),
             relative_risk_caveat=(
-                "Relative regional county-week Lyme forecast, not a per-bite "
-                "infection probability."
+                "Relative regional county seasonal Lyme forecast, not a "
+                "per-bite infection probability."
             ),
             research_only=True,
             not_public_maryland_default=True,
@@ -274,7 +294,7 @@ def _weekly_geography_payload(
 def _public_caveats(geography: _GeographyScope) -> list[str]:
     return [
         geography.relative_risk_caveat
-        if caveat.startswith("Relative Maryland county-week")
+        if caveat.startswith("Relative Maryland county seasonal")
         else caveat
         for caveat in PUBLIC_CAVEATS
     ]
@@ -435,6 +455,7 @@ def _weekly_payload(
         "seasonality_source_id": first.seasonality_source_id,
         "record_count": len(records),
         "year_selection": _year_selection(geography),
+        "temporal_contract": TEMPORAL_CONTRACT,
         "selected_score_config": _selected_score_config(first),
         "selected_forecast_metadata": _selected_forecast_metadata(records),
         "score_scale": {
@@ -547,7 +568,9 @@ def _model_card_payload(
         "clinical_disclaimer": CLINICAL_DISCLAIMER,
         "method_summary": (
             "Selected annual forecast rows apportioned by "
-            "CDC national MMWR-week Lyme onset seasonality."
+            "CDC national MMWR-week Lyme onset seasonality; displayed "
+            "county-week values are seasonal allocation, not observed "
+            "county-week data."
         ),
         "forecasting_status": {
             "status": "risk_forecasting_tool",
@@ -562,6 +585,7 @@ def _model_card_payload(
             ),
         },
         **_research_status_field(geography),
+        "temporal_contract": TEMPORAL_CONTRACT,
         "explainer_placeholders": EXPLAINER_PLACEHOLDERS,
         "annual_prediction_source": _annual_prediction_source(records),
         "quality_flags": [
@@ -693,6 +717,7 @@ def _source_catalog_payload(
         "source_seasonality_sha256": first.source_seasonality_sha256,
         "input_artifact_sha256": input_sha256,
         **_research_status_field(geography),
+        "temporal_contract": TEMPORAL_CONTRACT,
         "guidance_links": GUIDANCE_LINKS,
         "data_lag_and_update_policy": {
             "summary": (
@@ -727,8 +752,9 @@ def _source_catalog_payload(
                 "sha256": input_sha256,
                 "notes": (
                     "Derived from selected annual forecast rows "
-                    "and CDC seasonality; do not publish raw restricted or "
-                    "terms-unclear source extracts."
+                    "and CDC seasonality as a seasonal allocation; not "
+                    "observed county-week data. Do not publish raw restricted "
+                    "or terms-unclear source extracts."
                 ),
             },
             {
@@ -808,6 +834,7 @@ def _manifest_payload(
         "export_type": "static_export_manifest",
         "generated_at": generated_at,
         **_research_status_field(geography),
+        "temporal_contract": TEMPORAL_CONTRACT,
         "files": files,
         "record_counts": record_counts,
     }

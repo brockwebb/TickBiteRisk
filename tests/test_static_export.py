@@ -34,6 +34,21 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert weekly["export_type"] == "md_county_risk_weekly"
     assert weekly["scope"] == "maryland_county_week"
     assert weekly["date_system"]["name"] == "CDC MMWR"
+    assert weekly["temporal_contract"] == {
+        "observed_truth_spatial_grain": "county",
+        "observed_truth_temporal_grain": "year",
+        "forecast_truth_spatial_grain": "county",
+        "forecast_truth_temporal_grain": "year",
+        "display_temporal_grain": "mmwr_week",
+        "display_time_role": "seasonal_allocation_of_annual_forecast",
+        "seasonality_scope": "national",
+        "county_month_or_week_observed_truth_available": False,
+        "historical_display_policy": (
+            "Historical years are observed annual county incidence only; "
+            "derived weekly or monthly allocations must not be labeled as "
+            "observed historical risk."
+        ),
+    }
     assert weekly["record_count"] == 2
     assert weekly["model_name"] == "linear_blend_baseline"
     assert weekly["seasonality_source_id"] == "cdc_seasonality_week_2023"
@@ -47,8 +62,12 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         "update_mode": "pre_update",
     }
     assert (
-        "Relative Maryland county-week Lyme forecast, not a per-bite infection probability."
+        "Relative Maryland county seasonal Lyme forecast, not a per-bite infection probability."
         in weekly["caveats"]
+    )
+    assert any(
+        "derived seasonal allocations of annual county forecasts" in caveat
+        for caveat in weekly["caveats"]
     )
     assert "Not a personal infection probability." in weekly["caveats"]
     assert weekly["records"][0]["county_fips"] == "24003"
@@ -70,7 +89,8 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert anne_arundel["max_risk_score"] == 7
 
     assert model_card["product_framing"] == (
-        "Lyme risk forecasting tool for Maryland county-week conditions"
+        "Lyme risk forecasting tool for Maryland county annual disease "
+        "pressure with seasonal allocation"
     )
     assert model_card["score_interpretation"].startswith(
         "Relative seasonal Lyme forecast"
@@ -113,6 +133,8 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         ],
     }
     assert "Selected annual forecast" in model_card["method_summary"]
+    assert model_card["temporal_contract"] == weekly["temporal_contract"]
+    assert "not observed county-week data" in model_card["method_summary"]
     assert model_card["forecasting_status"] == {
         "status": "risk_forecasting_tool",
         "public_score_role": (
@@ -136,6 +158,9 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert "hierarchical" not in placeholder_text
     assert source_catalog["sources"][0]["artifact_type"] == "derived"
     assert "selected annual forecast rows" in source_catalog["sources"][0]["notes"]
+    assert source_catalog["temporal_contract"] == weekly["temporal_contract"]
+    assert "seasonal allocation" in source_catalog["sources"][0]["notes"]
+    assert "not observed county-week data" in source_catalog["sources"][0]["notes"]
     assert source_catalog["sources"][1]["source_id"] == "annual_prediction_branch"
     assert source_catalog["sources"][1]["run_id"] == "run1"
     assert source_catalog["sources"][1]["sha256"] == "a" * 64
@@ -174,6 +199,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
         "source_catalog.json",
         "static_export_manifest.json",
     ]
+    assert manifest["temporal_contract"] == weekly["temporal_contract"]
     assert manifest["record_counts"]["weekly_risk"] == 2
 
 
@@ -204,6 +230,12 @@ def test_export_static_risk_data_can_write_regional_research_scope(
 
     assert weekly["export_type"] == "regional_county_risk_weekly"
     assert weekly["scope"] == "midatlantic_county_week"
+    assert weekly["temporal_contract"]["observed_truth_temporal_grain"] == "year"
+    assert weekly["temporal_contract"]["forecast_truth_temporal_grain"] == "year"
+    assert weekly["temporal_contract"]["display_time_role"] == (
+        "seasonal_allocation_of_annual_forecast"
+    )
+    assert weekly["temporal_contract"] == model_card["temporal_contract"]
     assert weekly["research_status"] == {
         "research_only": True,
         "not_public_maryland_default": True,
@@ -214,7 +246,7 @@ def test_export_static_risk_data_can_write_regional_research_scope(
         "jurisdiction_count": 2,
     }
     assert (
-        "Relative regional county-week Lyme forecast, not a per-bite infection probability."
+        "Relative regional county seasonal Lyme forecast, not a per-bite infection probability."
         in weekly["caveats"]
     )
     assert not any("Relative Maryland" in caveat for caveat in weekly["caveats"])
@@ -225,7 +257,8 @@ def test_export_static_risk_data_can_write_regional_research_scope(
         "not_public_maryland_default": True,
     }
     assert model_card["product_framing"] == (
-        "Lyme risk forecasting tool for DE/DC/MD/PA/VA/WV county-week conditions"
+        "Lyme risk forecasting tool for DE/DC/MD/PA/VA/WV county annual "
+        "disease pressure with seasonal allocation"
     )
     assert model_card["research_status"] == {
         "research_only": True,

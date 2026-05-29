@@ -3,7 +3,8 @@
     "Informational and educational only; not medical advice.",
     "Does not diagnose disease or determine whether a person is infected.",
     "Not a treatment recommendation or substitute for a healthcare professional.",
-    "Relative Maryland county-week Lyme forecast, not a per-bite infection probability.",
+    "Relative Maryland county seasonal Lyme forecast, not a per-bite infection probability.",
+    "Displayed county-week values are derived seasonal allocations of annual county forecasts, not observed county-week data.",
     "Not a personal infection probability.",
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
@@ -17,7 +18,7 @@
   },
   "disease": "lyme",
   "export_type": "md_county_risk_weekly",
-  "generated_at": "2026-05-29T00:28:07+00:00",
+  "generated_at": "2026-05-29T20:25:04+00:00",
   "geography": {
     "jurisdiction_count": 24,
     "state": "MD",
@@ -38,7 +39,7 @@
       "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
     }
   ],
-  "input_artifact_sha256": "53ce17323f88076af1d3a76567ba831b0ea28f282c810a1f5e9569b7ed0d8622",
+  "input_artifact_sha256": "6b7680429535d413ef667b2ad02a4e11106e8584ff92bec63f9d0f86cd4655e3",
   "model_name": "linear_blend_baseline",
   "record_count": 1272,
   "records": [
@@ -66207,7 +66208,7 @@
   },
   "seasonality_source_id": "cdc_seasonality_week_2023",
   "selected_forecast_metadata": {
-    "as_of_date": "2026-05-28",
+    "as_of_date": "2026-05-29",
     "data_cutoff_date": "2024-12-31",
     "forecast_origin_year": 2024,
     "source_vintage": "2024-inclusive-local",
@@ -66219,9 +66220,20 @@
     "model_name": "linear_blend_baseline",
     "score_denominator": 4.673833,
     "seasonality_source_id": "cdc_seasonality_week_2023",
-    "source_prediction_run_id": "annual_forecast_target2026_origin2024_mintrain5_shrink5p0",
-    "source_prediction_sha256": "7638e3315ace0a395013367b5d94bcb61f98d931ed1b7a07a9ccda59f349dbc3",
+    "source_prediction_run_id": "annual_forecast_target2026_origin2024_mintrain5_ridge1p0_shrink5p0",
+    "source_prediction_sha256": "e5baec566ec4f71fdcaffe2b0fd462da9bdea63e7d19a6e826550cbf745e0de6",
     "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74"
+  },
+  "temporal_contract": {
+    "county_month_or_week_observed_truth_available": false,
+    "display_temporal_grain": "mmwr_week",
+    "display_time_role": "seasonal_allocation_of_annual_forecast",
+    "forecast_truth_spatial_grain": "county",
+    "forecast_truth_temporal_grain": "year",
+    "historical_display_policy": "Historical years are observed annual county incidence only; derived weekly or monthly allocations must not be labeled as observed historical risk.",
+    "observed_truth_spatial_grain": "county",
+    "observed_truth_temporal_grain": "year",
+    "seasonality_scope": "national"
   },
   "year_selection": "latest_available_per_county_mmwr_week"
 }

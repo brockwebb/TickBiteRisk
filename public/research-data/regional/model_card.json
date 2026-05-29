@@ -30,7 +30,8 @@
     "Informational and educational only; not medical advice.",
     "Does not diagnose disease or determine whether a person is infected.",
     "Not a treatment recommendation or substitute for a healthcare professional.",
-    "Relative regional county-week Lyme forecast, not a per-bite infection probability.",
+    "Relative regional county seasonal Lyme forecast, not a per-bite infection probability.",
+    "Displayed county-week values are derived seasonal allocations of annual county forecasts, not observed county-week data.",
     "Not a personal infection probability.",
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
@@ -66,8 +67,8 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-29T17:33:44+00:00",
-  "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
+  "generated_at": "2026-05-29T20:25:25+00:00",
+  "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality; displayed county-week values are seasonal allocation, not observed county-week data.",
   "model_name": "empirical_bayes_spatial_regime_incidence",
   "not_for": [
     "per-bite infection probability",
@@ -75,7 +76,7 @@
     "treatment recommendation",
     "weather-adjusted forecast"
   ],
-  "product_framing": "Lyme risk forecasting tool for DE/DC/MD/PA/VA/WV county-week conditions",
+  "product_framing": "Lyme risk forecasting tool for DE/DC/MD/PA/VA/WV county annual disease pressure with seasonal allocation",
   "quality_flags": [
     "relative_seasonal_baseline",
     "static_seasonality_prior",
@@ -86,6 +87,17 @@
     "research_only": true
   },
   "schema_version": "county-week-risk-static-v1",
-  "score_interpretation": "Relative seasonal Lyme forecast on a 1-10 regional scale; not a per-bite infection probability.",
-  "target_definition": "lyme_incidence_per_100k"
+  "score_interpretation": "Relative seasonal Lyme forecast on a 1-10 regional scale; annual county forecasts are allocated across MMWR weeks using national seasonality and are not per-bite infection probabilities.",
+  "target_definition": "lyme_incidence_per_100k",
+  "temporal_contract": {
+    "county_month_or_week_observed_truth_available": false,
+    "display_temporal_grain": "mmwr_week",
+    "display_time_role": "seasonal_allocation_of_annual_forecast",
+    "forecast_truth_spatial_grain": "county",
+    "forecast_truth_temporal_grain": "year",
+    "historical_display_policy": "Historical years are observed annual county incidence only; derived weekly or monthly allocations must not be labeled as observed historical risk.",
+    "observed_truth_spatial_grain": "county",
+    "observed_truth_temporal_grain": "year",
+    "seasonality_scope": "national"
+  }
 }

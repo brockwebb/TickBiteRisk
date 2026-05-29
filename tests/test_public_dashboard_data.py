@@ -113,12 +113,27 @@ def test_public_weekly_records_are_2026_true_forecast_rows() -> None:
     weekly = load_public_json("md_county_risk_weekly.json")
 
     assert {record["year"] for record in weekly["records"]} == {2026}
+    assert weekly["temporal_contract"] == {
+        "observed_truth_spatial_grain": "county",
+        "observed_truth_temporal_grain": "year",
+        "forecast_truth_spatial_grain": "county",
+        "forecast_truth_temporal_grain": "year",
+        "display_temporal_grain": "mmwr_week",
+        "display_time_role": "seasonal_allocation_of_annual_forecast",
+        "seasonality_scope": "national",
+        "county_month_or_week_observed_truth_available": False,
+        "historical_display_policy": (
+            "Historical years are observed annual county incidence only; "
+            "derived weekly or monthly allocations must not be labeled as "
+            "observed historical risk."
+        ),
+    }
     assert weekly["selected_score_config"]["source_prediction_run_id"].startswith(
         "annual_forecast_target2026_origin2024"
     )
     assert weekly["selected_forecast_metadata"] == {
         "forecast_origin_year": 2024,
-        "as_of_date": "2026-05-28",
+        "as_of_date": "2026-05-29",
         "data_cutoff_date": "2024-12-31",
         "source_vintage": "2024-inclusive-local",
         "update_mode": "pre_update",
@@ -141,12 +156,19 @@ def test_model_card_matches_weekly_export_metadata() -> None:
     weekly = load_public_json("md_county_risk_weekly.json")
     model_card = load_public_json("model_card.json")
 
-    for key in ["schema_version", "generated_at", "model_name", "caveats"]:
+    for key in [
+        "schema_version",
+        "generated_at",
+        "model_name",
+        "caveats",
+        "temporal_contract",
+    ]:
         assert model_card[key] == weekly[key]
 
     assert model_card["target_definition"] == "lyme_incidence_per_100k"
     assert model_card["product_framing"] == (
-        "Lyme risk forecasting tool for Maryland county-week conditions"
+        "Lyme risk forecasting tool for Maryland county annual disease "
+        "pressure with seasonal allocation"
     )
     assert model_card["score_interpretation"].startswith(
         "Relative seasonal Lyme forecast"
@@ -187,6 +209,7 @@ def test_model_card_matches_weekly_export_metadata() -> None:
         weekly["selected_score_config"]["source_prediction_sha256"]
     )
     assert "Selected annual forecast" in model_card["method_summary"]
+    assert "not observed county-week data" in model_card["method_summary"]
     validation = model_card["validation_summary"]
     assert validation["model_name"] == weekly["model_name"]
     assert validation["run_id"].startswith("model_compare_")
@@ -224,6 +247,7 @@ def test_source_catalog_exposes_selected_annual_prediction_branch() -> None:
     weekly = load_public_json("md_county_risk_weekly.json")
     source_catalog = load_public_json("source_catalog.json")
 
+    assert source_catalog["temporal_contract"] == weekly["temporal_contract"]
     annual_prediction = next(
         source
         for source in source_catalog["sources"]
@@ -248,7 +272,16 @@ def test_source_catalog_exposes_selected_annual_prediction_branch() -> None:
     )
     assert seasonality["artifact_type"] == "derived seasonality prior"
     public_notes = " ".join(source["notes"] for source in source_catalog["sources"])
+    assert "seasonal allocation" in public_notes
+    assert "not observed county-week data" in public_notes
     assert "model-comparison" not in public_notes
+
+
+def test_public_manifest_repeats_temporal_contract_for_auditability() -> None:
+    weekly = load_public_json("md_county_risk_weekly.json")
+    manifest = load_public_json("static_export_manifest.json")
+
+    assert manifest["temporal_contract"] == weekly["temporal_contract"]
 
 
 def test_source_catalog_explains_forecast_lag_and_reconciliation() -> None:

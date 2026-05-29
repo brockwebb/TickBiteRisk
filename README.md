@@ -4,8 +4,9 @@
 
 Build a transparent, Maryland-first tickborne disease risk forecasting research
 product from open public data. The current implementation is a risk forecasting tool
-that communicates relative county-week Lyme forecasts, forecast-update diagnostics, and a
-single-bite Lyme decision-support score. Calibrated absolute infection
+that communicates annual county Lyme disease-pressure forecasts with derived
+seasonal allocation, forecast-update diagnostics, and a single-bite Lyme
+decision-support score. Calibrated absolute infection
 probabilities for any U.S. county remain a research goal.
 
 This project ships as self-hosted code; we do not currently provide a public API.
@@ -66,7 +67,8 @@ The `dev` extra is intentionally light for CI. Install
 `python -m pip install -e ".[ocr]"` when you want the optional Docling parser
 for PDF/OCR review.
 
-The lookup output is a relative Maryland county-week seasonal Lyme forecast.
+The lookup output is a relative Maryland seasonal Lyme forecast derived from an
+annual county forecast and CDC national Lyme onset seasonality.
 The single-bite output is a decision-support score and CDC criteria explainer.
 Neither output is an absolute infection probability, diagnosis, treatment
 recommendation, or weather-adjusted forecast.
@@ -113,6 +115,18 @@ need actionable risk context during the season itself.
 TickBiteRisk treats forecasting as a way to make uncertainty visible before all
 official data are final. The public score is informational risk context, not a
 diagnosis, treatment recommendation, or certainty about any individual bite.
+
+## temporal grain contract
+
+Observed county Lyme truth is annual in the current public data stack. We do
+not currently have observed county-month or county-week tick abundance, tick
+infection prevalence, tick-bite counts, or Lyme case counts. Historical years
+therefore display annual reported cases and incidence only.
+
+Forecast targets are also annual county disease-pressure estimates. Seasonal
+views allocate those annual estimates across months or MMWR weeks using CDC
+national Lyme onset seasonality. They are useful for planning and prevention
+timing, but they are not observed county-month or county-week risk.
 
 ## how forecast updates work
 

@@ -123,10 +123,10 @@ const fixtures = {
     clinical_disclaimer:
       "Informational only. Not medical advice. Follow CDC guidance and contact a healthcare professional about your situation.",
     method_summary:
-      "Research regional county-week score derived from forecast-safe localized spatial regimes.",
+      "Research regional seasonal score derived from forecast-safe annual localized spatial regimes.",
     model_name: "empirical_bayes_spatial_regime_incidence",
     product_framing:
-      "Lyme risk forecasting tool for Mid-Atlantic county-week conditions",
+      "Lyme risk forecasting tool for Mid-Atlantic county annual disease pressure with seasonal allocation",
     research_status: {
       research_only: true,
       not_public_maryland_default: true,
@@ -234,7 +234,7 @@ test("regional research dashboard renders county risk, week slider, and regime i
     /is-same-regime/
   );
 
-  await page.locator("#week-input").fill("22");
+  await page.locator("#week-slider").fill("22");
   await expect(page.locator("#week-label")).toContainText("MMWR week 22");
   await expect(page.locator("#regional-panel-content")).toContainText("10/10");
   await expect(page.locator("#regional-panel-content")).toContainText(
@@ -281,7 +281,7 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#year-mode-label")).toContainText("Observed historical");
   await expect(page.locator("#week-input")).toBeDisabled();
   await expect(page.locator("#regional-panel-content")).toContainText(
-    "Observed reported incidence"
+    "Observed historical"
   );
   await expect(page.locator("#regional-panel-content")).toContainText("22 reported cases");
   await expect(page.locator("#regional-panel-content")).toContainText("77.19 per 100k");
@@ -299,6 +299,15 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await page.locator('path[data-county="24001"]').click();
   await expect(page.locator("#regional-panel-content")).toContainText(
     "Observed historical"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "41 reported cases"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "60.21 per 100k"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "41 reported cases"
   );
   await page.locator('path[data-county="51810"]').click();
   await expect(page.locator("#regional-panel-content")).toContainText(
@@ -350,11 +359,17 @@ function riskRecord(
     mmwr_week: mmwrWeek,
     predicted_weekly_incidence_80_interval: interval80,
     predicted_weekly_incidence_95_interval: interval95,
+    predicted_annual_incidence_per_100k:
+      weeklyIncidence / seasonalityShare(mmwrWeek),
     predicted_weekly_incidence_per_100k: weeklyIncidence,
     risk_category: category,
     risk_score: score,
     year,
   };
+}
+
+function seasonalityShare(mmwrWeek) {
+  return mmwrWeek === 22 ? 0.06 : 0.05;
 }
 
 function annualRecord(

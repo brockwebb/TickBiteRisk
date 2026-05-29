@@ -7,7 +7,7 @@
     "why_forecasting": "Forecasting gives timely prevention context while county-level surveillance reports, population denominators, and reviewed source updates catch up."
   },
   "export_type": "source_catalog",
-  "generated_at": "2026-05-29T17:33:44+00:00",
+  "generated_at": "2026-05-29T20:25:25+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -34,7 +34,7 @@
   "sources": [
     {
       "artifact_type": "derived",
-      "notes": "Derived from selected annual forecast rows and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
+      "notes": "Derived from selected annual forecast rows and CDC seasonality as a seasonal allocation; not observed county-week data. Do not publish raw restricted or terms-unclear source extracts.",
       "redistribution": "public derived data",
       "sha256": "f6ee26a0db38603924e7ef16d025ed128983ae697175959f2dd5d636448f0507",
       "source_id": "county_week_seasonal_risk_baseline"
@@ -82,5 +82,16 @@
       "redistribution": "public derived data",
       "source_id": "regional_observed_annual_incidence"
     }
-  ]
+  ],
+  "temporal_contract": {
+    "county_month_or_week_observed_truth_available": false,
+    "display_temporal_grain": "mmwr_week",
+    "display_time_role": "seasonal_allocation_of_annual_forecast",
+    "forecast_truth_spatial_grain": "county",
+    "forecast_truth_temporal_grain": "year",
+    "historical_display_policy": "Historical years are observed annual county incidence only; derived weekly or monthly allocations must not be labeled as observed historical risk.",
+    "observed_truth_spatial_grain": "county",
+    "observed_truth_temporal_grain": "year",
+    "seasonality_scope": "national"
+  }
 }

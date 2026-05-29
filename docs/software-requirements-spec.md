@@ -234,7 +234,10 @@ The export must:
 - include CDC guidance links, plain-language caveats, source SHA-256 provenance, score-scale metadata, quality flags, and a clinical disclaimer.
 - avoid raw source tables, private warehouse rows, credentials, and terms-unclear source extracts.
 
-The static export must be framed as a relative Maryland county-week Lyme forecast, not a per-bite infection probability, diagnosis, treatment recommendation, or weather-adjusted forecast.
+The static export must be framed as a relative Maryland seasonal Lyme forecast
+derived from annual county disease-pressure estimates, not observed county-week
+truth, per-bite infection probability, diagnosis, treatment recommendation, or
+weather-adjusted forecast.
 
 ### FR4F: Static Dashboard Prototype
 
@@ -243,7 +246,9 @@ The system must expose a static dashboard under `public/` that reads only
 county-week Lyme forecast with accessible map, county list, detail panel, CDC
 guidance links, and plain-language caveats. The dashboard must not describe the
 score as diagnosis, treatment guidance, personal infection probability, or
-weather-adjusted forecast.
+weather-adjusted forecast. Historical observed years must display annual county
+reported incidence/cases only unless a real county-month or county-week observed
+source is acquired and explicitly modeled.
 
 Future dashboard iterations should revisit the time control. The current date
 dropdown is sufficient for lookup, but a temporal slider, year-over-year

@@ -103,6 +103,15 @@ trajectories with prediction intervals or margins of error. Exploratory EDA
 views may live below the main map or in a separate product surface, but the
 central product question remains the same: "What is the forecast risk here?"
 
+After the 2026-05-29 data-grain audit, the temporal display contract is locked:
+observed historical truth is annual county reported Lyme data, not observed
+weekly or monthly county risk. Forecast targets are also annual county disease
+pressure. Weekly or monthly views are seasonal allocations of an annual forecast
+using national Lyme onset seasonality, and they must be labeled that way. The
+default UI should therefore be annual; historical years should keep time
+controls locked to annual unless true county-month or county-week observed data
+are acquired.
+
 ## Source And Provenance
 
 The regional county graph uses the Census TIGERweb `State_County` county layer

@@ -7,7 +7,7 @@
     "why_forecasting": "Forecasting gives timely prevention context while county-level surveillance reports, population denominators, and reviewed source updates catch up."
   },
   "export_type": "source_catalog",
-  "generated_at": "2026-05-29T00:28:07+00:00",
+  "generated_at": "2026-05-29T20:25:04+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -22,22 +22,22 @@
       "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
     }
   ],
-  "input_artifact_sha256": "53ce17323f88076af1d3a76567ba831b0ea28f282c810a1f5e9569b7ed0d8622",
+  "input_artifact_sha256": "6b7680429535d413ef667b2ad02a4e11106e8584ff92bec63f9d0f86cd4655e3",
   "schema_version": "county-week-risk-static-v1",
-  "source_prediction_run_id": "annual_forecast_target2026_origin2024_mintrain5_shrink5p0",
-  "source_prediction_sha256": "7638e3315ace0a395013367b5d94bcb61f98d931ed1b7a07a9ccda59f349dbc3",
+  "source_prediction_run_id": "annual_forecast_target2026_origin2024_mintrain5_ridge1p0_shrink5p0",
+  "source_prediction_sha256": "e5baec566ec4f71fdcaffe2b0fd462da9bdea63e7d19a6e826550cbf745e0de6",
   "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
   "sources": [
     {
       "artifact_type": "derived",
-      "notes": "Derived from selected annual forecast rows and CDC seasonality; do not publish raw restricted or terms-unclear source extracts.",
+      "notes": "Derived from selected annual forecast rows and CDC seasonality as a seasonal allocation; not observed county-week data. Do not publish raw restricted or terms-unclear source extracts.",
       "redistribution": "public derived data",
-      "sha256": "53ce17323f88076af1d3a76567ba831b0ea28f282c810a1f5e9569b7ed0d8622",
+      "sha256": "6b7680429535d413ef667b2ad02a4e11106e8584ff92bec63f9d0f86cd4655e3",
       "source_id": "county_week_seasonal_risk_baseline"
     },
     {
       "artifact_type": "annual prediction branch",
-      "as_of_date": "2026-05-28",
+      "as_of_date": "2026-05-29",
       "data_cutoff_date": "2024-12-31",
       "evaluation_mode": "annual_forecast_no_observed_target",
       "forecast_origin_year": 2024,
@@ -45,8 +45,8 @@
       "model_name": "linear_blend_baseline",
       "notes": "Selected annual no-observed-target forecast rows; historical backtests are separate validation evidence, not the forecast source.",
       "redistribution": "public derived data",
-      "run_id": "annual_forecast_target2026_origin2024_mintrain5_shrink5p0",
-      "sha256": "7638e3315ace0a395013367b5d94bcb61f98d931ed1b7a07a9ccda59f349dbc3",
+      "run_id": "annual_forecast_target2026_origin2024_mintrain5_ridge1p0_shrink5p0",
+      "sha256": "e5baec566ec4f71fdcaffe2b0fd462da9bdea63e7d19a6e826550cbf745e0de6",
       "source_id": "annual_prediction_branch",
       "source_vintage": "2024-inclusive-local",
       "update_mode": "pre_update",
@@ -59,5 +59,16 @@
       "sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
       "source_id": "cdc_seasonality_week_2023"
     }
-  ]
+  ],
+  "temporal_contract": {
+    "county_month_or_week_observed_truth_available": false,
+    "display_temporal_grain": "mmwr_week",
+    "display_time_role": "seasonal_allocation_of_annual_forecast",
+    "forecast_truth_spatial_grain": "county",
+    "forecast_truth_temporal_grain": "year",
+    "historical_display_policy": "Historical years are observed annual county incidence only; derived weekly or monthly allocations must not be labeled as observed historical risk.",
+    "observed_truth_spatial_grain": "county",
+    "observed_truth_temporal_grain": "year",
+    "seasonality_scope": "national"
+  }
 }

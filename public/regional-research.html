@@ -10,11 +10,11 @@
     <a class="skip-link" href="#regional-county-panel">Skip to county risk details</a>
     <header class="site-header regional-site-header">
       <div>
-        <p class="eyebrow">Mid-Atlantic county-week Lyme risk forecast research</p>
+        <p class="eyebrow">Mid-Atlantic annual Lyme risk forecast research</p>
         <h1>TickBiteRisk Regional Research</h1>
         <p class="lede">
-          Relative county-week Lyme risk forecasts across DE, DC, MD, PA, VA,
-          and WV with localized spatial-regime context.
+          Annual county Lyme risk forecasts across DE, DC, MD, PA, VA, and WV
+          with seasonal allocation and localized spatial-regime context.
         </p>
       </div>
       <p class="disclaimer">
@@ -34,11 +34,17 @@
             <span id="year-mode-label" class="mode-pill forecast-mode">Loading mode...</span>
           </div>
           <div class="regional-time-field">
-            <label for="week-input">MMWR week</label>
-            <div class="week-stepper">
-              <button id="week-prev" type="button" aria-label="Previous MMWR week" title="Previous MMWR week">&lt;</button>
-              <input id="week-input" type="number" min="1" max="53" step="1" value="1" inputmode="numeric" />
-              <button id="week-next" type="button" aria-label="Next MMWR week" title="Next MMWR week">&gt;</button>
+            <label for="week-slider">MMWR week</label>
+            <div class="week-control">
+              <input id="week-slider" type="range" min="1" max="53" step="1" value="1" />
+              <div class="week-scale" aria-hidden="true">
+                <span>1</span>
+                <span>13</span>
+                <span>26</span>
+                <span>39</span>
+                <span>53</span>
+              </div>
+              <input id="week-input" type="number" min="1" max="53" step="1" value="1" inputmode="numeric" aria-label="MMWR week number" />
             </div>
             <output id="week-label" class="muted" aria-live="polite">Loading week...</output>
           </div>
