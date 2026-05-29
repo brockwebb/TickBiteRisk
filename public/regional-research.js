@@ -14,6 +14,7 @@ const regionalState = {
   stateFilter: "",
   countySearch: "",
   byCountyWeek: new Map(),
+  byCountyYearWeek: new Map(),
   recordsByCounty: new Map(),
   annualByCountyYear: new Map(),
   annualRecordsByCounty: new Map(),
@@ -49,11 +50,17 @@ document.addEventListener("DOMContentLoaded", initRegionalResearch);
 
 async function initRegionalResearch() {
   document
-    .getElementById("year-slider")
-    .addEventListener("input", handleYearSliderInput);
+    .getElementById("year-select")
+    .addEventListener("change", handleYearSelectChange);
   document
-    .getElementById("week-slider")
-    .addEventListener("input", handleWeekSliderInput);
+    .getElementById("week-input")
+    .addEventListener("input", handleWeekInputChange);
+  document
+    .getElementById("week-prev")
+    .addEventListener("click", () => adjustRegionalWeek(-1));
+  document
+    .getElementById("week-next")
+    .addEventListener("click", () => adjustRegionalWeek(1));
   document
     .getElementById("state-filter")
     .addEventListener("change", handleRegionalListFilterChange);
@@ -95,8 +102,8 @@ async function initRegionalResearch() {
     indexRegionalAnnualRecords(annual.records || []);
     indexRegionalMetadata(countyMetadata.counties || []);
     indexRegionalOverlays(overlays.records || []);
-    setRegionalWeekBounds(weekly.records || []);
     setRegionalYearBounds(weekly.records || [], annual.records || []);
+    setRegionalWeekBounds(regionalForecastRecordsForSelectedYear());
     renderRegionalStateFilter();
     selectDefaultRegionalCounty();
     renderRegionalMap();
@@ -137,10 +144,16 @@ async function fetchRegionalJson(path) {
 
 function indexRegionalRecords(records) {
   regionalState.byCountyWeek.clear();
+  regionalState.byCountyYearWeek.clear();
   regionalState.recordsByCounty.clear();
   for (const record of records) {
+    const dataYear = regionalRecordYear(record);
     regionalState.byCountyWeek.set(
       `${record.county_fips}:${record.mmwr_week}`,
+      record
+    );
+    regionalState.byCountyYearWeek.set(
+      `${record.county_fips}:${dataYear}:${record.mmwr_week}`,
       record
     );
     if (!regionalState.recordsByCounty.has(record.county_fips)) {
@@ -149,7 +162,11 @@ function indexRegionalRecords(records) {
     regionalState.recordsByCounty.get(record.county_fips).push(record);
   }
   for (const countyRecords of regionalState.recordsByCounty.values()) {
-    countyRecords.sort((left, right) => Number(left.mmwr_week) - Number(right.mmwr_week));
+    countyRecords.sort(
+      (left, right) =>
+        regionalRecordYear(left) - regionalRecordYear(right) ||
+        Number(left.mmwr_week) - Number(right.mmwr_week)
+    );
   }
 }
 
@@ -189,15 +206,21 @@ function setRegionalWeekBounds(records) {
   const weeks = Array.from(new Set(records.map((record) => Number(record.mmwr_week))))
     .filter((week) => Number.isFinite(week))
     .sort((left, right) => left - right);
+  const input = document.getElementById("week-input");
   if (!weeks.length) {
+    regionalState.selectedWeek = Number(regionalState.selectedWeek) || 1;
+    input.min = "1";
+    input.max = "53";
+    input.value = String(regionalState.selectedWeek);
     updateRegionalWeekLabel();
     return;
   }
-  const slider = document.getElementById("week-slider");
-  slider.min = String(weeks[0]);
-  slider.max = String(weeks[weeks.length - 1]);
-  regionalState.selectedWeek = weeks[0];
-  slider.value = String(regionalState.selectedWeek);
+  input.min = String(weeks[0]);
+  input.max = String(weeks[weeks.length - 1]);
+  regionalState.selectedWeek = regionalClampWeek(
+    Number(regionalState.selectedWeek) || weeks[0]
+  );
+  input.value = String(regionalState.selectedWeek);
   updateRegionalWeekLabel();
 }
 
@@ -211,24 +234,35 @@ function setRegionalYearBounds(weeklyRecords, annualRecords) {
     .filter((year) => Number.isFinite(year))
     .sort((left, right) => left - right);
   regionalState.availableYears = years;
-  const slider = document.getElementById("year-slider");
+  const select = document.getElementById("year-select");
   if (!years.length) {
+    select.innerHTML = "";
     updateRegionalYearLabel();
     return;
   }
-  slider.min = "0";
-  slider.max = String(years.length - 1);
-  const forecastYear = Number(regionalForecastYearFromRecords());
-  const defaultYear = years.includes(forecastYear) ? forecastYear : years[years.length - 1];
+  select.innerHTML = years
+    .map(
+      (year) =>
+        `<option value="${regionalEscapeHtml(year)}">${regionalEscapeHtml(
+          regionalYearOptionLabel(year)
+        )}</option>`
+    )
+    .join("");
+  const forecastYears = regionalForecastYearsFromRecords();
+  const latestForecastYear = forecastYears[forecastYears.length - 1];
+  const defaultYear =
+    latestForecastYear && years.includes(latestForecastYear)
+      ? latestForecastYear
+      : years[years.length - 1];
   regionalState.selectedYear = defaultYear;
-  slider.value = String(years.indexOf(defaultYear));
+  select.value = String(defaultYear);
   updateRegionalYearLabel();
   updateRegionalWeekLabel();
 }
 
-function handleYearSliderInput(event) {
-  const index = Number(event.target.value);
-  regionalState.selectedYear = regionalState.availableYears[index];
+function handleYearSelectChange(event) {
+  regionalState.selectedYear = Number(event.target.value);
+  setRegionalWeekBounds(regionalForecastRecordsForSelectedYear());
   updateRegionalYearLabel();
   updateRegionalWeekLabel();
   renderRegionalMap();
@@ -238,12 +272,23 @@ function handleYearSliderInput(event) {
   selectRegionalCounty(regionalState.selectedCounty);
 }
 
-function handleWeekSliderInput(event) {
-  regionalState.selectedWeek = Number(event.target.value);
+function handleWeekInputChange(event) {
+  regionalState.selectedWeek = regionalClampWeek(Number(event.target.value));
+  event.target.value = String(regionalState.selectedWeek);
   updateRegionalWeekLabel();
   renderRegionalMap();
   renderRegionalCountyList();
   selectRegionalCounty(regionalState.selectedCounty);
+}
+
+function adjustRegionalWeek(delta) {
+  const input = document.getElementById("week-input");
+  if (input.disabled) return;
+  regionalState.selectedWeek = regionalClampWeek(
+    Number(regionalState.selectedWeek) + delta
+  );
+  input.value = String(regionalState.selectedWeek);
+  handleWeekInputChange({ target: input });
 }
 
 function handleRegionalListFilterChange() {
@@ -256,54 +301,113 @@ function handleRegionalListFilterChange() {
 }
 
 function updateRegionalWeekLabel() {
-  const slider = document.getElementById("week-slider");
-  const forecastMode = selectedRegionalYearMode() === "forecast";
-  slider.disabled = !forecastMode;
-  if (!forecastMode) {
+  const input = document.getElementById("week-input");
+  const previous = document.getElementById("week-prev");
+  const next = document.getElementById("week-next");
+  const mode = selectedRegionalDataMode();
+  const hasForecastRows = regionalForecastRecordsForSelectedYear().length > 0;
+  const enableWeekControls =
+    hasForecastRows && (mode === "forecast" || mode === "mixed");
+  input.disabled = !enableWeekControls;
+  previous.disabled = !enableWeekControls;
+  next.disabled = !enableWeekControls;
+  if (!enableWeekControls) {
     document.getElementById("week-label").textContent =
       "Week controls apply to forecast years";
     return;
   }
-  document.getElementById(
-    "week-label"
-  ).textContent = `Using MMWR week ${regionalState.selectedWeek}`;
+  const suffix =
+    mode === "mixed" ? " for forecast counties" : "";
+  document.getElementById("week-label").textContent =
+    `Using MMWR week ${regionalState.selectedWeek}${suffix}`;
 }
 
 function updateRegionalYearLabel() {
-  const mode = selectedRegionalYearMode();
+  const mode = selectedRegionalDataMode();
   const label = document.getElementById("year-label");
   const modeLabel = document.getElementById("year-mode-label");
   const selectedYear = regionalState.selectedYear || "Loading";
   label.textContent = `Using ${selectedYear}`;
-  modeLabel.textContent =
-    mode === "forecast" ? "Forecast" : "Observed historical";
+  modeLabel.textContent = regionalModeLabel(mode);
   modeLabel.classList.toggle("forecast-mode", mode === "forecast");
-  modeLabel.classList.toggle("observed-mode", mode !== "forecast");
+  modeLabel.classList.toggle("observed-mode", mode === "observed_historical");
+  modeLabel.classList.toggle("mixed-mode", mode === "mixed");
+  modeLabel.classList.toggle("unavailable-mode", mode === "unavailable");
 }
 
 function selectedRegionalYearMode() {
-  const forecastYear = Number(regionalForecastYearFromRecords());
-  return Number(regionalState.selectedYear) === forecastYear
-    ? "forecast"
-    : "observed_historical";
+  return selectedRegionalDataMode();
+}
+
+function selectedRegionalDataMode() {
+  return regionalDataModeForYear(regionalState.selectedYear);
+}
+
+function regionalDataModeForYear(year) {
+  const hasForecast = regionalForecastRecordsForYear(year).length > 0;
+  const hasObserved = regionalAnnualRecordsForYear(year).length > 0;
+  if (hasForecast && hasObserved) return "mixed";
+  if (hasForecast) return "forecast";
+  if (hasObserved) return "observed_historical";
+  return "unavailable";
+}
+
+function regionalCountyDataMode(countyFips) {
+  const selectedMode = selectedRegionalDataMode();
+  const annualRecord = getRegionalAnnualRecord(countyFips);
+  const forecastRecord = getRegionalRecord(countyFips);
+  if (selectedMode === "mixed") {
+    if (annualRecord) return "observed_historical";
+    if (forecastRecord) return "forecast";
+    return "unavailable";
+  }
+  if (selectedMode === "observed_historical") {
+    return annualRecord ? "observed_historical" : "unavailable";
+  }
+  if (selectedMode === "forecast") {
+    return forecastRecord ? "forecast" : "unavailable";
+  }
+  return "unavailable";
+}
+
+function regionalModeLabel(mode) {
+  if (mode === "forecast") return "Forecast";
+  if (mode === "mixed") return "Mixed observed/forecast";
+  if (mode === "observed_historical") return "Observed historical";
+  return "Unavailable";
+}
+
+function regionalYearOptionLabel(year) {
+  return `${year} - ${regionalModeLabel(regionalDataModeForYear(year))}`;
+}
+
+function regionalClampWeek(value) {
+  const input = document.getElementById("week-input");
+  const minimum = Number(input.min || 1);
+  const maximum = Number(input.max || 53);
+  const fallback = Number(regionalState.selectedWeek) || minimum;
+  const week = Number.isFinite(value) ? Math.round(value) : fallback;
+  return Math.min(maximum, Math.max(minimum, week));
 }
 
 function selectDefaultRegionalCounty() {
   const features = (regionalState.counties && regionalState.counties.features) || [];
   const firstWithRecord = features.find((feature) =>
-    regionalState.byCountyWeek.has(
-      `${feature.properties.county_fips}:${regionalState.selectedWeek}`
-    )
+    getRegionalRecord(feature.properties.county_fips)
+  );
+  const firstWithAnnual = features.find((feature) =>
+    getRegionalAnnualRecord(feature.properties.county_fips)
   );
   regionalState.selectedCounty = firstWithRecord
     ? firstWithRecord.properties.county_fips
+    : firstWithAnnual
+      ? firstWithAnnual.properties.county_fips
     : features[0] && features[0].properties.county_fips;
 }
 
 function getRegionalRecord(countyFips) {
-  if (selectedRegionalYearMode() !== "forecast") return null;
-  return regionalState.byCountyWeek.get(
-    `${countyFips}:${regionalState.selectedWeek}`
+  return regionalState.byCountyYearWeek.get(
+    `${countyFips}:${regionalState.selectedYear}:${regionalState.selectedWeek}`
   );
 }
 
@@ -314,11 +418,38 @@ function getRegionalAnnualRecord(countyFips) {
 }
 
 function regionalCountyWeekRecords(countyFips) {
-  return regionalState.recordsByCounty.get(countyFips) || [];
+  const selectedYear = Number(regionalState.selectedYear);
+  return (regionalState.recordsByCounty.get(countyFips) || []).filter(
+    (record) => regionalRecordYear(record) === selectedYear
+  );
 }
 
 function regionalCountyAnnualRecords(countyFips) {
   return regionalState.annualRecordsByCounty.get(countyFips) || [];
+}
+
+function regionalForecastRecordsForSelectedYear() {
+  return regionalForecastRecordsForYear(regionalState.selectedYear);
+}
+
+function regionalForecastRecordsForYear(year) {
+  const selectedYear = Number(year);
+  if (!Number.isFinite(selectedYear)) return [];
+  return ((regionalState.weekly && regionalState.weekly.records) || []).filter(
+    (record) => regionalRecordYear(record) === selectedYear
+  );
+}
+
+function regionalAnnualRecordsForYear(year) {
+  const selectedYear = Number(year);
+  if (!Number.isFinite(selectedYear)) return [];
+  return ((regionalState.annual && regionalState.annual.records) || []).filter(
+    (record) => Number(record.year) === selectedYear
+  );
+}
+
+function regionalRecordYear(record) {
+  return Number(record && (record.data_year || record.year));
 }
 
 function renderRegionalMap() {
@@ -373,19 +504,21 @@ function regionalCountyPath(feature, bounds, width, height) {
   const selectedRegime = selectedRegionalRegimeId();
   const stateAbbr = props.state_abbr || "";
   const annualRecord = getRegionalAnnualRecord(countyFips);
-  const forecastMode = selectedRegionalYearMode() === "forecast";
-  const displayClass = forecastMode
+  const countyMode = regionalCountyDataMode(countyFips);
+  const displayClass = countyMode === "forecast"
     ? record
       ? regionalRiskClass(record.risk_score)
       : "risk-unavailable"
-    : regionalObservedRiskClass(annualRecord);
-  const label = forecastMode
+    : countyMode === "observed_historical"
+      ? regionalObservedRiskClass(annualRecord)
+      : "risk-unavailable";
+  const label = countyMode === "forecast"
     ? record
       ? `${props.county_name}, ${stateAbbr}, ${regionalCategoryLabel(record.risk_category)}, ${record.risk_score} of 10`
       : `${props.county_name}, ${stateAbbr}, no forecast available`
-    : annualRecord
+    : countyMode === "observed_historical" && annualRecord
       ? `${props.county_name}, ${stateAbbr}, observed reported incidence ${regionalFormatNumber(annualRecord.incidence_per_100k)} per 100k in ${regionalState.selectedYear}`
-      : `${props.county_name}, ${stateAbbr}, no observed historical incidence available for ${regionalState.selectedYear}`;
+      : `${props.county_name}, ${stateAbbr}, no observed or forecast row available for ${regionalState.selectedYear}`;
   const classes = [
     "county-shape",
     "regional-county-shape",
@@ -457,26 +590,30 @@ function regionalCountyListButton(feature) {
   const props = feature.properties || {};
   const record = getRegionalRecord(props.county_fips);
   const annualRecord = getRegionalAnnualRecord(props.county_fips);
-  const forecastMode = selectedRegionalYearMode() === "forecast";
-  const score = forecastMode
+  const countyMode = regionalCountyDataMode(props.county_fips);
+  const score = countyMode === "forecast"
     ? record
       ? `${record.risk_score}/10`
       : "NA"
-    : annualRecord && annualRecord.incidence_per_100k !== null
+    : countyMode === "observed_historical" &&
+        annualRecord &&
+        annualRecord.incidence_per_100k !== null
       ? `${regionalFormatNumber(annualRecord.incidence_per_100k)}/100k`
       : "NA";
-  const category = forecastMode
+  const category = countyMode === "forecast"
     ? record
       ? regionalCategoryLabel(record.risk_category)
       : "unavailable"
-    : annualRecord
+    : countyMode === "observed_historical" && annualRecord
       ? regionalReadableName(annualRecord.diagnostic_midatlantic_incidence_tier)
       : "unavailable";
-  const badgeClass = forecastMode
+  const badgeClass = countyMode === "forecast"
     ? record
       ? regionalRiskClass(record.risk_score)
       : "risk-unavailable"
-    : regionalObservedRiskClass(annualRecord);
+    : countyMode === "observed_historical"
+      ? regionalObservedRiskClass(annualRecord)
+      : "risk-unavailable";
 
   return `<button type="button" data-county="${regionalEscapeHtml(props.county_fips)}" aria-pressed="${props.county_fips === regionalState.selectedCounty ? "true" : "false"}">
     <span>${regionalEscapeHtml(props.county_name)}<br><small>${regionalEscapeHtml(props.state_abbr || "")} · ${regionalEscapeHtml(category)}</small></span>
@@ -494,8 +631,9 @@ function selectRegionalCounty(countyFips) {
   const countyName = props.county_name || (metadata && metadata.county_name) || countyFips;
   const stateAbbr = props.state_abbr || "";
   const panel = document.getElementById("regional-panel-content");
+  const countyMode = regionalCountyDataMode(countyFips);
 
-  if (selectedRegionalYearMode() !== "forecast") {
+  if (countyMode === "observed_historical") {
     renderRegionalObservedCounty({
       countyFips,
       countyName,
@@ -506,10 +644,15 @@ function selectRegionalCounty(countyFips) {
     return;
   }
 
-  if (!record) {
-    panel.innerHTML = `<p>No forecast row available for ${regionalEscapeHtml(countyName)} in MMWR week ${regionalState.selectedWeek}.</p>`;
+  if (countyMode !== "forecast" || !record) {
+    panel.innerHTML = `<p>No observed or forecast row is available for ${regionalEscapeHtml(countyName)} in ${regionalEscapeHtml(regionalState.selectedYear)}.</p>`;
     renderRegionalRegime(metadata);
-    renderRegionalForecastChart(countyFips);
+    if (regionalCountyWeekRecords(countyFips).length) {
+      renderRegionalForecastChart(countyFips);
+    } else {
+      renderRegionalObservedHistoryChart(countyFips);
+    }
+    renderRegionalMap();
     updateRegionalSelectedControls();
     return;
   }
@@ -867,11 +1010,12 @@ function renderRegionalSources() {
 
 function renderRegionalForecastProvenance() {
   const target = document.getElementById("regional-forecast-provenance");
-  if (selectedRegionalYearMode() !== "forecast") {
+  const mode = selectedRegionalDataMode();
+  if (mode === "observed_historical" || mode === "unavailable") {
     target.innerHTML = `<dl class="regional-provenance-grid">
       <div>
         <dt>Data mode</dt>
-        <dd>Observed historical reported incidence</dd>
+        <dd>${regionalEscapeHtml(regionalModeLabel(mode))}${mode === "observed_historical" ? " reported incidence" : ""}</dd>
       </div>
       <div>
         <dt>Selected year</dt>
@@ -889,9 +1033,16 @@ function renderRegionalForecastProvenance() {
   const selectedForecast = weekly.selected_forecast_metadata || {};
   const modelName =
     modelCard.model_name || weekly.model_name || "regional research forecast";
-  const forecastYear =
-    selectedForecast.forecast_year || regionalForecastYearFromRecords();
+  const forecastYear = regionalState.selectedYear || selectedForecast.forecast_year;
+  const mixedNote =
+    mode === "mixed"
+      ? `<div>
+        <dt>Data mode</dt>
+        <dd>Mixed observed/forecast</dd>
+      </div>`
+      : "";
   target.innerHTML = `<dl class="regional-provenance-grid">
+    ${mixedNote}
     <div>
       <dt>Model</dt>
       <dd>${regionalEscapeHtml(regionalReadableName(modelName))}</dd>
@@ -912,20 +1063,24 @@ function renderRegionalForecastProvenance() {
 }
 
 function regionalForecastYearFromRecords() {
-  const years = Array.from(
-    new Set(
-      (regionalState.weekly.records || [])
-        .map((record) => record.data_year || record.year)
-        .filter(Boolean)
-    )
-  ).sort();
+  const years = regionalForecastYearsFromRecords();
   if (years.length === 1) {
-    return years[0];
+    return String(years[0]);
   }
   if (years.length > 1) {
     return `${years[0]}-${years[years.length - 1]}`;
   }
   return "";
+}
+
+function regionalForecastYearsFromRecords() {
+  return Array.from(
+    new Set(
+      ((regionalState.weekly && regionalState.weekly.records) || [])
+        .map((record) => regionalRecordYear(record))
+        .filter((year) => Number.isFinite(year))
+    )
+  ).sort((left, right) => left - right);
 }
 
 function selectedRegionalRegimeId() {

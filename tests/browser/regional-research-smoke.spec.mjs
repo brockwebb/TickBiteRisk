@@ -5,14 +5,20 @@ const fixtures = {
     caveats: ["informational_only", "not_medical_advice"],
     export_type: "regional_county_week_risk",
     model_name: "empirical_bayes_spatial_regime_incidence",
-    record_count: 6,
+    record_count: 12,
     records: [
-      riskRecord("24001", "Allegany County", 21, 9, "very_high", 2.6, [1.2, 3.8], [0.8, 5.4]),
-      riskRecord("24023", "Garrett County", 21, 8, "high", 2.1, [1.0, 3.1], [0.6, 4.8]),
-      riskRecord("51810", "Virginia Beach city", 21, 2, "very_low", 0.2, [0.05, 0.4], [0, 0.7]),
-      riskRecord("24001", "Allegany County", 22, 10, "very_high", 3.1, [1.5, 4.3], [0.9, 6.2]),
-      riskRecord("24023", "Garrett County", 22, 8, "high", 2.4, [1.1, 3.5], [0.7, 5.2]),
-      riskRecord("51810", "Virginia Beach city", 22, 1, "very_low", 0.12, [0.02, 0.3], [0, 0.5]),
+      riskRecord(2024, "24001", "Allegany County", 21, 7, "high", 1.9, [0.9, 2.8], [0.4, 4.2]),
+      riskRecord(2024, "51810", "Virginia Beach city", 21, 3, "low", 0.5, [0.2, 0.8], [0.1, 1.1]),
+      riskRecord(2025, "24001", "Allegany County", 21, 8, "high", 2.2, [1.1, 3.2], [0.6, 4.8]),
+      riskRecord(2025, "51810", "Virginia Beach city", 21, 2, "very_low", 0.3, [0.1, 0.5], [0, 0.8]),
+      riskRecord(2026, "24001", "Allegany County", 21, 9, "very_high", 2.6, [1.2, 3.8], [0.8, 5.4]),
+      riskRecord(2026, "24023", "Garrett County", 21, 8, "high", 2.1, [1.0, 3.1], [0.6, 4.8]),
+      riskRecord(2026, "51810", "Virginia Beach city", 21, 2, "very_low", 0.2, [0.05, 0.4], [0, 0.7]),
+      riskRecord(2026, "24001", "Allegany County", 22, 10, "very_high", 3.1, [1.5, 4.3], [0.9, 6.2]),
+      riskRecord(2026, "24023", "Garrett County", 22, 8, "high", 2.4, [1.1, 3.5], [0.7, 5.2]),
+      riskRecord(2026, "51810", "Virginia Beach city", 22, 1, "very_low", 0.12, [0.02, 0.3], [0, 0.5]),
+      riskRecord(2025, "24001", "Allegany County", 22, 8, "high", 2.5, [1.2, 3.6], [0.7, 5.1]),
+      riskRecord(2025, "51810", "Virginia Beach city", 22, 2, "very_low", 0.32, [0.1, 0.6], [0, 0.9]),
     ],
     research_status: {
       research_only: true,
@@ -36,8 +42,6 @@ const fixtures = {
       annualRecord("24001", "Allegany County", "MD", 2023, 35, 68000, 51.47, "top_quintile"),
       annualRecord("24001", "Allegany County", "MD", 2024, 41, 68100, 60.21, "top_quintile"),
       annualRecord("24023", "Garrett County", "MD", 2023, 22, 28500, 77.19, "top_decile"),
-      annualRecord("24023", "Garrett County", "MD", 2024, 19, 28400, 66.9, "top_quintile"),
-      annualRecord("51810", "Virginia Beach city", "VA", 2024, 4, 455000, 0.88, "lower_half"),
     ],
     research_status: {
       research_only: true,
@@ -230,7 +234,7 @@ test("regional research dashboard renders county risk, week slider, and regime i
     /is-same-regime/
   );
 
-  await page.locator("#week-slider").fill("22");
+  await page.locator("#week-input").fill("22");
   await expect(page.locator("#week-label")).toContainText("MMWR week 22");
   await expect(page.locator("#regional-panel-content")).toContainText("10/10");
   await expect(page.locator("#regional-panel-content")).toContainText(
@@ -272,10 +276,10 @@ test("regional research dashboard renders county risk, week slider, and regime i
     "empirical bayes spatial regime incidence"
   );
 
-  await page.locator("#year-slider").fill("0");
+  await page.locator("#year-select").selectOption("2023");
   await expect(page.locator("#year-label")).toContainText("2023");
   await expect(page.locator("#year-mode-label")).toContainText("Observed historical");
-  await expect(page.locator("#week-slider")).toBeDisabled();
+  await expect(page.locator("#week-input")).toBeDisabled();
   await expect(page.locator("#regional-panel-content")).toContainText(
     "Observed reported incidence"
   );
@@ -289,16 +293,38 @@ test("regional research dashboard renders county risk, week slider, and regime i
     "reported cases are not stable true incidence"
   );
 
-  await page.locator("#year-slider").fill("2");
+  await page.locator("#year-select").selectOption("2024");
+  await expect(page.locator("#year-mode-label")).toContainText("Mixed observed/forecast");
+  await expect(page.locator("#week-input")).toBeEnabled();
+  await page.locator('path[data-county="24001"]').click();
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Observed historical"
+  );
+  await page.locator('path[data-county="51810"]').click();
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "forecast year 2024"
+  );
+
+  await page.locator("#year-select").selectOption("2025");
+  await expect(page.locator("#year-label")).toContainText("2025");
+  await expect(page.locator("#year-mode-label")).toContainText("Forecast");
+  await expect(page.locator("#week-input")).toBeEnabled();
+
+  await page.locator("#year-select").selectOption("2026");
   await expect(page.locator("#year-label")).toContainText("2026");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
-  await expect(page.locator("#week-slider")).toBeEnabled();
+  await expect(page.locator("#week-input")).toBeEnabled();
+  await page.locator('path[data-county="24023"]').click();
   await expect(page.locator("#regional-panel-content")).toContainText("8/10");
+
+  await page.locator("#regional-forecast-chart").scrollIntoViewIfNeeded();
+  await expect(page.locator(".regional-time-toolbar")).toBeInViewport();
 
   expect(consoleErrors).toEqual([]);
 });
 
 function riskRecord(
+  year,
   countyFips,
   countyName,
   mmwrWeek,
@@ -315,7 +341,7 @@ function riskRecord(
     ],
     county_fips: countyFips,
     county_name: countyName,
-    data_year: 2026,
+    data_year: year,
     feature_quality_flags: [
       "localized_spatial_regime_feature",
       "forecast_safe_prior_history_spatial_regime",
@@ -327,7 +353,7 @@ function riskRecord(
     predicted_weekly_incidence_per_100k: weeklyIncidence,
     risk_category: category,
     risk_score: score,
-    year: 2026,
+    year,
   };
 }
 
