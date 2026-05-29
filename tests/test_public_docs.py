@@ -446,6 +446,29 @@ def test_data_sources_catalog_tracks_remaining_candidate_sources() -> None:
         assert token in catalog
 
 
+def test_data_sources_catalog_tracks_2024_plus_regional_source_watchlist() -> None:
+    catalog = DATA_SOURCES.read_text(encoding="utf-8")
+
+    for token in [
+        "2024+ regional and exposure watchlist",
+        "Official/source URL or acquisition procedure",
+        "`delaware_dhss_lyme_table`",
+        "`virginia_vdh_reportable_disease_dashboard`",
+        "`west_virginia_oeps_vectorborne_reports`",
+        "`dc_health_tickborne_report`",
+        "`mass_dph_monthly_tickborne_reports`",
+        "`maine_jmmc_2024_county_rates`",
+        "`ohio_odh_lyme_dashboard`",
+        "`nj_doh_tickborne_page`",
+        "`cdc_surveillance_based_lyme_disease_network`",
+        "`foia_nndss_preliminary_county`",
+        "`state_essence_tick_bite_proxy`",
+        "not a confirmed disease truth label",
+        "needs official export check",
+    ]:
+        assert token in catalog
+
+
 def test_docs_capture_mid_atlantic_expansion_and_temporal_viz_candidates() -> None:
     roadmap = ROADMAP.read_text(encoding="utf-8")
     vision = VISION_SCOPE.read_text(encoding="utf-8")

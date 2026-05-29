@@ -83,6 +83,32 @@ def test_project_manifest_tracks_remaining_candidate_sources() -> None:
         assert source_id in source_ids
 
 
+def test_project_manifest_tracks_2024_plus_source_watchlist() -> None:
+    sources = load_sources_from_markdown(Path("docs/data-manifest.md"))
+    sources_by_id = {source.source_id: source for source in sources}
+
+    expected = {
+        "delaware_dhss_lyme_table": "https://dhss.delaware.gov/",
+        "virginia_vdh_reportable_disease_dashboard": "https://www.vdh.virginia.gov/",
+        "west_virginia_oeps_vectorborne_reports": "https://oeps.wv.gov/",
+        "dc_health_tickborne_report": "https://dchealth.dc.gov/",
+        "mass_dph_monthly_tickborne_reports": "https://www.mass.gov/lists/monthly-tick-borne-disease-reports",
+        "maine_jmmc_2024_county_rates": "https://knowledgeconnection.mainehealth.org/",
+        "ohio_odh_lyme_dashboard": "https://odh.ohio.gov/",
+        "nj_doh_tickborne_page": "https://www.nj.gov/health/",
+        "cdc_surveillance_based_lyme_disease_network": "https://www.cdc.gov/lyme/data-research/facts-stats/",
+        "foia_nndss_preliminary_county": "https://www.cdc.gov/nndss/",
+        "state_essence_tick_bite_proxy": "https://www.cdc.gov/nssp/",
+    }
+
+    for source_id, url_prefix in expected.items():
+        assert source_id in sources_by_id
+        source = sources_by_id[source_id]
+        assert source.location.startswith(url_prefix)
+        assert "candidate" in source.status
+        assert "not a confirmed disease truth label" in source.notes
+
+
 def test_project_docs_define_acquisition_provenance_contract() -> None:
     docs_text = "\n".join(
         [
