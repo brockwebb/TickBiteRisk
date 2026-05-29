@@ -408,6 +408,26 @@ artifacts.
       overall results become `do_not_apply_to_public_forecast`; subgroup/year
       results remain `diagnostic_subgroup_only`.
 
+17c. `tickbiterisk etl forecast-bayesian-update-backtest`
+    - Applies a forecast-safe Gamma-Poisson Bayesian update backtest using only
+      prior model-branch forecast errors as evidence.
+    - Typical run:
+      `tickbiterisk etl forecast-bayesian-update-backtest --predictions-path build/etl/model-comparison/model_comparison_predictions.csv --output-dir build/etl/forecast-bayesian-update-backtest`.
+    - Treats predicted cases as model exposure and observed cases as evidence
+      for a posterior case multiplier. The posterior is centered on a neutral
+      multiplier of 1.0 before prior updates arrive.
+    - Writes `forecast_bayesian_update_backtest_runs.csv`,
+      `forecast_bayesian_update_backtest_predictions.csv`, and
+      `forecast_bayesian_update_backtest_metrics.csv`.
+    - Metric rows include `update_gate_decision` and `update_gate_reason`.
+      Overall improvements in both incidence and case MAE become
+      `candidate_review_required`; worsening or mixed overall results become
+      `do_not_apply_to_public_forecast`; subgroup/year results remain
+      `diagnostic_subgroup_only`.
+    - Current live results are evidence against automatic public use: default
+      Bayesian updating worsened overall MAE for all branches, while preserving
+      useful posterior audit fields for future hierarchical update design.
+
 18. `tickbiterisk etl county-week-risk`
     - Current public 2026 run:
       `tickbiterisk etl county-week-risk --predictions-path build/etl/annual-forecast/annual_forecast_predictions.csv --seasonality-baseline-path build/etl/seasonality/seasonality_baseline.csv --model-name linear_blend_baseline --output-dir build/etl/county-week-risk --replace`.

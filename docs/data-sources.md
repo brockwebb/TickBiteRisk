@@ -89,6 +89,9 @@ feature ideas to test in time-aware backtests before any public model claim.
 | `forecast_calibration_summary.csv` | `tickbiterisk etl model-diagnostics` | Empirical observed-to-predicted calibration factors by branch, surveillance regime, and year |
 | `forecast_calibration_backtest_predictions.csv` | `tickbiterisk etl forecast-calibration-backtest` | Forecast-safe shrunken calibration predictions using prior update evidence only |
 | `forecast_calibration_backtest_metrics.csv` | `tickbiterisk etl forecast-calibration-backtest` | Original-vs-calibrated MAE/RMSE metrics for empirical update multipliers |
+| `forecast_bayesian_update_backtest_runs.csv` | `tickbiterisk etl forecast-bayesian-update-backtest` | Gamma-Poisson forecast-update run manifest with prior strength and source hash |
+| `forecast_bayesian_update_backtest_predictions.csv` | `tickbiterisk etl forecast-bayesian-update-backtest` | Posterior updated prediction rows using prior forecast errors as evidence |
+| `forecast_bayesian_update_backtest_metrics.csv` | `tickbiterisk etl forecast-bayesian-update-backtest` | Original-vs-updated MAE/RMSE and interval coverage metrics for Bayesian update tests |
 | `noaa_cpc_oni_seasons.csv` | `tickbiterisk etl enso-oni` | NOAA CPC ONI seasonal anomalies and El Nino / La Nina phase labels |
 | `noaa_cpc_oni_model_year_features.csv` | `tickbiterisk etl enso-oni` | Complete prior-year ONI model-year climate context features |
 | `noaa_psl_mei_v2_monthly.csv` | `tickbiterisk etl enso-mei-v2` | NOAA PSL MEI.v2 monthly global ocean-atmosphere index values |

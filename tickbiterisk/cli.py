@@ -277,6 +277,13 @@ from tickbiterisk.modeling.forecast_calibration_backtest import (
 from tickbiterisk.modeling.forecast_calibration_backtest_build import (
     write_forecast_calibration_backtest_outputs,
 )
+from tickbiterisk.modeling.forecast_bayesian_update_backtest import (
+    ForecastBayesianUpdateBacktestInputError,
+    build_forecast_bayesian_update_backtest,
+)
+from tickbiterisk.modeling.forecast_bayesian_update_backtest_build import (
+    write_forecast_bayesian_update_backtest_outputs,
+)
 from tickbiterisk.modeling.model_compare import (
     ModelComparisonInputError,
     run_model_comparison,
@@ -2481,6 +2488,71 @@ def forecast_calibration_backtest(
     )
     typer.echo(
         f"Wrote {len(result.metrics)} forecast calibration backtest metric row(s) to "
+        f"{outputs.metrics_path}"
+    )
+
+
+@etl_app.command("forecast-bayesian-update-backtest")
+def forecast_bayesian_update_backtest(
+    predictions_path: Path = typer.Option(
+        Path("build/etl/model-comparison/model_comparison_predictions.csv"),
+        help="Input model comparison predictions CSV.",
+    ),
+    start_year: int = typer.Option(
+        2007,
+        help="First held-out year to update.",
+    ),
+    end_year: int | None = typer.Option(
+        None,
+        help="Last held-out year to update. Defaults to max year in input.",
+    ),
+    min_prior_updates: int = typer.Option(
+        5,
+        help="Minimum prior update rows required before applying posterior evidence.",
+    ),
+    prior_strength_cases: float = typer.Option(
+        10.0,
+        help="Gamma prior case strength centered on a multiplier of 1.0.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/forecast-bayesian-update-backtest"),
+        help="Output directory for forecast Bayesian update backtest artifacts.",
+    ),
+) -> None:
+    if not predictions_path.exists():
+        raise typer.BadParameter(
+            f"Model comparison predictions file not found: {predictions_path}"
+        )
+    if min_prior_updates < 1:
+        raise typer.BadParameter("min-prior-updates must be at least 1")
+    if not math.isfinite(prior_strength_cases) or prior_strength_cases <= 0:
+        raise typer.BadParameter(
+            "prior-strength-cases must be finite and greater than 0"
+        )
+    if end_year is not None and start_year > end_year:
+        raise typer.BadParameter("start-year must be less than or equal to end-year")
+
+    try:
+        result = build_forecast_bayesian_update_backtest(
+            predictions_path=predictions_path,
+            start_year=start_year,
+            end_year=end_year,
+            min_prior_updates=min_prior_updates,
+            prior_strength_cases=prior_strength_cases,
+        )
+    except ForecastBayesianUpdateBacktestInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_forecast_bayesian_update_backtest_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote 1 forecast Bayesian update backtest run row(s) to "
+        f"{outputs.runs_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.predictions)} forecast Bayesian update backtest "
+        f"prediction row(s) to {outputs.predictions_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.metrics)} forecast Bayesian update backtest metric row(s) to "
         f"{outputs.metrics_path}"
     )
 
