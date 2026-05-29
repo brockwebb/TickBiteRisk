@@ -162,6 +162,9 @@ def write_regional_research_dashboard_assets(
             encoding="utf-8",
         )
         annual_incidence_count = int(annual_incidence_payload["record_count"])
+        _augment_regional_source_catalog_with_annual_incidence(
+            static_paths.source_catalog_path
+        )
     overlay_path = None
     overlay_count = 0
     overlay_payload = None
@@ -574,6 +577,32 @@ def _augment_manifest_with_regional_assets(
         record_counts["spatial_regime_overlays"] = spatial_regime_overlay_count
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _augment_regional_source_catalog_with_annual_incidence(
+    source_catalog_path: Path,
+) -> None:
+    catalog = json.loads(source_catalog_path.read_text(encoding="utf-8"))
+    sources = catalog.setdefault("sources", [])
+    source_id = "regional_observed_annual_incidence"
+    if not any(source.get("source_id") == source_id for source in sources):
+        sources.append(
+            {
+                "source_id": source_id,
+                "artifact_type": "derived observed surveillance layer",
+                "redistribution": "public derived data",
+                "notes": (
+                    "Derived county-year reported Lyme cases and incidence for "
+                    "historical context; reported cases are not stable true "
+                    "incidence and diagnostic ranks are not forecast-safe "
+                    "features."
+                ),
+            }
+        )
+    source_catalog_path.write_text(
+        json.dumps(catalog, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 

@@ -7,11 +7,21 @@
     "data_cutoff_date": "2023-12-31",
     "evaluation_mode": "regional_annual_forecast_no_observed_target",
     "forecast_origin_year": 2023,
-    "interval_sha256": "9c0427a5d9616e6c778365683861bfc5e0b34bec26d3a907f60d62cc5f1704ef",
+    "forecast_years": [
+      2024,
+      2025,
+      2026
+    ],
+    "interval_sha256": "95c9015686187f753151ab9f2c4ad012c0e8ea285f3abf6a68c5bf63d71a4d31",
     "model_family": "empirical_bayes_spatial_regime",
     "model_name": "empirical_bayes_spatial_regime_incidence",
-    "run_id": "regional_annual_forecast_target2026_origin2023_mintrain3_lookback3_shrink5p0_spatialregimes",
-    "sha256": "866af9dbcd39b1629ac4709c73eed0e5835fd3b701158791168f2cdf71286bf3",
+    "run_id": "regional_annual_forecast_target2024_origin2023_mintrain3_lookback3_shrink5p0_spatialregimes",
+    "sha256": "247da9eaafa50fa48bdaaab8cdceafad7cd4b66c4584296fcef31d6c023e89f9",
+    "source_prediction_run_ids": [
+      "regional_annual_forecast_target2024_origin2023_mintrain3_lookback3_shrink5p0_spatialregimes",
+      "regional_annual_forecast_target2025_origin2023_mintrain3_lookback3_shrink5p0_spatialregimes",
+      "regional_annual_forecast_target2026_origin2023_mintrain3_lookback3_shrink5p0_spatialregimes"
+    ],
     "source_vintage": "cdc_lyme_county_dashboard_2023",
     "update_mode": "pre_update",
     "weather_mode": "not_used_by_regional_annual_forecast"
@@ -56,7 +66,7 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-29T15:53:43+00:00",
+  "generated_at": "2026-05-29T17:33:44+00:00",
   "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality.",
   "model_name": "empirical_bayes_spatial_regime_incidence",
   "not_for": [

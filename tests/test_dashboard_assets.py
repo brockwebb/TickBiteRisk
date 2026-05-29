@@ -151,6 +151,7 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         result.spatial_regime_overlays_path.read_text(encoding="utf-8")
     )
     manifest = json.loads(result.export_manifest_path.read_text(encoding="utf-8"))
+    source_catalog = json.loads(result.source_catalog_path.read_text(encoding="utf-8"))
 
     assert weekly["scope"] == "midatlantic_county_week"
     assert weekly["research_status"]["research_only"] is True
@@ -211,6 +212,11 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert manifest["record_counts"]["regional_state_geojson_features"] == 2
     assert manifest["record_counts"]["regional_annual_observed_incidence"] == 2
     assert manifest["record_counts"]["spatial_regime_overlays"] == 1
+    assert any(
+        source["source_id"] == "regional_observed_annual_incidence"
+        and source["artifact_type"] == "derived observed surveillance layer"
+        for source in source_catalog["sources"]
+    )
 
 
 def test_simplify_regional_geojson_for_web_map_reduces_dense_polygon_rings() -> None:

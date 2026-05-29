@@ -52,6 +52,7 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     annual = load_regional_json("regional_county_incidence_annual.json")
     states = load_regional_json("regional_states.geojson")
     overlays = load_regional_json("regional_spatial_regime_overlays.json")
+    source_catalog = load_regional_json("source_catalog.json")
     research_status_payloads = [
         load_regional_json(filename)
         for filename in EXPECTED_REGIONAL_DATA_FILES
@@ -71,8 +72,25 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     assert weekly["record_count"] == len(weekly["records"])
     assert len(weekly_counties) == 283
     assert weekly_counties == metadata_counties == geojson_counties
-    assert {record["year"] for record in weekly["records"]} == {2026}
+    assert weekly["year_selection"] == "all_available_years"
+    assert {record["year"] for record in weekly["records"]} == {2024, 2025, 2026}
+    assert {record["data_year"] for record in weekly["records"]} == {
+        2024,
+        2025,
+        2026,
+    }
+    assert weekly["selected_forecast_metadata"]["forecast_years"] == [
+        2024,
+        2025,
+        2026,
+    ]
+    assert len(weekly["selected_forecast_metadata"]["source_prediction_run_ids"]) == 3
+    assert len(weekly["records"]) == 283 * 53 * 3
     assert {record["mmwr_week"] for record in weekly["records"]} == set(range(1, 54))
+    assert all(
+        county["available_years"] == [2024, 2025, 2026]
+        for county in metadata["counties"]
+    )
 
     assert geojson["metadata"]["web_map_simplified"] is True
     assert geojson["metadata"]["feature_count"] == 283
@@ -88,6 +106,10 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     assert annual["research_status"] == EXPECTED_RESEARCH_STATUS
     assert annual["record_count"] == len(annual["records"])
     assert annual["year_range"] == [2001, 2024]
+    assert sum(1 for record in annual["records"] if record["year"] == 2024) == 67
+    assert {
+        record["state_abbr"] for record in annual["records"] if record["year"] == 2024
+    } == {"PA"}
     assert len({record["county_fips"] for record in annual["records"]}) == 283
     assert set(annual["records"][0]) == {
         "county_fips",
@@ -117,6 +139,10 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     )
     assert "reported cases are not stable true incidence" in (
         " ".join(annual["caveats"]).lower()
+    )
+    assert any(
+        source["source_id"] == "regional_observed_annual_incidence"
+        for source in source_catalog["sources"]
     )
 
     assert overlays["record_count"] == len(overlays["records"])

@@ -541,7 +541,7 @@ h1 {
 #regional-forecast-chart,
 .regional-map-shell,
 .regional-chart-section {
-  scroll-margin-top: 9rem;
+  scroll-margin-top: 12rem;
 }
 
 .regional-county-shape {
@@ -815,5 +815,37 @@ h1 {
   .regional-list-filters {
     grid-template-columns: auto minmax(9rem, 12rem) auto minmax(12rem, 1fr) auto;
     align-items: center;
+  }
+}
+
+@media (min-width: 720px) {
+  .regional-time-grid {
+    grid-template-columns: minmax(18rem, 1fr) minmax(18rem, 0.85fr);
+  }
+
+  .regional-time-field {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .regional-time-field label {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .regional-time-field select,
+  .regional-time-field .week-stepper {
+    grid-column: 2 / -1;
+    grid-row: 1;
+  }
+
+  .regional-time-field output {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .regional-time-field .mode-pill {
+    grid-column: 3;
+    grid-row: 2;
   }
 }

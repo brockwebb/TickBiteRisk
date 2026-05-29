@@ -7,18 +7,18 @@
     "source_catalog.json",
     "static_export_manifest.json",
     "regional_counties.geojson",
-    "regional_spatial_regime_overlays.json",
     "regional_states.geojson",
-    "regional_county_incidence_annual.json"
+    "regional_county_incidence_annual.json",
+    "regional_spatial_regime_overlays.json"
   ],
-  "generated_at": "2026-05-29T15:53:43+00:00",
+  "generated_at": "2026-05-29T17:33:44+00:00",
   "record_counts": {
     "county_metadata": 283,
     "regional_annual_observed_incidence": 6576,
     "regional_county_geojson_features": 283,
     "regional_state_geojson_features": 6,
     "spatial_regime_overlays": 127,
-    "weekly_risk": 14999
+    "weekly_risk": 44997
   },
   "research_status": {
     "not_public_maryland_default": true,
