@@ -65,6 +65,12 @@
       "redistribution": "public derived data",
       "sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
       "source_id": "cdc_seasonality_week_2023"
+    },
+    {
+      "artifact_type": "derived observed surveillance layer",
+      "notes": "Derived county-year reported Lyme cases and incidence for historical context; reported cases are not stable true incidence and diagnostic ranks are not forecast-safe features.",
+      "redistribution": "public derived data",
+      "source_id": "regional_observed_annual_incidence"
     }
   ]
 }

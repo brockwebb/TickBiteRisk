@@ -111,6 +111,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         json.dumps(_regional_state_geojson()),
         encoding="utf-8",
     )
+    regional_incidence_path = _write_regional_incidence(
+        tmp_path / "regional_incidence.csv"
+    )
     overlays_path = _write_regional_overlay_summary(tmp_path / "overlays.csv")
     output_dir = tmp_path / "regional-dashboard"
 
@@ -119,6 +122,7 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         output_dir=output_dir,
         regional_counties_geojson_path=regional_geojson_path,
         regional_states_geojson_path=regional_states_path,
+        regional_incidence_path=regional_incidence_path,
         spatial_regime_summary_path=overlays_path,
         model_name="linear_blend_baseline",
     )
@@ -127,6 +131,8 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert result.county_geojson_path.name == "regional_counties.geojson"
     assert result.state_geojson_path is not None
     assert result.state_geojson_path.name == "regional_states.geojson"
+    assert result.annual_incidence_path is not None
+    assert result.annual_incidence_path.name == "regional_county_incidence_annual.json"
     assert result.spatial_regime_overlays_path is not None
     assert result.spatial_regime_overlays_path.name == (
         "regional_spatial_regime_overlays.json"
@@ -138,6 +144,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     )
     counties = json.loads(result.county_geojson_path.read_text(encoding="utf-8"))
     states = json.loads(result.state_geojson_path.read_text(encoding="utf-8"))
+    annual_incidence = json.loads(
+        result.annual_incidence_path.read_text(encoding="utf-8")
+    )
     overlays = json.loads(
         result.spatial_regime_overlays_path.read_text(encoding="utf-8")
     )
@@ -149,6 +158,35 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert states["metadata"]["scope"] == "midatlantic_state_boundary"
     assert states["metadata"]["feature_count"] == 2
     assert states["features"][0]["properties"]["state_abbr"] == "MD"
+    assert annual_incidence["export_type"] == "regional_county_incidence_annual"
+    assert annual_incidence["data_role"] == "observed_historical"
+    assert annual_incidence["research_status"]["research_only"] is True
+    assert annual_incidence["record_count"] == 2
+    assert annual_incidence["year_range"] == [2023, 2024]
+    assert "reported cases are not stable true incidence" in (
+        " ".join(annual_incidence["caveats"]).lower()
+    )
+    assert annual_incidence["records"][0] == {
+        "county_fips": "24003",
+        "county_name": "Anne Arundel County",
+        "data_role": "observed_historical",
+        "diagnostic_midatlantic_incidence_percentile": 0.72,
+        "diagnostic_midatlantic_incidence_rank": 80,
+        "diagnostic_midatlantic_incidence_tier": "upper_half",
+        "feature_quality_flags": [
+            "regional_incidence_diagnostic",
+            "reported_cases_not_stable_true_incidence",
+        ],
+        "incidence_per_100k": 18.5,
+        "population": 590000,
+        "reported_cases": 109,
+        "state_abbr": "MD",
+        "state_fips": "24",
+        "state_name": "Maryland",
+        "year": 2023,
+    }
+    assert "lyme_panel_sha256" not in annual_incidence["records"][0]
+    assert "population_panel_sha256" not in annual_incidence["records"][0]
     assert overlays["record_count"] == 1
     assert overlays["records"][0]["region_id"] == "2024_regime_01"
     assert overlays["records"][0]["county_fips_list"] == ["24003", "42001"]
@@ -167,9 +205,11 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     }
     assert "regional_counties.geojson" in manifest["files"]
     assert "regional_states.geojson" in manifest["files"]
+    assert "regional_county_incidence_annual.json" in manifest["files"]
     assert "regional_spatial_regime_overlays.json" in manifest["files"]
     assert manifest["record_counts"]["regional_county_geojson_features"] == 2
     assert manifest["record_counts"]["regional_state_geojson_features"] == 2
+    assert manifest["record_counts"]["regional_annual_observed_incidence"] == 2
     assert manifest["record_counts"]["spatial_regime_overlays"] == 1
 
 
@@ -389,6 +429,84 @@ def _write_regional_overlay_summary(path: Path) -> Path:
         ",".join(columns)
         + "\n"
         + ",".join(f'"{row[column]}"' for column in columns)
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_regional_incidence(path: Path) -> Path:
+    columns = [
+        "state_fips",
+        "state_abbr",
+        "state_name",
+        "county_fips",
+        "county_name",
+        "year",
+        "total_cases",
+        "population",
+        "incidence_per_100k",
+        "diagnostic_midatlantic_incidence_rank",
+        "diagnostic_midatlantic_incidence_percentile",
+        "diagnostic_midatlantic_incidence_tier",
+        "diagnostic_prior_year_midatlantic_incidence_rank",
+        "diagnostic_midatlantic_incidence_rank_change",
+        "lyme_panel_sha256",
+        "population_panel_sha256",
+        "feature_quality_flags",
+    ]
+    rows = [
+        {
+            "state_fips": "24",
+            "state_abbr": "MD",
+            "state_name": "Maryland",
+            "county_fips": "24003",
+            "county_name": "Anne Arundel County",
+            "year": "2023",
+            "total_cases": "109",
+            "population": "590000",
+            "incidence_per_100k": "18.5",
+            "diagnostic_midatlantic_incidence_rank": "80",
+            "diagnostic_midatlantic_incidence_percentile": "0.72",
+            "diagnostic_midatlantic_incidence_tier": "upper_half",
+            "diagnostic_prior_year_midatlantic_incidence_rank": "75",
+            "diagnostic_midatlantic_incidence_rank_change": "5",
+            "lyme_panel_sha256": "a" * 64,
+            "population_panel_sha256": "b" * 64,
+            "feature_quality_flags": (
+                "regional_incidence_diagnostic,"
+                "reported_cases_not_stable_true_incidence"
+            ),
+        },
+        {
+            "state_fips": "42",
+            "state_abbr": "PA",
+            "state_name": "Pennsylvania",
+            "county_fips": "42001",
+            "county_name": "Adams County",
+            "year": "2024",
+            "total_cases": "210",
+            "population": "105000",
+            "incidence_per_100k": "200.0",
+            "diagnostic_midatlantic_incidence_rank": "5",
+            "diagnostic_midatlantic_incidence_percentile": "0.98",
+            "diagnostic_midatlantic_incidence_tier": "top_decile",
+            "diagnostic_prior_year_midatlantic_incidence_rank": "10",
+            "diagnostic_midatlantic_incidence_rank_change": "-5",
+            "lyme_panel_sha256": "a" * 64,
+            "population_panel_sha256": "b" * 64,
+            "feature_quality_flags": (
+                "regional_incidence_diagnostic,"
+                "reported_cases_not_stable_true_incidence"
+            ),
+        },
+    ]
+    path.write_text(
+        ",".join(columns)
+        + "\n"
+        + "\n".join(
+            ",".join(f'"{row[column]}"' for column in columns) for row in rows
+        )
         + "\n",
         encoding="utf-8",
     )

@@ -93,6 +93,7 @@ jobs:
           expected_files = [
               "model_card.json",
               "regional_counties.geojson",
+              "regional_county_incidence_annual.json",
               "regional_states.geojson",
               "regional_county_metadata.json",
               "regional_county_risk_weekly.json",
@@ -124,6 +125,7 @@ jobs:
           weekly = load_json("regional_county_risk_weekly.json")
           metadata = load_json("regional_county_metadata.json")
           geojson = load_json("regional_counties.geojson")
+          annual = load_json("regional_county_incidence_annual.json")
           states = load_json("regional_states.geojson")
           overlays = load_json("regional_spatial_regime_overlays.json")
           source_catalog = load_json("source_catalog.json")
@@ -131,6 +133,7 @@ jobs:
           regional_payloads = {
               "model_card.json": model_card,
               "regional_county_metadata.json": metadata,
+              "regional_county_incidence_annual.json": annual,
               "regional_county_risk_weekly.json": weekly,
               "regional_spatial_regime_overlays.json": overlays,
               "source_catalog.json": source_catalog,
@@ -181,6 +184,49 @@ jobs:
               feature["properties"]["state_abbr"] for feature in states["features"]
           } != {"DE", "DC", "MD", "PA", "VA", "WV"}:
               raise SystemExit("Regional states GeoJSON must cover DE/DC/MD/PA/VA/WV.")
+          if annual["data_role"] != "observed_historical":
+              raise SystemExit("Regional annual incidence data must be historical observed data.")
+          if annual["record_count"] != len(annual["records"]):
+              raise SystemExit("Regional annual incidence record_count does not match records.")
+          if annual["year_range"] != [2001, 2024]:
+              raise SystemExit("Regional annual incidence must cover observed years 2001-2024.")
+          if len({record["county_fips"] for record in annual["records"]}) != 283:
+              raise SystemExit("Regional annual incidence must include 283 counties.")
+          expected_annual_fields = {
+              "county_fips",
+              "county_name",
+              "data_role",
+              "diagnostic_midatlantic_incidence_percentile",
+              "diagnostic_midatlantic_incidence_rank",
+              "diagnostic_midatlantic_incidence_tier",
+              "feature_quality_flags",
+              "incidence_per_100k",
+              "population",
+              "reported_cases",
+              "state_abbr",
+              "state_fips",
+              "state_name",
+              "year",
+          }
+          if set(annual["records"][0]) != expected_annual_fields:
+              raise SystemExit("Regional annual incidence records expose unexpected fields.")
+          if {record["data_role"] for record in annual["records"]} != {"observed_historical"}:
+              raise SystemExit("Regional annual incidence records must be observed historical rows.")
+          if any("total_cases" in record for record in annual["records"]):
+              raise SystemExit("Regional annual incidence must expose reported_cases, not total_cases.")
+          if any("lyme_panel_sha256" in record for record in annual["records"]):
+              raise SystemExit("Regional annual incidence must not repeat raw panel hashes per record.")
+          if any("population_panel_sha256" in record for record in annual["records"]):
+              raise SystemExit("Regional annual incidence must not repeat raw panel hashes per record.")
+          if not all(
+              "reported_cases_not_stable_true_incidence" in record["feature_quality_flags"]
+              for record in annual["records"]
+          ):
+              raise SystemExit("Regional annual incidence must retain surveillance caveat flags.")
+          if "reported cases are not stable true incidence" not in " ".join(
+              annual["caveats"]
+          ).lower():
+              raise SystemExit("Regional annual incidence must explain reported-case caveats.")
 
           if metadata["county_count"] != 283 or not all(
               county.get("selected_spatial_regime") for county in metadata["counties"]

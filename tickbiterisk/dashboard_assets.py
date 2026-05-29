@@ -44,6 +44,7 @@ class RegionalResearchDashboardAssetPaths:
     export_manifest_path: Path
     county_geojson_path: Path
     state_geojson_path: Path | None
+    annual_incidence_path: Path | None
     spatial_regime_overlays_path: Path | None
 
 
@@ -96,6 +97,7 @@ def write_regional_research_dashboard_assets(
     output_dir: Path,
     regional_counties_geojson_path: Path,
     regional_states_geojson_path: Path | None = None,
+    regional_incidence_path: Path | None = None,
     spatial_regime_summary_path: Path | None = None,
     model_name: str = "empirical_bayes_spatial_regime_incidence",
     seasonality_source_id: str = "cdc_seasonality_week_2023",
@@ -128,6 +130,10 @@ def write_regional_research_dashboard_assets(
         json.dumps(normalized_geojson, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    allowed_county_fips = {
+        feature["properties"]["county_fips"]
+        for feature in normalized_geojson["features"]
+    }
     state_geojson_path = None
     state_feature_count = 0
     if regional_states_geojson_path is not None:
@@ -143,6 +149,19 @@ def write_regional_research_dashboard_assets(
             encoding="utf-8",
         )
         state_feature_count = len(normalized_state_geojson["features"])
+    annual_incidence_output_path = None
+    annual_incidence_count = 0
+    if regional_incidence_path is not None:
+        annual_incidence_payload = regional_annual_observed_incidence_payload(
+            regional_incidence_path,
+            allowed_county_fips=allowed_county_fips,
+        )
+        annual_incidence_output_path = output_dir / "regional_county_incidence_annual.json"
+        annual_incidence_output_path.write_text(
+            json.dumps(annual_incidence_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        annual_incidence_count = int(annual_incidence_payload["record_count"])
     overlay_path = None
     overlay_count = 0
     overlay_payload = None
@@ -167,6 +186,8 @@ def write_regional_research_dashboard_assets(
         feature_count=len(normalized_geojson["features"]),
         state_geojson_path=state_geojson_path,
         state_feature_count=state_feature_count,
+        annual_incidence_path=annual_incidence_output_path,
+        annual_incidence_count=annual_incidence_count,
         spatial_regime_overlays_path=overlay_path,
         spatial_regime_overlay_count=overlay_count,
     )
@@ -175,6 +196,7 @@ def write_regional_research_dashboard_assets(
         static_paths,
         county_geojson_path,
         state_geojson_path,
+        annual_incidence_output_path,
         overlay_path,
     )
 
@@ -391,6 +413,79 @@ def regional_spatial_regime_overlay_payload(
     }
 
 
+def regional_annual_observed_incidence_payload(
+    incidence_path: Path,
+    *,
+    allowed_county_fips: set[str] | None = None,
+) -> dict[str, object]:
+    with incidence_path.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    records = [
+        _regional_annual_observed_incidence_record(row)
+        for row in rows
+        if allowed_county_fips is None or row.get("county_fips") in allowed_county_fips
+    ]
+    records.sort(key=lambda row: (str(row["county_fips"]), int(row["year"])))
+    if not records:
+        raise ValueError("Expected at least one regional annual incidence row")
+    years = sorted({int(row["year"]) for row in records})
+    county_count = len({str(row["county_fips"]) for row in records})
+    return {
+        "schema_version": "regional-county-incidence-annual-v1",
+        "export_type": "regional_county_incidence_annual",
+        "data_role": "observed_historical",
+        "geography": "DE/DC/MD/PA/VA/WV county-equivalent",
+        "grain": "county_year",
+        "measure": "reported Lyme cases and reported incidence per 100k",
+        "record_count": len(records),
+        "county_count": county_count,
+        "year_range": [years[0], years[-1]],
+        "research_status": {
+            "research_only": True,
+            "not_public_maryland_default": True,
+        },
+        "caveats": [
+            "Reported cases are not stable true incidence and do not measure individual infection probability.",
+            "Incidence depends on Census population denominators and vintage revisions.",
+            "Lyme surveillance and case-definition changes affect comparability across years.",
+            "Diagnostic ranks and tiers are same-year exploratory summaries, not forecast-safe model inputs.",
+            "Informational only. Not medical advice.",
+        ],
+        "records": records,
+    }
+
+
+def _regional_annual_observed_incidence_record(row: dict[str, str]) -> dict[str, object]:
+    flags = split_quality_flags(row.get("feature_quality_flags", ""))
+    population = _optional_int(row.get("population"))
+    incidence = _optional_float(row.get("incidence_per_100k"))
+    tier = row.get("diagnostic_midatlantic_incidence_tier") or None
+    if population is None or incidence is None:
+        tier = "population_missing"
+        if "missing_population_denominator" not in flags:
+            flags.append("missing_population_denominator")
+    return {
+        "county_fips": str(row.get("county_fips", "")).zfill(5),
+        "county_name": row.get("county_name", ""),
+        "data_role": "observed_historical",
+        "diagnostic_midatlantic_incidence_percentile": _optional_float(
+            row.get("diagnostic_midatlantic_incidence_percentile")
+        ),
+        "diagnostic_midatlantic_incidence_rank": _optional_int(
+            row.get("diagnostic_midatlantic_incidence_rank")
+        ),
+        "diagnostic_midatlantic_incidence_tier": tier,
+        "feature_quality_flags": flags,
+        "incidence_per_100k": incidence,
+        "population": population,
+        "reported_cases": _optional_int(row.get("total_cases")),
+        "state_abbr": row.get("state_abbr", ""),
+        "state_fips": str(row.get("state_fips", "")).zfill(2),
+        "state_name": row.get("state_name", ""),
+        "year": _required_int(row.get("year"), "year"),
+    }
+
+
 def _paths_from_static(
     output_dir: Path,
     static_paths: StaticRiskExportPaths,
@@ -412,6 +507,7 @@ def _regional_paths_from_static(
     static_paths: StaticRiskExportPaths,
     county_geojson_path: Path,
     state_geojson_path: Path | None,
+    annual_incidence_path: Path | None,
     spatial_regime_overlays_path: Path | None,
 ) -> RegionalResearchDashboardAssetPaths:
     return RegionalResearchDashboardAssetPaths(
@@ -423,6 +519,7 @@ def _regional_paths_from_static(
         export_manifest_path=static_paths.export_manifest_path,
         county_geojson_path=county_geojson_path,
         state_geojson_path=state_geojson_path,
+        annual_incidence_path=annual_incidence_path,
         spatial_regime_overlays_path=spatial_regime_overlays_path,
     )
 
@@ -452,6 +549,8 @@ def _augment_manifest_with_regional_assets(
     feature_count: int,
     state_geojson_path: Path | None,
     state_feature_count: int,
+    annual_incidence_path: Path | None,
+    annual_incidence_count: int,
     spatial_regime_overlays_path: Path | None,
     spatial_regime_overlay_count: int,
 ) -> None:
@@ -461,10 +560,14 @@ def _augment_manifest_with_regional_assets(
         files.append(county_geojson_path.name)
     if state_geojson_path is not None and state_geojson_path.name not in files:
         files.append(state_geojson_path.name)
+    if annual_incidence_path is not None and annual_incidence_path.name not in files:
+        files.append(annual_incidence_path.name)
     record_counts = manifest.setdefault("record_counts", {})
     record_counts["regional_county_geojson_features"] = feature_count
     if state_geojson_path is not None:
         record_counts["regional_state_geojson_features"] = state_feature_count
+    if annual_incidence_path is not None:
+        record_counts["regional_annual_observed_incidence"] = annual_incidence_count
     if spatial_regime_overlays_path is not None:
         if spatial_regime_overlays_path.name not in files:
             files.append(spatial_regime_overlays_path.name)
@@ -653,3 +756,21 @@ def _int_value(value: str) -> int:
 
 def _float_value(value: str) -> float:
     return float(str(value).replace(",", "").strip())
+
+
+def _required_int(value: str | None, field_name: str) -> int:
+    if value is None or not str(value).strip():
+        raise ValueError(f"missing required integer field: {field_name}")
+    return _int_value(value)
+
+
+def _optional_int(value: str | None) -> int | None:
+    if value is None or not str(value).strip():
+        return None
+    return _int_value(value)
+
+
+def _optional_float(value: str | None) -> float | None:
+    if value is None or not str(value).strip():
+        return None
+    return _float_value(value)

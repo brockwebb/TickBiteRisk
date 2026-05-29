@@ -10,6 +10,7 @@ REGIONAL_DATA_DIR = REPO_ROOT / "public" / "research-data" / "regional"
 EXPECTED_REGIONAL_DATA_FILES = {
     "model_card.json",
     "regional_counties.geojson",
+    "regional_county_incidence_annual.json",
     "regional_states.geojson",
     "regional_county_metadata.json",
     "regional_county_risk_weekly.json",
@@ -48,6 +49,7 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     weekly = load_regional_json("regional_county_risk_weekly.json")
     metadata = load_regional_json("regional_county_metadata.json")
     geojson = load_regional_json("regional_counties.geojson")
+    annual = load_regional_json("regional_county_incidence_annual.json")
     states = load_regional_json("regional_states.geojson")
     overlays = load_regional_json("regional_spatial_regime_overlays.json")
     research_status_payloads = [
@@ -82,6 +84,40 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     assert {
         feature["properties"]["state_abbr"] for feature in states["features"]
     } == {"DE", "DC", "MD", "PA", "VA", "WV"}
+    assert annual["data_role"] == "observed_historical"
+    assert annual["research_status"] == EXPECTED_RESEARCH_STATUS
+    assert annual["record_count"] == len(annual["records"])
+    assert annual["year_range"] == [2001, 2024]
+    assert len({record["county_fips"] for record in annual["records"]}) == 283
+    assert set(annual["records"][0]) == {
+        "county_fips",
+        "county_name",
+        "data_role",
+        "diagnostic_midatlantic_incidence_percentile",
+        "diagnostic_midatlantic_incidence_rank",
+        "diagnostic_midatlantic_incidence_tier",
+        "feature_quality_flags",
+        "incidence_per_100k",
+        "population",
+        "reported_cases",
+        "state_abbr",
+        "state_fips",
+        "state_name",
+        "year",
+    }
+    assert {record["data_role"] for record in annual["records"]} == {
+        "observed_historical"
+    }
+    assert all("total_cases" not in record for record in annual["records"])
+    assert all("lyme_panel_sha256" not in record for record in annual["records"])
+    assert all("population_panel_sha256" not in record for record in annual["records"])
+    assert all(
+        "reported_cases_not_stable_true_incidence" in record["feature_quality_flags"]
+        for record in annual["records"]
+    )
+    assert "reported cases are not stable true incidence" in (
+        " ".join(annual["caveats"]).lower()
+    )
 
     assert overlays["record_count"] == len(overlays["records"])
     assert overlays["research_status"]["research_only"] is True
@@ -102,6 +138,9 @@ def test_pages_workflow_validates_regional_research_preview_assets() -> None:
         "public/research-data/regional",
         'data_dir.rglob("*")',
         "regional_payloads",
+        "regional_county_incidence_annual.json",
+        "reported_cases",
+        "total_cases",
         "regional_county_risk_weekly.json",
         "regional_counties.geojson",
         "regional_states.geojson",
