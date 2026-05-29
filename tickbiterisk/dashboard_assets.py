@@ -118,7 +118,9 @@ def write_regional_research_dashboard_assets(
         geography_scope=MIDATLANTIC_GEOGRAPHY_SCOPE,
     )
     raw_geojson = json.loads(regional_counties_geojson_path.read_text(encoding="utf-8"))
-    normalized_geojson = normalize_regional_county_geojson(raw_geojson)
+    normalized_geojson = simplify_regional_geojson_for_web_map(
+        normalize_regional_county_geojson(raw_geojson)
+    )
     county_geojson_path = output_dir / "regional_counties.geojson"
     county_geojson_path.write_text(
         json.dumps(normalized_geojson, indent=2, sort_keys=True) + "\n",
@@ -259,6 +261,39 @@ def normalize_regional_county_geojson(
             "not_public_maryland_default": True,
         },
         "features": features,
+    }
+
+
+def simplify_regional_geojson_for_web_map(
+    payload: dict[str, Any],
+    *,
+    tolerance: float = 0.01,
+    coordinate_precision: int = 4,
+) -> dict[str, Any]:
+    simplified_features = []
+    for feature in payload.get("features", []):
+        simplified_features.append(
+            {
+                "type": "Feature",
+                "properties": dict(feature.get("properties", {})),
+                "geometry": _simplify_geometry_for_web_map(
+                    feature.get("geometry", {}),
+                    tolerance=tolerance,
+                    coordinate_precision=coordinate_precision,
+                ),
+            }
+        )
+    metadata = dict(payload.get("metadata", {}))
+    metadata["web_map_simplified"] = True
+    metadata["geometry_simplification"] = {
+        "method": "radial_distance_ring_simplification",
+        "tolerance_degrees": tolerance,
+        "coordinate_precision": coordinate_precision,
+    }
+    return {
+        "type": payload.get("type", "FeatureCollection"),
+        "metadata": metadata,
+        "features": simplified_features,
     }
 
 
@@ -442,6 +477,97 @@ def _state_abbr(state_fips: str) -> str:
         "51": "VA",
         "54": "WV",
     }.get(state_fips, state_fips)
+
+
+def _simplify_geometry_for_web_map(
+    geometry: dict[str, Any],
+    *,
+    tolerance: float,
+    coordinate_precision: int,
+) -> dict[str, Any]:
+    geometry_type = geometry.get("type")
+    coordinates = geometry.get("coordinates")
+    if geometry_type == "Point":
+        return {
+            "type": "Point",
+            "coordinates": _round_point(coordinates, coordinate_precision),
+        }
+    if geometry_type == "Polygon":
+        return {
+            "type": "Polygon",
+            "coordinates": [
+                _simplify_ring_for_web_map(
+                    ring,
+                    tolerance=tolerance,
+                    coordinate_precision=coordinate_precision,
+                )
+                for ring in coordinates or []
+            ],
+        }
+    if geometry_type == "MultiPolygon":
+        return {
+            "type": "MultiPolygon",
+            "coordinates": [
+                [
+                    _simplify_ring_for_web_map(
+                        ring,
+                        tolerance=tolerance,
+                        coordinate_precision=coordinate_precision,
+                    )
+                    for ring in polygon
+                ]
+                for polygon in coordinates or []
+            ],
+        }
+    return geometry
+
+
+def _simplify_ring_for_web_map(
+    ring: list[list[float]],
+    *,
+    tolerance: float,
+    coordinate_precision: int,
+) -> list[list[float]]:
+    if len(ring) < 4:
+        return [_round_point(point, coordinate_precision) for point in ring]
+
+    source_points = list(ring)
+    if source_points[0] == source_points[-1]:
+        source_points = source_points[:-1]
+    if len(source_points) < 3:
+        return [_round_point(point, coordinate_precision) for point in ring]
+
+    kept = [source_points[0]]
+    last_point = source_points[0]
+    tolerance_squared = tolerance * tolerance
+    for point in source_points[1:]:
+        if _squared_distance(last_point, point) >= tolerance_squared:
+            kept.append(point)
+            last_point = point
+    if len(kept) < 3:
+        kept = source_points
+
+    simplified = [_round_point(point, coordinate_precision) for point in kept]
+    if simplified[0] != simplified[-1]:
+        simplified.append(list(simplified[0]))
+    if len(simplified) < 4:
+        return [_round_point(point, coordinate_precision) for point in ring]
+    return simplified
+
+
+def _round_point(point: Any, coordinate_precision: int) -> list[float]:
+    if not isinstance(point, list | tuple) or len(point) < 2:
+        return []
+    return [
+        round(float(point[0]), coordinate_precision),
+        round(float(point[1]), coordinate_precision),
+    ]
+
+
+def _squared_distance(left: list[float], right: list[float]) -> float:
+    return (float(left[0]) - float(right[0])) ** 2 + (
+        float(left[1]) - float(right[1])
+    ) ** 2
 
 
 def _int_value(value: str) -> int:

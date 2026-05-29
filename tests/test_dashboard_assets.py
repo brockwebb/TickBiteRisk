@@ -6,6 +6,7 @@ from tickbiterisk.dashboard_assets import (
     TIGERWEB_COUNTIES_URL,
     normalize_maryland_county_geojson,
     normalize_regional_county_geojson,
+    simplify_regional_geojson_for_web_map,
     write_dashboard_assets,
     write_regional_research_dashboard_assets,
 )
@@ -143,6 +144,30 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert manifest["record_counts"]["spatial_regime_overlays"] == 1
 
 
+def test_simplify_regional_geojson_for_web_map_reduces_dense_polygon_rings() -> None:
+    normalized = normalize_regional_county_geojson(_dense_regional_geojson())
+
+    simplified = simplify_regional_geojson_for_web_map(
+        normalized,
+        tolerance=0.01,
+        coordinate_precision=4,
+    )
+
+    source_ring = normalized["features"][0]["geometry"]["coordinates"][0]
+    simplified_ring = simplified["features"][0]["geometry"]["coordinates"][0]
+
+    assert len(source_ring) > 80
+    assert len(simplified_ring) < len(source_ring) / 4
+    assert simplified_ring[0] == simplified_ring[-1]
+    assert len(simplified_ring) >= 4
+    assert simplified["metadata"]["web_map_simplified"] is True
+    assert simplified["metadata"]["geometry_simplification"] == {
+        "coordinate_precision": 4,
+        "method": "radial_distance_ring_simplification",
+        "tolerance_degrees": 0.01,
+    }
+
+
 def _fixture_geojson() -> dict:
     county_rows = [
         ("24001", "Allegany County"),
@@ -203,6 +228,37 @@ def _regional_geojson() -> dict:
                 },
                 "geometry": {"type": "Point", "coordinates": [-77.2, 39.9]},
             },
+        ],
+    }
+
+
+def _dense_regional_geojson() -> dict:
+    ring = []
+    for step in range(31):
+        ring.append([-77.0 + step * 0.001, 39.0])
+    for step in range(1, 31):
+        ring.append([-76.97, 39.0 + step * 0.001])
+    for step in range(1, 31):
+        ring.append([-76.97 - step * 0.001, 39.03])
+    for step in range(1, 31):
+        ring.append([-77.0, 39.03 - step * 0.001])
+    ring.append(ring[0])
+    return {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {
+                    "county_fips": "24003",
+                    "county_name": "Anne Arundel County",
+                    "state_fips": "24",
+                    "source_geoid": "24003",
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [ring],
+                },
+            }
         ],
     }
 

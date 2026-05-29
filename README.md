@@ -85,6 +85,24 @@ Then open `http://localhost:8000`.
 GitHub Pages deployment uses the committed `public/` directory and requires no
 runtime secrets or raw data access.
 
+## quick start (regional research map)
+
+The regional research page is committed at `public/regional-research.html`, but
+its generated DE/DC/MD/PA/VA/WV bundle is intentionally ignored. After running
+the regional ETL and dashboard asset commands, materialize the local bundle with:
+
+```bash
+mkdir -p public/research-data/regional
+cp build/public-regional-risk/*.json build/public-regional-risk/*.geojson public/research-data/regional/
+python -m http.server 8000 --directory public
+```
+
+Then open `http://localhost:8000/regional-research.html`.
+
+This page is research-only. It keeps county click targets as the primary risk
+unit while adding localized spatial-regime context and empirical interval bands.
+The committed Maryland dashboard at `/` remains the public default.
+
 ## why forecast Lyme risk?
 
 Official Lyme surveillance data often lag the conditions people are living
@@ -299,6 +317,11 @@ research bundle currently includes 14,999 county-week risk records, 283
 county-equivalent map features, and 127 localized spatial-regime overlay rows
 for `empirical_bayes_spatial_regime_incidence`; the county metadata also carries
 each county's selected spatial-regime membership for map click panels.
+The regional map GeoJSON is simplified for browser rendering while preserving
+the full 283-county feature set and source/caveat metadata.
+`public/regional-research.html` can consume this bundle from ignored
+`public/research-data/regional/` for local GUI review, preserving `/` and
+`public/data` as the committed Maryland public contract.
 
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only
@@ -382,6 +405,12 @@ python -m http.server 8000 --directory public
 ```
 
 Open `http://localhost:8000`.
+
+For the regional research GUI, build or copy the ignored regional bundle to
+`public/research-data/regional/` and open
+`http://localhost:8000/regional-research.html`. That page is not deployed as the
+public Maryland default; it is a local research surface for county forecasts,
+week changes, uncertainty intervals, and localized spatial-regime overlays.
 
 GitHub Pages deployment is handled by GitHub Actions from the committed `public/`
 directory. In repository Settings > Pages, set the source to GitHub Actions; no

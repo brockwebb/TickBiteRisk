@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TickBiteRisk Regional Research Forecast</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#regional-county-panel">Skip to county risk details</a>
+    <header class="site-header regional-site-header">
+      <div>
+        <p class="eyebrow">Mid-Atlantic county-week Lyme risk forecast research</p>
+        <h1>TickBiteRisk Regional Research</h1>
+        <p class="lede">
+          Relative county-week Lyme risk forecasts across DE, DC, MD, PA, VA,
+          and WV with localized spatial-regime context.
+        </p>
+      </div>
+      <p class="disclaimer">
+        Informational only. Not medical advice. Research-only regional outputs
+        are not the public Maryland default.
+      </p>
+    </header>
+
+    <main class="dashboard regional-dashboard">
+      <section class="controls regional-controls" aria-labelledby="regional-controls-title">
+        <h2 id="regional-controls-title">Forecast week</h2>
+        <div class="week-slider-row">
+          <label for="week-slider">MMWR week</label>
+          <input id="week-slider" type="range" min="1" max="53" step="1" value="1" />
+          <output id="week-label" class="muted" aria-live="polite">Loading week...</output>
+        </div>
+      </section>
+
+      <section class="map-section regional-map-shell" aria-labelledby="regional-map-title">
+        <div class="regional-map-heading">
+          <h2 id="regional-map-title">Regional county map</h2>
+          <p id="regional-map-meta" class="muted">Loading counties...</p>
+        </div>
+        <div
+          id="regional-risk-map"
+          class="risk-map regional-risk-map"
+          role="group"
+          aria-label="Mid-Atlantic county risk research map"
+        >
+          <p class="loading">Loading map...</p>
+        </div>
+        <div class="legend" aria-label="Risk score legend">
+          <span><b class="swatch risk-very-low"></b>1-2 very low</span>
+          <span><b class="swatch risk-low"></b>3-4 low</span>
+          <span><b class="swatch risk-moderate"></b>5-6 moderate</span>
+          <span><b class="swatch risk-high"></b>7-8 high</span>
+          <span><b class="swatch risk-very-high"></b>9-10 very high</span>
+        </div>
+      </section>
+
+      <aside
+        id="regional-county-panel"
+        class="county-panel regional-county-panel"
+        aria-labelledby="regional-panel-title"
+      >
+        <h2 id="regional-panel-title">County risk details</h2>
+        <div id="regional-panel-content" aria-live="polite">
+          <p>Select a county to see its forecasted regional risk context.</p>
+        </div>
+        <section
+          id="regional-regime-panel"
+          class="regional-regime-strip"
+          aria-labelledby="regional-regime-title"
+        >
+          <h3 id="regional-regime-title">Localized spatial regime</h3>
+          <p class="muted">Select a county to see its research regime.</p>
+        </section>
+      </aside>
+
+      <section class="county-list-section regional-county-list-section" aria-labelledby="regional-list-title">
+        <h2 id="regional-list-title">County list</h2>
+        <div id="regional-county-list" class="county-list regional-county-list"></div>
+      </section>
+
+      <section class="sources regional-source-section" aria-labelledby="regional-source-title">
+        <h2 id="regional-source-title">Sources and research notes</h2>
+        <div id="regional-source-content">
+          <p>Loading source notes...</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="regional-research.js" defer></script>
+  </body>
+</html>

@@ -118,6 +118,16 @@ annual forecast branch, and empirical prediction intervals around regional
 annual forecast rows. These outputs do not yet promote a public forecast branch,
 and they do not change the Maryland static dashboard score.
 
+A separate regional research GUI can consume the generated regional bundle
+without committing the large derived assets or changing the public Maryland
+default. The research map should keep county selection first, then layer on
+MMWR week changes, county-level empirical intervals, and the selected localized
+spatial regime so users can see where custom regimes modify the baseline
+without treating state boundaries as ecological model boundaries.
+The GUI bundle may simplify regional county geometry for browser rendering, but
+it must preserve county identifiers, state display metadata, source caveats, and
+the full county-equivalent feature count.
+
 Regional annual forecast intervals are calibrated from rolling-origin regional
 incidence stress residuals. They must use only residuals whose held-out test
 year is at or before the forecast origin, must match the annual forecast source
