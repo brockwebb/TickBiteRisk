@@ -167,6 +167,7 @@ tickbiterisk etl acs-exposure --year 2023 --output-dir build/etl/acs-exposure --
 tickbiterisk etl acs-exposure --year 2024 --output-dir build/etl/acs-exposure --append
 tickbiterisk etl regional-lyme-outcomes --raw-dir data/raw/lyme --pa-2024-workbook-path data/raw/lyme/pennsylvania_doh_official_lyme_by_report_2024_with_map.xlsx --de-lyme-html-path data/raw/lyme/delaware_dhss_lyme_data_2019_2023.html --va-vdh-locality-csv-path data/raw/lyme/virginia_vdh_reportable_disease_geography_2024.csv --output-dir build/etl/regional-lyme
 tickbiterisk etl wv-vectorborne-summary --raw-dir data/raw/lyme/west-virginia --output-dir build/etl/wv-vectorborne
+tickbiterisk etl mass-dph-syndromic-ed --raw-dir data/raw/exposure/massachusetts --output-dir build/etl/mass-dph-syndromic-ed
 tickbiterisk etl regional-signals --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --output-dir build/etl/regional-signals
 tickbiterisk etl regional-hotspots --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --output-dir build/etl/regional-hotspots
 tickbiterisk etl regional-incidence --regional-lyme-path build/etl/regional-lyme/midatlantic_lyme_county_year.csv --regional-population-path build/etl/regional-population/midatlantic_county_population_year.csv --output-dir build/etl/regional-incidence
@@ -227,6 +228,14 @@ Current ACS exposure note: `acs-exposure` now materializes supported 2023 and
 These are rolling-survey residential context proxies using 2024 Gazetteer land
 area for density fields, not observed tick encounters, disease outcomes, or
 public-default score inputs.
+
+Current Massachusetts syndromic ED note: `mass-dph-syndromic-ed` parses
+official Massachusetts DPH DOCX reports into
+`mass_dph_syndromic_ed_county_summary.csv`. It is a human
+exposure/surveillance sidecar for current tickborne-disease ED visit pressure,
+not Lyme incidence, not a confirmed disease truth label, and not a public
+Maryland model input. The 2026-05-29 live smoke wrote 39
+county/combined-county rows for 2024, 2025, and April 2026.
 
 Current age-structure note: `model-features` can join
 `midatlantic_age_demographics_county_year.csv` with

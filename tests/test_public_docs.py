@@ -150,6 +150,26 @@ def test_readme_frames_current_build_as_forecasting_product_with_explainer_place
     assert "hierarchical" not in public_placeholder_section
 
 
+def test_public_docs_catalog_massachusetts_syndromic_ed_sidecar() -> None:
+    docs_text = "\n".join(
+        [
+            README.read_text(encoding="utf-8"),
+            DATA_SOURCES.read_text(encoding="utf-8"),
+            Path("docs/data-manifest.md").read_text(encoding="utf-8"),
+            ETL_PIPELINE.read_text(encoding="utf-8"),
+        ]
+    )
+
+    for token in [
+        "mass-dph-syndromic-ed",
+        "mass_dph_syndromic_ed_county_summary.csv",
+        "Massachusetts DPH syndromic ED",
+        "not Lyme incidence",
+        "not a confirmed disease truth label",
+    ]:
+        assert token in docs_text
+
+
 def test_readme_contribution_checks_match_configured_tooling() -> None:
     readme = README.read_text(encoding="utf-8")
     contribute = readme.split("## contribute", maxsplit=1)[1].split(

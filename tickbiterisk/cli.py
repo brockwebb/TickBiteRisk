@@ -121,6 +121,13 @@ from tickbiterisk.etl.lyme_aggregate_build import (
     LymeAggregateOutputPaths,
     write_lyme_aggregate_outputs,
 )
+from tickbiterisk.etl.mass_dph_syndromic_ed import (
+    MassDphSyndromicEdCountySummary,
+    parse_mass_dph_syndromic_ed_docx,
+)
+from tickbiterisk.etl.mass_dph_syndromic_ed_build import (
+    write_mass_dph_syndromic_ed_output,
+)
 from tickbiterisk.etl.regional_lyme import (
     RegionalLymeCountyYear,
     parse_cdc_midatlantic_county_dashboard,
@@ -728,6 +735,65 @@ WV_VECTORBORNE_SOURCE_METADATA = [
         "citation_url": "https://oeps.wv.gov/arboviral-diseases",
         "parser_method": "parse_wv_vectorborne_report_pdf:pypdfium_text_table3",
         "report_year": "2025",
+    },
+]
+MASS_DPH_SYNDROMIC_ED_SOURCE_METADATA = [
+    {
+        "filename": "mass_dph_tickborne_syndromic_2024_jan_dec.docx",
+        "source_id": "mass_dph_tickborne_syndromic_2024_jan_dec_docx",
+        "source_name": (
+            "Massachusetts DPH Tick Exposure and Tickborne Disease "
+            "Syndromic Surveillance Report, January-December 2024"
+        ),
+        "source_url": (
+            "https://www.mass.gov/doc/"
+            "tick-exposure-and-tickborne-disease-syndromic-surveillance-report-"
+            "january-december-2024/download"
+        ),
+        "citation_url": "https://www.mass.gov/lists/monthly-tick-borne-disease-reports",
+        "parser_method": "parse_mass_dph_syndromic_ed_docx:DOCX Table 1",
+        "report_year": "2024",
+        "report_period_label": "January-December 2024",
+        "report_period_start": "2024-01-01",
+        "report_period_end": "2024-12-31",
+    },
+    {
+        "filename": "mass_dph_tickborne_syndromic_2025_jan_dec.docx",
+        "source_id": "mass_dph_tickborne_syndromic_2025_jan_dec_docx",
+        "source_name": (
+            "Massachusetts DPH Tick Exposure and Tickborne Disease "
+            "Syndromic Surveillance Report, January-December 2025"
+        ),
+        "source_url": (
+            "https://www.mass.gov/doc/"
+            "tick-exposure-and-tickborne-disease-syndromic-surveillance-report-"
+            "january-december-2025/download"
+        ),
+        "citation_url": "https://www.mass.gov/lists/monthly-tick-borne-disease-reports",
+        "parser_method": "parse_mass_dph_syndromic_ed_docx:DOCX Table 1",
+        "report_year": "2025",
+        "report_period_label": "January-December 2025",
+        "report_period_start": "2025-01-01",
+        "report_period_end": "2025-12-31",
+    },
+    {
+        "filename": "mass_dph_tickborne_syndromic_2026_april.docx",
+        "source_id": "mass_dph_tickborne_syndromic_2026_april_docx",
+        "source_name": (
+            "Massachusetts DPH Tick Exposure and Tickborne Disease "
+            "Syndromic Surveillance Report, April 2026"
+        ),
+        "source_url": (
+            "https://www.mass.gov/doc/"
+            "tick-exposure-and-tickborne-disease-syndromic-surveillance-report-"
+            "april-2026/download"
+        ),
+        "citation_url": "https://www.mass.gov/lists/monthly-tick-borne-disease-reports",
+        "parser_method": "parse_mass_dph_syndromic_ed_docx:DOCX Table 1",
+        "report_year": "2026",
+        "report_period_label": "April 2026",
+        "report_period_start": "2026-01-01",
+        "report_period_end": "2026-04-30",
     },
 ]
 
@@ -2842,6 +2908,69 @@ def wv_vectorborne_summary(
     typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
+@etl_app.command("mass-dph-syndromic-ed")
+def mass_dph_syndromic_ed(
+    raw_dir: Path = typer.Option(
+        Path("data/raw/exposure/massachusetts"),
+        help="Raw directory containing Massachusetts DPH syndromic ED DOCX reports.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/mass-dph-syndromic-ed"),
+        help="Output directory for Massachusetts DPH syndromic ED artifacts.",
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None,
+        help="Output CSV manifest for raw-source acquisition provenance.",
+    ),
+) -> None:
+    rows_by_source: dict[str, list[MassDphSyndromicEdCountySummary]] = {}
+    source_paths_by_id = {}
+    for metadata in MASS_DPH_SYNDROMIC_ED_SOURCE_METADATA:
+        source_path = raw_dir / str(metadata["filename"])
+        if not source_path.exists():
+            raise typer.BadParameter(
+                "Massachusetts DPH syndromic ED source file not found: "
+                f"{source_path}"
+            )
+        source_id = str(metadata["source_id"])
+        source_paths_by_id[source_id] = source_path
+        rows_by_source[source_id] = parse_mass_dph_syndromic_ed_docx(
+            source_path,
+            source_id=source_id,
+            source_url=str(metadata["source_url"]),
+            report_year=int(str(metadata["report_year"])),
+            report_period_label=str(metadata["report_period_label"]),
+            report_period_start=str(metadata["report_period_start"]),
+            report_period_end=str(metadata["report_period_end"]),
+        )
+
+    rows = [
+        row
+        for metadata in MASS_DPH_SYNDROMIC_ED_SOURCE_METADATA
+        for row in rows_by_source[str(metadata["source_id"])]
+    ]
+    output_path = write_mass_dph_syndromic_ed_output(rows, output_dir)
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    provenance_output = write_acquisition_provenance_manifest(
+        _mass_dph_syndromic_ed_provenance_records(
+            rows_by_source=rows_by_source,
+            source_paths_by_id=source_paths_by_id,
+            output_path=output_path,
+            raw_dir=raw_dir,
+            output_dir=output_dir,
+            manifest_path=resolved_manifest_path,
+        ),
+        manifest_path=resolved_manifest_path,
+    )
+    typer.echo(
+        f"Wrote {len(rows)} Massachusetts DPH syndromic ED county summary row(s) "
+        f"to {output_path}"
+    )
+    typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
 @etl_app.command("regional-lyme-outcomes")
 def regional_lyme_outcomes(
     raw_dir: Path = typer.Option(
@@ -4631,6 +4760,90 @@ def _wv_vectorborne_acquisition_command(
             "tickbiterisk",
             "etl",
             "wv-vectorborne-summary",
+            "--raw-dir",
+            _public_provenance_path(raw_dir),
+            "--output-dir",
+            _public_provenance_path(output_dir),
+            "--provenance-manifest-path",
+            _public_provenance_path(manifest_path),
+        ]
+    )
+
+
+def _mass_dph_syndromic_ed_provenance_records(
+    *,
+    rows_by_source: dict[str, list[MassDphSyndromicEdCountySummary]],
+    source_paths_by_id: dict[str, Path],
+    output_path: Path,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> list[AcquisitionProvenanceRecord]:
+    command = _mass_dph_syndromic_ed_acquisition_command(
+        raw_dir=raw_dir,
+        output_dir=output_dir,
+        manifest_path=manifest_path,
+    )
+    metadata_by_source = {
+        str(metadata["source_id"]): metadata
+        for metadata in MASS_DPH_SYNDROMIC_ED_SOURCE_METADATA
+    }
+    records = []
+    for source_id in sorted(rows_by_source):
+        metadata = metadata_by_source[source_id]
+        source_path = source_paths_by_id[source_id]
+        records.append(
+            AcquisitionProvenanceRecord(
+                source_id=source_id,
+                source_name=str(metadata["source_name"]),
+                source_url=str(metadata["source_url"]),
+                citation_url=str(metadata["citation_url"]),
+                acquisition_command=command,
+                acquisition_procedure=(
+                    "Read the ignored local Massachusetts DPH DOCX report, "
+                    "extract Table 1 county residence emergency-department "
+                    "tick-borne disease visit counts and rates, and write a "
+                    "syndromic exposure/diagnosis sidecar."
+                ),
+                request_method="LOCAL_FILE_READ",
+                request_description=(
+                    "Read local raw Massachusetts DPH syndromic surveillance "
+                    f"DOCX report {source_path.name}."
+                ),
+                derived_artifact_paths=[source_path, output_path],
+                derived_artifact_path_labels=[source_path.name, output_path.name],
+                row_count=len(rows_by_source[source_id]),
+                parser_method=str(metadata["parser_method"]),
+                extraction_quality="accepted_docx_table1_county_residence_rows",
+                access_notes=(
+                    "Public Massachusetts DPH DOCX report reached from the "
+                    "official Monthly Tick-borne Disease Reports page; no "
+                    "secret or credential required. Raw DOCX remains in "
+                    "ignored storage."
+                ),
+                modeling_caveats=(
+                    "Massachusetts DPH syndromic ED sidecar only; ED visits "
+                    "are exposure/surveillance context, not Lyme incidence, "
+                    "not tick-bite counts, not disease-specific, not a "
+                    "confirmed disease truth label, not public-default, and "
+                    "not model input in this slice."
+                ),
+            )
+        )
+    return records
+
+
+def _mass_dph_syndromic_ed_acquisition_command(
+    *,
+    raw_dir: Path,
+    output_dir: Path,
+    manifest_path: Path,
+) -> str:
+    return _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "mass-dph-syndromic-ed",
             "--raw-dir",
             _public_provenance_path(raw_dir),
             "--output-dir",

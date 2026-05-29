@@ -114,6 +114,9 @@ def test_project_manifest_tracks_2024_plus_source_watchlist() -> None:
         elif source_id == "west_virginia_oeps_vectorborne_reports":
             assert "etl_supported" in source.status
             assert "state_aggregate" in source.status
+        elif source_id == "mass_dph_monthly_tickborne_reports":
+            assert "etl_supported" in source.status
+            assert "syndromic_ed_signal" in source.status
         else:
             assert "candidate" in source.status
         assert "not a confirmed disease truth label" in source.notes
@@ -131,7 +134,7 @@ def test_project_docs_define_acquisition_provenance_contract() -> None:
         "Acquisition provenance contract",
         "Direct API and raw-source ETL run manifests",
         "acquisition_provenance.csv",
-        "ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, NSSP coverage, seasonality baseline, tick status, and mast/acorn",
+        "ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, NSSP coverage, seasonality baseline, tick status, and mast/acorn",
         "source URL or API endpoint",
         "rerunnable command",
         "citation URL",

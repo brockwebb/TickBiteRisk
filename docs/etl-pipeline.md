@@ -27,7 +27,7 @@ manifest for catalog-style acquisitions. Because that command only acquires raw
 files/pages, parser method and extraction quality are recorded as explicit
 not-yet-evaluated placeholders until a downstream parser writes source-specific
 extraction summaries. Direct API and raw-source ETL run manifests use
-`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, NSSP coverage, seasonality baseline, tick status, and mast/acorn
+`acquisition_provenance.csv`; ENSO, EnviroAtlas, USDM drought, Census population, regional population, regional demographics, ACS exposure, building permits, county reference, deer harvest, Open-Meteo weather backfill, NOAA weather primitives, NOAA weather backfill, Lyme outcomes, aggregate Lyme validation, regional Lyme outcomes, regional signals, Massachusetts DPH syndromic ED, NSSP coverage, seasonality baseline, tick status, and mast/acorn
 are wired to that pattern,
 preserving request URL, rerunnable command, parser/extraction status, derived
 artifact checksums, and source caveats. Other API ETLs may still keep lineage in
@@ -71,6 +71,19 @@ artifacts.
      `acquisition_provenance.csv`.
    - These rows are West Virginia state aggregate validation/context only.
      They do not provide county rows; county maps are not digitized.
+
+1b3. `tickbiterisk etl mass-dph-syndromic-ed`
+   - Reads ignored local Massachusetts DPH DOCX reports downloaded from the
+     official Monthly Tick-borne Disease Reports page.
+   - Extracts Table 1 county residence emergency-department visit totals,
+     tickborne-disease diagnosis visit counts, and rates per 10,000 visits.
+   - Writes `mass_dph_syndromic_ed_county_summary.csv` and
+     `acquisition_provenance.csv`.
+   - These rows are Massachusetts DPH syndromic ED exposure/surveillance
+     context only. They are not Lyme incidence, not tick-bite counts, not a
+     confirmed disease truth label, and not model input in this slice.
+   - The source combines Dukes and Nantucket in one row; the ETL preserves that
+     combined geography instead of assigning it to one county FIPS.
 
 1c. `tickbiterisk etl regional-population`
    - Pulls keyless static Census county population CSVs for DE, DC, MD, PA,
