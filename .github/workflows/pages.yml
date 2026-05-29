@@ -111,7 +111,7 @@ jobs:
               for path in data_dir.rglob("*")
               if path.is_file()
           )
-          if present != expected_files:
+          if present != sorted(expected_files):
               raise SystemExit(
                   f"Unexpected regional research data files: {present}; expected {expected_files}"
               )
@@ -236,7 +236,7 @@ jobs:
               raise SystemExit("Regional spatial overlay record_count does not match records.")
           if manifest["record_counts"]["weekly_risk"] != weekly["record_count"]:
               raise SystemExit("Regional manifest weekly_risk count does not match payload.")
-          if sorted(manifest["files"]) != expected_files:
+          if sorted(manifest["files"]) != sorted(expected_files):
               raise SystemExit("Regional manifest file list does not match committed assets.")
 
           for source in source_catalog["sources"]:

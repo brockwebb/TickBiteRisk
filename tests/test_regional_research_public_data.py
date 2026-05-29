@@ -137,6 +137,7 @@ def test_pages_workflow_validates_regional_research_preview_assets() -> None:
         "Validate regional research preview data",
         "public/research-data/regional",
         'data_dir.rglob("*")',
+        "present != sorted(expected_files)",
         "regional_payloads",
         "regional_county_incidence_annual.json",
         "reported_cases",
