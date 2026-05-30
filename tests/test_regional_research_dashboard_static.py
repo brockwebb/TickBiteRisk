@@ -61,6 +61,11 @@ def test_regional_research_html_has_map_controls_and_research_boundaries() -> No
         assert token in html
 
     assert 'id="regional-county-list"' not in html
+    assert "Selected county weekly forecast with empirical intervals" not in html
+    assert (
+        'id="regional-forecast-chart"\n          class="forecast-chart"\n          role="img"'
+        not in html
+    )
     assert "Research-only regional outputs" not in html
     assert "public Maryland default" not in html
 

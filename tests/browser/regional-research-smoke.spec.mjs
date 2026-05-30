@@ -309,6 +309,14 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "Regional annual forecast"
   );
+  await expect(page.locator("#regional-forecast-chart")).not.toHaveAttribute(
+    "role",
+    "img"
+  );
+  await expect(page.locator("#regional-forecast-chart svg")).toHaveAttribute(
+    "aria-label",
+    /Regional annual incidence forecast/
+  );
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "32.67 per 100k"
   );
@@ -515,8 +523,11 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await page.locator("#county-search").fill("Garrett");
   await expect(page.locator("#regional-list-status")).toContainText("1 county choice");
   await expect(page.locator("#regional-county-picker")).toContainText("Garrett County");
-  await page.locator("#regional-county-picker").selectOption("24023");
+  await expect(page.locator("#regional-county-picker")).toHaveValue("24023");
   await expect(panel).toContainText("Garrett County");
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Garrett County weekly forecast"
+  );
   await page.locator("#regional-bite-tick-species").selectOption("ixodes_scapularis");
   await page.locator("#regional-bite-tick-stage").selectOption("nymph");
   await page.locator("#regional-bite-attachment-hours").fill("48");

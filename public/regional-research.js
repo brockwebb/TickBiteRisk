@@ -772,15 +772,27 @@ function renderRegionalCountyList() {
   const picker = document.getElementById("regional-county-picker");
   const features = filteredRegionalFeatures();
   picker.innerHTML = features.map(regionalCountyPickerOption).join("");
+  picker.disabled = !features.length;
   const selectedInResults = features.some(
     (feature) => (feature.properties || {}).county_fips === regionalState.selectedCounty
   );
+  let nextCounty = regionalState.selectedCounty;
   if (selectedInResults) {
-    picker.value = regionalState.selectedCounty;
+    nextCounty = regionalState.selectedCounty;
   } else if (features.length) {
-    picker.value = (features[0].properties || {}).county_fips;
+    nextCounty = (features[0].properties || {}).county_fips;
+  } else {
+    nextCounty = "";
   }
+  picker.value = nextCounty;
   renderRegionalListStatus(features.length);
+  if (nextCounty && nextCounty !== regionalState.selectedCounty) {
+    regionalState.forecastScope = "county";
+    regionalState.forecastScopeCounty = nextCounty;
+    syncRegionalForecastScopeControls();
+    selectRegionalCounty(nextCounty);
+    return;
+  }
   updateRegionalSelectedControls();
 }
 
