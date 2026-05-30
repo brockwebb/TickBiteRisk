@@ -867,7 +867,6 @@ function renderRegionalObservedCounty({
     updateRegionalSelectedControls();
     return;
   }
-  const forecastRecord = getRegionalRecord(countyFips);
   panel.innerHTML = `<div class="score-card observed-card">
     <p class="muted">Observed historical, reported surveillance year ${regionalEscapeHtml(annualRecord.year)}</p>
     <h3>${regionalEscapeHtml(countyName)}${stateAbbr ? `, ${regionalEscapeHtml(stateAbbr)}` : ""}</h3>
@@ -875,7 +874,7 @@ function renderRegionalObservedCounty({
     <p>Observed reported incidence: ${regionalFormatNumber(annualRecord.incidence_per_100k)} per 100k.</p>
     <p>${regionalEscapeHtml(annualRecord.reported_cases)} reported cases; population denominator ${regionalFormatNumber(annualRecord.population)}.</p>
     <p>Mid-Atlantic diagnostic tier: ${regionalEscapeHtml(regionalReadableName(annualRecord.diagnostic_midatlantic_incidence_tier))}.</p>
-    ${renderRegionalForecastCheck(annualRecord, forecastRecord)}
+    ${renderRegionalForecastCheck(metadata)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(annualRecord)}
     <p class="disclaimer">Reported cases are not stable true incidence. This historical layer is informational only, not medical advice, and not a forecast-safe feature for the selected year.</p>
@@ -886,25 +885,44 @@ function renderRegionalObservedCounty({
   updateRegionalSelectedControls();
 }
 
-function renderRegionalForecastCheck(annualRecord, forecastRecord) {
+function renderRegionalForecastCheck(metadata) {
+  const fit = getRegionalForecastObservedFit(metadata);
+  if (!fit) return "";
+  const observed = Number(fit.observed_incidence_per_100k);
+  const forecast = Number(fit.predicted_incidence_per_100k);
+  const residual = Number(fit.incidence_residual_per_100k);
   if (
-    !annualRecord ||
-    !forecastRecord ||
-    annualRecord.state_abbr !== "PA" ||
-    Number(annualRecord.year) !== 2024
+    !Number.isFinite(observed) ||
+    !Number.isFinite(forecast) ||
+    !Number.isFinite(residual)
   ) {
     return "";
   }
-  const observed = Number(annualRecord.incidence_per_100k);
-  const forecast = Number(forecastRecord.predicted_annual_incidence_per_100k);
-  if (!Number.isFinite(observed) || !Number.isFinite(forecast)) return "";
-  const residual = observed - forecast;
   const residualText = `${residual >= 0 ? "+" : ""}${regionalFormatNumber(residual)}`;
+  const observedCases = Number(fit.observed_cases);
+  const predictedCases = Number(fit.predicted_cases);
+  const caseText =
+    Number.isFinite(observedCases) && Number.isFinite(predictedCases)
+      ? `<p>Cases: observed ${regionalFormatNumber(observedCases)} vs forecast ${regionalFormatNumber(predictedCases)}.</p>`
+      : "";
   return `<section class="lineage-strip forecast-check" aria-labelledby="regional-forecast-check-heading">
     <h4 id="regional-forecast-check-heading">PA 2024 forecast check</h4>
-    <p>Partial state-source overlay: observed ${regionalFormatNumber(observed)} per 100k vs forecast ${regionalFormatNumber(forecast)} per 100k; residual ${regionalEscapeHtml(residualText)} per 100k.</p>
+    <p>Artifact-backed partial state-source overlay: observed ${regionalFormatNumber(observed)} per 100k vs forecast ${regionalFormatNumber(forecast)} per 100k; residual ${regionalEscapeHtml(residualText)} per 100k.</p>
+    ${caseText}
     <p>This is post-forecast goodness-of-fit context, not regional truth, model training data, or automatic calibration.</p>
   </section>`;
+}
+
+function getRegionalForecastObservedFit(metadata) {
+  const records =
+    metadata && Array.isArray(metadata.forecast_observed_fit)
+      ? metadata.forecast_observed_fit
+      : [];
+  const selectedYear = Number(regionalState.selectedYear);
+  return (
+    records.find((record) => Number(record.forecast_year) === selectedYear) ||
+    null
+  );
 }
 
 function renderRegionalObservedAnnualContext(countyFips) {

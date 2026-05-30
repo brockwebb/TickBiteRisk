@@ -79,7 +79,7 @@
       "promotion_rule": "Bayesian or calibration updates are not promoted to public scores unless rolling-origin backtests show improved error or calibration."
     }
   },
-  "generated_at": "2026-05-29T21:55:46+00:00",
+  "generated_at": "2026-05-30T00:46:34+00:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -159,6 +159,12 @@
       "notes": "horizon-matched analog-year companion rows identify the nearest comparable reported-incidence history used by the analog research branch; this explains context and does not replace the selected risk-score branch.",
       "redistribution": "public derived data",
       "source_id": "regional_nearest_comparable_years"
+    },
+    {
+      "artifact_type": "derived post-forecast diagnostic layer",
+      "notes": "post-forecast county residual diagnostics compare selected regional forecast branches with later state-source observed overlays; these rows are not regional truth, model training features, or automatic calibration.",
+      "redistribution": "public derived data",
+      "source_id": "regional_forecast_observed_fit"
     }
   ],
   "temporal_contract": {

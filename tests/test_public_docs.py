@@ -14,6 +14,9 @@ TESTING_CI_PLAN = Path("docs/testing-ci-plan.md")
 ETL_PIPELINE = Path("docs/etl-pipeline.md")
 MODEL_BACKGROUND = Path("docs/model-background.md")
 SRS = Path("docs/software-requirements-spec.md")
+REGIONAL_SPATIAL_SPEC = Path(
+    "docs/superpowers/specs/2026-05-29-regional-spatial-forecast-design.md"
+)
 
 
 def test_user_guide_matches_implemented_maryland_forecast_product() -> None:
@@ -320,6 +323,30 @@ def test_public_modeling_docs_do_not_overclaim_unimplemented_model_lanes() -> No
     ]
     for token in forbidden_tokens:
         assert token not in docs_text
+
+
+def test_regional_spatial_spec_locks_update_change_point_and_color_scale_contract() -> None:
+    regional_spec = " ".join(
+        REGIONAL_SPATIAL_SPEC.read_text(encoding="utf-8").split()
+    )
+    model_spec = " ".join(MODEL_SPEC.read_text(encoding="utf-8").split())
+
+    for token in [
+        "partial-pooling evidence",
+        "not a blanket regional multiplier",
+        "1996, 2008, 2011, 2017, and 2022",
+        "change-point or source-regime terms",
+        "Visual top-coding",
+        "display transform, not a score transform",
+    ]:
+        assert token in regional_spec
+
+    for token in [
+        "Known Lyme surveillance case-definition years",
+        "1996, 2008, 2011, 2017, and 2022",
+        "not a blanket regional multiplier",
+    ]:
+        assert token in model_spec
 
 
 def test_docs_capture_virginia_2024_state_overlay() -> None:

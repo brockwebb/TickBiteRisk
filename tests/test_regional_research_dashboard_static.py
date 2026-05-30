@@ -59,6 +59,7 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function renderRegionalForecastBasis",
         "function renderRegionalComparableYear",
         "function renderRegionalForecastCheck",
+        "function getRegionalForecastObservedFit",
         "function regionalForecastBasisList",
         "function regionalWeekDateRange",
         "function formatRegionalDateRange",
@@ -85,6 +86,8 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "Forecast basis",
         "Nearest comparable history",
         "PA 2024 forecast check",
+        "forecast_observed_fit",
+        "Artifact-backed partial state-source overlay",
         "post-forecast goodness-of-fit",
         "MMWR week",
         "Seasonal allocation",
@@ -124,6 +127,16 @@ def test_regional_research_javascript_keeps_historical_years_annual_only() -> No
         "observed_historical_weekly",
     ]:
         assert token not in js
+
+
+def test_regional_forecast_observed_fit_requires_matching_selected_year() -> None:
+    js = (PUBLIC_DIR / "regional-research.js").read_text(encoding="utf-8")
+    function_body = js.split("function getRegionalForecastObservedFit", maxsplit=1)[
+        1
+    ].split("function renderRegionalObservedAnnualContext", maxsplit=1)[0]
+
+    assert "Number(record.forecast_year) === selectedYear" in function_body
+    assert "records[0]" not in function_body
 
 
 def test_regional_research_css_has_stable_map_slider_and_regime_styles() -> None:

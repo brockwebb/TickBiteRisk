@@ -1,12 +1,14 @@
+import csv
 import json
 from pathlib import Path
 
-from tests.test_runtime_risk_lookup import _write_scores
+from tests.test_runtime_risk_lookup import _score_row, _write_scores
 from tickbiterisk.dashboard_assets import (
     TIGERWEB_COUNTIES_URL,
     normalize_maryland_county_geojson,
     normalize_regional_county_geojson,
     normalize_regional_state_geojson,
+    regional_forecast_observed_fit_payload,
     simplify_regional_geojson_for_web_map,
     write_dashboard_assets,
     write_regional_research_dashboard_assets,
@@ -100,7 +102,7 @@ def test_normalize_regional_state_geojson_keeps_public_boundary_fields() -> None
 def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     tmp_path: Path,
 ) -> None:
-    scores_path = _write_scores(tmp_path / "scores.csv")
+    scores_path = _write_regional_scores(tmp_path / "scores.csv")
     regional_geojson_path = tmp_path / "regional_counties.geojson"
     regional_geojson_path.write_text(
         json.dumps(_regional_geojson()),
@@ -118,6 +120,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     annual_forecast_path = _write_regional_annual_forecast_predictions(
         tmp_path / "regional_annual_forecast_predictions.csv"
     )
+    observed_fit_path = _write_regional_forecast_observed_fit(
+        tmp_path / "regional_forecast_observed_fit_comparisons.csv"
+    )
     output_dir = tmp_path / "regional-dashboard"
 
     result = write_regional_research_dashboard_assets(
@@ -128,6 +133,7 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         regional_incidence_path=regional_incidence_path,
         spatial_regime_summary_path=overlays_path,
         regional_annual_forecast_path=annual_forecast_path,
+        regional_forecast_observed_fit_path=observed_fit_path,
         model_name="linear_blend_baseline",
     )
 
@@ -141,6 +147,10 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert result.spatial_regime_overlays_path.name == (
         "regional_spatial_regime_overlays.json"
     )
+    assert result.forecast_observed_fit_path is not None
+    assert result.forecast_observed_fit_path.name == (
+        "regional_forecast_observed_fit.json"
+    )
 
     weekly = json.loads(result.weekly_risk_path.read_text(encoding="utf-8"))
     county_metadata = json.loads(
@@ -153,6 +163,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     )
     overlays = json.loads(
         result.spatial_regime_overlays_path.read_text(encoding="utf-8")
+    )
+    observed_fit = json.loads(
+        result.forecast_observed_fit_path.read_text(encoding="utf-8")
     )
     manifest = json.loads(result.export_manifest_path.read_text(encoding="utf-8"))
     source_catalog = json.loads(result.source_catalog_path.read_text(encoding="utf-8"))
@@ -195,6 +208,19 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert overlays["record_count"] == 1
     assert overlays["records"][0]["region_id"] == "2024_regime_01"
     assert overlays["records"][0]["county_fips_list"] == ["24003", "42001"]
+    assert observed_fit["export_type"] == "regional_forecast_observed_fit"
+    assert observed_fit["data_role"] == "post_forecast_diagnostic"
+    assert observed_fit["record_count"] == 1
+    assert observed_fit["records"][0]["county_fips"] == "42001"
+    assert observed_fit["records"][0]["forecast_year"] == 2024
+    assert observed_fit["records"][0]["observed_incidence_per_100k"] == 119.45
+    assert observed_fit["records"][0]["predicted_incidence_per_100k"] == 85.13
+    assert observed_fit["records"][0]["incidence_residual_per_100k"] == 34.32
+    assert observed_fit["records"][0]["diagnostic_flags"] == [
+        "partial_state_overlay",
+        "post_forecast_diagnostic",
+        "not_training_feature",
+    ]
     anne_arundel = next(
         county
         for county in county_metadata["counties"]
@@ -221,15 +247,42 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
             "basis": "horizon-matched reported-incidence history",
         }
     ]
+    adams = next(
+        county
+        for county in county_metadata["counties"]
+        if county["county_fips"] == "42001"
+    )
+    assert adams["forecast_observed_fit"] == [
+        {
+            "diagnostic_scope": "pa_2024_partial_state_overlay",
+            "forecast_year": 2024,
+            "forecast_origin_year": 2023,
+            "model_name": "empirical_bayes_spatial_regime_incidence",
+            "observed_incidence_per_100k": 119.45,
+            "predicted_incidence_per_100k": 85.13,
+            "incidence_residual_per_100k": 34.32,
+            "observed_cases": 128,
+            "predicted_cases": 91.22,
+            "case_residual": 36.78,
+            "basis": "post-forecast state-source overlay diagnostic",
+            "diagnostic_flags": [
+                "partial_state_overlay",
+                "post_forecast_diagnostic",
+                "not_training_feature",
+            ],
+        }
+    ]
     assert "regional_counties.geojson" in manifest["files"]
     assert "regional_states.geojson" in manifest["files"]
     assert "regional_county_incidence_annual.json" in manifest["files"]
     assert "regional_spatial_regime_overlays.json" in manifest["files"]
+    assert "regional_forecast_observed_fit.json" in manifest["files"]
     assert manifest["record_counts"]["regional_county_geojson_features"] == 2
     assert manifest["record_counts"]["regional_state_geojson_features"] == 2
     assert manifest["record_counts"]["regional_annual_observed_incidence"] == 2
     assert manifest["record_counts"]["spatial_regime_overlays"] == 1
-    assert manifest["record_counts"]["regional_nearest_comparable_years"] == 1
+    assert manifest["record_counts"]["regional_nearest_comparable_years"] == 2
+    assert manifest["record_counts"]["regional_forecast_observed_fit"] == 1
     assert any(
         source["source_id"] == "regional_observed_annual_incidence"
         and source["artifact_type"] == "derived observed surveillance layer"
@@ -240,6 +293,27 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         and "horizon-matched analog" in source["notes"]
         for source in source_catalog["sources"]
     )
+    assert any(
+        source["source_id"] == "regional_forecast_observed_fit"
+        and "post-forecast" in source["notes"]
+        for source in source_catalog["sources"]
+    )
+
+
+def test_regional_forecast_observed_fit_payload_filters_to_map_counties(
+    tmp_path: Path,
+) -> None:
+    observed_fit_path = _write_regional_forecast_observed_fit(
+        tmp_path / "regional_forecast_observed_fit_comparisons.csv"
+    )
+
+    payload = regional_forecast_observed_fit_payload(
+        observed_fit_path,
+        allowed_county_fips={"24003"},
+    )
+
+    assert payload["record_count"] == 0
+    assert payload["records"] == []
 
 
 def test_simplify_regional_geojson_for_web_map_reduces_dense_polygon_rings() -> None:
@@ -524,6 +598,106 @@ def _write_regional_annual_forecast_predictions(path: Path) -> Path:
         + "\n".join(
             ",".join(f'"{row[column]}"' for column in columns) for row in rows
         )
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_regional_scores(path: Path) -> Path:
+    rows = [
+        _score_row("24003", "Anne Arundel County", "2022", "1", "6"),
+        _score_row("24003", "Anne Arundel County", "2023", "1", "7"),
+        _score_row("24005", "Baltimore County", "2023", "1", "4"),
+        _score_row("42001", "Adams County", "2024", "1", "7"),
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_regional_forecast_observed_fit(path: Path) -> Path:
+    columns = [
+        "run_id",
+        "diagnostic_scope",
+        "source_forecast_run_id",
+        "model_name",
+        "model_family",
+        "target_definition",
+        "feature_set",
+        "feature_profile",
+        "evaluation_mode",
+        "state_fips",
+        "state_abbr",
+        "state_name",
+        "county_fips",
+        "county_name",
+        "forecast_year",
+        "forecast_origin_year",
+        "as_of_date",
+        "data_cutoff_date",
+        "source_vintage",
+        "update_mode",
+        "forecast_population",
+        "observed_population",
+        "predicted_cases",
+        "observed_cases",
+        "case_residual",
+        "absolute_case_error",
+        "predicted_incidence_per_100k",
+        "observed_incidence_per_100k",
+        "incidence_residual_per_100k",
+        "absolute_incidence_error_per_100k",
+        "model_feature_quality_flags",
+        "forecast_assumption_flags",
+        "observed_quality_flags",
+        "diagnostic_flags",
+    ]
+    row = {
+        "run_id": "regional_forecast_observed_fit_pa2024_origin2023",
+        "diagnostic_scope": "pa_2024_partial_state_overlay",
+        "source_forecast_run_id": "regional_annual_forecast_target2024_origin2023",
+        "model_name": "empirical_bayes_spatial_regime_incidence",
+        "model_family": "empirical_bayes_spatial_regime",
+        "target_definition": "reported_lyme_incidence_per_100k",
+        "feature_set": "historical_incidence_forecast_baselines",
+        "feature_profile": "localized_spatial_regime_shrinkage",
+        "evaluation_mode": "regional_annual_forecast_no_observed_target",
+        "state_fips": "42",
+        "state_abbr": "PA",
+        "state_name": "Pennsylvania",
+        "county_fips": "42001",
+        "county_name": "Adams County",
+        "forecast_year": "2024",
+        "forecast_origin_year": "2023",
+        "as_of_date": "2026-05-29",
+        "data_cutoff_date": "2023-12-31",
+        "source_vintage": "cdc_lyme_county_dashboard_2023",
+        "update_mode": "pre_update",
+        "forecast_population": "107155",
+        "observed_population": "107155",
+        "predicted_cases": "91.22",
+        "observed_cases": "128",
+        "case_residual": "36.78",
+        "absolute_case_error": "36.78",
+        "predicted_incidence_per_100k": "85.13",
+        "observed_incidence_per_100k": "119.45",
+        "incidence_residual_per_100k": "34.32",
+        "absolute_incidence_error_per_100k": "34.32",
+        "model_feature_quality_flags": "forecast_safe_prior_outcomes_only",
+        "forecast_assumption_flags": "forecast_without_observed_target",
+        "observed_quality_flags": "state_source_not_cdc_public_use",
+        "diagnostic_flags": (
+            "partial_state_overlay,post_forecast_diagnostic,not_training_feature"
+        ),
+    }
+    path.write_text(
+        ",".join(columns)
+        + "\n"
+        + ",".join(f'"{row[column]}"' for column in columns)
         + "\n",
         encoding="utf-8",
     )

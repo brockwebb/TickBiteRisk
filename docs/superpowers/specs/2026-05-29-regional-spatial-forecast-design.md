@@ -72,6 +72,23 @@ state-source, or near-real-time proxy data become available. Late-arriving data
 should update the forecast with provenance and caveats rather than rewriting
 history as if the late data had been known at the original forecast origin.
 
+Observed state-source overlays, such as Pennsylvania 2024, are valuable
+partial-pooling evidence for later updates. They should be used to update
+similar localized regimes, source vintages, and surveillance regimes when
+backtests support doing so. They are not a blanket regional multiplier. A high
+or low residual in one observed state should not automatically scale every
+county in DE/DC/MD/PA/VA/WV, especially when the residual may reflect reporting
+mechanics as much as ecology.
+
+Known Lyme surveillance case-definition years, currently 1996, 2008, 2011,
+2017, and 2022 in CDC/NNDSS case-definition records, must be treated as
+change-point or source-regime terms in Bayesian, calibration, random-forest,
+analog, and empirical-Bayes lanes. Forecast models should distinguish
+ecological movement from surveillance definition changes, state-source overlays,
+probable-only rows, laboratory-based surveillance changes, and other reporting
+breaks. A Bayesian update that ignores those regime switches can learn the
+wrong base rate with impressive-looking arithmetic.
+
 The regional public/product default remains separate from research branches.
 Cross-border spatial features are research diagnostics until rolling-origin
 tests show stable improvement and a separate public branch decision is made.
@@ -102,6 +119,15 @@ while charts can show county, state, Mid-Atlantic, and localized-regime
 trajectories with prediction intervals or margins of error. Exploratory EDA
 views may live below the main map or in a separate product surface, but the
 central product question remains the same: "What is the forecast risk here?"
+
+Map colors are a display layer over the risk score, not the risk score itself.
+Visual top-coding can be used for the darkest color when extreme counties make
+the rest of the map unreadable, but it must be explicit: the legend should show
+the top-code threshold or percentile, preserve the underlying numeric value in
+county detail panels, and describe the choice as a display transform, not a
+score transform. Category colors may also map to fixed risk thresholds, but the
+threshold contract must be documented and stable enough for users to compare
+counties and years.
 
 After the 2026-05-29 data-grain audit, the temporal display contract is locked:
 observed historical truth is annual county reported Lyme data, not observed

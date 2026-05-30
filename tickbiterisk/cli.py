@@ -1330,6 +1330,13 @@ def dashboard_build_regional_research_assets(
             "horizon-matched analog comparable-year context."
         ),
     ),
+    regional_forecast_observed_fit_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional regional forecast observed-fit comparison CSV used to "
+            "attach post-forecast state-overlay diagnostics."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/public-regional-risk"),
         help="Output directory for regional research dashboard data assets.",
@@ -1386,6 +1393,14 @@ def dashboard_build_regional_research_assets(
         raise typer.BadParameter(
             f"Regional annual forecast file not found: {regional_annual_forecast_path}"
         )
+    if (
+        regional_forecast_observed_fit_path is not None
+        and not regional_forecast_observed_fit_path.exists()
+    ):
+        raise typer.BadParameter(
+            "Regional forecast observed-fit file not found: "
+            f"{regional_forecast_observed_fit_path}"
+        )
     try:
         outputs = write_regional_research_dashboard_assets(
             scores_path=scores_path,
@@ -1395,6 +1410,9 @@ def dashboard_build_regional_research_assets(
             regional_incidence_path=resolved_regional_incidence_path,
             spatial_regime_summary_path=resolved_spatial_regime_summary_path,
             regional_annual_forecast_path=regional_annual_forecast_path,
+            regional_forecast_observed_fit_path=(
+                regional_forecast_observed_fit_path
+            ),
             model_name=model_name,
             seasonality_source_id=seasonality_source_id,
         )
@@ -1409,6 +1427,8 @@ def dashboard_build_regional_research_assets(
         typer.echo(f"Wrote {outputs.annual_incidence_path}")
     if outputs.spatial_regime_overlays_path is not None:
         typer.echo(f"Wrote {outputs.spatial_regime_overlays_path}")
+    if outputs.forecast_observed_fit_path is not None:
+        typer.echo(f"Wrote {outputs.forecast_observed_fit_path}")
 
 
 @etl_app.command("weather-locations")

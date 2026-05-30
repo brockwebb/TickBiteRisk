@@ -250,6 +250,14 @@ reported cases into latent true disease burden. Known reporting-break regimes
 are kept separate from clean disease-pressure signals so future Bayesian or
 hierarchical models can assign reliability to incoming evidence.
 
+Known Lyme surveillance case-definition years include 1996, 2008, 2011, 2017,
+and 2022 in CDC/NNDSS case-definition records. These years, plus state-source
+overlays and probable-only or laboratory-based surveillance rows, should be
+explicit source-regime or change-point covariates before an update model is
+allowed to move a public forecast. A Pennsylvania 2024 overlay can provide
+partial evidence for comparable counties and localized regimes, but it is not a
+blanket regional multiplier.
+
 `forecast_calibration_summary.csv` is the bridge artifact for that future
 update model. It summarizes observed-to-predicted case ratios and additive
 incidence offsets by model branch, source vintage, surveillance regime, and

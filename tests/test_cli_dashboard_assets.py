@@ -9,8 +9,10 @@ from tests.test_dashboard_assets import (
     _regional_geojson,
     _regional_state_geojson,
     _write_regional_annual_forecast_predictions,
+    _write_regional_forecast_observed_fit,
     _write_regional_incidence,
     _write_regional_overlay_summary,
+    _write_regional_scores,
 )
 from tickbiterisk.cli import app
 
@@ -107,7 +109,7 @@ def test_dashboard_build_assets_accepts_source_branch_selectors(
 def test_dashboard_build_regional_research_assets_writes_bundle(
     tmp_path: Path,
 ) -> None:
-    scores_path = _write_scores(tmp_path / "scores.csv")
+    scores_path = _write_regional_scores(tmp_path / "scores.csv")
     regional_geojson_path = tmp_path / "regional_counties.geojson"
     regional_geojson_path.write_text(
         json.dumps(_regional_geojson()),
@@ -124,6 +126,9 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
     overlay_path = _write_regional_overlay_summary(tmp_path / "overlays.csv")
     annual_forecast_path = _write_regional_annual_forecast_predictions(
         tmp_path / "regional_annual_forecast_predictions.csv"
+    )
+    observed_fit_path = _write_regional_forecast_observed_fit(
+        tmp_path / "regional_forecast_observed_fit_comparisons.csv"
     )
     output_dir = tmp_path / "regional-dashboard"
 
@@ -144,6 +149,8 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
             str(overlay_path),
             "--regional-annual-forecast-path",
             str(annual_forecast_path),
+            "--regional-forecast-observed-fit-path",
+            str(observed_fit_path),
             "--output-dir",
             str(output_dir),
             "--model-name",
@@ -158,6 +165,7 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
     assert (output_dir / "regional_states.geojson").exists()
     assert (output_dir / "regional_county_incidence_annual.json").exists()
     assert (output_dir / "regional_spatial_regime_overlays.json").exists()
+    assert (output_dir / "regional_forecast_observed_fit.json").exists()
     metadata = json.loads(
         (output_dir / "regional_county_metadata.json").read_text(encoding="utf-8")
     )
@@ -165,6 +173,11 @@ def test_dashboard_build_regional_research_assets_writes_bundle(
         county.get("nearest_comparable_years")
         for county in metadata["counties"]
         if county["county_fips"] == "24003"
+    )
+    assert any(
+        county.get("forecast_observed_fit")
+        for county in metadata["counties"]
+        if county["county_fips"] == "42001"
     )
 
 

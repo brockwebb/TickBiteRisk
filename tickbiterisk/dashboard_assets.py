@@ -46,6 +46,7 @@ class RegionalResearchDashboardAssetPaths:
     state_geojson_path: Path | None
     annual_incidence_path: Path | None
     spatial_regime_overlays_path: Path | None
+    forecast_observed_fit_path: Path | None
 
 
 def write_dashboard_assets(
@@ -100,6 +101,7 @@ def write_regional_research_dashboard_assets(
     regional_incidence_path: Path | None = None,
     spatial_regime_summary_path: Path | None = None,
     regional_annual_forecast_path: Path | None = None,
+    regional_forecast_observed_fit_path: Path | None = None,
     model_name: str = "empirical_bayes_spatial_regime_incidence",
     seasonality_source_id: str = "cdc_seasonality_week_2023",
     benchmark_quantile: float | None = None,
@@ -197,6 +199,31 @@ def write_regional_research_dashboard_assets(
         _augment_regional_source_catalog_with_comparable_years(
             static_paths.source_catalog_path
         )
+    forecast_observed_fit_output_path = None
+    forecast_observed_fit_count = 0
+    if regional_forecast_observed_fit_path is not None:
+        forecast_observed_fit_payload = regional_forecast_observed_fit_payload(
+            regional_forecast_observed_fit_path,
+            allowed_county_fips=allowed_county_fips,
+        )
+        forecast_observed_fit_output_path = (
+            output_dir / "regional_forecast_observed_fit.json"
+        )
+        forecast_observed_fit_output_path.write_text(
+            json.dumps(forecast_observed_fit_payload, indent=2, sort_keys=True)
+            + "\n",
+            encoding="utf-8",
+        )
+        forecast_observed_fit_count = int(
+            forecast_observed_fit_payload["record_count"]
+        )
+        _augment_regional_county_metadata_with_forecast_observed_fit(
+            static_paths.county_metadata_path,
+            forecast_observed_fit_payload,
+        )
+        _augment_regional_source_catalog_with_forecast_observed_fit(
+            static_paths.source_catalog_path
+        )
     _augment_manifest_with_regional_assets(
         static_paths.export_manifest_path,
         county_geojson_path=county_geojson_path,
@@ -208,6 +235,8 @@ def write_regional_research_dashboard_assets(
         spatial_regime_overlays_path=overlay_path,
         spatial_regime_overlay_count=overlay_count,
         comparable_year_count=comparable_year_count,
+        forecast_observed_fit_path=forecast_observed_fit_output_path,
+        forecast_observed_fit_count=forecast_observed_fit_count,
     )
     return _regional_paths_from_static(
         output_dir,
@@ -216,6 +245,7 @@ def write_regional_research_dashboard_assets(
         state_geojson_path,
         annual_incidence_output_path,
         overlay_path,
+        forecast_observed_fit_output_path,
     )
 
 
@@ -531,6 +561,47 @@ def regional_nearest_comparable_years_payload(
     return comparable_by_county
 
 
+def regional_forecast_observed_fit_payload(
+    comparisons_path: Path,
+    *,
+    allowed_county_fips: set[str] | None = None,
+) -> dict[str, object]:
+    with comparisons_path.open(encoding="utf-8", newline="") as handle:
+        records = [
+            _regional_forecast_observed_fit_record(row)
+            for row in csv.DictReader(handle)
+            if allowed_county_fips is None
+            or str(row.get("county_fips", "")).zfill(5) in allowed_county_fips
+        ]
+    records.sort(
+        key=lambda row: (
+            str(row["county_fips"]),
+            int(row["forecast_year"]),
+            str(row["model_name"]),
+        )
+    )
+    return {
+        "schema_version": "regional-forecast-observed-fit-v1",
+        "export_type": "regional_forecast_observed_fit",
+        "data_role": "post_forecast_diagnostic",
+        "geography": "selected DE/DC/MD/PA/VA/WV state-source overlay counties",
+        "grain": "county_year_model",
+        "measure": "forecast-vs-observed reported Lyme incidence and cases",
+        "record_count": len(records),
+        "research_status": {
+            "research_only": True,
+            "not_public_maryland_default": True,
+        },
+        "caveats": [
+            "This is a partial state-source overlay diagnostic, not regional truth.",
+            "Observed state-source rows are not model training features or automatic calibration.",
+            "Reported cases are not stable true incidence and do not measure individual infection probability.",
+            "Informational only. Not medical advice.",
+        ],
+        "records": records,
+    }
+
+
 def _regional_annual_observed_incidence_record(row: dict[str, str]) -> dict[str, object]:
     flags = split_quality_flags(row.get("feature_quality_flags", ""))
     population = _optional_int(row.get("population"))
@@ -562,6 +633,60 @@ def _regional_annual_observed_incidence_record(row: dict[str, str]) -> dict[str,
     }
 
 
+def _regional_forecast_observed_fit_record(row: dict[str, str]) -> dict[str, object]:
+    return {
+        "run_id": str(row.get("run_id", "")),
+        "diagnostic_scope": str(row.get("diagnostic_scope", "")),
+        "source_forecast_run_id": str(row.get("source_forecast_run_id", "")),
+        "model_name": str(row.get("model_name", "")),
+        "model_family": str(row.get("model_family", "")),
+        "feature_profile": str(row.get("feature_profile", "")),
+        "evaluation_mode": str(row.get("evaluation_mode", "")),
+        "county_fips": str(row.get("county_fips", "")).zfill(5),
+        "county_name": str(row.get("county_name", "")),
+        "state_abbr": str(row.get("state_abbr", "")),
+        "state_fips": str(row.get("state_fips", "")).zfill(2),
+        "state_name": str(row.get("state_name", "")),
+        "forecast_year": _required_int(row.get("forecast_year"), "forecast_year"),
+        "forecast_origin_year": _required_int(
+            row.get("forecast_origin_year"),
+            "forecast_origin_year",
+        ),
+        "as_of_date": str(row.get("as_of_date", "")),
+        "data_cutoff_date": str(row.get("data_cutoff_date", "")),
+        "source_vintage": str(row.get("source_vintage", "")),
+        "update_mode": str(row.get("update_mode", "")),
+        "forecast_population": _optional_int(row.get("forecast_population")),
+        "observed_population": _optional_int(row.get("observed_population")),
+        "predicted_cases": _optional_float(row.get("predicted_cases")),
+        "observed_cases": _optional_int(row.get("observed_cases")),
+        "case_residual": _optional_float(row.get("case_residual")),
+        "absolute_case_error": _optional_float(row.get("absolute_case_error")),
+        "predicted_incidence_per_100k": _optional_float(
+            row.get("predicted_incidence_per_100k")
+        ),
+        "observed_incidence_per_100k": _optional_float(
+            row.get("observed_incidence_per_100k")
+        ),
+        "incidence_residual_per_100k": _optional_float(
+            row.get("incidence_residual_per_100k")
+        ),
+        "absolute_incidence_error_per_100k": _optional_float(
+            row.get("absolute_incidence_error_per_100k")
+        ),
+        "model_feature_quality_flags": split_quality_flags(
+            row.get("model_feature_quality_flags", "")
+        ),
+        "forecast_assumption_flags": split_quality_flags(
+            row.get("forecast_assumption_flags", "")
+        ),
+        "observed_quality_flags": split_quality_flags(
+            row.get("observed_quality_flags", "")
+        ),
+        "diagnostic_flags": split_quality_flags(row.get("diagnostic_flags", "")),
+    }
+
+
 def _paths_from_static(
     output_dir: Path,
     static_paths: StaticRiskExportPaths,
@@ -585,6 +710,7 @@ def _regional_paths_from_static(
     state_geojson_path: Path | None,
     annual_incidence_path: Path | None,
     spatial_regime_overlays_path: Path | None,
+    forecast_observed_fit_path: Path | None,
 ) -> RegionalResearchDashboardAssetPaths:
     return RegionalResearchDashboardAssetPaths(
         output_dir=output_dir,
@@ -597,6 +723,7 @@ def _regional_paths_from_static(
         state_geojson_path=state_geojson_path,
         annual_incidence_path=annual_incidence_path,
         spatial_regime_overlays_path=spatial_regime_overlays_path,
+        forecast_observed_fit_path=forecast_observed_fit_path,
     )
 
 
@@ -630,6 +757,8 @@ def _augment_manifest_with_regional_assets(
     spatial_regime_overlays_path: Path | None,
     spatial_regime_overlay_count: int,
     comparable_year_count: int = 0,
+    forecast_observed_fit_path: Path | None = None,
+    forecast_observed_fit_count: int = 0,
 ) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     files = manifest.setdefault("files", [])
@@ -651,6 +780,10 @@ def _augment_manifest_with_regional_assets(
         record_counts["spatial_regime_overlays"] = spatial_regime_overlay_count
     if comparable_year_count:
         record_counts["regional_nearest_comparable_years"] = comparable_year_count
+    if forecast_observed_fit_path is not None:
+        if forecast_observed_fit_path.name not in files:
+            files.append(forecast_observed_fit_path.name)
+        record_counts["regional_forecast_observed_fit"] = forecast_observed_fit_count
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -709,6 +842,32 @@ def _augment_regional_source_catalog_with_comparable_years(
     )
 
 
+def _augment_regional_source_catalog_with_forecast_observed_fit(
+    source_catalog_path: Path,
+) -> None:
+    catalog = json.loads(source_catalog_path.read_text(encoding="utf-8"))
+    sources = catalog.setdefault("sources", [])
+    source_id = "regional_forecast_observed_fit"
+    if not any(source.get("source_id") == source_id for source in sources):
+        sources.append(
+            {
+                "source_id": source_id,
+                "artifact_type": "derived post-forecast diagnostic layer",
+                "redistribution": "public derived data",
+                "notes": (
+                    "post-forecast county residual diagnostics compare selected "
+                    "regional forecast branches with later state-source observed "
+                    "overlays; these rows are not regional truth, model training "
+                    "features, or automatic calibration."
+                ),
+            }
+        )
+    source_catalog_path.write_text(
+        json.dumps(catalog, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _augment_regional_county_metadata_with_regimes(
     county_metadata_path: Path,
     overlay_payload: dict[str, object],
@@ -742,6 +901,49 @@ def _augment_regional_county_metadata_with_comparable_years(
         encoding="utf-8",
     )
     return attached_count
+
+
+def _augment_regional_county_metadata_with_forecast_observed_fit(
+    county_metadata_path: Path,
+    forecast_observed_fit_payload: dict[str, object],
+) -> None:
+    metadata = json.loads(county_metadata_path.read_text(encoding="utf-8"))
+    records_by_county: dict[str, list[dict[str, object]]] = {}
+    for record in forecast_observed_fit_payload.get("records", []):
+        if not isinstance(record, dict):
+            continue
+        county_fips = str(record.get("county_fips", "")).zfill(5)
+        records_by_county.setdefault(county_fips, []).append(
+            _forecast_observed_fit_metadata_record(record)
+        )
+    for county in metadata.get("counties", []):
+        county_fips = str(county.get("county_fips", "")).zfill(5)
+        county_records = records_by_county.get(county_fips)
+        if county_records:
+            county["forecast_observed_fit"] = county_records
+    county_metadata_path.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _forecast_observed_fit_metadata_record(
+    record: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "diagnostic_scope": record["diagnostic_scope"],
+        "forecast_year": record["forecast_year"],
+        "forecast_origin_year": record["forecast_origin_year"],
+        "model_name": record["model_name"],
+        "observed_incidence_per_100k": record["observed_incidence_per_100k"],
+        "predicted_incidence_per_100k": record["predicted_incidence_per_100k"],
+        "incidence_residual_per_100k": record["incidence_residual_per_100k"],
+        "observed_cases": record["observed_cases"],
+        "predicted_cases": record["predicted_cases"],
+        "case_residual": record["case_residual"],
+        "basis": "post-forecast state-source overlay diagnostic",
+        "diagnostic_flags": record["diagnostic_flags"],
+    }
 
 
 def _county_regime_memberships(

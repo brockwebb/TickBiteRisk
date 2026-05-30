@@ -86,14 +86,15 @@ const fixtures = {
   },
   "regional_county_incidence_annual.json": {
     caveats: ["reported cases are not stable true incidence", "informational only"],
-    county_count: 3,
+    county_count: 4,
     data_role: "observed_historical",
     export_type: "regional_county_incidence_annual",
     record_count: 5,
     records: [
       annualRecord("24001", "Allegany County", "MD", 2023, 35, 68000, 51.47, "top_quintile"),
-      annualRecord("24001", "Allegany County", "PA", 2024, 41, 68100, 60.21, "top_quintile"),
+      annualRecord("24001", "Allegany County", "MD", 2024, 41, 68100, 60.21, "top_quintile"),
       annualRecord("24023", "Garrett County", "MD", 2023, 22, 28500, 77.19, "top_decile"),
+      annualRecord("42001", "Adams County", "PA", 2024, 128, 107154, 119.45, "top_decile"),
     ],
     research_status: {
       research_only: true,
@@ -102,10 +103,38 @@ const fixtures = {
     year_range: [2023, 2024],
   },
   "regional_county_metadata.json": {
-    county_count: 3,
+    county_count: 4,
     counties: [
       countyMetadata("24001", "Allegany County", "2024_regime_07", "Spatial regime 7", 7),
       countyMetadata("24023", "Garrett County", "2024_regime_07", "Spatial regime 7", 7),
+      {
+        ...countyMetadata(
+          "42001",
+          "Adams County",
+          "2024_regime_07",
+          "Spatial regime 7",
+          7
+        ),
+        forecast_observed_fit: [
+          {
+            case_residual: 36.78,
+            diagnostic_flags: [
+              "partial_state_overlay",
+              "post_forecast_diagnostic",
+              "not_training_feature",
+            ],
+            diagnostic_scope: "pa_2024_partial_state_overlay",
+            forecast_origin_year: 2023,
+            forecast_year: 2024,
+            incidence_residual_per_100k: 34.32,
+            model_name: "empirical_bayes_spatial_regime_incidence",
+            observed_cases: 128,
+            observed_incidence_per_100k: 119.45,
+            predicted_cases: 91.22,
+            predicted_incidence_per_100k: 85.13,
+          },
+        ],
+      },
       countyMetadata(
         "51810",
         "Virginia Beach city",
@@ -122,25 +151,27 @@ const fixtures = {
   "regional_counties.geojson": {
     type: "FeatureCollection",
     metadata: {
-      feature_count: 3,
+      feature_count: 4,
       research_only: true,
-      states: ["MD", "VA"],
+      states: ["MD", "PA", "VA"],
     },
     features: [
       countyFeature("24001", "Allegany County", "MD", -79.5, 39.3),
       countyFeature("24023", "Garrett County", "MD", -79.2, 39.0),
+      countyFeature("42001", "Adams County", "PA", -77.2, 39.9),
       countyFeature("51810", "Virginia Beach city", "VA", -76.0, 36.8),
     ],
   },
   "regional_states.geojson": {
     type: "FeatureCollection",
     metadata: {
-      feature_count: 2,
+      feature_count: 3,
       research_only: true,
       scope: "midatlantic_state_boundary",
     },
     features: [
       stateFeature("24", "MD", "Maryland", -79.8, 37.6, -75.0, 39.8),
+      stateFeature("42", "PA", "Pennsylvania", -77.5, 39.6, -76.9, 40.2),
       stateFeature("51", "VA", "Virginia", -76.6, 36.2, -75.3, 37.4),
     ],
   },
@@ -236,8 +267,8 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(
     page.getByRole("heading", { name: "TickBiteRisk Regional Research" })
   ).toBeVisible();
-  await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(3);
-  await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(2);
+  await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(4);
+  await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(3);
   await expect(page.locator("#year-label")).toContainText("2026");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
   await expect(page.locator("#week-label")).toContainText("May 24-30, 2026");
@@ -404,11 +435,22 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#regional-panel-content")).toContainText(
     "41 reported cases"
   );
+  await expect(page.locator("#regional-panel-content")).not.toContainText(
+    "PA 2024 forecast check"
+  );
+  await page.locator('path[data-county="42001"]').click();
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Adams County"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText("PA");
   await expect(page.locator("#regional-panel-content")).toContainText(
     "PA 2024 forecast check"
   );
   await expect(page.locator("#regional-panel-content")).toContainText(
-    "observed 60.21 per 100k vs forecast 38.00 per 100k"
+    "observed 119.45 per 100k vs forecast 85.13 per 100k"
+  );
+  await expect(page.locator("#regional-panel-content")).toContainText(
+    "Cases: observed 128.00 vs forecast 91.22"
   );
   await expect(page.locator("#regional-panel-content")).toContainText(
     "post-forecast goodness-of-fit"

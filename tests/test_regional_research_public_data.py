@@ -15,6 +15,7 @@ EXPECTED_REGIONAL_DATA_FILES = {
     "regional_states.geojson",
     "regional_county_metadata.json",
     "regional_county_risk_weekly.json",
+    "regional_forecast_observed_fit.json",
     "regional_spatial_regime_overlays.json",
     "source_catalog.json",
     "static_export_manifest.json",
@@ -53,6 +54,7 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     annual = load_regional_json("regional_county_incidence_annual.json")
     states = load_regional_json("regional_states.geojson")
     overlays = load_regional_json("regional_spatial_regime_overlays.json")
+    observed_fit = load_regional_json("regional_forecast_observed_fit.json")
     source_catalog = load_regional_json("source_catalog.json")
     research_status_payloads = [
         load_regional_json(filename)
@@ -207,6 +209,8 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     )
 
     assert overlays["record_count"] == len(overlays["records"])
+    assert observed_fit["record_count"] == len(observed_fit["records"]) == 67
+    assert observed_fit["data_role"] == "post_forecast_diagnostic"
     assert overlays["research_status"]["research_only"] is True
     assert all(
         county.get("selected_spatial_regime")
