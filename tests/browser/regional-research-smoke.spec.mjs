@@ -284,6 +284,7 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   const weeklyViewRadio = page.locator("#forecast-view-weekly");
   const regionScopeRadio = page.locator("#forecast-scope-region");
   const stateScopeRadio = page.locator("#forecast-scope-state");
+  const regimeScopeRadio = page.locator("#forecast-scope-regime");
   const countyScopeRadio = page.locator("#forecast-scope-county");
 
   await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(4);
@@ -303,9 +304,23 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator(".forecast-scope-radios")).toBeVisible();
   await expect(regionScopeRadio).toBeChecked();
   await expect(stateScopeRadio).toBeVisible();
+  await expect(regimeScopeRadio).toBeVisible();
   await expect(countyScopeRadio).toBeVisible();
   await expect(page.locator("#forecast-state-select")).toBeDisabled();
   await expect(page.locator("#forecast-county-select")).toBeDisabled();
+  await expect(page.locator("#regional-regime-layer-toggle")).toBeChecked();
+  await expect(page.locator("#regional-forecast-explainer")).toContainText(
+    "Annual target"
+  );
+  await expect(page.locator("#regional-forecast-explainer")).toContainText(
+    "empirical forecast-error ranges"
+  );
+  await expect(page.locator("#regional-forecast-explainer")).toContainText(
+    "Map colors are display categories"
+  );
+  await expect(page.locator("#regional-forecast-explainer")).toContainText(
+    "not automatic public score corrections"
+  );
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "Regional annual forecast"
   );
@@ -492,6 +507,22 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   );
   await expect(page.locator('path[data-county="51810"]')).not.toHaveClass(
     /is-same-regime/
+  );
+  await page.locator("#regional-regime-layer-toggle").setChecked(false);
+  await expect(page.locator('path[data-county="24023"]')).not.toHaveClass(
+    /is-same-regime/
+  );
+  await page.locator("#regional-regime-layer-toggle").setChecked(true);
+  await expect(page.locator('path[data-county="24023"]')).toHaveClass(
+    /is-same-regime/
+  );
+  await page.locator('label[for="forecast-scope-regime"]').click();
+  await expect(regimeScopeRadio).toBeChecked();
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Spatial regime 7 local region weekly forecast"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "MMWR weeks 21-22"
   );
 
   await page.locator("#week-slider").fill("22");

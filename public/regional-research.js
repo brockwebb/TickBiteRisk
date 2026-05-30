@@ -15,6 +15,7 @@ const regionalState = {
   forecastScopeState: "",
   forecastScopeCounty: null,
   biteEstimateRequested: false,
+  showRegimeOverlay: true,
   availableYears: [],
   stateFilter: "",
   countySearch: "",
@@ -100,6 +101,9 @@ async function initRegionalResearch() {
   document
     .getElementById("forecast-county-select")
     .addEventListener("change", handleForecastCountyChange);
+  document
+    .getElementById("regional-regime-layer-toggle")
+    .addEventListener("change", handleRegionalRegimeLayerToggle);
   document
     .getElementById("week-input")
     .addEventListener("input", handleWeekInputChange);
@@ -375,6 +379,11 @@ function handleForecastCountyChange(event) {
   selectRegionalCounty(regionalState.forecastScopeCounty);
 }
 
+function handleRegionalRegimeLayerToggle(event) {
+  regionalState.showRegimeOverlay = Boolean(event.target.checked);
+  renderRegionalMap();
+}
+
 function handleWeekSliderInput(event) {
   regionalState.selectedWeek = regionalClampWeek(Number(event.target.value));
   syncRegionalWeekControls();
@@ -498,17 +507,24 @@ function syncRegionalForecastViewRadios(weeklyAvailable, view) {
 }
 
 function syncRegionalForecastScopeControls() {
-  const scope = regionalForecastScopeValue(regionalState.forecastScope);
+  let scope = regionalForecastScopeValue(regionalState.forecastScope);
+  if (scope === "regime" && !regionalRegimeScopeAvailable()) {
+    regionalState.forecastScope = "county";
+    scope = "county";
+  }
   regionalState.forecastScope = scope;
   const region = document.getElementById("forecast-scope-region");
   const state = document.getElementById("forecast-scope-state");
+  const regime = document.getElementById("forecast-scope-regime");
   const county = document.getElementById("forecast-scope-county");
   const stateSelect = document.getElementById("forecast-state-select");
   const countySelect = document.getElementById("forecast-county-select");
-  if (!region || !state || !county || !stateSelect || !countySelect) return;
+  if (!region || !state || !regime || !county || !stateSelect || !countySelect) return;
 
   region.checked = scope === "region";
   state.checked = scope === "state";
+  regime.checked = scope === "regime";
+  regime.disabled = !regionalRegimeScopeAvailable();
   county.checked = scope === "county";
   stateSelect.disabled = scope !== "state";
   countySelect.disabled = scope !== "county";
@@ -525,7 +541,9 @@ function syncRegionalForecastScopeControls() {
 }
 
 function regionalForecastScopeValue(value) {
-  return value === "state" || value === "county" ? value : "region";
+  return value === "state" || value === "county" || value === "regime"
+    ? value
+    : "region";
 }
 
 function selectedRegionalYearMode() {
@@ -672,6 +690,10 @@ function regionalRecordYear(record) {
 function renderRegionalMap() {
   const container = document.getElementById("regional-risk-map");
   if (!regionalState.counties) return;
+  const regimeToggle = document.getElementById("regional-regime-layer-toggle");
+  if (regimeToggle) {
+    regimeToggle.checked = Boolean(regionalState.showRegimeOverlay);
+  }
 
   const features = regionalState.counties.features || [];
   const bounds = regionalGeoBounds(features);
@@ -750,7 +772,9 @@ function regionalCountyPath(feature, bounds, width, height) {
     "county-shape",
     "regional-county-shape",
     displayClass,
-    regime && regime.region_id === selectedRegime ? "is-same-regime" : "",
+    regionalState.showRegimeOverlay && regime && regime.region_id === selectedRegime
+      ? "is-same-regime"
+      : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -1826,13 +1850,16 @@ function renderRegionalForecastVisualization() {
   const view = selectedRegionalForecastView();
   if (view === "weekly") {
     renderRegionalWeeklyScopeChart(regionalAggregateWeeklyForecastRecords());
+    renderRegionalForecastExplainer();
     return;
   }
   if (selectedRegionalDataMode() === "observed_historical") {
     renderRegionalObservedScopeHistoryChart(regionalAggregateObservedAnnualRecords());
+    renderRegionalForecastExplainer();
     return;
   }
   renderRegionalAnnualScopeChart(regionalAggregateAnnualForecastSummary());
+  renderRegionalForecastExplainer();
 }
 
 function regionalForecastScopeCountyFips() {
@@ -1854,6 +1881,19 @@ function regionalForecastScopeFeatures() {
       (feature) => (feature.properties || {}).county_fips === countyFips
     );
   }
+  if (scope === "regime") {
+    const overlay = regionalRegimeScopeOverlay();
+    const countyFipsSet = new Set(
+      overlay && Array.isArray(overlay.county_fips_list)
+        ? overlay.county_fips_list.map((countyFips) =>
+            String(countyFips).padStart(5, "0")
+          )
+        : []
+    );
+    return features.filter((feature) =>
+      countyFipsSet.has((feature.properties || {}).county_fips)
+    );
+  }
   return features;
 }
 
@@ -1870,7 +1910,30 @@ function regionalForecastScopeLabel() {
       "Selected county"
     );
   }
+  if (scope === "regime") {
+    const overlay = regionalRegimeScopeOverlay();
+    const metadata = regionalState.metadataByCounty.get(
+      regionalForecastScopeCountyFips()
+    );
+    const regime = regionalSelectedRegimeForYear(metadata);
+    const regionName =
+      (overlay && (overlay.region_name || overlay.region_id)) ||
+      (regime && (regime.region_name || regime.region_id)) ||
+      "Local forecast region";
+    return `${regionName} local region`;
+  }
   return "Regional";
+}
+
+function regionalRegimeScopeAvailable() {
+  return Boolean(regionalRegimeScopeOverlay());
+}
+
+function regionalRegimeScopeOverlay() {
+  const countyFips = regionalForecastScopeCountyFips();
+  const metadata = regionalState.metadataByCounty.get(countyFips);
+  const regime = regionalSelectedRegimeForYear(metadata);
+  return regionalSelectedRegimeOverlay(regime);
 }
 
 function regionalForecastScopeCountyCountText(count) {
@@ -1880,7 +1943,39 @@ function regionalForecastScopeCountyCountText(count) {
 
 function regionalForecastScopeAnnualTitle(scopeLabel) {
   if (scopeLabel === "Regional") return "Regional annual forecast";
+  if (String(scopeLabel).endsWith(" local region")) {
+    return `${String(scopeLabel).replace(/ local region$/, "")} local region annual forecast`;
+  }
   return `${scopeLabel} annual forecast`;
+}
+
+function renderRegionalForecastExplainer() {
+  const target = document.getElementById("regional-forecast-explainer");
+  if (!target) return;
+  const weekly = regionalState.weekly || {};
+  const basis = weekly.forecast_basis || {};
+  const seasonal = basis.seasonal_allocation || {};
+  const uncertainty = basis.uncertainty || {};
+  const updatePolicy = basis.update_policy || {};
+  const scoreScale = weekly.score_scale || {};
+  const denominator =
+    scoreScale.score_denominator === undefined ||
+    scoreScale.score_denominator === null
+      ? "the documented regional denominator"
+      : regionalFormatNumber(scoreScale.score_denominator);
+  const intervalMethod =
+    uncertainty.public_term ||
+    uncertainty.interval_method ||
+    "forecast interval";
+  const seasonalScope = seasonal.scope || "national Lyme onset seasonality";
+  const updateStatus =
+    updatePolicy.bayesian_update_status || "research backtest only";
+  target.innerHTML = `<h3 id="regional-forecast-explainer-title">Forecast notes</h3>
+    <p><b>Annual target:</b> reported Lyme incidence per 100k and predicted reported cases. County-level Lyme truth in this preview is annual surveillance data, not observed county-week truth.</p>
+    <p><b>Weekly view:</b> current-year weekly values spread the annual forecast across MMWR weeks using ${regionalEscapeHtml(seasonalScope)}.</p>
+    <p><b>Intervals:</b> dark and light blue bands are empirical forecast-error ranges around reported-incidence forecasts (${regionalEscapeHtml(regionalReadableName(intervalMethod))}), not medical confidence intervals.</p>
+    <p><b>Score scale:</b> weekly scores divide predicted weekly incidence by ${regionalEscapeHtml(denominator)}, then round and clamp to 1-10. Map colors are display categories over the selected metric; they do not replace the numeric incidence or score shown in county details.</p>
+    <p><b>Updates:</b> Bayesian or calibration updates are ${regionalEscapeHtml(regionalReadableName(updateStatus))} and are not automatic public score corrections.</p>`;
 }
 
 function regionalAggregateAnnualForecastSummary() {

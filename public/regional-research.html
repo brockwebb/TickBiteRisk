@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TickBiteRisk Regional Research: Lyme Disease Forecasting and Risk Assessment</title>
-    <link rel="stylesheet" href="styles.css?v=20260530-radio-cache" />
+    <link rel="stylesheet" href="styles.css?v=20260530-regime-scope" />
   </head>
   <body>
     <a class="skip-link" href="#regional-county-panel">Skip to county risk details</a>
@@ -66,6 +66,12 @@
           <h2 id="regional-map-title">Regional county map</h2>
           <p id="regional-map-meta" class="muted">Loading counties...</p>
         </div>
+        <div class="regional-map-layer-controls" aria-label="Regional map layers">
+          <label for="regional-regime-layer-toggle">
+            <input id="regional-regime-layer-toggle" type="checkbox" checked />
+            <span>Show local forecast region</span>
+          </label>
+        </div>
         <div
           id="regional-risk-map"
           class="risk-map regional-risk-map"
@@ -118,6 +124,8 @@
             <label for="forecast-scope-region">All states</label>
             <input id="forecast-scope-state" type="radio" name="forecast-scope" value="state" />
             <label for="forecast-scope-state">State</label>
+            <input id="forecast-scope-regime" type="radio" name="forecast-scope" value="regime" />
+            <label for="forecast-scope-regime">Local region</label>
             <input id="forecast-scope-county" type="radio" name="forecast-scope" value="county" />
             <label for="forecast-scope-county">County</label>
           </div>
@@ -132,6 +140,14 @@
         >
           <p class="loading">Loading forecast chart...</p>
         </div>
+        <section
+          id="regional-forecast-explainer"
+          class="regional-forecast-explainer"
+          aria-labelledby="regional-forecast-explainer-title"
+        >
+          <h3 id="regional-forecast-explainer-title">Forecast notes</h3>
+          <p>Loading forecast notes...</p>
+        </section>
       </section>
 
       <section class="county-list-section regional-county-tools-section" aria-labelledby="regional-list-title">
@@ -209,6 +225,6 @@
       </section>
     </main>
 
-    <script src="regional-research.js?v=20260530-radio-cache" defer></script>
+    <script src="regional-research.js?v=20260530-regime-scope" defer></script>
   </body>
 </html>
