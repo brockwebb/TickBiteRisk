@@ -89,6 +89,15 @@ probable-only rows, laboratory-based surveillance changes, and other reporting
 breaks. A Bayesian update that ignores those regime switches can learn the
 wrong base rate with impressive-looking arithmetic.
 
+Protocol-era normalization is a valid research lane, but it should be framed as
+harmonization for comparability rather than truth correction. The analogy is
+constant-dollar inflation adjustment: older surveillance eras can be transformed
+onto a present-era dimensionless scale or modeled with era offsets so the model
+can compare patterns across time. The output should remain explicitly labeled as
+a harmonized index or source-regime-adjusted estimate, because the transform
+assumes the underlying bias process is stable enough to estimate and does not
+recover unobserved true infections.
+
 The regional public/product default remains separate from research branches.
 Cross-border spatial features are research diagnostics until rolling-origin
 tests show stable improvement and a separate public branch decision is made.

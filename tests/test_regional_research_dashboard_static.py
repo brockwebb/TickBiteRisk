@@ -62,6 +62,10 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function renderRegionalComparableYear",
         "function renderRegionalForecastCheck",
         "function getRegionalForecastObservedFit",
+        "function renderRegionalProtocolNote",
+        "function renderRegionalHistoricalRegimeNotice",
+        "function regionalShowForecastRegimeContext",
+        "function regionalSurveillanceProtocolForYear",
         "function regionalForecastBasisList",
         "function regionalWeekDateRange",
         "function formatRegionalDateRange",
@@ -90,6 +94,12 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "Predicted annual incidence",
         "Predicted annual cases",
         "Observed annual context",
+        "Surveillance protocol",
+        "Protocol era",
+        "1996 surveillance definition era",
+        "2008 surveillance definition era",
+        "2022 surveillance definition era",
+        "Forecast regions are shown only for forecast years",
         "observed reported incidence",
         "Linear score",
         "Why this forecast?",
@@ -138,6 +148,21 @@ def test_regional_research_javascript_keeps_historical_years_annual_only() -> No
         "observed_historical_weekly",
     ]:
         assert token not in js
+
+
+def test_regional_research_javascript_does_not_mix_forecast_regimes_into_observed_years() -> None:
+    js = (PUBLIC_DIR / "regional-research.js").read_text(encoding="utf-8")
+    observed_body = js.split("function renderRegionalObservedCounty", maxsplit=1)[
+        1
+    ].split("function renderRegionalForecastCheck", maxsplit=1)[0]
+    selected_regime_body = js.split("function selectedRegionalRegimeId", maxsplit=1)[
+        1
+    ].split("function updateRegionalSelectedControls", maxsplit=1)[0]
+
+    assert "renderRegionalHistoricalRegimeNotice()" in observed_body
+    assert "renderRegionalCountyRegime(metadata)" not in observed_body
+    assert "renderRegionalProtocolNote(annualRecord.year)" in observed_body
+    assert "regionalShowForecastRegimeContext()" in selected_regime_body
 
 
 def test_regional_forecast_observed_fit_requires_matching_selected_year() -> None:

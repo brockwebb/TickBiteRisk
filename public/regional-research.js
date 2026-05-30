@@ -47,6 +47,33 @@ const regionalFlagLabels = {
   not_public_default: "Research layer, not public default",
 };
 
+const regionalSurveillanceProtocols = [
+  {
+    startYear: 2022,
+    label: "2022 surveillance definition era",
+    note:
+      "High-incidence jurisdictions can rely more on laboratory reporting, so reported counts can rise because reporting changed.",
+  },
+  {
+    startYear: 2008,
+    label: "2008 surveillance definition era",
+    note:
+      "The national definition added probable cases and narrowed laboratory evidence, so counts are not perfectly comparable with earlier years.",
+  },
+  {
+    startYear: 1996,
+    label: "1996 surveillance definition era",
+    note:
+      "The national definition recommended two-step testing and changed how cases were counted for surveillance.",
+  },
+  {
+    startYear: Number.NEGATIVE_INFINITY,
+    label: "pre-1996 surveillance definition era",
+    note:
+      "Early national surveillance is useful history, but it should not be compared to later eras without caveats.",
+  },
+];
+
 document.addEventListener("DOMContentLoaded", initRegionalResearch);
 
 async function initRegionalResearch() {
@@ -769,6 +796,7 @@ function selectRegionalCounty(countyFips) {
     <p>80% empirical interval: ${regionalFormatNumber(interval80[0])} to ${regionalFormatNumber(interval80[1])} per 100k.</p>
     <p>95% empirical interval: ${regionalFormatNumber(interval95[0])} to ${regionalFormatNumber(interval95[1])} per 100k.</p>
     ${renderRegionalScaleDiagnostics(record)}
+    ${renderRegionalProtocolNote(record.data_year || record.year)}
     ${renderRegionalForecastBasis(record)}
     ${renderRegionalComparableYear(record, metadata)}
     ${renderRegionalCountyRegime(metadata)}
@@ -814,6 +842,7 @@ function renderRegionalAnnualForecastCounty({
     ${weeklyHint}
     ${renderRegionalObservedAnnualContext(countyFips)}
     ${renderRegionalForecastCheck(metadata)}
+    ${renderRegionalProtocolNote(record.data_year || record.year)}
     ${renderRegionalForecastBasis(record)}
     ${renderRegionalComparableYear(record, metadata)}
     ${renderRegionalCountyRegime(metadata)}
@@ -1049,7 +1078,8 @@ function renderRegionalObservedCounty({
     <p>${regionalEscapeHtml(annualRecord.reported_cases)} reported cases; population denominator ${regionalFormatNumber(annualRecord.population)}.</p>
     <p>Mid-Atlantic diagnostic tier: ${regionalEscapeHtml(regionalReadableName(annualRecord.diagnostic_midatlantic_incidence_tier))}.</p>
     ${renderRegionalForecastCheck(metadata)}
-    ${renderRegionalCountyRegime(metadata)}
+    ${renderRegionalProtocolNote(annualRecord.year)}
+    ${renderRegionalHistoricalRegimeNotice()}
     ${renderRegionalFlagCaveats(annualRecord)}
     <p class="disclaimer">Reported cases are not stable true incidence. This historical layer is informational only, not medical advice, and not a forecast-safe feature for the selected year.</p>
   </div>`;
@@ -1099,6 +1129,30 @@ function getRegionalForecastObservedFit(metadata) {
   );
 }
 
+function renderRegionalProtocolNote(year) {
+  const protocol = regionalSurveillanceProtocolForYear(year);
+  return `<details class="lineage-strip protocol-note" open>
+    <summary>Surveillance protocol</summary>
+    <p><b>Protocol era:</b> ${regionalEscapeHtml(protocol.label)}.</p>
+    <p>${regionalEscapeHtml(protocol.note)}</p>
+    <p>Major Lyme surveillance definition breaks include 1996, 2008, and 2022. Cross-era comparisons should use source-regime terms or a harmonized index, not silent case-count correction.</p>
+  </details>`;
+}
+
+function regionalSurveillanceProtocolForYear(year) {
+  const selectedYear = Number(year);
+  if (!Number.isFinite(selectedYear)) {
+    return {
+      label: "unknown surveillance definition era",
+      note:
+        "The selected year is unavailable, so cross-year comparability should be treated as unknown.",
+    };
+  }
+  return regionalSurveillanceProtocols.find(
+    (protocol) => selectedYear >= protocol.startYear
+  );
+}
+
 function renderRegionalObservedAnnualContext(countyFips) {
   const annualRecord = getRegionalAnnualRecord(countyFips);
   if (!annualRecord) {
@@ -1111,6 +1165,9 @@ function renderRegionalObservedAnnualContext(countyFips) {
 }
 
 function renderRegionalCountyRegime(metadata) {
+  if (!regionalShowForecastRegimeContext()) {
+    return renderRegionalHistoricalRegimeNotice();
+  }
   const regime = metadata && metadata.selected_spatial_regime;
   if (!regime) return "";
   return `<section class="lineage-strip" aria-labelledby="regional-lineage-heading">
@@ -1132,8 +1189,20 @@ function renderRegionalCountyRegime(metadata) {
   </section>`;
 }
 
+function renderRegionalHistoricalRegimeNotice() {
+  return `<section class="lineage-strip" aria-labelledby="regional-historical-regime-heading">
+    <h4 id="regional-historical-regime-heading">Forecast region context</h4>
+    <p>Forecast regions are shown only for forecast years. The selected historical map is observed annual data, so forecast feature years and forecast origins are hidden here.</p>
+  </section>`;
+}
+
 function renderRegionalRegime(metadata) {
   const target = document.getElementById("regional-regime-panel");
+  if (!regionalShowForecastRegimeContext()) {
+    target.innerHTML = `<h3 id="regional-regime-title">Forecast region context</h3>
+      <p class="muted">Forecast regions are shown only for forecast years. This view is observed annual data for ${regionalEscapeHtml(regionalState.selectedYear || "the selected year")}.</p>`;
+    return;
+  }
   const regime = metadata && metadata.selected_spatial_regime;
   if (!regime) {
     target.innerHTML = `<h3 id="regional-regime-title">Localized spatial regime</h3><p class="muted">No spatial-regime membership is available for this county.</p>`;
@@ -1557,9 +1626,15 @@ function regionalForecastYearsFromRecords() {
 }
 
 function selectedRegionalRegimeId() {
+  if (!regionalShowForecastRegimeContext()) return null;
   const metadata = regionalState.metadataByCounty.get(regionalState.selectedCounty);
   const regime = metadata && metadata.selected_spatial_regime;
   return regime && regime.region_id;
+}
+
+function regionalShowForecastRegimeContext() {
+  if (!regionalState.selectedCounty) return false;
+  return regionalCountyDataMode(regionalState.selectedCounty) === "forecast";
 }
 
 function updateRegionalSelectedControls() {

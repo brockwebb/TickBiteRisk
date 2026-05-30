@@ -438,6 +438,17 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   );
   await expect(panel).toContainText("22 reported cases");
   await expect(panel).toContainText("77.19 per 100k");
+  await expect(panel).toContainText("Surveillance protocol");
+  await expect(panel).toContainText("2022 surveillance definition era");
+  await expect(panel).not.toContainText("Feature year");
+  await expect(panel).not.toContainText("Forecast origin");
+  await expect(page.locator("#regional-regime-panel")).toContainText(
+    "Forecast regions are shown only for forecast years"
+  );
+  await expect(page.locator("#regional-regime-panel")).not.toContainText("Feature year");
+  await expect(page.locator('path[data-county="24001"]')).not.toHaveClass(
+    /is-same-regime/
+  );
   await expect(page.locator("#regional-forecast-chart .observed-history-line")).toHaveCount(1);
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "observed annual incidence history"
