@@ -40,15 +40,27 @@ def test_regional_research_html_has_map_controls_and_research_boundaries() -> No
         'id="forecast-county-select"',
         'id="state-filter"',
         'id="county-search"',
+        'id="regional-county-picker"',
         'id="regional-list-status" aria-live="polite"',
+        'id="regional-bite-form"',
+        'id="regional-bite-tick-species"',
+        'id="regional-bite-tick-stage"',
+        'id="regional-bite-attachment-hours"',
+        'id="regional-bite-engorgement"',
+        'id="regional-bite-hours-since-removal"',
+        'id="regional-bite-doxycycline-safe"',
+        'id="regional-bite-tick-count"',
+        'id="regional-bite-result" class="bite-result" aria-live="polite"',
         'id="regional-forecast-provenance"',
         'id="regional-source-content"',
         "Forecast window",
+        "Tick bite guidance",
         "Informational only. Not medical advice.",
         "regional-research.js",
     ]:
         assert token in html
 
+    assert 'id="regional-county-list"' not in html
     assert "Research-only regional outputs" not in html
     assert "public Maryland default" not in html
 
@@ -104,6 +116,14 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function regionalAnnualForecastSummary",
         "function regionalCountyWeekRecords",
         "function handleRegionalListFilterChange",
+        "function handleRegionalCountyPickerChange",
+        "function handleRegionalBiteSubmit",
+        "function renderRegionalBiteResult",
+        "function readRegionalBiteInputs",
+        "function estimateRegionalSingleBiteRisk",
+        "function regionalLocationSeasonModifier",
+        "function regionalPepCriteria",
+        "function regionalBiteRiskBand",
         "function filteredRegionalFeatures",
         "function renderRegionalForecastProvenance",
         "function handleWeekSliderInput",
@@ -144,6 +164,9 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "The red dot marks the selected week",
         "The brown line is observed annual reported incidence",
         "The blue dot is the selected annual forecast",
+        "Bite concern score",
+        "CDC consideration context",
+        "Bite-specific caveats",
         "Nearest comparable history",
         "How unusual is this forecast?",
         "Compared with this county",
@@ -173,6 +196,8 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
     assert "data/md_county_risk_weekly.json" not in js
     assert "md_counties.geojson" not in js
     assert "forecast-view-select" not in js
+    assert "regional-county-list" not in js
+    assert "Maryland high-incidence context" not in js
     assert "Not used:" not in js
     assert "public Maryland default" not in js
     assert "Research only:" not in js

@@ -767,6 +767,10 @@ h1 {
   margin: 0;
 }
 
+.regional-county-tools-section .regional-bite-calculator {
+  max-width: 60rem;
+}
+
 .regional-source-section {
   grid-column: 1 / -1;
 }
@@ -910,6 +914,7 @@ h1 {
   .regional-controls,
   .county-list-section,
   .regional-county-list-section,
+  .regional-county-tools-section,
   .regional-chart-section,
   .validation-summary,
   .sources,
@@ -918,7 +923,7 @@ h1 {
   }
 
   .regional-list-filters {
-    grid-template-columns: auto minmax(9rem, 12rem) auto minmax(12rem, 1fr) auto;
+    grid-template-columns: auto minmax(8rem, 11rem) auto minmax(12rem, 1fr) auto minmax(14rem, 1fr) auto;
     align-items: center;
   }
 

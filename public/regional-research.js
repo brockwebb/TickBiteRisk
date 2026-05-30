@@ -14,6 +14,7 @@ const regionalState = {
   forecastScope: "region",
   forecastScopeState: "",
   forecastScopeCounty: null,
+  biteEstimateRequested: false,
   availableYears: [],
   stateFilter: "",
   countySearch: "",
@@ -111,6 +112,12 @@ async function initRegionalResearch() {
   document
     .getElementById("county-search")
     .addEventListener("input", handleRegionalListFilterChange);
+  document
+    .getElementById("regional-county-picker")
+    .addEventListener("change", handleRegionalCountyPickerChange);
+  document
+    .getElementById("regional-bite-form")
+    .addEventListener("submit", handleRegionalBiteSubmit);
 
   try {
     const [
@@ -400,6 +407,20 @@ function handleRegionalListFilterChange() {
     .value.trim()
     .toLowerCase();
   renderRegionalCountyList();
+}
+
+function handleRegionalCountyPickerChange(event) {
+  const countyFips = event.target.value;
+  regionalState.forecastScope = "county";
+  regionalState.forecastScopeCounty = countyFips;
+  syncRegionalForecastScopeControls();
+  selectRegionalCounty(countyFips);
+}
+
+function handleRegionalBiteSubmit(event) {
+  event.preventDefault();
+  regionalState.biteEstimateRequested = true;
+  renderRegionalBiteResult();
 }
 
 function updateRegionalWeekLabel() {
@@ -748,14 +769,17 @@ function regionalCountyPath(feature, bounds, width, height) {
 }
 
 function renderRegionalCountyList() {
-  const list = document.getElementById("regional-county-list");
+  const picker = document.getElementById("regional-county-picker");
   const features = filteredRegionalFeatures();
-  list.innerHTML = features.map(regionalCountyListButton).join("");
-  list.querySelectorAll("button[data-county]").forEach((button) => {
-    button.addEventListener("click", () =>
-      selectRegionalCountyFromMap(button.dataset.county)
-    );
-  });
+  picker.innerHTML = features.map(regionalCountyPickerOption).join("");
+  const selectedInResults = features.some(
+    (feature) => (feature.properties || {}).county_fips === regionalState.selectedCounty
+  );
+  if (selectedInResults) {
+    picker.value = regionalState.selectedCounty;
+  } else if (features.length) {
+    picker.value = (features[0].properties || {}).county_fips;
+  }
   renderRegionalListStatus(features.length);
   updateRegionalSelectedControls();
 }
@@ -824,11 +848,11 @@ function regionalCountySortLabel(feature) {
 
 function renderRegionalListStatus(count) {
   const status = document.getElementById("regional-list-status");
-  const noun = count === 1 ? "county" : "counties";
-  status.textContent = `${count} ${noun} shown`;
+  const noun = count === 1 ? "county choice" : "county choices";
+  status.textContent = `${count} ${noun}`;
 }
 
-function regionalCountyListButton(feature) {
+function regionalCountyPickerOption(feature) {
   const props = feature.properties || {};
   const record = getRegionalRecord(props.county_fips);
   const annualRecord = getRegionalAnnualRecord(props.county_fips);
@@ -856,18 +880,8 @@ function regionalCountyListButton(feature) {
     : countyMode === "observed_historical" && annualRecord
       ? regionalReadableName(annualRecord.diagnostic_midatlantic_incidence_tier)
       : "unavailable";
-  const badgeClass = countyMode === "forecast"
-    ? forecastView === "weekly" && record
-      ? regionalRiskClass(record.risk_score)
-      : regionalAnnualIncidenceClass(annualSummary.predictedAnnualIncidence)
-    : countyMode === "observed_historical"
-      ? regionalObservedRiskClass(annualRecord)
-      : "risk-unavailable";
 
-  return `<button type="button" data-county="${regionalEscapeHtml(props.county_fips)}" aria-pressed="${props.county_fips === regionalState.selectedCounty ? "true" : "false"}">
-    <span>${regionalEscapeHtml(props.county_name)}<br><small>${regionalEscapeHtml(props.state_abbr || "")} · ${regionalEscapeHtml(category)}</small></span>
-    <span class="score-badge ${badgeClass}">${regionalEscapeHtml(score)}</span>
-  </button>`;
+  return `<option value="${regionalEscapeHtml(props.county_fips)}">${regionalEscapeHtml(props.county_name)}${props.state_abbr ? `, ${regionalEscapeHtml(props.state_abbr)}` : ""} - ${regionalEscapeHtml(category)} - ${regionalEscapeHtml(score)}</option>`;
 }
 
 function selectRegionalCounty(countyFips) {
@@ -1508,6 +1522,291 @@ function renderRegionalFlagCaveats(record) {
     <h4 id="regional-flag-heading">What to know about this score</h4>
     <ul class="flag-list">${items}</ul>
   </section>`;
+}
+
+function renderRegionalBiteResult() {
+  const target = document.getElementById("regional-bite-result");
+  const record = regionalBiteForecastRecord();
+  if (!record) {
+    target.innerHTML =
+      "<p>Select a county with a current forecast before estimating bite concern.</p>";
+    return;
+  }
+  const result = estimateRegionalSingleBiteRisk(record, readRegionalBiteInputs());
+  const criteriaItems = result.pep_criteria
+    .map(
+      (criterion) => `<li>
+        <span class="criteria-status">${regionalEscapeHtml(criterion.status)}</span>
+        <span>${regionalEscapeHtml(regionalReadableName(criterion.criterion))}</span>
+        <small>${regionalEscapeHtml(criterion.explanation)}</small>
+      </li>`
+    )
+    .join("");
+  const dateRange = regionalWeekDateRange(record);
+  const periodText = dateRange
+    ? `${dateRange} (MMWR week ${record.mmwr_week})`
+    : `MMWR week ${record.mmwr_week}`;
+
+  target.innerHTML = `<section aria-labelledby="regional-bite-result-title">
+    <h4 id="regional-bite-result-title">Bite concern score</h4>
+    <p class="muted">Uses ${regionalEscapeHtml(periodText)} forecast context for ${regionalEscapeHtml(record.county_name || record.county_fips)}.</p>
+    <p><span class="score-badge ${regionalRiskClass(result.single_bite_risk_score)}">${regionalEscapeHtml(result.single_bite_risk_score)}/10</span> ${regionalEscapeHtml(result.single_bite_risk_band)}</p>
+    <p>${regionalEscapeHtml(result.risk_interpretation)}</p>
+    <p><b>CDC consideration context:</b> ${regionalEscapeHtml(regionalReadableName(result.pep_consideration))}</p>
+    <ul class="criteria-list">${criteriaItems}</ul>
+    ${renderRegionalBiteCaveats(result.caveats)}
+    <p class="disclaimer">This is not an absolute infection probability, diagnosis, or treatment recommendation.</p>
+  </section>`;
+}
+
+function readRegionalBiteInputs() {
+  return {
+    attachment_hours: regionalOptionalNumber("regional-bite-attachment-hours"),
+    doxycycline_safe: regionalOptionalBoolean("regional-bite-doxycycline-safe"),
+    engorgement: document.getElementById("regional-bite-engorgement").value,
+    hours_since_removal: regionalOptionalNumber("regional-bite-hours-since-removal"),
+    tick_count: regionalOptionalNumber("regional-bite-tick-count") || 1,
+    tick_species: document.getElementById("regional-bite-tick-species").value,
+    tick_stage: document.getElementById("regional-bite-tick-stage").value,
+  };
+}
+
+function estimateRegionalSingleBiteRisk(record, input) {
+  const modifiers = {
+    attachment: regionalAttachmentModifier(
+      input.attachment_hours,
+      input.engorgement
+    ),
+    location_season: regionalLocationSeasonModifier(record),
+    tick_species: regionalSpeciesModifier(input.tick_species),
+    tick_stage: regionalStageModifier(input.tick_stage),
+  };
+  const rawSingle = Math.min(
+    1,
+    Math.max(
+      0,
+      modifiers.location_season *
+        modifiers.tick_species *
+        modifiers.tick_stage *
+        modifiers.attachment
+    )
+  );
+  const tickCount = Math.min(20, Math.max(1, Number(input.tick_count || 1)));
+  const combined = 1 - (1 - rawSingle) ** tickCount;
+  const scoreRaw = Number((combined * 10).toFixed(6));
+  const score = Math.max(1, Math.min(10, Math.ceil(scoreRaw)));
+  const criteria = regionalPepCriteria(record, input);
+  return {
+    caveats: regionalBiteCaveats(record, input),
+    evidence_modifiers: modifiers,
+    pep_consideration: regionalPepConsideration(criteria),
+    pep_criteria: criteria,
+    risk_interpretation:
+      "This score combines the selected county-week forecast with tick identity, stage, attachment, engorgement, and tick count. It is not an absolute infection probability.",
+    single_bite_risk_band: regionalBiteRiskBand(score),
+    single_bite_risk_score: score,
+    single_bite_risk_score_raw: scoreRaw,
+  };
+}
+
+function regionalBiteForecastRecord() {
+  const countyFips = regionalState.selectedCounty;
+  if (!countyFips) return null;
+  const selectedRecord = getRegionalRecord(countyFips);
+  if (selectedRecord && isLatestRegionalForecastYear()) return selectedRecord;
+  const latestYear = latestRegionalForecastYear();
+  const records = (regionalState.recordsByCounty.get(countyFips) || []).filter(
+    (record) => regionalRecordYear(record) === latestYear
+  );
+  return (
+    records.find((record) => Number(record.mmwr_week) === regionalState.selectedWeek) ||
+    records[0] ||
+    null
+  );
+}
+
+function regionalLocationSeasonModifier(record) {
+  const scoreBaseline = Number(record.risk_score || 1) / 10;
+  const annualIncidence = Number(record.predicted_annual_incidence_per_100k);
+  if (Number.isFinite(annualIncidence) && annualIncidence >= 50) {
+    return Math.max(scoreBaseline, 0.55);
+  }
+  if (Number.isFinite(annualIncidence) && annualIncidence >= 25) {
+    return Math.max(scoreBaseline, 0.35);
+  }
+  return scoreBaseline;
+}
+
+function regionalSpeciesModifier(species) {
+  if (species === "ixodes_scapularis") return 1;
+  if (species === "possible_ixodes") return 0.75;
+  if (species === "unknown") return 0.5;
+  return 0.05;
+}
+
+function regionalStageModifier(stage) {
+  if (stage === "nymph") return 1;
+  if (stage === "adult") return 0.85;
+  if (stage === "larva") return 0.1;
+  return 0.7;
+}
+
+function regionalAttachmentModifier(hours, engorgement) {
+  let base = 0.7;
+  if (hours !== null && hours < 24) base = 0.15;
+  if (hours !== null && hours >= 24 && hours < 36) base = 0.45;
+  if (hours !== null && hours >= 36 && hours < 48) base = 1;
+  if (hours !== null && hours >= 48 && hours < 72) base = 1.25;
+  if (hours !== null && hours >= 72) base = 1.4;
+  if (engorgement === "flat") return Math.min(base, 0.2);
+  if (engorgement === "slightly_engorged") return Math.max(base, 0.75);
+  if (engorgement === "engorged") return Math.max(base, 1.15);
+  return base;
+}
+
+function regionalPepCriteria(record, input) {
+  return [
+    regionalLymeCommonAreaCriterion(record),
+    regionalTickIdentityCriterion(input),
+    regionalAttachmentCriterion(input),
+    {
+      criterion: "removal_window",
+      status:
+        input.hours_since_removal === null
+          ? "uncertain"
+          : input.hours_since_removal <= 72
+            ? "meets"
+            : "not_met",
+      explanation: "CDC consideration is most relevant within 72 hours after removal.",
+    },
+    {
+      criterion: "doxycycline_safety",
+      status:
+        input.doxycycline_safe === null
+          ? "uncertain"
+          : input.doxycycline_safe
+            ? "meets"
+            : "not_met",
+      explanation: "A healthcare professional must decide whether doxycycline is safe.",
+    },
+  ];
+}
+
+function regionalLymeCommonAreaCriterion(record) {
+  const annualIncidence = Number(record.predicted_annual_incidence_per_100k);
+  const riskScore = Number(record.risk_score);
+  const status =
+    riskScore >= 5 || annualIncidence >= 25
+      ? "meets"
+      : riskScore >= 3
+        ? "uncertain"
+        : "not_met";
+  return {
+    criterion: "local_forecast_context",
+    explanation:
+      "Uses the selected county's forecast context because public county-week tick infection prevalence is not available.",
+    status,
+  };
+}
+
+function regionalTickIdentityCriterion(input) {
+  let status = "uncertain";
+  if (
+    input.tick_species === "ixodes_scapularis" &&
+    (input.tick_stage === "nymph" || input.tick_stage === "adult")
+  ) {
+    status = "meets";
+  }
+  if (input.tick_species === "not_ixodes" || input.tick_stage === "larva") {
+    status = "not_met";
+  }
+  return {
+    criterion: "tick_identity",
+    explanation:
+      "CDC Lyme prophylaxis guidance focuses on adult or nymphal blacklegged ticks.",
+    status,
+  };
+}
+
+function regionalAttachmentCriterion(input) {
+  let status = "uncertain";
+  if (
+    input.engorgement === "engorged" ||
+    (input.attachment_hours !== null && input.attachment_hours >= 36)
+  ) {
+    status = "meets";
+  }
+  if (
+    input.engorgement === "flat" ||
+    (input.attachment_hours !== null && input.attachment_hours < 24)
+  ) {
+    status = "not_met";
+  }
+  return {
+    criterion: "attachment_duration",
+    explanation: "CDC guidance treats 36+ hours or engorgement as a key consideration.",
+    status,
+  };
+}
+
+function regionalPepConsideration(criteria) {
+  const statuses = new Set(criteria.map((criterion) => criterion.status));
+  if (statuses.size === 1 && statuses.has("meets")) {
+    return "meets_cdc_consideration_criteria";
+  }
+  if (statuses.has("not_met")) {
+    return "does_not_meet_cdc_consideration_criteria";
+  }
+  return "partially_meets_cdc_consideration_criteria";
+}
+
+function regionalBiteRiskBand(score) {
+  if (score >= 9) return "high";
+  if (score >= 7) return "elevated";
+  if (score >= 5) return "moderate";
+  if (score >= 3) return "low";
+  return "very low";
+}
+
+function regionalBiteCaveats(record, input) {
+  const caveats = [
+    "not_calibrated_absolute_probability",
+    "not_diagnosis_or_treatment_recommendation",
+    "regional_forecast_context_not_tick_test",
+  ];
+  if (input.tick_species === "not_ixodes") {
+    caveats.push("non_ixodes_lyme_vector_unlikely");
+  }
+  if (!isLatestRegionalForecastYear(regionalRecordYear(record))) {
+    caveats.push("uses_latest_available_forecast_context");
+  }
+  return caveats;
+}
+
+function renderRegionalBiteCaveats(caveats) {
+  if (!caveats || !caveats.length) return "";
+  const items = caveats
+    .map((caveat) => `<li>${regionalEscapeHtml(regionalReadableBiteCaveat(caveat))}</li>`)
+    .join("");
+  return `<section class="bite-caveats" aria-labelledby="regional-bite-caveats-title">
+    <h5 id="regional-bite-caveats-title">Bite-specific caveats</h5>
+    <ul>${items}</ul>
+  </section>`;
+}
+
+function regionalReadableBiteCaveat(caveat) {
+  const labels = {
+    non_ixodes_lyme_vector_unlikely: "non blacklegged tick Lyme vector unlikely",
+    not_calibrated_absolute_probability:
+      "not calibrated as an absolute infection probability",
+    not_diagnosis_or_treatment_recommendation:
+      "not a diagnosis or treatment recommendation",
+    regional_forecast_context_not_tick_test:
+      "county forecast context is not a tick test or infected-tick prevalence measurement",
+    uses_latest_available_forecast_context:
+      "uses the latest available weekly forecast context for this county",
+  };
+  return labels[caveat] || regionalSentenceCase(String(caveat).replaceAll("_", " "));
 }
 
 function renderRegionalForecastVisualization() {
@@ -2354,6 +2653,13 @@ function updateRegionalSelectedControls() {
     element.setAttribute("aria-pressed", String(isSelected));
     element.classList.toggle("is-selected", isSelected);
   });
+  const picker = document.getElementById("regional-county-picker");
+  if (picker && regionalState.selectedCounty) {
+    picker.value = regionalState.selectedCounty;
+  }
+  if (regionalState.biteEstimateRequested) {
+    renderRegionalBiteResult();
+  }
 }
 
 function findRegionalCountyFeature(countyFips) {
@@ -2365,7 +2671,7 @@ function findRegionalCountyFeature(countyFips) {
 
 function renderRegionalLoadError(error) {
   document.getElementById("regional-risk-map").innerHTML = `<p role="alert">${regionalEscapeHtml(error.message)}</p>`;
-  document.getElementById("regional-county-list").innerHTML = "";
+  document.getElementById("regional-county-picker").innerHTML = "";
   document.getElementById("regional-panel-content").innerHTML =
     "<p>Regional research data bundle is unavailable.</p>";
   document.getElementById("regional-regime-panel").innerHTML =
@@ -2530,6 +2836,20 @@ function regionalCategoryLabel(value) {
 
 function regionalFormatNumber(value) {
   return Number(value || 0).toFixed(2);
+}
+
+function regionalOptionalNumber(id) {
+  const value = document.getElementById(id).value;
+  if (value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function regionalOptionalBoolean(id) {
+  const value = document.getElementById(id).value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
 }
 
 function regionalEscapeHtml(value) {

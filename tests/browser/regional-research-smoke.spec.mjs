@@ -510,14 +510,33 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   );
 
   await page.locator("#state-filter").selectOption("MD");
-  await expect(page.locator("#regional-list-status")).toContainText("2 counties shown");
-  await expect(page.locator("#regional-county-list button[data-county]")).toHaveCount(2);
+  await expect(page.locator("#regional-list-status")).toContainText("2 county choices");
+  await expect(page.locator("#regional-county-list")).toHaveCount(0);
   await page.locator("#county-search").fill("Garrett");
-  await expect(page.locator("#regional-list-status")).toContainText("1 county shown");
-  await expect(page.locator("#regional-county-list button[data-county]")).toHaveCount(1);
-  await expect(page.locator("#regional-county-list")).toContainText("Garrett County");
-  await page.locator('button[data-county="24023"]').click();
+  await expect(page.locator("#regional-list-status")).toContainText("1 county choice");
+  await expect(page.locator("#regional-county-picker")).toContainText("Garrett County");
+  await page.locator("#regional-county-picker").selectOption("24023");
   await expect(panel).toContainText("Garrett County");
+  await page.locator("#regional-bite-tick-species").selectOption("ixodes_scapularis");
+  await page.locator("#regional-bite-tick-stage").selectOption("nymph");
+  await page.locator("#regional-bite-attachment-hours").fill("48");
+  await page.locator("#regional-bite-engorgement").selectOption("engorged");
+  await page.locator("#regional-bite-hours-since-removal").fill("24");
+  await page.locator("#regional-bite-doxycycline-safe").selectOption("true");
+  await page.locator("#regional-bite-tick-count").fill("1");
+  await page.locator("#regional-bite-form button[type=\"submit\"]").click();
+  await expect(page.locator("#regional-bite-result")).toContainText(
+    "Bite concern score"
+  );
+  await expect(page.locator("#regional-bite-result")).toContainText(
+    "CDC consideration context"
+  );
+  await expect(page.locator("#regional-bite-result")).toContainText(
+    "Bite-specific caveats"
+  );
+  await expect(page.locator("#regional-bite-result")).toContainText(
+    "not an absolute infection probability"
+  );
 
   await expect(page.locator("#regional-source-content")).toContainText(
     "Forecast-safe branches use prior-year"
