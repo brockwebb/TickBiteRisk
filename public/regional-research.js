@@ -2311,6 +2311,36 @@ function regionalChartYAxisMarkup({ height, maxValue, padding, width, yScale }) 
   </g>`;
 }
 
+function regionalChartXAxisMarkup({ height, maxYear, minYear, padding, xScale }) {
+  const axisY = height - padding.bottom;
+  const titleY = height - 4;
+  return `<g class="chart-x-scale" aria-label="X-axis year scale">
+    ${regionalChartYearTicks(minYear, maxYear)
+      .map((year) => {
+        const x = xScale(year);
+        return `<line class="chart-x-tick-line" x1="${x.toFixed(2)}" y1="${axisY}" x2="${x.toFixed(2)}" y2="${axisY + 5}"></line>
+        <text class="chart-x-tick" x="${x.toFixed(2)}" y="${axisY + 18}">${regionalEscapeHtml(year)}</text>`;
+      })
+      .join("")}
+    <text class="chart-x-axis-title" x="${padding.left}" y="${titleY}">Year</text>
+  </g>`;
+}
+
+function regionalChartYearTicks(minYear, maxYear) {
+  const start = Math.round(Number(minYear));
+  const end = Math.round(Number(maxYear));
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return [];
+  if (start === end) return [start];
+  if (end - start <= 5) return [start, end];
+  const ticks = [start];
+  const firstFiveYearTick = Math.ceil(start / 5) * 5;
+  for (let year = firstFiveYearTick; year < end; year += 5) {
+    if (year > start) ticks.push(year);
+  }
+  ticks.push(end);
+  return Array.from(new Set(ticks));
+}
+
 function renderRegionalAnnualChartContext(comparison) {
   const interval = comparison.interval || {};
   return `<section class="forecast-chart-context" aria-label="Annual forecast comparison">
@@ -2631,7 +2661,6 @@ function renderRegionalAnnualScopeChart(scopeSummary) {
     ariaLabel: `${scopeSummary.scopeLabel} annual incidence forecast and observed history`,
     observedRecords,
     points,
-    xLabelPrefix: "Annual incidence",
   });
   target.innerHTML = `${renderRegionalAnnualChartContext(comparison)}${chart}`;
   const casesText = Number.isFinite(Number(scopeSummary.predictedAnnualCases))
@@ -2740,7 +2769,6 @@ function renderRegionalObservedScopeHistoryChart(records) {
       value: Number(record.incidence_per_100k),
       year: Number(record.year),
     })),
-    xLabelPrefix: "Observed years",
   });
   const years = records.map((record) => Number(record.year));
   const minYear = Math.min(...years);
@@ -2756,11 +2784,10 @@ function regionalAnnualChartSvg({
   ariaLabel,
   observedRecords,
   points,
-  xLabelPrefix,
 }) {
   const width = 760;
   const height = 260;
-  const padding = { top: 28, right: 22, bottom: 34, left: 58 };
+  const padding = { top: 28, right: 22, bottom: 48, left: 58 };
   const years = points.map((point) => Number(point.year));
   const minYear = Math.min(...years);
   const maxYear = Math.max(...years);
@@ -2795,15 +2822,22 @@ function regionalAnnualChartSvg({
     width,
     yScale,
   });
+  const xAxis = regionalChartXAxisMarkup({
+    height,
+    maxYear,
+    minYear,
+    padding,
+    xScale,
+  });
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${regionalEscapeHtml(ariaLabel)}">
     ${yAxis}
+    ${xAxis}
     ${observedLine}
     <line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
     <line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}"></line>
     <circle class="${regionalEscapeHtml(activeClass)}" ${activeYearAttribute}="${regionalEscapeHtml(activeYear)}" cx="${activeX.toFixed(2)}" cy="${activeY.toFixed(2)}" r="6">
       <title>${regionalEscapeHtml(activeTitle)}</title>
     </circle>
-    <text class="chart-label" x="${padding.left}" y="${height - 10}">${regionalEscapeHtml(xLabelPrefix)} ${regionalEscapeHtml(minYear)}-${regionalEscapeHtml(maxYear)}</text>
   </svg>`;
 }
 

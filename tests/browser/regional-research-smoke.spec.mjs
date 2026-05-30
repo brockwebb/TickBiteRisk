@@ -530,6 +530,16 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
     "Incidence per 100k"
   );
   await expect(page.locator("#regional-forecast-chart .chart-y-tick")).toHaveCount(3);
+  await expect(page.locator("#regional-forecast-chart .chart-x-axis-title")).toContainText(
+    "Year"
+  );
+  await expect(page.locator("#regional-forecast-chart .chart-x-tick")).toHaveCount(2);
+  await expect(page.locator("#regional-forecast-chart .chart-x-tick").first()).toContainText(
+    "2023"
+  );
+  await expect(page.locator("#regional-forecast-chart .chart-x-tick").last()).toContainText(
+    "2026"
+  );
   await page.locator('label[for="forecast-scope-region"]').click();
   await expect(regionScopeRadio).toBeChecked();
   await expect(page.locator("#regional-chart-summary")).toContainText(

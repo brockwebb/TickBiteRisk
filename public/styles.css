@@ -1078,13 +1078,24 @@ h1 {
 }
 
 .chart-y-axis-title,
-.chart-y-tick {
+.chart-y-tick,
+.chart-x-axis-title,
+.chart-x-tick {
   fill: var(--muted);
   font-size: 11px;
 }
 
 .chart-y-tick {
   text-anchor: end;
+}
+
+.chart-x-tick {
+  text-anchor: middle;
+}
+
+.chart-x-tick-line {
+  stroke: var(--line);
+  stroke-width: 1;
 }
 
 .county-list button.is-selected {

@@ -242,6 +242,8 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "worse than average",
         "chart-y-axis-title",
         "chart-y-tick",
+        "chart-x-axis-title",
+        "chart-x-tick",
         "Predicted score footnote",
         "Annual view shows the peak weekly score",
         "not a personal infection probability",
