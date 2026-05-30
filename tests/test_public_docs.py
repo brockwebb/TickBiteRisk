@@ -9,6 +9,7 @@ USER_GUIDE = Path("docs/user-guide.md")
 ROADMAP = Path("docs/roadmap.md")
 VISION_SCOPE = Path("docs/vision-scope.md")
 MODEL_SPEC = Path("docs/model-spec.md")
+REGIONAL_RESEARCH_EVIDENCE = Path("docs/regional-research-evidence.md")
 DATA_SOURCES = Path("docs/data-sources.md")
 TESTING_CI_PLAN = Path("docs/testing-ci-plan.md")
 ETL_PIPELINE = Path("docs/etl-pipeline.md")
@@ -480,6 +481,40 @@ def test_roadmap_documents_autonomous_queue_and_hitl_gates() -> None:
         "deliberate untracked local files",
     ]:
         assert token in roadmap
+
+
+def test_regional_research_evidence_pack_preserves_public_boundary() -> None:
+    evidence = REGIONAL_RESEARCH_EVIDENCE.read_text(encoding="utf-8")
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+
+    for token in [
+        "Regional Research Evidence Pack",
+        "spatial-regime evidence pack",
+        "forecast update evidence pack",
+        "regional_spatial_regime_runs.csv",
+        "regional_spatial_regime_summary.csv",
+        "regional_spatial_regime_forecast_interval_summary.csv",
+        "regional_forecast_observed_fit_summary.csv",
+        "forecast_calibration_backtest_metrics.csv",
+        "forecast_bayesian_update_backtest_metrics.csv",
+        "n_input_rows: 6,599",
+        "n_summary_rows: 1,224",
+        "2024 regime count: 127",
+        "2024 county-equivalent coverage: 283",
+        "Pennsylvania 2024 partial overlay",
+        "predicted 9,415.098301 cases",
+        "observed 16,620 cases",
+        "linear_blend_baseline",
+        "forecast_safe_top4_ensemble",
+        "do_not_apply_to_public_forecast",
+        "Gamma-Poisson",
+        "not_public_maryland_default",
+        "not automatic public score corrections",
+        "Public branch promotion remains HITL",
+    ]:
+        assert token in evidence
+
+    assert "docs/regional-research-evidence.md" in roadmap
 
 
 def test_vision_scope_includes_single_bite_score_without_absolute_probability_claim() -> None:

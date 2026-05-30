@@ -50,7 +50,8 @@ local-region chart scope controls, forecast explanation panels, static asset
 cache hardening, and documentation that keeps the research/public boundary
 visible.
 
-The next autonomous evidence tasks are:
+The active evidence pack lives at `docs/regional-research-evidence.md`. The
+remaining autonomous evidence maintenance tasks are:
 
 - spatial-regime evidence pack: summarize localized regime membership,
   forecast-safe inputs, interval behavior, and backtest/fit caveats without
