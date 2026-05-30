@@ -289,6 +289,24 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
 
   await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(4);
   await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(3);
+  await expect(page.locator(".regional-jump-links")).toContainText("Research notes");
+  await expect(page.locator(".regional-jump-links")).toContainText("County details");
+  await page.locator('.regional-jump-links a[href="#regional-source-title"]').click();
+  await expect(page.locator("#regional-source-title")).toBeInViewport();
+  await page.locator('.regional-source-section a[href="#regional-top"]').click();
+  await expect(page.locator("#regional-top")).toBeInViewport();
+  const mapBox = await page.locator(".regional-map-shell").boundingBox();
+  const chartBox = await page.locator(".regional-chart-section").boundingBox();
+  const panelBox = await page.locator("#regional-county-panel").boundingBox();
+  const toolsBox = await page.locator(".regional-county-tools-section").boundingBox();
+  expect(mapBox).not.toBeNull();
+  expect(chartBox).not.toBeNull();
+  expect(panelBox).not.toBeNull();
+  expect(toolsBox).not.toBeNull();
+  expect(Math.abs(chartBox.x - mapBox.x)).toBeLessThan(8);
+  expect(chartBox.y).toBeGreaterThan(mapBox.y + mapBox.height - 8);
+  expect(Math.abs(toolsBox.x - panelBox.x)).toBeLessThan(8);
+  expect(toolsBox.y).toBeGreaterThan(panelBox.y + panelBox.height - 8);
   await expect(page.locator("#year-label")).toContainText("2026");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
   await expect(page.locator(".forecast-view-radios")).toBeVisible();
@@ -354,6 +372,13 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#forecast-county-select")).toHaveValue("24001");
   await expect(panel).toContainText("Allegany County");
   await expect(panel).toContainText("MD");
+  await expect(panel).toContainText("How bad is it?");
+  await expect(panel).toContainText("Predicted score");
+  await expect(panel).toContainText("10/10");
+  await expect(panel).toContainText("peak seasonal score");
+  await expect(panel).toContainText("Forecast percentile");
+  await expect(panel).toContainText("82nd percentile");
+  await expect(panel).toContainText("above typical");
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("52.00 per 100k");
   await expect(panel).toContainText("Predicted annual cases");
@@ -404,7 +429,7 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
       "82nd percentile"
     );
     await expect(panel).toContainText(
-      "likely range 65th-91st percentile"
+      "likely range 65th percentile to 91st percentile"
     );
     await expect(panel).toContainText(
       "not tick abundance"
@@ -474,6 +499,9 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(panel).toContainText("May 24-30, 2026");
   await expect(panel).toContainText("MMWR week 21");
   await expect(panel).toContainText("9/10");
+  await expect(panel).toContainText("selected week score");
+  await expect(panel).toContainText("Season peak");
+  await expect(panel).toContainText("10/10");
   await expect(panel).toContainText("Predicted weekly incidence");
   await expect(panel).toContainText(
     "Linear score"
@@ -591,6 +619,15 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#regional-source-content")).toContainText(
     "Forecast-safe branches use prior-year"
   );
+  await expect(page.locator("#regional-source-content")).toContainText(
+    "Predicted score footnote"
+  );
+  await expect(page.locator("#regional-source-content")).toContainText(
+    "Annual view shows the peak weekly score"
+  );
+  await expect(page.locator("#regional-source-content")).toContainText(
+    "not a personal infection probability"
+  );
   await expect(page.locator("#regional-source-content")).not.toContainText(
     "not public Maryland default"
   );
@@ -643,6 +680,8 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
   await expectWeekControlsDisabled(page);
   await page.locator('path[data-county="24001"]').click();
+  await expect(panel).toContainText("Predicted score");
+  await expect(panel).toContainText("7/10");
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("38.00 per 100k");
   await expect(panel).toContainText("Predicted annual cases");
@@ -694,6 +733,8 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
   await expectWeekControlsDisabled(page);
   await page.locator('path[data-county="24001"]').click();
+  await expect(panel).toContainText("Predicted score");
+  await expect(panel).toContainText("8/10");
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("44.00 per 100k");
   await expect(panel).toContainText("Predicted annual cases");
@@ -709,6 +750,8 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
   await expectWeekControlsDisabled(page);
   await page.locator('path[data-county="24023"]').click();
+  await expect(panel).toContainText("Predicted score");
+  await expect(panel).toContainText("8/10");
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("42.00 per 100k");
   await expect(panel).not.toContainText("Predicted weekly incidence");

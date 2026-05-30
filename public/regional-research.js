@@ -974,6 +974,7 @@ function selectRegionalCounty(countyFips) {
 
   const interval80 = record.predicted_weekly_incidence_80_interval || [0, 0];
   const interval95 = record.predicted_weekly_incidence_95_interval || [0, 0];
+  const annualSummary = regionalAnnualForecastSummary(countyFips);
   const dateRange = regionalWeekDateRange(record);
   const periodText = dateRange
     ? `${dateRange} (MMWR week ${record.mmwr_week})`
@@ -981,7 +982,13 @@ function selectRegionalCounty(countyFips) {
   panel.innerHTML = `<div class="score-card">
     <p class="muted">${regionalEscapeHtml(periodText)}, forecast year ${regionalEscapeHtml(record.data_year || record.year)}</p>
     <h3>${regionalEscapeHtml(countyName)}${stateAbbr ? `, ${regionalEscapeHtml(stateAbbr)}` : ""}</h3>
-    <p><span class="score-badge ${regionalRiskClass(record.risk_score)}">${regionalEscapeHtml(record.risk_score)}/10</span> ${regionalEscapeHtml(regionalCategoryLabel(record.risk_category))}</p>
+    ${renderRegionalForecastSeveritySummary({
+      activeRecord: record,
+      annualSummary,
+      countyFips,
+      forecastView: "weekly",
+      metadata,
+    })}
     <p>Predicted weekly incidence: ${regionalFormatNumber(record.predicted_weekly_incidence_per_100k)} per 100k.</p>
     <p>80% empirical interval: ${regionalFormatNumber(interval80[0])} to ${regionalFormatNumber(interval80[1])} per 100k.</p>
     <p>95% empirical interval: ${regionalFormatNumber(interval95[0])} to ${regionalFormatNumber(interval95[1])} per 100k.</p>
@@ -989,7 +996,6 @@ function selectRegionalCounty(countyFips) {
     ${renderRegionalProtocolNote(record.data_year || record.year)}
     ${renderRegionalForecastBasis(record)}
     ${renderRegionalComparableYear(record, metadata)}
-    ${renderRegionalForecastTypicality(metadata)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
     <p class="disclaimer">Informational only. This is not a per-bite infection probability, diagnosis, or treatment recommendation.</p>
@@ -1027,6 +1033,13 @@ function renderRegionalAnnualForecastCounty({
   panel.innerHTML = `<div class="score-card">
     <p class="muted">Annual forecast for ${regionalEscapeHtml(record.data_year || record.year)}</p>
     <h3>${regionalEscapeHtml(countyName)}${stateAbbr ? `, ${regionalEscapeHtml(stateAbbr)}` : ""}</h3>
+    ${renderRegionalForecastSeveritySummary({
+      activeRecord: record,
+      annualSummary: summary,
+      countyFips,
+      forecastView: "annual",
+      metadata,
+    })}
     <p><span class="score-badge ${annualClass}">${regionalFormatNumber(summary.predictedAnnualIncidence)}/100k</span> predicted annual incidence</p>
     <p>Predicted annual incidence: ${regionalFormatNumber(summary.predictedAnnualIncidence)} per 100k.</p>
     <p>Predicted annual cases: ${regionalEscapeHtml(casesText)}.</p>
@@ -1036,7 +1049,6 @@ function renderRegionalAnnualForecastCounty({
     ${renderRegionalProtocolNote(record.data_year || record.year)}
     ${renderRegionalForecastBasis(record)}
     ${renderRegionalComparableYear(record, metadata)}
-    ${renderRegionalForecastTypicality(metadata)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
     <p class="disclaimer">Informational only. This is a forecast of reported Lyme disease pressure, not a per-bite infection probability, diagnosis, or treatment recommendation.</p>
@@ -1095,6 +1107,95 @@ function regionalAnnualForecastSummary(countyFips) {
     predictedAnnualCases,
     predictedAnnualIncidence,
   };
+}
+
+function renderRegionalForecastSeveritySummary({
+  activeRecord,
+  annualSummary,
+  countyFips,
+  forecastView,
+  metadata,
+}) {
+  const peakRecord = regionalPeakWeeklyScoreRecord(countyFips);
+  const scoreRecord = forecastView === "weekly" && activeRecord
+    ? activeRecord
+    : peakRecord || activeRecord;
+  const score = Number(scoreRecord && scoreRecord.risk_score);
+  const scoreClass = Number.isFinite(score)
+    ? regionalRiskClass(score)
+    : "risk-unavailable";
+  const scoreText = Number.isFinite(score)
+    ? `${regionalEscapeHtml(score)}/10`
+    : "unavailable";
+  const scoreBasis =
+    forecastView === "weekly" ? "selected week score" : "peak seasonal score";
+  const peakScore = Number(peakRecord && peakRecord.risk_score);
+  const peakHtml =
+    forecastView === "weekly" && peakRecord
+      ? `<div>
+          <dt>Season peak</dt>
+          <dd><span class="score-badge ${regionalRiskClass(peakScore)}">${regionalEscapeHtml(peakScore)}/10</span><br><span>peak seasonal score</span></dd>
+        </div>`
+      : "";
+  const typicality = regionalForecastTypicalityForYear(metadata);
+  const percentile = typicality
+    ? regionalPercentilePhrase(typicality.forecast_percentile_of_county_history)
+    : "unavailable";
+  const severity = typicality && typicality.severity_label
+    ? typicality.severity_label
+    : "not classified";
+  const lower = typicality
+    ? regionalPercentilePhrase(typicality.lower_80_percentile_of_county_history)
+    : "unknown";
+  const upper = typicality
+    ? regionalPercentilePhrase(typicality.upper_80_percentile_of_county_history)
+    : "unknown";
+  const comparisonYears =
+    typicality &&
+    typicality.comparison_year_start &&
+    typicality.comparison_year_end
+      ? `${typicality.comparison_year_start}-${typicality.comparison_year_end}`
+      : "prior reported years";
+  const evidence = typicality && typicality.typicality_evidence_level
+    ? typicality.typicality_evidence_level
+    : "limited";
+  const annualIncidence = Number(annualSummary && annualSummary.predictedAnnualIncidence);
+  const annualIncidenceText = Number.isFinite(annualIncidence)
+    ? `${regionalFormatNumber(annualIncidence)} per 100k`
+    : "unavailable";
+  return `<section class="forecast-severity-summary" aria-labelledby="regional-forecast-severity-heading">
+    <h4 id="regional-forecast-severity-heading">How bad is it?</h4>
+    <dl class="forecast-severity-grid">
+      <div>
+        <dt>Predicted score</dt>
+        <dd><span class="score-badge ${scoreClass}">${scoreText}</span><br><span>${regionalEscapeHtml(scoreBasis)}</span></dd>
+      </div>
+      ${peakHtml}
+      <div>
+        <dt>Forecast percentile</dt>
+        <dd><b>${regionalEscapeHtml(percentile)}</b><br><span>${regionalEscapeHtml(severity)}</span></dd>
+      </div>
+      <div>
+        <dt>Annual forecast</dt>
+        <dd>${regionalEscapeHtml(annualIncidenceText)}</dd>
+      </div>
+    </dl>
+    <p class="forecast-severity-note"><b>How unusual is this forecast?</b> Compared with this county's prior reported Lyme years (${regionalEscapeHtml(comparisonYears)}), this forecast is ${regionalEscapeHtml(severity)} (${regionalEscapeHtml(percentile)}).</p>
+    <p class="forecast-severity-note"><b>Forecast interval range:</b> likely range ${regionalEscapeHtml(lower)} to ${regionalEscapeHtml(upper)}; evidence ${regionalEscapeHtml(evidence)}.</p>
+    <p class="forecast-severity-note">This score and percentile summarize reported-incidence forecasts. They are not tick abundance, infected tick prevalence, or individual infection probability.</p>
+  </section>`;
+}
+
+function regionalPeakWeeklyScoreRecord(countyFips) {
+  return regionalCountyWeekRecords(countyFips).reduce((bestRecord, record) => {
+    const score = Number(record.risk_score);
+    const bestScore = Number(bestRecord && bestRecord.risk_score);
+    if (!Number.isFinite(score)) return bestRecord;
+    if (!bestRecord || !Number.isFinite(bestScore) || score > bestScore) {
+      return record;
+    }
+    return bestRecord;
+  }, null);
 }
 
 function renderRegionalScaleDiagnostics(record) {
@@ -1285,6 +1386,11 @@ function regionalOrdinalPercentile(value) {
   if (mod10 === 2) return `${rounded}nd`;
   if (mod10 === 3) return `${rounded}rd`;
   return `${rounded}th`;
+}
+
+function regionalPercentilePhrase(value) {
+  const ordinal = regionalOrdinalPercentile(value);
+  return ordinal === "unknown" ? "unknown" : `${ordinal} percentile`;
 }
 
 function regionalWeekDateRange(record) {
@@ -2645,12 +2751,17 @@ function renderRegionalSources() {
     )
     .join("");
   target.innerHTML = `<p><b>Score role:</b> ${regionalEscapeHtml(modelCard.score_interpretation || "Relative seasonal Lyme forecast on a 1 to 10 scale.")}</p>
+    ${regionalForecastScoreFootnote()}
     <p><b>Map unit:</b> Annual forecast and historical years use reported Lyme incidence per 100k. Weekly seasonal risk is an optional current-year view that allocates the annual forecast across the season.</p>
     <p>${regionalEscapeHtml(policy.why_forecasting || "Official county surveillance data lag real-world exposure conditions.")}</p>
     <p>${regionalEscapeHtml(policy.forecast_boundary || "Forecast-safe branches use prior-year and trailing regional data only.")}</p>
     ${annualCaveat ? `<p>${regionalEscapeHtml(annualCaveat)}</p>` : ""}
     <p>${regionalEscapeHtml(modelCard.method_summary || "Regional forecast-safe county-week risk research layer.")}</p>
     ${sourceItems ? `<ul class="source-detail-list">${sourceItems}</ul>` : ""}`;
+}
+
+function regionalForecastScoreFootnote() {
+  return `<p><b>Predicted score footnote:</b> The predicted score is a plain-language 1-10 display score estimated from forecasted weekly reported Lyme incidence. The model starts with an annual county forecast, spreads it across weeks using CDC national Lyme onset seasonality, divides the weekly incidence by the regional score denominator, then rounds and clamps the result from 1 to 10. Annual view shows the peak weekly score for that forecast season; weekly view shows the selected week score. It is not a personal infection probability.</p>`;
 }
 
 function renderRegionalForecastProvenance() {
