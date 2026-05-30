@@ -17,6 +17,7 @@ EXPECTED_REGIONAL_DATA_FILES = {
     "regional_county_metadata.json",
     "regional_county_risk_weekly.json",
     "regional_forecast_observed_fit.json",
+    "regional_forecast_typicality.json",
     "regional_spatial_regime_overlays.json",
     "source_catalog.json",
     "static_export_manifest.json",
@@ -63,6 +64,7 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     states = load_regional_json("regional_states.geojson")
     overlays = load_regional_json("regional_spatial_regime_overlays.json")
     observed_fit = load_regional_json("regional_forecast_observed_fit.json")
+    typicality = load_regional_json("regional_forecast_typicality.json")
     source_catalog = load_regional_json("source_catalog.json")
     research_status_payloads = [
         load_regional_json(filename)
@@ -219,9 +221,27 @@ def test_regional_research_bundle_has_complete_county_week_contract() -> None:
     assert overlays["record_count"] == len(overlays["records"])
     assert observed_fit["record_count"] == len(observed_fit["records"]) == 67
     assert observed_fit["data_role"] == "post_forecast_diagnostic"
+    assert typicality["record_count"] == len(typicality["records"]) == 283 * 3
+    assert typicality["data_role"] == "forecast_explanation"
+    assert {
+        record["forecast_year"] for record in typicality["records"]
+    } == {2024, 2025, 2026}
+    assert all(
+        record["comparison_scope"] == "county_prior_history"
+        for record in typicality["records"]
+    )
+    assert all(
+        record["protocol_policy"] == "raw_with_surveillance_protocol_caveat"
+        for record in typicality["records"]
+    )
     assert overlays["research_status"]["research_only"] is True
     assert all(
         county.get("selected_spatial_regime")
+        for county in metadata["counties"]
+    )
+    assert all(
+        [row["forecast_year"] for row in county.get("forecast_typicality", [])]
+        == [2024, 2025, 2026]
         for county in metadata["counties"]
     )
 
@@ -239,6 +259,7 @@ def test_pages_workflow_validates_regional_research_preview_assets() -> None:
         "present != sorted(expected_files)",
         "regional_payloads",
         "regional_county_incidence_annual.json",
+        "regional_forecast_typicality.json",
         "reported_cases",
         "total_cases",
         "regional_county_risk_weekly.json",
@@ -248,6 +269,7 @@ def test_pages_workflow_validates_regional_research_preview_assets() -> None:
         "source_prediction_run_ids",
         "Regional preview must contain forecast years 2024, 2025, and 2026.",
         "regional_observed_annual_incidence",
+        "regional_forecast_typicality",
         "Regional 2024 observed incidence must remain the partial PA overlay.",
     ]:
         assert token in workflow

@@ -165,6 +165,12 @@
       "notes": "post-forecast county residual diagnostics compare selected regional forecast branches with later state-source observed overlays; these rows are not regional truth, model training features, or automatic calibration.",
       "redistribution": "public derived data",
       "source_id": "regional_forecast_observed_fit"
+    },
+    {
+      "artifact_type": "derived forecast explanation layer",
+      "notes": "forecast typicality compares selected annual forecast incidence with prior reported annual incidence for the same county; percentiles carry surveillance protocol caveats and are explanation context, not tick abundance or individual infection probability.",
+      "redistribution": "public derived data",
+      "source_id": "regional_forecast_typicality"
     }
   ],
   "temporal_contract": {

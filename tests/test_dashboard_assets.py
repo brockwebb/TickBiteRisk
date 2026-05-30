@@ -9,6 +9,7 @@ from tickbiterisk.dashboard_assets import (
     normalize_regional_county_geojson,
     normalize_regional_state_geojson,
     regional_forecast_observed_fit_payload,
+    regional_forecast_typicality_payload,
     simplify_regional_geojson_for_web_map,
     write_dashboard_assets,
     write_regional_research_dashboard_assets,
@@ -123,6 +124,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     observed_fit_path = _write_regional_forecast_observed_fit(
         tmp_path / "regional_forecast_observed_fit_comparisons.csv"
     )
+    typicality_path = _write_regional_forecast_typicality(
+        tmp_path / "regional_forecast_typicality.csv"
+    )
     output_dir = tmp_path / "regional-dashboard"
 
     result = write_regional_research_dashboard_assets(
@@ -134,6 +138,7 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         spatial_regime_summary_path=overlays_path,
         regional_annual_forecast_path=annual_forecast_path,
         regional_forecast_observed_fit_path=observed_fit_path,
+        regional_forecast_typicality_path=typicality_path,
         model_name="linear_blend_baseline",
     )
 
@@ -151,6 +156,8 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert result.forecast_observed_fit_path.name == (
         "regional_forecast_observed_fit.json"
     )
+    assert result.forecast_typicality_path is not None
+    assert result.forecast_typicality_path.name == "regional_forecast_typicality.json"
 
     weekly = json.loads(result.weekly_risk_path.read_text(encoding="utf-8"))
     county_metadata = json.loads(
@@ -166,6 +173,9 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     )
     observed_fit = json.loads(
         result.forecast_observed_fit_path.read_text(encoding="utf-8")
+    )
+    typicality = json.loads(
+        result.forecast_typicality_path.read_text(encoding="utf-8")
     )
     manifest = json.loads(result.export_manifest_path.read_text(encoding="utf-8"))
     source_catalog = json.loads(result.source_catalog_path.read_text(encoding="utf-8"))
@@ -221,6 +231,15 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         "post_forecast_diagnostic",
         "not_training_feature",
     ]
+    assert typicality["export_type"] == "regional_forecast_typicality"
+    assert typicality["data_role"] == "forecast_explanation"
+    assert typicality["record_count"] == 1
+    assert typicality["records"][0]["county_fips"] == "24003"
+    assert typicality["records"][0]["forecast_percentile_of_county_history"] == 82.0
+    assert typicality["records"][0]["severity_label"] == "above typical"
+    assert typicality["records"][0]["interval_severity_label"] == (
+        "typical to much higher than typical"
+    )
     anne_arundel = next(
         county
         for county in county_metadata["counties"]
@@ -245,6 +264,25 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
             "match_distance": 2.75,
             "predicted_incidence_per_100k": 42.5,
             "basis": "horizon-matched reported-incidence history",
+        }
+    ]
+    assert anne_arundel["forecast_typicality"] == [
+        {
+            "baseline_year_count": 23,
+            "comparison_scope": "county_prior_history",
+            "comparison_year_end": 2023,
+            "comparison_year_start": 2001,
+            "forecast_percentile_of_county_history": 82.0,
+            "forecast_year": 2026,
+            "interval_severity_label": "typical to much higher than typical",
+            "lower_80_percentile_of_county_history": 65.0,
+            "model_name": "linear_blend_baseline",
+            "predicted_incidence_per_100k": 42.5,
+            "protocol_policy": "raw_with_surveillance_protocol_caveat",
+            "severity_label": "above typical",
+            "typical_p75_incidence_per_100k": 33.0,
+            "typicality_evidence_level": "moderate",
+            "upper_80_percentile_of_county_history": 91.0,
         }
     ]
     adams = next(
@@ -277,12 +315,14 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
     assert "regional_county_incidence_annual.json" in manifest["files"]
     assert "regional_spatial_regime_overlays.json" in manifest["files"]
     assert "regional_forecast_observed_fit.json" in manifest["files"]
+    assert "regional_forecast_typicality.json" in manifest["files"]
     assert manifest["record_counts"]["regional_county_geojson_features"] == 2
     assert manifest["record_counts"]["regional_state_geojson_features"] == 2
     assert manifest["record_counts"]["regional_annual_observed_incidence"] == 2
     assert manifest["record_counts"]["spatial_regime_overlays"] == 1
     assert manifest["record_counts"]["regional_nearest_comparable_years"] == 2
     assert manifest["record_counts"]["regional_forecast_observed_fit"] == 1
+    assert manifest["record_counts"]["regional_forecast_typicality"] == 1
     assert any(
         source["source_id"] == "regional_observed_annual_incidence"
         and source["artifact_type"] == "derived observed surveillance layer"
@@ -298,6 +338,11 @@ def test_write_regional_research_dashboard_assets_writes_map_and_overlay(
         and "post-forecast" in source["notes"]
         for source in source_catalog["sources"]
     )
+    assert any(
+        source["source_id"] == "regional_forecast_typicality"
+        and "prior reported annual incidence" in source["notes"]
+        for source in source_catalog["sources"]
+    )
 
 
 def test_regional_forecast_observed_fit_payload_filters_to_map_counties(
@@ -310,6 +355,22 @@ def test_regional_forecast_observed_fit_payload_filters_to_map_counties(
     payload = regional_forecast_observed_fit_payload(
         observed_fit_path,
         allowed_county_fips={"24003"},
+    )
+
+    assert payload["record_count"] == 0
+    assert payload["records"] == []
+
+
+def test_regional_forecast_typicality_payload_filters_to_map_counties(
+    tmp_path: Path,
+) -> None:
+    typicality_path = _write_regional_forecast_typicality(
+        tmp_path / "regional_forecast_typicality.csv"
+    )
+
+    payload = regional_forecast_typicality_payload(
+        typicality_path,
+        allowed_county_fips={"42001"},
     )
 
     assert payload["record_count"] == 0
@@ -692,6 +753,118 @@ def _write_regional_forecast_observed_fit(path: Path) -> Path:
         "observed_quality_flags": "state_source_not_cdc_public_use",
         "diagnostic_flags": (
             "partial_state_overlay,post_forecast_diagnostic,not_training_feature"
+        ),
+    }
+    path.write_text(
+        ",".join(columns)
+        + "\n"
+        + ",".join(f'"{row[column]}"' for column in columns)
+        + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _write_regional_forecast_typicality(path: Path) -> Path:
+    columns = [
+        "run_id",
+        "source_interval_run_id",
+        "source_forecast_run_id",
+        "model_name",
+        "model_family",
+        "target_definition",
+        "feature_set",
+        "feature_profile",
+        "evaluation_mode",
+        "state_fips",
+        "state_abbr",
+        "state_name",
+        "county_fips",
+        "county_name",
+        "forecast_year",
+        "forecast_origin_year",
+        "as_of_date",
+        "data_cutoff_date",
+        "source_vintage",
+        "update_mode",
+        "forecast_population",
+        "predicted_cases",
+        "predicted_incidence_per_100k",
+        "lower_80_incidence_per_100k",
+        "upper_80_incidence_per_100k",
+        "lower_95_incidence_per_100k",
+        "upper_95_incidence_per_100k",
+        "comparison_scope",
+        "comparison_year_start",
+        "comparison_year_end",
+        "baseline_year_count",
+        "typical_median_incidence_per_100k",
+        "typical_p25_incidence_per_100k",
+        "typical_p75_incidence_per_100k",
+        "forecast_percentile_of_county_history",
+        "lower_80_percentile_of_county_history",
+        "upper_80_percentile_of_county_history",
+        "lower_95_percentile_of_county_history",
+        "upper_95_percentile_of_county_history",
+        "severity_label",
+        "interval_severity_label",
+        "typicality_evidence_level",
+        "margin_to_typical_band_per_100k",
+        "typicality_method",
+        "baseline_policy",
+        "protocol_policy",
+        "assumption_flags",
+    ]
+    row = {
+        "run_id": "regional_forecast_typicality_fixture",
+        "source_interval_run_id": "regional_annual_forecast_intervals_fixture",
+        "source_forecast_run_id": "regional_annual_forecast_target2026_origin2023",
+        "model_name": "linear_blend_baseline",
+        "model_family": "empirical_bayes_spatial_regime",
+        "target_definition": "reported_lyme_incidence_per_100k",
+        "feature_set": "historical_incidence_forecast_baselines",
+        "feature_profile": "localized_spatial_regime_shrinkage",
+        "evaluation_mode": "regional_annual_forecast_no_observed_target",
+        "state_fips": "24",
+        "state_abbr": "MD",
+        "state_name": "Maryland",
+        "county_fips": "24003",
+        "county_name": "Anne Arundel County",
+        "forecast_year": "2026",
+        "forecast_origin_year": "2023",
+        "as_of_date": "2026-05-30",
+        "data_cutoff_date": "2023-12-31",
+        "source_vintage": "unit_test",
+        "update_mode": "pre_update",
+        "forecast_population": "100000",
+        "predicted_cases": "42.5",
+        "predicted_incidence_per_100k": "42.5",
+        "lower_80_incidence_per_100k": "25.0",
+        "upper_80_incidence_per_100k": "55.0",
+        "lower_95_incidence_per_100k": "10.0",
+        "upper_95_incidence_per_100k": "75.0",
+        "comparison_scope": "county_prior_history",
+        "comparison_year_start": "2001",
+        "comparison_year_end": "2023",
+        "baseline_year_count": "23",
+        "typical_median_incidence_per_100k": "28.0",
+        "typical_p25_incidence_per_100k": "16.0",
+        "typical_p75_incidence_per_100k": "33.0",
+        "forecast_percentile_of_county_history": "82.0",
+        "lower_80_percentile_of_county_history": "65.0",
+        "upper_80_percentile_of_county_history": "91.0",
+        "lower_95_percentile_of_county_history": "25.0",
+        "upper_95_percentile_of_county_history": "99.0",
+        "severity_label": "above typical",
+        "interval_severity_label": "typical to much higher than typical",
+        "typicality_evidence_level": "moderate",
+        "margin_to_typical_band_per_100k": "9.5",
+        "typicality_method": "empirical_percentile_of_prior_county_history",
+        "baseline_policy": "county history years <= forecast_origin_year",
+        "protocol_policy": "raw_with_surveillance_protocol_caveat",
+        "assumption_flags": (
+            "forecast_typicality_county_prior_history,"
+            "reported_cases_not_stable_true_incidence,not_public_default"
         ),
     }
     path.write_text(

@@ -72,6 +72,20 @@ state-source, or near-real-time proxy data become available. Late-arriving data
 should update the forecast with provenance and caveats rather than rewriting
 history as if the late data had been known at the original forecast origin.
 
+Claims that a year is "bad," "typical," or "unusual" must be tied to a named
+comparison set and metric. The first public/research implementation compares
+forecast annual reported Lyme incidence with that same county's prior reported
+annual incidence through the forecast origin, then reports an empirical
+percentile and an interval percentile range. Plain-language labels should use
+the percentile contract: below typical under the 25th percentile, typical from
+the 25th through 75th percentile, above typical above the 75th and below the
+90th percentile, and much higher than typical at or above the 90th percentile.
+This is a reported Lyme disease pressure comparison, not a direct claim about
+tick abundance, infected tick prevalence, or individual infection probability.
+The artifact must retain the raw numeric forecast, the percentile basis,
+the uncertainty range, and the surveillance protocol caveat so later data can
+recalibrate the estimate rather than erase the original forecast.
+
 Observed state-source overlays, such as Pennsylvania 2024, are valuable
 partial-pooling evidence for later updates. They should be used to update
 similar localized regimes, source vintages, and surveillance regimes when

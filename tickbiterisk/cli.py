@@ -373,6 +373,13 @@ from tickbiterisk.modeling.regional_forecast_observed_fit import (
 from tickbiterisk.modeling.regional_forecast_observed_fit_build import (
     write_regional_forecast_observed_fit_outputs,
 )
+from tickbiterisk.modeling.regional_forecast_typicality import (
+    RegionalForecastTypicalityInputError,
+    build_regional_forecast_typicality,
+)
+from tickbiterisk.modeling.regional_forecast_typicality_build import (
+    write_regional_forecast_typicality_outputs,
+)
 from tickbiterisk.modeling.regional_outcome_stress import (
     RegionalOutcomeStressInputError,
     build_regional_outcome_stress,
@@ -1337,6 +1344,13 @@ def dashboard_build_regional_research_assets(
             "attach post-forecast state-overlay diagnostics."
         ),
     ),
+    regional_forecast_typicality_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional regional forecast typicality CSV used to attach "
+            "county-history percentile explanation context."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/public-regional-risk"),
         help="Output directory for regional research dashboard data assets.",
@@ -1401,6 +1415,14 @@ def dashboard_build_regional_research_assets(
             "Regional forecast observed-fit file not found: "
             f"{regional_forecast_observed_fit_path}"
         )
+    if (
+        regional_forecast_typicality_path is not None
+        and not regional_forecast_typicality_path.exists()
+    ):
+        raise typer.BadParameter(
+            "Regional forecast typicality file not found: "
+            f"{regional_forecast_typicality_path}"
+        )
     try:
         outputs = write_regional_research_dashboard_assets(
             scores_path=scores_path,
@@ -1413,6 +1435,7 @@ def dashboard_build_regional_research_assets(
             regional_forecast_observed_fit_path=(
                 regional_forecast_observed_fit_path
             ),
+            regional_forecast_typicality_path=regional_forecast_typicality_path,
             model_name=model_name,
             seasonality_source_id=seasonality_source_id,
         )
@@ -1429,6 +1452,8 @@ def dashboard_build_regional_research_assets(
         typer.echo(f"Wrote {outputs.spatial_regime_overlays_path}")
     if outputs.forecast_observed_fit_path is not None:
         typer.echo(f"Wrote {outputs.forecast_observed_fit_path}")
+    if outputs.forecast_typicality_path is not None:
+        typer.echo(f"Wrote {outputs.forecast_typicality_path}")
 
 
 @etl_app.command("weather-locations")
@@ -4158,6 +4183,63 @@ def regional_spatial_regime_forecast_interval_summary(
     typer.echo(
         f"Wrote {len(result.summary)} regional spatial regime forecast interval "
         f"summary row(s) to {outputs.summary_path}"
+    )
+
+
+@etl_app.command("regional-forecast-typicality")
+def regional_forecast_typicality(
+    regional_incidence_path: Path = typer.Option(
+        Path("build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv"),
+        help="Input Mid-Atlantic Lyme incidence county-year panel.",
+    ),
+    regional_annual_forecast_intervals_path: Path = typer.Option(
+        Path("build/etl/regional-annual-forecast/regional_annual_forecast_intervals.csv"),
+        help="Input regional annual forecast county interval CSV.",
+    ),
+    model_name: str = typer.Option(
+        "empirical_bayes_spatial_regime_incidence",
+        help="Forecast branch to compare against prior county history.",
+    ),
+    min_history_years: int = typer.Option(
+        3,
+        help="Minimum prior county years required for typicality comparison.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/regional-forecast-typicality"),
+        help="Output directory for regional forecast typicality artifacts.",
+    ),
+) -> None:
+    if not regional_incidence_path.exists():
+        raise typer.BadParameter(
+            f"Regional incidence panel not found: {regional_incidence_path}"
+        )
+    if not regional_annual_forecast_intervals_path.exists():
+        raise typer.BadParameter(
+            "Regional annual forecast intervals not found: "
+            f"{regional_annual_forecast_intervals_path}"
+        )
+    if min_history_years < 1:
+        raise typer.BadParameter("min-history-years must be at least 1")
+
+    try:
+        result = build_regional_forecast_typicality(
+            regional_incidence_path=regional_incidence_path,
+            regional_annual_forecast_intervals_path=(
+                regional_annual_forecast_intervals_path
+            ),
+            model_name=model_name,
+            min_history_years=min_history_years,
+        )
+    except RegionalForecastTypicalityInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_regional_forecast_typicality_outputs(result, output_dir)
+    typer.echo(
+        f"Wrote 1 regional forecast typicality run row(s) to "
+        f"{outputs.runs_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.rows)} regional forecast typicality row(s) to "
+        f"{outputs.typicality_path}"
     )
 
 

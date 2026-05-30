@@ -799,6 +799,7 @@ function selectRegionalCounty(countyFips) {
     ${renderRegionalProtocolNote(record.data_year || record.year)}
     ${renderRegionalForecastBasis(record)}
     ${renderRegionalComparableYear(record, metadata)}
+    ${renderRegionalForecastTypicality(metadata)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
     <p class="disclaimer">Research only. This is not a per-bite infection probability, diagnosis, treatment recommendation, or public Maryland default.</p>
@@ -845,6 +846,7 @@ function renderRegionalAnnualForecastCounty({
     ${renderRegionalProtocolNote(record.data_year || record.year)}
     ${renderRegionalForecastBasis(record)}
     ${renderRegionalComparableYear(record, metadata)}
+    ${renderRegionalForecastTypicality(metadata)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
     <p class="disclaimer">Research only. This is a forecast of reported Lyme disease pressure, not a per-bite infection probability, diagnosis, treatment recommendation, or public Maryland default.</p>
@@ -1012,6 +1014,58 @@ function renderRegionalComparableYear(record, metadata) {
     <p>${regionalEscapeHtml(match.match_origin_year)} origin -&gt; ${regionalEscapeHtml(match.match_observed_year)} observed outcome (${horizon}; ${regionalEscapeHtml(distance)}).</p>
     <p>Basis: ${regionalEscapeHtml(match.basis || "horizon-matched reported-incidence history")} from ${regionalEscapeHtml(regionalReadableName(match.analog_model_name || "analog_year_county_incidence"))}.</p>
   </section>`;
+}
+
+function renderRegionalForecastTypicality(metadata) {
+  const typicality = regionalForecastTypicalityForYear(metadata);
+  if (!typicality) return "";
+  const percentile = regionalOrdinalPercentile(
+    typicality.forecast_percentile_of_county_history
+  );
+  const lower = regionalOrdinalPercentile(
+    typicality.lower_80_percentile_of_county_history
+  );
+  const upper = regionalOrdinalPercentile(
+    typicality.upper_80_percentile_of_county_history
+  );
+  const comparisonYears =
+    typicality.comparison_year_start && typicality.comparison_year_end
+      ? `${typicality.comparison_year_start}-${typicality.comparison_year_end}`
+      : "prior reported years";
+  const evidence = typicality.typicality_evidence_level || "limited";
+  return `<section class="lineage-strip forecast-typicality" aria-labelledby="regional-forecast-typicality-heading">
+    <h4 id="regional-forecast-typicality-heading">How unusual is this forecast?</h4>
+    <p>Compared with this county's prior reported Lyme years (${regionalEscapeHtml(comparisonYears)}), this forecast is <b>${regionalEscapeHtml(typicality.severity_label || "not classified")}</b> (${regionalEscapeHtml(percentile)} percentile).</p>
+    <p><b>Forecast interval range:</b> likely range ${regionalEscapeHtml(lower)}-${regionalEscapeHtml(upper)} percentile; evidence ${regionalEscapeHtml(evidence)}.</p>
+    <p>This compares reported annual Lyme incidence. It is not tick abundance, infected tick prevalence, or individual infection probability.</p>
+  </section>`;
+}
+
+function regionalForecastTypicalityForYear(metadata) {
+  const records =
+    metadata && Array.isArray(metadata.forecast_typicality)
+      ? metadata.forecast_typicality
+      : [];
+  const selectedYear = Number(regionalState.selectedYear);
+  return (
+    records.find((record) => Number(record.forecast_year) === selectedYear) ||
+    null
+  );
+}
+
+function regionalOrdinalPercentile(value) {
+  const percentile = Number(value);
+  if (!Number.isFinite(percentile)) return "unknown";
+  const rounded = Math.round(percentile);
+  const mod100 = rounded % 100;
+  if (mod100 >= 11 && mod100 <= 13) {
+    return `${rounded}th`;
+  }
+  const mod10 = rounded % 10;
+  if (mod10 === 1) return `${rounded}st`;
+  if (mod10 === 2) return `${rounded}nd`;
+  if (mod10 === 3) return `${rounded}rd`;
+  return `${rounded}th`;
 }
 
 function regionalWeekDateRange(record) {

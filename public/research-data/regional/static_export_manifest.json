@@ -10,7 +10,8 @@
     "regional_states.geojson",
     "regional_county_incidence_annual.json",
     "regional_spatial_regime_overlays.json",
-    "regional_forecast_observed_fit.json"
+    "regional_forecast_observed_fit.json",
+    "regional_forecast_typicality.json"
   ],
   "generated_at": "2026-05-30T00:46:34+00:00",
   "record_counts": {
@@ -18,6 +19,7 @@
     "regional_annual_observed_incidence": 6576,
     "regional_county_geojson_features": 283,
     "regional_forecast_observed_fit": 67,
+    "regional_forecast_typicality": 849,
     "regional_nearest_comparable_years": 849,
     "regional_state_geojson_features": 6,
     "spatial_regime_overlays": 127,

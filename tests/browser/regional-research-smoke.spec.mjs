@@ -322,12 +322,27 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(panel).toContainText(
     "research-only"
   );
-  await expect(panel).toContainText(
-    "Nearest comparable history"
-  );
-  await expect(panel).toContainText(
-    "2018 origin -> 2021 observed outcome"
-  );
+    await expect(panel).toContainText(
+      "Nearest comparable history"
+    );
+    await expect(panel).toContainText(
+      "2018 origin -> 2021 observed outcome"
+    );
+    await expect(panel).toContainText(
+      "How unusual is this forecast?"
+    );
+    await expect(panel).toContainText(
+      "above typical"
+    );
+    await expect(panel).toContainText(
+      "82nd percentile"
+    );
+    await expect(panel).toContainText(
+      "likely range 65th-91st percentile"
+    );
+    await expect(panel).toContainText(
+      "not tick abundance"
+    );
   await expect(panel).toContainText(
     "Spatial regime 7"
   );
@@ -647,6 +662,25 @@ function countyMetadata(countyFips, countyName, regionId, regionName, rank) {
         match_observed_year: 2021,
         match_origin_year: 2018,
         predicted_incidence_per_100k: 42.5,
+      },
+    ],
+    forecast_typicality: [
+      {
+        baseline_year_count: 23,
+        comparison_scope: "county_prior_history",
+        comparison_year_end: 2023,
+        comparison_year_start: 2001,
+        forecast_percentile_of_county_history: 82,
+        forecast_year: 2026,
+        interval_severity_label: "typical to much higher than typical",
+        lower_80_percentile_of_county_history: 65,
+        model_name: "empirical_bayes_spatial_regime_incidence",
+        predicted_incidence_per_100k: 52,
+        protocol_policy: "raw_with_surveillance_protocol_caveat",
+        severity_label: "above typical",
+        typical_p75_incidence_per_100k: 45,
+        typicality_evidence_level: "moderate",
+        upper_80_percentile_of_county_history: 91,
       },
     ],
   };

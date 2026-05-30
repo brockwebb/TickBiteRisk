@@ -60,6 +60,8 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function renderRegionalScaleDiagnostics",
         "function renderRegionalForecastBasis",
         "function renderRegionalComparableYear",
+        "function renderRegionalForecastTypicality",
+        "function regionalForecastTypicalityForYear",
         "function renderRegionalForecastCheck",
         "function getRegionalForecastObservedFit",
         "function renderRegionalProtocolNote",
@@ -105,6 +107,10 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "Why this forecast?",
         "Forecast basis",
         "Nearest comparable history",
+        "How unusual is this forecast?",
+        "Compared with this county",
+        "Forecast interval range",
+        "not tick abundance",
         "PA 2024 forecast check",
         "forecast_observed_fit",
         "Artifact-backed partial state-source overlay",
@@ -170,6 +176,16 @@ def test_regional_forecast_observed_fit_requires_matching_selected_year() -> Non
     function_body = js.split("function getRegionalForecastObservedFit", maxsplit=1)[
         1
     ].split("function renderRegionalObservedAnnualContext", maxsplit=1)[0]
+
+    assert "Number(record.forecast_year) === selectedYear" in function_body
+    assert "records[0]" not in function_body
+
+
+def test_regional_forecast_typicality_requires_matching_selected_year() -> None:
+    js = (PUBLIC_DIR / "regional-research.js").read_text(encoding="utf-8")
+    function_body = js.split("function regionalForecastTypicalityForYear", maxsplit=1)[
+        1
+    ].split("function renderRegionalForecastCheck", maxsplit=1)[0]
 
     assert "Number(record.forecast_year) === selectedYear" in function_body
     assert "records[0]" not in function_body

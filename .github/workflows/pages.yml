@@ -98,6 +98,7 @@ jobs:
               "regional_county_metadata.json",
               "regional_county_risk_weekly.json",
               "regional_forecast_observed_fit.json",
+              "regional_forecast_typicality.json",
               "regional_spatial_regime_overlays.json",
               "source_catalog.json",
               "static_export_manifest.json",
@@ -130,6 +131,7 @@ jobs:
           states = load_json("regional_states.geojson")
           overlays = load_json("regional_spatial_regime_overlays.json")
           observed_fit = load_json("regional_forecast_observed_fit.json")
+          typicality = load_json("regional_forecast_typicality.json")
           source_catalog = load_json("source_catalog.json")
           manifest = load_json("static_export_manifest.json")
           regional_payloads = {
@@ -138,6 +140,7 @@ jobs:
               "regional_county_incidence_annual.json": annual,
               "regional_county_risk_weekly.json": weekly,
               "regional_forecast_observed_fit.json": observed_fit,
+              "regional_forecast_typicality.json": typicality,
               "regional_spatial_regime_overlays.json": overlays,
               "source_catalog.json": source_catalog,
               "static_export_manifest.json": manifest,
@@ -253,11 +256,28 @@ jobs:
               for source in source_catalog["sources"]
           ):
               raise SystemExit("Regional source catalog must include the observed annual incidence layer.")
+          if not any(
+              source.get("source_id") == "regional_forecast_typicality"
+              for source in source_catalog["sources"]
+          ):
+              raise SystemExit("Regional source catalog must include the forecast typicality layer.")
 
           if metadata["county_count"] != 283 or not all(
               county.get("selected_spatial_regime") for county in metadata["counties"]
           ):
               raise SystemExit("Regional county metadata must include selected spatial regimes.")
+          if typicality["record_count"] != 283 * 3:
+              raise SystemExit("Regional forecast typicality must cover 283 counties x 3 forecast years.")
+          if typicality["data_role"] != "forecast_explanation":
+              raise SystemExit("Regional forecast typicality must stay an explanation layer.")
+          if {
+              record["forecast_year"] for record in typicality["records"]
+          } != {2024, 2025, 2026}:
+              raise SystemExit("Regional forecast typicality must cover forecast years 2024, 2025, and 2026.")
+          if not all(
+              county.get("forecast_typicality") for county in metadata["counties"]
+          ):
+              raise SystemExit("Regional county metadata must include forecast typicality context.")
           if not all(
               county.get("available_years") == [2024, 2025, 2026]
               for county in metadata["counties"]
