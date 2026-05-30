@@ -790,6 +790,12 @@ h1 {
   stroke-width: 2;
 }
 
+.annual-forecast-point {
+  fill: #204f8f;
+  stroke: #fff;
+  stroke-width: 2;
+}
+
 .chart-axis {
   stroke: var(--line);
   stroke-width: 1;

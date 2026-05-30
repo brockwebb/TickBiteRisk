@@ -5,7 +5,7 @@ const fixtures = {
     caveats: ["informational_only", "not_medical_advice"],
     export_type: "regional_county_week_risk",
     model_name: "empirical_bayes_spatial_regime_incidence",
-    record_count: 12,
+    record_count: 13,
     forecast_basis: {
       analog_year_definition: {
         current_role: "comparison_or_research_branch_unless_selected",
@@ -60,17 +60,21 @@ const fixtures = {
     },
     records: [
       riskRecord(2024, "24001", "Allegany County", 21, 7, "high", 1.9, [0.9, 2.8], [0.4, 4.2]),
+      riskRecord(2024, "42001", "Adams County", 21, 9, "very_high", 4.2565, [2.1, 5.3], [1.2, 7.1], {
+        annualCases: 91.22,
+        annualIncidence: 85.13,
+      }),
       riskRecord(2024, "51810", "Virginia Beach city", 21, 3, "low", 0.5, [0.2, 0.8], [0.1, 1.1]),
       riskRecord(2025, "24001", "Allegany County", 21, 8, "high", 2.2, [1.1, 3.2], [0.6, 4.8]),
       riskRecord(2025, "51810", "Virginia Beach city", 21, 2, "very_low", 0.3, [0.1, 0.5], [0, 0.8]),
       riskRecord(2026, "24001", "Allegany County", 21, 9, "very_high", 2.6, [1.2, 3.8], [0.8, 5.4]),
       riskRecord(2026, "24023", "Garrett County", 21, 8, "high", 2.1, [1.0, 3.1], [0.6, 4.8]),
       riskRecord(2026, "51810", "Virginia Beach city", 21, 2, "very_low", 0.2, [0.05, 0.4], [0, 0.7]),
-      riskRecord(2026, "24001", "Allegany County", 22, 10, "very_high", 3.1, [1.5, 4.3], [0.9, 6.2]),
-      riskRecord(2026, "24023", "Garrett County", 22, 8, "high", 2.4, [1.1, 3.5], [0.7, 5.2]),
-      riskRecord(2026, "51810", "Virginia Beach city", 22, 1, "very_low", 0.12, [0.02, 0.3], [0, 0.5]),
-      riskRecord(2025, "24001", "Allegany County", 22, 8, "high", 2.5, [1.2, 3.6], [0.7, 5.1]),
-      riskRecord(2025, "51810", "Virginia Beach city", 22, 2, "very_low", 0.32, [0.1, 0.6], [0, 0.9]),
+      riskRecord(2026, "24001", "Allegany County", 22, 10, "very_high", 3.12, [1.5, 4.3], [0.9, 6.2]),
+      riskRecord(2026, "24023", "Garrett County", 22, 8, "high", 2.52, [1.1, 3.5], [0.7, 5.2]),
+      riskRecord(2026, "51810", "Virginia Beach city", 22, 1, "very_low", 0.24, [0.02, 0.3], [0, 0.5]),
+      riskRecord(2025, "24001", "Allegany County", 22, 8, "high", 2.64, [1.2, 3.6], [0.7, 5.1]),
+      riskRecord(2025, "51810", "Virginia Beach city", 22, 2, "very_low", 0.36, [0.1, 0.6], [0, 0.9]),
     ],
     research_status: {
       research_only: true,
@@ -86,13 +90,12 @@ const fixtures = {
   },
   "regional_county_incidence_annual.json": {
     caveats: ["reported cases are not stable true incidence", "informational only"],
-    county_count: 4,
+    county_count: 3,
     data_role: "observed_historical",
     export_type: "regional_county_incidence_annual",
-    record_count: 5,
+    record_count: 3,
     records: [
       annualRecord("24001", "Allegany County", "MD", 2023, 35, 68000, 51.47, "top_quintile"),
-      annualRecord("24001", "Allegany County", "MD", 2024, 41, 68100, 60.21, "top_quintile"),
       annualRecord("24023", "Garrett County", "MD", 2023, 22, 28500, 77.19, "top_decile"),
       annualRecord("42001", "Adams County", "PA", 2024, 128, 107154, 119.45, "top_decile"),
     ],
@@ -239,7 +242,7 @@ const fixtures = {
   },
 };
 
-test("regional research dashboard renders county risk, week slider, and regime intervals", async ({
+test("regional research dashboard renders annual forecasts, seasonal view, and regime intervals", async ({
   page,
 }) => {
   const consoleErrors = [];
@@ -267,71 +270,65 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(
     page.getByRole("heading", { name: "TickBiteRisk Regional Research" })
   ).toBeVisible();
+  const panel = page.locator("#regional-panel-content");
+  const forecastViewSelect = page.locator("#forecast-view-select");
+
   await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(4);
   await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(3);
   await expect(page.locator("#year-label")).toContainText("2026");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
-  await expect(page.locator("#week-label")).toContainText("May 24-30, 2026");
-  await expect(page.locator("#week-label")).toContainText("MMWR week 21");
-  await expect(page.locator("#regional-panel-content")).toHaveAttribute(
+  await expect(forecastViewSelect).toBeVisible();
+  await expect(forecastViewSelect).toContainText("Annual forecast");
+  await expect(forecastViewSelect).toContainText("Weekly seasonal risk");
+  await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
+  await expectWeekControlsDisabled(page);
+  await expect(panel).toHaveAttribute(
     "aria-live",
     "polite"
   );
 
   await page.locator('path[data-county="24001"]').click();
-  await expect(page.locator("#regional-panel-content")).toContainText("Allegany County");
-  await expect(page.locator("#regional-panel-content")).toContainText("MD");
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "May 24-30, 2026"
-  );
-  await expect(page.locator("#regional-panel-content")).toContainText("MMWR week 21");
-  await expect(page.locator("#regional-panel-content")).toContainText("9/10");
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "95% empirical interval: 0.80 to 5.40 per 100k"
-  );
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "Linear score"
-  );
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "score denominator 4.50"
-  );
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "rounded and clamped to 1-10"
-  );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText("Allegany County");
+  await expect(panel).toContainText("MD");
+  await expect(panel).toContainText("Predicted annual incidence");
+  await expect(panel).toContainText("52.00 per 100k");
+  await expect(panel).toContainText("Predicted annual cases");
+  await expect(panel).not.toContainText("Predicted weekly incidence");
+  await expect(panel).not.toContainText("MMWR week 21");
+  await expect(panel).toContainText(
     "Why this forecast?"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Forecast origin 2023"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Data cutoff 2023-12-31"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "prior reported Lyme incidence"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "localized spatial-regime prior incidence"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Seasonal allocation"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "national Lyme onset seasonality"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Bayesian updates"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "research-only"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Nearest comparable history"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "2018 origin -> 2021 observed outcome"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Spatial regime 7"
   );
   await expect(page.locator("#regional-regime-panel")).toContainText("2 counties");
@@ -340,6 +337,33 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#regional-regime-panel")).toContainText("Garrett County");
   await expect(page.locator("#regional-regime-panel")).toContainText(
     "Regime 95% interval: 8.20 to 31.50 per 100k"
+  );
+  await expect(page.locator("#regional-chart-summary")).not.toContainText(
+    "weekly forecast window"
+  );
+
+  await forecastViewSelect.selectOption({ label: "Weekly seasonal risk" });
+  await expect(page.locator("#forecast-view-label")).toContainText(
+    "Weekly seasonal risk"
+  );
+  await expectWeekControlsEnabled(page);
+  await expect(page.locator("#week-label")).toContainText("May 24-30, 2026");
+  await expect(page.locator("#week-label")).toContainText("MMWR week 21");
+  await expect(panel).toContainText("May 24-30, 2026");
+  await expect(panel).toContainText("MMWR week 21");
+  await expect(panel).toContainText("9/10");
+  await expect(panel).toContainText("Predicted weekly incidence");
+  await expect(panel).toContainText(
+    "Linear score"
+  );
+  await expect(panel).toContainText(
+    "score denominator 4.50"
+  );
+  await expect(panel).toContainText(
+    "rounded and clamped to 1-10"
+  );
+  await expect(panel).toContainText(
+    "95% empirical interval: 0.80 to 5.40 per 100k"
   );
   await expect(page.locator("#regional-forecast-chart svg")).toBeVisible();
   await expect(page.locator("#regional-forecast-chart .interval-band-95")).toHaveCount(1);
@@ -359,20 +383,20 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await page.locator("#week-slider").fill("22");
   await expect(page.locator("#week-label")).toContainText("May 31-Jun 6, 2026");
   await expect(page.locator("#week-label")).toContainText("MMWR week 22");
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "May 31-Jun 6, 2026"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText("10/10");
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText("10/10");
+  await expect(panel).toContainText(
     "95% empirical interval: 0.90 to 6.20 per 100k"
   );
   await expect(page.locator("#regional-forecast-chart [data-active-week=\"22\"]")).toHaveCount(1);
 
   await page.locator('path[data-county="51810"]').click();
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Virginia Beach city"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText("VA");
+  await expect(panel).toContainText("VA");
   await expect(page.locator("#regional-regime-panel")).toContainText("Spatial regime 2");
   await expect(page.locator("#regional-regime-panel")).toContainText("Virginia Beach city");
   await expect(page.locator("#regional-chart-summary")).toContainText(
@@ -387,7 +411,7 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await expect(page.locator("#regional-county-list button[data-county]")).toHaveCount(1);
   await expect(page.locator("#regional-county-list")).toContainText("Garrett County");
   await page.locator('button[data-county="24023"]').click();
-  await expect(page.locator("#regional-panel-content")).toContainText("Garrett County");
+  await expect(panel).toContainText("Garrett County");
 
   await expect(page.locator("#regional-source-content")).toContainText(
     "Forecast-safe branches use prior-year"
@@ -405,12 +429,15 @@ test("regional research dashboard renders county risk, week slider, and regime i
   await page.locator("#year-select").selectOption("2023");
   await expect(page.locator("#year-label")).toContainText("2023");
   await expect(page.locator("#year-mode-label")).toContainText("Observed historical");
-  await expect(page.locator("#week-input")).toBeDisabled();
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(page.locator("#forecast-view-label")).toContainText(
+    "Observed historical annual data"
+  );
+  await expectWeekControlsDisabled(page);
+  await expect(panel).toContainText(
     "Observed historical"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText("22 reported cases");
-  await expect(page.locator("#regional-panel-content")).toContainText("77.19 per 100k");
+  await expect(panel).toContainText("22 reported cases");
+  await expect(panel).toContainText("77.19 per 100k");
   await expect(page.locator("#regional-forecast-chart .observed-history-line")).toHaveCount(1);
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "observed annual incidence history"
@@ -420,63 +447,84 @@ test("regional research dashboard renders county risk, week slider, and regime i
   );
 
   await page.locator("#year-select").selectOption("2024");
-  await expect(page.locator("#year-mode-label")).toContainText("Mixed observed/forecast");
-  await expect(page.locator("#week-input")).toBeEnabled();
+  await expect(page.locator("#year-label")).toContainText("2024");
+  await expect(page.locator("#year-mode-label")).toContainText(
+    "Forecast with observed comparison"
+  );
+  await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
+  await expectWeekControlsDisabled(page);
   await page.locator('path[data-county="24001"]').click();
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "Observed historical"
-  );
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "41 reported cases"
-  );
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "60.21 per 100k"
-  );
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "41 reported cases"
-  );
-  await expect(page.locator("#regional-panel-content")).not.toContainText(
+  await expect(panel).toContainText("Predicted annual incidence");
+  await expect(panel).toContainText("38.00 per 100k");
+  await expect(panel).toContainText("Predicted annual cases");
+  await expect(panel).not.toContainText("Observed historical");
+  await expect(panel).not.toContainText("Predicted weekly incidence");
+  await expect(panel).not.toContainText(
     "PA 2024 forecast check"
   );
   await page.locator('path[data-county="42001"]').click();
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Adams County"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText("PA");
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText("PA");
+  await expect(panel).toContainText("Predicted annual incidence");
+  await expect(panel).toContainText("85.13 per 100k");
+  await expect(panel).toContainText("Predicted annual cases");
+  await expect(panel).toContainText("91.22");
+  await expect(panel).toContainText(
     "PA 2024 forecast check"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "observed 119.45 per 100k vs forecast 85.13 per 100k"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "Cases: observed 128.00 vs forecast 91.22"
   );
-  await expect(page.locator("#regional-panel-content")).toContainText(
+  await expect(panel).toContainText(
     "post-forecast goodness-of-fit"
   );
-  await page.locator('path[data-county="51810"]').click();
-  await expect(page.locator("#regional-panel-content")).toContainText(
-    "forecast year 2024"
+  await expect(panel).not.toContainText("observed reported incidence");
+  await expect(panel).not.toContainText("Predicted weekly incidence");
+  await expect(page.locator("#regional-forecast-provenance")).toContainText(
+    "Forecast with observed comparison"
   );
 
   await page.locator("#year-select").selectOption("2025");
   await expect(page.locator("#year-label")).toContainText("2025");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
-  await expect(page.locator("#week-input")).toBeEnabled();
+  await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
+  await expectWeekControlsDisabled(page);
+  await page.locator('path[data-county="24001"]').click();
+  await expect(panel).toContainText("Predicted annual incidence");
+  await expect(panel).toContainText("44.00 per 100k");
+  await expect(panel).toContainText("Predicted annual cases");
+  await expect(panel).not.toContainText("Predicted weekly incidence");
 
   await page.locator("#year-select").selectOption("2026");
   await expect(page.locator("#year-label")).toContainText("2026");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
-  await expect(page.locator("#week-input")).toBeEnabled();
+  await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
+  await expectWeekControlsDisabled(page);
   await page.locator('path[data-county="24023"]').click();
-  await expect(page.locator("#regional-panel-content")).toContainText("8/10");
+  await expect(panel).toContainText("Predicted annual incidence");
+  await expect(panel).toContainText("42.00 per 100k");
+  await expect(panel).not.toContainText("Predicted weekly incidence");
 
   await page.locator("#regional-forecast-chart").scrollIntoViewIfNeeded();
   await expect(page.locator(".regional-time-toolbar")).toBeInViewport();
 
   expect(consoleErrors).toEqual([]);
 });
+
+async function expectWeekControlsDisabled(page) {
+  await expect(page.locator("#week-input")).toBeDisabled();
+  await expect(page.locator("#week-slider")).toBeDisabled();
+}
+
+async function expectWeekControlsEnabled(page) {
+  await expect(page.locator("#week-input")).toBeEnabled();
+  await expect(page.locator("#week-slider")).toBeEnabled();
+}
 
 function riskRecord(
   year,
@@ -487,8 +535,14 @@ function riskRecord(
   category,
   weeklyIncidence,
   interval80,
-  interval95
+  interval95,
+  options = {}
 ) {
+  const annualIncidence =
+    options.annualIncidence ?? weeklyIncidence / seasonalityShare(mmwrWeek);
+  const annualCases = options.annualCases ?? annualIncidence;
+  const weeklyCases = annualCases * seasonalityShare(mmwrWeek);
+
   return {
     backtest_assumption_flags: [
       "not_public_default",
@@ -507,8 +561,9 @@ function riskRecord(
     week_end_date: mmwrWeek === 22 ? `${year}-06-06` : `${year}-05-30`,
     predicted_weekly_incidence_80_interval: interval80,
     predicted_weekly_incidence_95_interval: interval95,
-    predicted_annual_incidence_per_100k:
-      weeklyIncidence / seasonalityShare(mmwrWeek),
+    predicted_annual_cases: annualCases,
+    predicted_annual_incidence_per_100k: annualIncidence,
+    predicted_weekly_cases: weeklyCases,
     predicted_weekly_incidence_per_100k: weeklyIncidence,
     risk_category: category,
     risk_score: score,

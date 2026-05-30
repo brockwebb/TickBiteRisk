@@ -13,8 +13,8 @@
         <p class="eyebrow">Mid-Atlantic annual Lyme risk forecast research</p>
         <h1>TickBiteRisk Regional Research</h1>
         <p class="lede">
-          Annual county Lyme risk forecasts across DE, DC, MD, PA, VA, and WV
-          with seasonal allocation and localized spatial-regime context.
+          Click a county to see its Lyme forecast, the predicted annual rate,
+          predicted case total, and the data behind the estimate.
         </p>
       </div>
       <p class="disclaimer">
@@ -32,6 +32,14 @@
             <select id="year-select"></select>
             <output id="year-label" class="muted" aria-live="polite">Loading year...</output>
             <span id="year-mode-label" class="mode-pill forecast-mode">Loading mode...</span>
+          </div>
+          <div class="regional-time-field">
+            <label for="forecast-view-select">View</label>
+            <select id="forecast-view-select">
+              <option value="annual">Annual forecast</option>
+              <option value="weekly">Weekly seasonal risk</option>
+            </select>
+            <output id="forecast-view-label" class="muted" aria-live="polite">Loading view...</output>
           </div>
           <div class="regional-time-field">
             <label for="week-slider">MMWR week</label>
@@ -64,7 +72,7 @@
         >
           <p class="loading">Loading map...</p>
         </div>
-        <div class="legend" aria-label="Risk score legend">
+        <div id="regional-risk-legend" class="legend" aria-label="Risk score legend">
           <span><b class="swatch risk-very-low"></b>1-2 very low</span>
           <span><b class="swatch risk-low"></b>3-4 low</span>
           <span><b class="swatch risk-moderate"></b>5-6 moderate</span>
