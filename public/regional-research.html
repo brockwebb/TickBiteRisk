@@ -34,11 +34,13 @@
             <span id="year-mode-label" class="mode-pill forecast-mode">Loading mode...</span>
           </div>
           <div class="regional-time-field">
-            <label for="forecast-view-select">View</label>
-            <select id="forecast-view-select">
-              <option value="annual">Annual forecast</option>
-              <option value="weekly">Weekly seasonal risk</option>
-            </select>
+            <span class="control-label">View</span>
+            <div class="forecast-view-radios" role="radiogroup" aria-label="Forecast view">
+              <input id="forecast-view-annual" type="radio" name="forecast-view" value="annual" checked />
+              <label for="forecast-view-annual">Annual forecast</label>
+              <input id="forecast-view-weekly" type="radio" name="forecast-view" value="weekly" />
+              <label for="forecast-view-weekly">Weekly seasonal risk</label>
+            </div>
             <output id="forecast-view-label" class="muted" aria-live="polite">Loading view...</output>
           </div>
           <div class="regional-time-field">

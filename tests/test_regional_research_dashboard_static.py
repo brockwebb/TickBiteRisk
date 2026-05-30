@@ -17,7 +17,10 @@ def test_regional_research_html_has_map_controls_and_research_boundaries() -> No
         'id="year-select"',
         'id="year-label" class="muted" aria-live="polite"',
         'id="year-mode-label" class="mode-pill forecast-mode"',
-        'id="forecast-view-select"',
+        'class="forecast-view-radios"',
+        'name="forecast-view"',
+        'id="forecast-view-annual"',
+        'id="forecast-view-weekly"',
         'id="forecast-view-label" class="muted" aria-live="polite"',
         'id="week-slider"',
         'class="week-scale"',
@@ -80,6 +83,7 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function handleForecastViewChange",
         "function selectedRegionalDataMode",
         "function selectedRegionalForecastView",
+        "function syncRegionalForecastViewRadios",
         "function renderRegionalAnnualForecastCounty",
         "function regionalAnnualForecastSummary",
         "function regionalCountyWeekRecords",
@@ -112,7 +116,10 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "County level data are released as annual totals only",
         "most recent CDC county data available in this release",
         "The green line is the predicted weekly Lyme incidence",
-        "The blue bands show the forecast interval",
+        "Dark blue band",
+        "Light blue band",
+        "past forecast errors",
+        "not medical confidence intervals",
         "The red dot marks the selected week",
         "The brown line is observed annual reported incidence",
         "The blue dot is the selected annual forecast",
@@ -144,6 +151,7 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
 
     assert "data/md_county_risk_weekly.json" not in js
     assert "md_counties.geojson" not in js
+    assert "forecast-view-select" not in js
     assert "Not used:" not in js
     assert "public Maryland default" not in js
     assert "Research only:" not in js

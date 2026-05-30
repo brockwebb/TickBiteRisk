@@ -280,15 +280,22 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("body")).not.toContainText("not public Maryland default");
   await expect(page.locator("body")).not.toContainText("Research only");
   const panel = page.locator("#regional-panel-content");
-  const forecastViewSelect = page.locator("#forecast-view-select");
+  const annualViewRadio = page.locator("#forecast-view-annual");
+  const weeklyViewRadio = page.locator("#forecast-view-weekly");
 
   await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(4);
   await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(3);
   await expect(page.locator("#year-label")).toContainText("2026");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
-  await expect(forecastViewSelect).toBeVisible();
-  await expect(forecastViewSelect).toContainText("Annual forecast");
-  await expect(forecastViewSelect).toContainText("Weekly seasonal risk");
+  await expect(page.locator(".forecast-view-radios")).toBeVisible();
+  await expect(annualViewRadio).toBeChecked();
+  await expect(weeklyViewRadio).toBeVisible();
+  await expect(page.locator('label[for="forecast-view-annual"]')).toContainText(
+    "Annual forecast"
+  );
+  await expect(page.locator('label[for="forecast-view-weekly"]')).toContainText(
+    "Weekly seasonal risk"
+  );
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
   await expectWeekControlsDisabled(page);
   await expect(panel).toHaveAttribute(
@@ -382,7 +389,7 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
     "The blue dot is the selected annual forecast"
   );
 
-  await forecastViewSelect.selectOption({ label: "Weekly seasonal risk" });
+  await page.locator('label[for="forecast-view-weekly"]').click();
   await expect(page.locator("#forecast-view-label")).toContainText(
     "Weekly seasonal risk"
   );
@@ -412,7 +419,16 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
     "The green line is the predicted weekly Lyme incidence"
   );
   await expect(page.locator("#regional-chart-summary")).toContainText(
-    "The blue bands show the forecast interval"
+    "Dark blue band"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Light blue band"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "past forecast errors"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "not medical confidence intervals"
   );
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "The red dot marks the selected week"

@@ -492,7 +492,8 @@ h1 {
   gap: 0.35rem;
 }
 
-.regional-time-field label {
+.regional-time-field label,
+.regional-time-field .control-label {
   color: var(--muted);
   font-weight: 700;
 }
@@ -510,6 +511,47 @@ h1 {
 
 .regional-time-field select {
   width: 100%;
+}
+
+.forecast-view-radios {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.forecast-view-radios input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.forecast-view-radios label {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+}
+
+.forecast-view-radios input:checked + label {
+  border-color: #15351f;
+  background: #15351f;
+  color: #fff;
+}
+
+.forecast-view-radios input:focus-visible + label {
+  outline: 3px solid #d8ebff;
+  outline-offset: 2px;
+}
+
+.forecast-view-radios input:disabled + label {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .week-control {
@@ -852,12 +894,14 @@ h1 {
     align-items: center;
   }
 
-  .regional-time-field label {
+  .regional-time-field label,
+  .regional-time-field .control-label {
     grid-column: 1;
     grid-row: 1;
   }
 
   .regional-time-field select,
+  .regional-time-field .forecast-view-radios,
   .regional-time-field .week-control {
     grid-column: 2 / -1;
     grid-row: 1;

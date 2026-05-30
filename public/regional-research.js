@@ -85,8 +85,8 @@ async function initRegionalResearch() {
     .getElementById("year-select")
     .addEventListener("change", handleYearSelectChange);
   document
-    .getElementById("forecast-view-select")
-    .addEventListener("change", handleForecastViewChange);
+    .querySelectorAll('input[name="forecast-view"]')
+    .forEach((input) => input.addEventListener("change", handleForecastViewChange));
   document
     .getElementById("week-input")
     .addEventListener("input", handleWeekInputChange);
@@ -405,7 +405,6 @@ function updateRegionalYearLabel() {
 }
 
 function updateRegionalForecastViewControl() {
-  const select = document.getElementById("forecast-view-select");
   const label = document.getElementById("forecast-view-label");
   const mode = selectedRegionalDataMode();
   const hasForecast = regionalForecastRecordsForSelectedYear().length > 0;
@@ -414,8 +413,7 @@ function updateRegionalForecastViewControl() {
     regionalState.forecastView = "annual";
   }
   const view = selectedRegionalForecastView();
-  select.value = view === "weekly" ? "weekly" : "annual";
-  select.disabled = !weeklyAvailable;
+  syncRegionalForecastViewRadios(weeklyAvailable, view);
   if (view === "weekly") {
     label.textContent = "Weekly seasonal risk: seasonally allocated forecast";
   } else if (mode === "forecast" || mode === "mixed") {
@@ -426,6 +424,14 @@ function updateRegionalForecastViewControl() {
   } else {
     label.textContent = "No annual forecast or observed data for this year";
   }
+}
+
+function syncRegionalForecastViewRadios(weeklyAvailable, view) {
+  const annual = document.getElementById("forecast-view-annual");
+  const weekly = document.getElementById("forecast-view-weekly");
+  annual.checked = view !== "weekly";
+  weekly.checked = view === "weekly";
+  weekly.disabled = !weeklyAvailable;
 }
 
 function selectedRegionalYearMode() {
@@ -1523,7 +1529,7 @@ function renderRegionalForecastChart(countyFips) {
     <text class="chart-label" x="${padding.left}" y="${height - 10}">MMWR weeks ${regionalEscapeHtml(minWeek)}-${regionalEscapeHtml(maxWeek)}</text>
     <text class="chart-label" x="${padding.left}" y="13">${regionalFormatNumber(maxValue)} per 100k</text>
   </svg>`;
-  summary.textContent = `${countyName} weekly forecast, MMWR weeks ${minWeek}-${maxWeek}. The green line is the predicted weekly Lyme incidence. The blue bands show the forecast interval. The red dot marks the selected week ${activeRecord.mmwr_week}, with a 95% empirical interval of ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k.`;
+  summary.textContent = `${countyName} weekly forecast, MMWR weeks ${minWeek}-${maxWeek}. The green line is the predicted weekly Lyme incidence. Dark blue band: narrower expected range from past forecast errors. Light blue band: wider expected range from past forecast errors. The red dot marks the selected week ${activeRecord.mmwr_week}, with a wider range of ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k. These ranges are uncertainty around reported-incidence forecasts, not medical confidence intervals.`;
 }
 
 function renderRegionalObservedHistoryChart(countyFips) {
