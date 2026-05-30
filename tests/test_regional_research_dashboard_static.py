@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -68,6 +69,18 @@ def test_regional_research_html_has_map_controls_and_research_boundaries() -> No
     )
     assert "Research-only regional outputs" not in html
     assert "public Maryland default" not in html
+
+
+def test_regional_research_html_cache_busts_css_and_script_assets() -> None:
+    html = (PUBLIC_DIR / "regional-research.html").read_text(encoding="utf-8")
+
+    stylesheet = re.search(r'href="styles\.css\?v=([^"]+)"', html)
+    script = re.search(r'src="regional-research\.js\?v=([^"]+)"', html)
+
+    assert stylesheet is not None
+    assert script is not None
+    assert stylesheet.group(1) == script.group(1)
+    assert "forecast-view-select" not in stylesheet.group(1)
 
 
 def test_regional_research_javascript_uses_regional_bundle_without_maryland_default() -> None:
