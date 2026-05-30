@@ -268,8 +268,17 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await page.goto("/regional-research.html");
 
   await expect(
-    page.getByRole("heading", { name: "TickBiteRisk Regional Research" })
+    page.getByRole("heading", {
+      name:
+        "TickBiteRisk Regional Research: Lyme Disease Forecasting and Risk Assessment",
+    })
   ).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(
+    "Research-only regional outputs are not the public Maryland default"
+  );
+  await expect(page.locator("body")).not.toContainText("not_public_maryland_default");
+  await expect(page.locator("body")).not.toContainText("not public Maryland default");
+  await expect(page.locator("body")).not.toContainText("Research only");
   const panel = page.locator("#regional-panel-content");
   const forecastViewSelect = page.locator("#forecast-view-select");
 
@@ -299,10 +308,10 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
     "Why this forecast?"
   );
   await expect(panel).toContainText(
-    "Forecast origin 2023"
+    "County level data are released as annual totals only"
   );
   await expect(panel).toContainText(
-    "Data cutoff 2023-12-31"
+    "The most recent CDC county data available in this release are 2023"
   );
   await expect(panel).toContainText(
     "prior reported Lyme incidence"
@@ -310,6 +319,8 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(panel).toContainText(
     "localized spatial-regime prior incidence"
   );
+  await expect(panel).not.toContainText("Not used:");
+  await expect(panel).not.toContainText("observed county-week Lyme cases");
   await expect(panel).toContainText(
     "Seasonal allocation"
   );
@@ -320,7 +331,7 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
     "Bayesian updates"
   );
   await expect(panel).toContainText(
-    "research-only"
+    "not part of the displayed score yet"
   );
     await expect(panel).toContainText(
       "Nearest comparable history"
@@ -346,15 +357,29 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(panel).toContainText(
     "Spatial regime 7"
   );
+  await expect(panel).not.toContainText("Feature year");
+  await expect(panel).not.toContainText("Forecast origin");
+  await expect(page.locator("#regional-regime-panel")).toContainText(
+    "Local forecast region"
+  );
+  await expect(page.locator("#regional-regime-panel")).toContainText(
+    "Forecast year 2026"
+  );
   await expect(page.locator("#regional-regime-panel")).toContainText("2 counties");
-  await expect(page.locator("#regional-regime-panel")).toContainText("Regime counties");
+  await expect(page.locator("#regional-regime-panel")).toContainText("Region counties");
   await expect(page.locator("#regional-regime-panel")).toContainText("Allegany County");
   await expect(page.locator("#regional-regime-panel")).toContainText("Garrett County");
   await expect(page.locator("#regional-regime-panel")).toContainText(
-    "Regime 95% interval: 8.20 to 31.50 per 100k"
+    "Region 95% interval: 8.20 to 31.50 per 100k"
   );
   await expect(page.locator("#regional-chart-summary")).not.toContainText(
     "weekly forecast window"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "The brown line is observed annual reported incidence"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "The blue dot is the selected annual forecast"
   );
 
   await forecastViewSelect.selectOption({ label: "Weekly seasonal risk" });
@@ -384,7 +409,13 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#regional-forecast-chart .interval-band-95")).toHaveCount(1);
   await expect(page.locator("#regional-forecast-chart .county-forecast-line")).toHaveCount(1);
   await expect(page.locator("#regional-chart-summary")).toContainText(
-    "Allegany County weekly forecast window"
+    "The green line is the predicted weekly Lyme incidence"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "The blue bands show the forecast interval"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "The red dot marks the selected week"
   );
   await expect(page.locator("#regional-chart-summary")).toContainText("MMWR weeks 21-22");
   await expect(page.locator("#regional-forecast-chart [data-active-week=\"21\"]")).toHaveCount(1);
@@ -415,7 +446,7 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#regional-regime-panel")).toContainText("Spatial regime 2");
   await expect(page.locator("#regional-regime-panel")).toContainText("Virginia Beach city");
   await expect(page.locator("#regional-chart-summary")).toContainText(
-    "Virginia Beach city weekly forecast window"
+    "Virginia Beach city weekly forecast"
   );
 
   await page.locator("#state-filter").selectOption("MD");
@@ -431,8 +462,11 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#regional-source-content")).toContainText(
     "Forecast-safe branches use prior-year"
   );
+  await expect(page.locator("#regional-source-content")).not.toContainText(
+    "not public Maryland default"
+  );
   await expect(page.locator("#regional-forecast-provenance")).toContainText(
-    "Forecast origin 2023"
+    "Data through 2023"
   );
   await expect(page.locator("#regional-forecast-provenance")).toContainText(
     "Forecast year 2026"
@@ -483,6 +517,16 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("38.00 per 100k");
   await expect(panel).toContainText("Predicted annual cases");
+  await expect(panel).toContainText("How unusual is this forecast?");
+  await expect(panel).toContainText("55th percentile");
+  await expect(panel).not.toContainText("Feature year");
+  await expect(panel).not.toContainText("Forecast origin");
+  await expect(page.locator("#regional-regime-panel")).toContainText(
+    "No local forecast region summary is available for 2024"
+  );
+  await expect(page.locator("#regional-regime-panel")).not.toContainText(
+    "Region 95% interval"
+  );
   await expect(panel).not.toContainText("Observed historical");
   await expect(panel).not.toContainText("Predicted weekly incidence");
   await expect(panel).not.toContainText(
@@ -524,6 +568,10 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("44.00 per 100k");
   await expect(panel).toContainText("Predicted annual cases");
+  await expect(panel).toContainText("65th percentile");
+  await expect(page.locator("#regional-regime-panel")).toContainText(
+    "No local forecast region summary is available for 2025"
+  );
   await expect(panel).not.toContainText("Predicted weekly incidence");
 
   await page.locator("#year-select").selectOption("2026");
@@ -538,6 +586,9 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
 
   await page.locator("#regional-forecast-chart").scrollIntoViewIfNeeded();
   await expect(page.locator(".regional-time-toolbar")).toBeInViewport();
+  await expect(page.locator("body")).not.toContainText("not_public_maryland_default");
+  await expect(page.locator("body")).not.toContainText("not public Maryland default");
+  await expect(page.locator("body")).not.toContainText("Research only");
 
   expect(consoleErrors).toEqual([]);
 });
@@ -572,6 +623,7 @@ function riskRecord(
   return {
     backtest_assumption_flags: [
       "not_public_default",
+      "not_public_maryland_default",
       "forecast_without_observed_target",
     ],
     county_fips: countyFips,
@@ -664,25 +716,35 @@ function countyMetadata(countyFips, countyName, regionId, regionName, rank) {
         predicted_incidence_per_100k: 42.5,
       },
     ],
-    forecast_typicality: [
-      {
-        baseline_year_count: 23,
-        comparison_scope: "county_prior_history",
-        comparison_year_end: 2023,
-        comparison_year_start: 2001,
-        forecast_percentile_of_county_history: 82,
-        forecast_year: 2026,
-        interval_severity_label: "typical to much higher than typical",
-        lower_80_percentile_of_county_history: 65,
-        model_name: "empirical_bayes_spatial_regime_incidence",
-        predicted_incidence_per_100k: 52,
-        protocol_policy: "raw_with_surveillance_protocol_caveat",
-        severity_label: "above typical",
-        typical_p75_incidence_per_100k: 45,
-        typicality_evidence_level: "moderate",
-        upper_80_percentile_of_county_history: 91,
-      },
-    ],
+    forecast_typicality: forecastTypicalityRows(),
+  };
+}
+
+function forecastTypicalityRows() {
+  return [
+    forecastTypicalityRow(2024, 55, 30, 78, "typical", 38),
+    forecastTypicalityRow(2025, 65, 42, 85, "typical", 44),
+    forecastTypicalityRow(2026, 82, 65, 91, "above typical", 52),
+  ];
+}
+
+function forecastTypicalityRow(year, percentile, lower, upper, label, incidence) {
+  return {
+    baseline_year_count: 23,
+    comparison_scope: "county_prior_history",
+    comparison_year_end: 2023,
+    comparison_year_start: 2001,
+    forecast_percentile_of_county_history: percentile,
+    forecast_year: year,
+    interval_severity_label: "typical to much higher than typical",
+    lower_80_percentile_of_county_history: lower,
+    model_name: "empirical_bayes_spatial_regime_incidence",
+    predicted_incidence_per_100k: incidence,
+    protocol_policy: "raw_with_surveillance_protocol_caveat",
+    severity_label: label,
+    typical_p75_incidence_per_100k: 45,
+    typicality_evidence_level: "moderate",
+    upper_80_percentile_of_county_history: upper,
   };
 }
 

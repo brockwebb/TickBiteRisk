@@ -273,3 +273,42 @@ def test_pages_workflow_validates_regional_research_preview_assets() -> None:
         "Regional 2024 observed incidence must remain the partial PA overlay.",
     ]:
         assert token in workflow
+
+
+def test_regional_research_visible_source_inputs_do_not_leak_internal_flags() -> None:
+    weekly = load_regional_json("regional_county_risk_weekly.json")
+    annual = load_regional_json("regional_county_incidence_annual.json")
+    model_card = load_regional_json("model_card.json")
+    source_catalog = load_regional_json("source_catalog.json")
+
+    visible_source_text = json.dumps(
+        {
+            "annual_caveats": annual.get("caveats", []),
+            "forecast_basis": weekly.get("forecast_basis", {}),
+            "model_card": {
+                "method_summary": model_card.get("method_summary", ""),
+                "score_interpretation": model_card.get("score_interpretation", ""),
+            },
+            "source_catalog": {
+                "data_lag_and_update_policy": source_catalog.get(
+                    "data_lag_and_update_policy", {}
+                ),
+                "sources": [
+                    {
+                        "notes": source.get("notes", ""),
+                        "public_notes": source.get("public_notes", ""),
+                        "source_id": source.get("source_id", ""),
+                    }
+                    for source in source_catalog.get("sources", [])
+                ],
+            },
+        },
+        sort_keys=True,
+    ).lower()
+
+    for internal_phrase in [
+        "not_public_maryland_default",
+        "not public maryland default",
+        "public maryland default",
+    ]:
+        assert internal_phrase not in visible_source_text

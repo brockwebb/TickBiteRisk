@@ -44,8 +44,12 @@ const regionalFlagLabels = {
     "Forecast-safe prior spatial-regime history",
   localized_spatial_regime_feature:
     "Localized spatial-regime research feature",
-  not_public_default: "Research layer, not public default",
 };
+
+const regionalHiddenFlagCaveats = new Set([
+  "not_public_default",
+  "not_public_maryland_default",
+]);
 
 const regionalSurveillanceProtocols = [
   {
@@ -226,7 +230,10 @@ function indexRegionalMetadata(counties) {
 function indexRegionalOverlays(records) {
   regionalState.overlaysByRegime.clear();
   for (const overlay of records) {
-    regionalState.overlaysByRegime.set(overlay.region_id, overlay);
+    regionalState.overlaysByRegime.set(
+      `${Number(overlay.forecast_year)}:${overlay.region_id}`,
+      overlay
+    );
   }
 }
 
@@ -604,7 +611,7 @@ function regionalCountyPath(feature, bounds, width, height) {
   const countyFips = props.county_fips;
   const record = getRegionalRecord(countyFips);
   const metadata = regionalState.metadataByCounty.get(countyFips);
-  const regime = metadata && metadata.selected_spatial_regime;
+  const regime = regionalSelectedRegimeForYear(metadata);
   const selectedRegime = selectedRegionalRegimeId();
   const stateAbbr = props.state_abbr || "";
   const annualRecord = getRegionalAnnualRecord(countyFips);
@@ -802,7 +809,7 @@ function selectRegionalCounty(countyFips) {
     ${renderRegionalForecastTypicality(metadata)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
-    <p class="disclaimer">Research only. This is not a per-bite infection probability, diagnosis, treatment recommendation, or public Maryland default.</p>
+    <p class="disclaimer">Informational only. This is not a per-bite infection probability, diagnosis, or treatment recommendation.</p>
   </div>`;
   renderRegionalRegime(metadata);
   renderRegionalForecastChart(countyFips);
@@ -849,7 +856,7 @@ function renderRegionalAnnualForecastCounty({
     ${renderRegionalForecastTypicality(metadata)}
     ${renderRegionalCountyRegime(metadata)}
     ${renderRegionalFlagCaveats(record)}
-    <p class="disclaimer">Research only. This is a forecast of reported Lyme disease pressure, not a per-bite infection probability, diagnosis, treatment recommendation, or public Maryland default.</p>
+    <p class="disclaimer">Informational only. This is a forecast of reported Lyme disease pressure, not a per-bite infection probability, diagnosis, or treatment recommendation.</p>
   </div>`;
   renderRegionalRegime(metadata);
   renderRegionalAnnualForecastChart(countyFips, summary);
@@ -956,10 +963,6 @@ function renderRegionalForecastBasis(record) {
     basis.signals_used,
     "prior reported Lyme incidence"
   );
-  const signalsNotUsed = regionalForecastBasisList(
-    basis.signals_not_used,
-    "observed county-week Lyme cases"
-  );
   const seasonalityScope =
     seasonal.scope || "national Lyme onset seasonality";
   const seasonalityRole =
@@ -969,21 +972,26 @@ function renderRegionalForecastBasis(record) {
     uncertainty.interval_method ||
     record.annual_interval_method ||
     "empirical forecast residuals";
-  const bayesianStatus = updatePolicy.bayesian_update_status === "research_backtest_only"
-    ? "research-only"
-    : regionalReadableName(updatePolicy.bayesian_update_status || "research-only");
   const bayesianMethod =
     updatePolicy.bayesian_update_method || "gamma_poisson_case_multiplier";
+  const latestCdcYear = regionalLatestCdcCountyYear(forecastOrigin, dataCutoff);
 
   return `<section class="lineage-strip forecast-basis" aria-labelledby="regional-forecast-basis-heading">
     <h4 id="regional-forecast-basis-heading">Why this forecast?</h4>
-    <p><b>Forecast basis:</b> ${regionalEscapeHtml(regionalReadableName(modelName))}. Forecast origin ${regionalEscapeHtml(forecastOrigin)}; Data cutoff ${regionalEscapeHtml(dataCutoff)}.</p>
-    <p><b>Signals used:</b> ${signalsUsed}</p>
-    <p><b>Not used:</b> ${signalsNotUsed}</p>
-    <p><b>Seasonal allocation:</b> ${regionalEscapeHtml(seasonalityScope)} ${regionalEscapeHtml(seasonalityRole)}.</p>
-    <p><b>Forecast interval:</b> ${regionalEscapeHtml(regionalReadableName(intervalMethod))}.</p>
-    <p><b>Bayesian updates:</b> ${regionalEscapeHtml(regionalReadableName(bayesianMethod))} is ${regionalEscapeHtml(bayesianStatus)}.</p>
+    <p><b>County data:</b> County level data are released as annual totals only. The most recent CDC county data available in this release are ${regionalEscapeHtml(latestCdcYear)}.</p>
+    <p><b>What the model uses:</b> ${signalsUsed}. Selected model: ${regionalEscapeHtml(regionalReadableName(modelName))}.</p>
+    <p><b>Weekly estimates:</b> Weekly estimates are based on known tick activity cycles. The annual county forecast is spread across MMWR weeks using ${regionalEscapeHtml(seasonalityScope)}.</p>
+    <p><b>Seasonal allocation:</b> ${regionalEscapeHtml(seasonalityRole)}.</p>
+    <p><b>Forecast interval:</b> ${regionalEscapeHtml(regionalReadableName(intervalMethod))}; bands show model uncertainty around reported-incidence estimates.</p>
+    <p><b>Bayesian updates:</b> ${regionalEscapeHtml(regionalReadableName(bayesianMethod))} is not part of the displayed score yet. It is reserved for backtests and future updates when new annual data arrive.</p>
   </section>`;
+}
+
+function regionalLatestCdcCountyYear(forecastOrigin, dataCutoff) {
+  const originYear = Number(forecastOrigin);
+  if (Number.isFinite(originYear)) return String(originYear);
+  const cutoffMatch = String(dataCutoff || "").match(/^(\d{4})-/);
+  return cutoffMatch ? cutoffMatch[1] : "unknown";
 }
 
 function regionalForecastBasisList(items, fallback) {
@@ -1051,6 +1059,34 @@ function regionalForecastTypicalityForYear(metadata) {
     records.find((record) => Number(record.forecast_year) === selectedYear) ||
     null
   );
+}
+
+function regionalSelectedRegimeForYear(metadata) {
+  const regime = metadata && metadata.selected_spatial_regime;
+  const selectedYear = Number(regionalState.selectedYear);
+  const regimeYearMatches =
+    regime && Number(regime.forecast_year) === selectedYear;
+  if (
+    !regime ||
+    !Number.isFinite(selectedYear) ||
+    !regimeYearMatches
+  ) {
+    return null;
+  }
+  return regime;
+}
+
+function regionalSelectedRegimeOverlay(regime) {
+  if (!regime) return null;
+  const selectedYear = Number(regionalState.selectedYear);
+  if (!Number.isFinite(selectedYear)) return null;
+  const overlay = regionalState.overlaysByRegime.get(
+    `${selectedYear}:${regime.region_id}`
+  );
+  const overlayYearMatches =
+    overlay && Number(overlay.forecast_year) === selectedYear;
+  if (!overlay || !overlayYearMatches) return null;
+  return overlay;
 }
 
 function regionalOrdinalPercentile(value) {
@@ -1222,22 +1258,28 @@ function renderRegionalCountyRegime(metadata) {
   if (!regionalShowForecastRegimeContext()) {
     return renderRegionalHistoricalRegimeNotice();
   }
-  const regime = metadata && metadata.selected_spatial_regime;
-  if (!regime) return "";
+  const regime = regionalSelectedRegimeForYear(metadata);
+  if (!regime) {
+    return `<section class="lineage-strip" aria-labelledby="regional-lineage-heading">
+      <h4 id="regional-lineage-heading">Local forecast region</h4>
+      <p>No local forecast region summary is available for ${regionalEscapeHtml(regionalState.selectedYear || "the selected forecast year")}.</p>
+    </section>`;
+  }
+  const dataThrough = regime.forecast_origin_year || "the latest complete CDC county year";
   return `<section class="lineage-strip" aria-labelledby="regional-lineage-heading">
-    <h4 id="regional-lineage-heading">Localized spatial regime</h4>
+    <h4 id="regional-lineage-heading">Local forecast region</h4>
     <dl class="lineage-grid">
       <div>
-        <dt>Research region</dt>
+        <dt>Model region</dt>
         <dd>${regionalEscapeHtml(regime.region_name || regime.region_id)}</dd>
       </div>
       <div>
-        <dt>Feature year</dt>
-        <dd>${regionalEscapeHtml(regime.spatial_regime_feature_year)}</dd>
+        <dt>Forecast year</dt>
+        <dd>${regionalEscapeHtml(regime.forecast_year || regionalState.selectedYear)}</dd>
       </div>
       <div>
-        <dt>Forecast origin</dt>
-        <dd>${regionalEscapeHtml(regime.forecast_origin_year)}</dd>
+        <dt>Data through</dt>
+        <dd>${regionalEscapeHtml(dataThrough)}</dd>
       </div>
     </dl>
   </section>`;
@@ -1257,16 +1299,16 @@ function renderRegionalRegime(metadata) {
       <p class="muted">Forecast regions are shown only for forecast years. This view is observed annual data for ${regionalEscapeHtml(regionalState.selectedYear || "the selected year")}.</p>`;
     return;
   }
-  const regime = metadata && metadata.selected_spatial_regime;
+  const regime = regionalSelectedRegimeForYear(metadata);
   if (!regime) {
-    target.innerHTML = `<h3 id="regional-regime-title">Localized spatial regime</h3><p class="muted">No spatial-regime membership is available for this county.</p>`;
+    target.innerHTML = `<h3 id="regional-regime-title">Local forecast region</h3><p class="muted">No local forecast region summary is available for ${regionalEscapeHtml(regionalState.selectedYear || "the selected forecast year")}.</p>`;
     return;
   }
-  const overlay = regionalState.overlaysByRegime.get(regime.region_id);
+  const overlay = regionalSelectedRegimeOverlay(regime);
   if (!overlay) {
-    target.innerHTML = `<h3 id="regional-regime-title">Localized spatial regime</h3>
+    target.innerHTML = `<h3 id="regional-regime-title">Local forecast region</h3>
       <p><b>${regionalEscapeHtml(regime.region_name || regime.region_id)}</b></p>
-      <p class="muted">Regime interval summary is unavailable in this bundle.</p>`;
+      <p class="muted">No local forecast region summary is available for ${regionalEscapeHtml(regionalState.selectedYear || "the selected forecast year")}.</p>`;
     return;
   }
   const interval80 = overlay.predicted_incidence_80_interval || [0, 0];
@@ -1275,28 +1317,28 @@ function renderRegionalRegime(metadata) {
   const countyItems = countyNames
     .map((countyName) => `<li>${regionalEscapeHtml(countyName)}</li>`)
     .join("");
-  target.innerHTML = `<h3 id="regional-regime-title">Localized spatial regime</h3>
+  target.innerHTML = `<h3 id="regional-regime-title">Local forecast region</h3>
     <p><b>${regionalEscapeHtml(overlay.region_name || overlay.region_id)}</b></p>
-    <p>${regionalEscapeHtml(overlay.n_counties)} counties in this localized research cluster.</p>
+    <p>Forecast year ${regionalEscapeHtml(overlay.forecast_year || regionalState.selectedYear)}. Region includes ${regionalEscapeHtml(overlay.n_counties)} counties with similar local history.</p>
     <section class="regional-regime-counties" aria-labelledby="regional-regime-counties-title">
-      <h4 id="regional-regime-counties-title">Regime counties</h4>
+      <h4 id="regional-regime-counties-title">Region counties</h4>
       <ul>${countyItems}</ul>
     </section>
     <dl class="regional-regime-metrics">
       <div>
-        <dt>Regime incidence</dt>
+        <dt>Region incidence</dt>
         <dd>${regionalFormatNumber(overlay.predicted_incidence_per_100k)} per 100k</dd>
       </div>
       <div>
-        <dt>Regime 80% interval</dt>
+        <dt>Region 80% interval</dt>
         <dd>${regionalFormatNumber(interval80[0])} to ${regionalFormatNumber(interval80[1])} per 100k</dd>
       </div>
       <div>
-        <dt>Regime 95% interval</dt>
-        <dd>Regime 95% interval: ${regionalFormatNumber(interval95[0])} to ${regionalFormatNumber(interval95[1])} per 100k</dd>
+        <dt>Region 95% interval</dt>
+        <dd>Region 95% interval: ${regionalFormatNumber(interval95[0])} to ${regionalFormatNumber(interval95[1])} per 100k</dd>
       </div>
     </dl>
-    <p class="muted">States remain display and reporting rollups; this regime is a localized research grouping.</p>`;
+    <p class="muted">States remain display and reporting rollups; this region is a local modeling group.</p>`;
 }
 
 function regionalRegimeCountyNames(overlay) {
@@ -1322,6 +1364,9 @@ function renderRegionalFlagCaveats(record) {
     ...(record.feature_quality_flags || []),
     ...(record.backtest_assumption_flags || []),
   ]);
+  for (const hiddenFlag of regionalHiddenFlagCaveats) {
+    flags.delete(hiddenFlag);
+  }
   if (!flags.size) return "";
   const items = Array.from(flags)
     .map((flag) => `<li>${regionalEscapeHtml(regionalReadableFlag(flag))}</li>`)
@@ -1406,7 +1451,7 @@ function renderRegionalAnnualForecastChart(countyFips, annualSummary) {
     <text class="chart-label" x="${padding.left}" y="${height - 10}">Annual incidence ${regionalEscapeHtml(minYear)}-${regionalEscapeHtml(maxYear)}</text>
     <text class="chart-label" x="${padding.left}" y="13">${regionalFormatNumber(maxValue)} per 100k</text>
   </svg>`;
-  summary.textContent = `${countyName} annual forecast for ${forecastYear}: predicted annual incidence ${regionalFormatNumber(annualSummary.predictedAnnualIncidence)} per 100k and predicted annual cases ${Number.isFinite(annualSummary.predictedAnnualCases) ? regionalFormatNumber(annualSummary.predictedAnnualCases) : "unavailable"}.`;
+  summary.textContent = `${countyName} annual forecast for ${forecastYear}. The brown line is observed annual reported incidence. The blue dot is the selected annual forecast: ${regionalFormatNumber(annualSummary.predictedAnnualIncidence)} per 100k and ${Number.isFinite(annualSummary.predictedAnnualCases) ? regionalFormatNumber(annualSummary.predictedAnnualCases) : "unavailable"} predicted cases. County level CDC data are annual, so historical weeks or months are not shown.`;
 }
 
 function renderRegionalForecastChart(countyFips) {
@@ -1478,7 +1523,7 @@ function renderRegionalForecastChart(countyFips) {
     <text class="chart-label" x="${padding.left}" y="${height - 10}">MMWR weeks ${regionalEscapeHtml(minWeek)}-${regionalEscapeHtml(maxWeek)}</text>
     <text class="chart-label" x="${padding.left}" y="13">${regionalFormatNumber(maxValue)} per 100k</text>
   </svg>`;
-  summary.textContent = `${countyName} weekly forecast window, MMWR weeks ${minWeek}-${maxWeek}; selected week ${activeRecord.mmwr_week} has 95% empirical interval ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k.`;
+  summary.textContent = `${countyName} weekly forecast, MMWR weeks ${minWeek}-${maxWeek}. The green line is the predicted weekly Lyme incidence. The blue bands show the forecast interval. The red dot marks the selected week ${activeRecord.mmwr_week}, with a 95% empirical interval of ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k.`;
 }
 
 function renderRegionalObservedHistoryChart(countyFips) {
@@ -1581,7 +1626,7 @@ function renderRegionalSources() {
         `<li><b>${regionalEscapeHtml(regionalReadableName(source.source_id))}</b>: ${regionalEscapeHtml(source.public_notes || source.notes || "Derived research input.")}</li>`
     )
     .join("");
-  target.innerHTML = `<p><b>Research only:</b> ${regionalEscapeHtml(modelCard.score_interpretation || "Relative seasonal Lyme forecast on a 1 to 10 scale.")} This is not public Maryland default.</p>
+  target.innerHTML = `<p><b>Score role:</b> ${regionalEscapeHtml(modelCard.score_interpretation || "Relative seasonal Lyme forecast on a 1 to 10 scale.")}</p>
     <p><b>Map unit:</b> Annual forecast and historical years use reported Lyme incidence per 100k. Weekly seasonal risk is an optional current-year view that allocates the annual forecast across the season.</p>
     <p>${regionalEscapeHtml(policy.why_forecasting || "Official county surveillance data lag real-world exposure conditions.")}</p>
     <p>${regionalEscapeHtml(policy.forecast_boundary || "Forecast-safe branches use prior-year and trailing regional data only.")}</p>
@@ -1604,8 +1649,8 @@ function renderRegionalForecastProvenance() {
         <dd>${regionalEscapeHtml(regionalState.selectedYear || "unknown")}</dd>
       </div>
       <div>
-        <dt>Boundary</dt>
-        <dd>Research only, not public Maryland default</dd>
+        <dt>Map boundary</dt>
+        <dd>DE, DC, MD, PA, VA, and WV counties; states are reporting and display rollups</dd>
       </div>
     </dl>`;
     return;
@@ -1634,16 +1679,16 @@ function renderRegionalForecastProvenance() {
       <dd>${regionalEscapeHtml(regionalReadableName(modelName))}</dd>
     </div>
     <div>
-      <dt>Forecast origin</dt>
-      <dd>Forecast origin ${regionalEscapeHtml(selectedForecast.forecast_origin_year || "unknown")}</dd>
+      <dt>Data through</dt>
+      <dd>Data through ${regionalEscapeHtml(selectedForecast.forecast_origin_year || "unknown")}</dd>
     </div>
     <div>
       <dt>Forecast year</dt>
       <dd>Forecast year ${regionalEscapeHtml(forecastYear || "unknown")}</dd>
     </div>
     <div>
-      <dt>Boundary</dt>
-      <dd>Research only, not public Maryland default</dd>
+      <dt>Map boundary</dt>
+      <dd>DE, DC, MD, PA, VA, and WV counties; states are reporting and display rollups</dd>
     </div>
   </dl>`;
 }
@@ -1682,7 +1727,7 @@ function regionalForecastYearsFromRecords() {
 function selectedRegionalRegimeId() {
   if (!regionalShowForecastRegimeContext()) return null;
   const metadata = regionalState.metadataByCounty.get(regionalState.selectedCounty);
-  const regime = metadata && metadata.selected_spatial_regime;
+  const regime = regionalSelectedRegimeForYear(metadata);
   return regime && regime.region_id;
 }
 
@@ -1712,7 +1757,7 @@ function renderRegionalLoadError(error) {
   document.getElementById("regional-panel-content").innerHTML =
     "<p>Regional research data bundle is unavailable.</p>";
   document.getElementById("regional-regime-panel").innerHTML =
-    '<h3 id="regional-regime-title">Localized spatial regime</h3><p class="muted">Regional regime data are unavailable.</p>';
+    '<h3 id="regional-regime-title">Local forecast region</h3><p class="muted">Regional forecast region data are unavailable.</p>';
   document.getElementById("regional-source-content").innerHTML =
     "<p>Regional source notes are unavailable.</p>";
   document.getElementById("regional-forecast-provenance").innerHTML =

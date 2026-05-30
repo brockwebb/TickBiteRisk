@@ -161,6 +161,27 @@ default UI should therefore be annual; historical years should keep time
 controls locked to annual unless true county-month or county-week observed data
 are acquired.
 
+Plain-language dashboard copy should say this directly: county-level Lyme data
+are released as annual totals only, and the most recent CDC county data in the
+current regional release are 2023. The dashboard should not describe missing
+fine-grain Lyme/tick observations as "not used" data, because that implies an
+available dataset was intentionally excluded. Forecast explanations should say
+that annual forecasts use prior reported Lyme incidence, population
+denominators, local-region/neighbor patterns, and uncertainty from historical
+forecast error; weekly estimates spread that annual forecast across the season
+using known Lyme/tick activity timing. Chart captions should explain the marks
+in plain English: observed-history line, forecast point or selected-week point,
+and forecast interval bands. Internal research-status flags such as
+`not_public_maryland_default` are provenance metadata, not user-facing copy.
+
+Localized-region context must be selected-year aware. If the public bundle only
+contains a spatial-regime overlay for 2026, the UI must not reuse that overlay
+for 2024 or 2025. For years without a matching overlay, the region panel should
+say that no local forecast-region summary is available for the selected year.
+Forecast typicality is a separate county-history comparison and should remain
+available for every forecast year where the typicality artifact has a matching
+county-year row.
+
 ## Source And Provenance
 
 The regional county graph uses the Census TIGERweb `State_County` county layer

@@ -8,8 +8,8 @@ def test_regional_research_html_has_map_controls_and_research_boundaries() -> No
     html = (PUBLIC_DIR / "regional-research.html").read_text(encoding="utf-8")
 
     for token in [
-        "<title>TickBiteRisk Regional Research Forecast</title>",
-        "TickBiteRisk Regional Research",
+        "<title>TickBiteRisk Regional Research: Lyme Disease Forecasting and Risk Assessment</title>",
+        "TickBiteRisk Regional Research: Lyme Disease Forecasting and Risk Assessment",
         "Mid-Atlantic annual Lyme risk forecast research",
         "Click a county to see its Lyme forecast, the predicted annual rate,",
         'id="regional-risk-map"',
@@ -39,6 +39,9 @@ def test_regional_research_html_has_map_controls_and_research_boundaries() -> No
     ]:
         assert token in html
 
+    assert "Research-only regional outputs" not in html
+    assert "public Maryland default" not in html
+
 
 def test_regional_research_javascript_uses_regional_bundle_without_maryland_default() -> None:
     js = (PUBLIC_DIR / "regional-research.js").read_text(encoding="utf-8")
@@ -62,6 +65,8 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function renderRegionalComparableYear",
         "function renderRegionalForecastTypicality",
         "function regionalForecastTypicalityForYear",
+        "function regionalSelectedRegimeForYear",
+        "function regionalSelectedRegimeOverlay",
         "function renderRegionalForecastCheck",
         "function getRegionalForecastObservedFit",
         "function renderRegionalProtocolNote",
@@ -87,7 +92,6 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "function renderRegionalObservedAnnualContext",
         "function regionalRiskFillColor",
         "forecast_safe_prior_history_spatial_regime",
-        "Forecast origin",
         "Forecast year",
         "Observed historical",
         "Forecast with observed comparison",
@@ -105,7 +109,13 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "observed reported incidence",
         "Linear score",
         "Why this forecast?",
-        "Forecast basis",
+        "County level data are released as annual totals only",
+        "most recent CDC county data available in this release",
+        "The green line is the predicted weekly Lyme incidence",
+        "The blue bands show the forecast interval",
+        "The red dot marks the selected week",
+        "The brown line is observed annual reported incidence",
+        "The blue dot is the selected annual forecast",
         "Nearest comparable history",
         "How unusual is this forecast?",
         "Compared with this county",
@@ -124,17 +134,19 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "county-forecast-line",
         "interval-band-95",
         "data-active-week",
-        "Research only",
-        "not public Maryland default",
         "95% empirical interval",
-        "Regime 95% interval",
-        "Regime counties",
+        "Local forecast region",
+        "Region 95% interval",
+        "Region counties",
         "regional-state-boundary",
     ]:
         assert token in js
 
     assert "data/md_county_risk_weekly.json" not in js
     assert "md_counties.geojson" not in js
+    assert "Not used:" not in js
+    assert "public Maryland default" not in js
+    assert "Research only:" not in js
 
 
 def test_regional_research_javascript_keeps_historical_years_annual_only() -> None:
@@ -189,6 +201,20 @@ def test_regional_forecast_typicality_requires_matching_selected_year() -> None:
 
     assert "Number(record.forecast_year) === selectedYear" in function_body
     assert "records[0]" not in function_body
+
+
+def test_regional_spatial_regime_context_requires_matching_selected_year() -> None:
+    js = (PUBLIC_DIR / "regional-research.js").read_text(encoding="utf-8")
+    selected_regime_body = js.split("function regionalSelectedRegimeForYear", maxsplit=1)[
+        1
+    ].split("function regionalSelectedRegimeOverlay", maxsplit=1)[0]
+    selected_overlay_body = js.split("function regionalSelectedRegimeOverlay", maxsplit=1)[
+        1
+    ].split("function renderRegionalHistoricalRegimeNotice", maxsplit=1)[0]
+
+    assert "Number(regime.forecast_year) === selectedYear" in selected_regime_body
+    assert "Number(overlay.forecast_year) === selectedYear" in selected_overlay_body
+    assert "overlaysByRegime.get(regime.region_id)" not in selected_overlay_body
 
 
 def test_regional_research_css_has_stable_map_slider_and_regime_styles() -> None:
