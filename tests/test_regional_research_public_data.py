@@ -7,6 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REGIONAL_DATA_DIR = REPO_ROOT / "public" / "research-data" / "regional"
+PAGES_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pages.yml"
 
 EXPECTED_REGIONAL_DATA_FILES = {
     "model_card.json",
@@ -45,6 +46,13 @@ def test_regional_research_bundle_files_are_present_for_pages_preview() -> None:
     }
 
     assert committed_files == EXPECTED_REGIONAL_DATA_FILES
+
+
+def test_pages_workflow_regional_preview_file_guard_matches_public_bundle() -> None:
+    workflow = PAGES_WORKFLOW.read_text(encoding="utf-8")
+
+    for filename in EXPECTED_REGIONAL_DATA_FILES:
+        assert filename in workflow
 
 
 def test_regional_research_bundle_has_complete_county_week_contract() -> None:
