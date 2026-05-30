@@ -462,6 +462,26 @@ def test_roadmap_starts_from_shipped_static_maryland_v0() -> None:
         assert token not in current_section
 
 
+def test_roadmap_documents_autonomous_queue_and_hitl_gates() -> None:
+    roadmap = ROADMAP.read_text(encoding="utf-8")
+
+    for token in [
+        "Autonomous research queue before HITL",
+        "local forecast-region overlays",
+        "local-region chart scope",
+        "forecast explanation panels",
+        "spatial-regime evidence pack",
+        "forecast update evidence pack",
+        "HITL gates",
+        "public branch promotion",
+        "risk color scale or top-coding",
+        "medical or CDC guidance wording",
+        "default map or chart scope",
+        "deliberate untracked local files",
+    ]:
+        assert token in roadmap
+
+
 def test_vision_scope_includes_single_bite_score_without_absolute_probability_claim() -> None:
     vision = VISION_SCOPE.read_text(encoding="utf-8")
 
