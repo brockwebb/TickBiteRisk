@@ -156,6 +156,7 @@ h1 {
 .regional-map-shell,
 .regional-county-panel,
 .regional-chart-section,
+.regional-bite-calculator,
 .regional-source-section {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -296,6 +297,39 @@ h1 {
   margin: 0.35rem 0 0;
 }
 
+.forecast-chart-context {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid #204f8f;
+  border-radius: 6px;
+  background: #f4f8fd;
+}
+
+.forecast-chart-context-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.65rem;
+  margin: 0 0 0.65rem;
+}
+
+.forecast-chart-context-grid dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.forecast-chart-context-grid dd {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.forecast-chart-context p {
+  margin: 0;
+}
+
 .lineage-strip {
   margin: 1rem 0;
   padding: 0.75rem;
@@ -361,6 +395,15 @@ h1 {
 
 .bite-calculator h3 {
   margin-top: 0;
+}
+
+.regional-bite-calculator {
+  margin-top: 0;
+}
+
+.regional-bite-calculator h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.35rem;
 }
 
 .bite-form-grid {
@@ -889,10 +932,6 @@ h1 {
   margin: 0;
 }
 
-.regional-county-tools-section .regional-bite-calculator {
-  max-width: 60rem;
-}
-
 .regional-source-section {
   grid-column: 1 / -1;
 }
@@ -1028,9 +1067,24 @@ h1 {
   stroke-width: 1;
 }
 
+.chart-grid {
+  stroke: #e2e8e4;
+  stroke-width: 1;
+}
+
 .chart-label {
   fill: var(--muted);
   font-size: 12px;
+}
+
+.chart-y-axis-title,
+.chart-y-tick {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.chart-y-tick {
+  text-anchor: end;
 }
 
 .county-list button.is-selected {

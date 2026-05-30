@@ -151,6 +151,13 @@ const fixtures = {
       not_public_maryland_default: true,
     },
   },
+  "regional_forecast_typicality.json": {
+    caveats: ["reported cases are not stable true incidence", "informational only"],
+    data_role: "forecast_context",
+    export_type: "regional_forecast_typicality",
+    record_count: 12,
+    records: forecastTypicalityRecords(),
+  },
   "regional_counties.geojson": {
     type: "FeatureCollection",
     metadata: {
@@ -297,16 +304,26 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#regional-top")).toBeInViewport();
   const mapBox = await page.locator(".regional-map-shell").boundingBox();
   const chartBox = await page.locator(".regional-chart-section").boundingBox();
+  const biteBox = await page.locator(".regional-bite-calculator").boundingBox();
   const panelBox = await page.locator("#regional-county-panel").boundingBox();
   const toolsBox = await page.locator(".regional-county-tools-section").boundingBox();
   expect(mapBox).not.toBeNull();
   expect(chartBox).not.toBeNull();
+  expect(biteBox).not.toBeNull();
   expect(panelBox).not.toBeNull();
   expect(toolsBox).not.toBeNull();
   expect(Math.abs(chartBox.x - mapBox.x)).toBeLessThan(8);
   expect(chartBox.y).toBeGreaterThan(mapBox.y + mapBox.height - 8);
+  expect(Math.abs(biteBox.x - chartBox.x)).toBeLessThan(8);
+  expect(biteBox.y).toBeGreaterThan(chartBox.y + chartBox.height - 8);
   expect(Math.abs(toolsBox.x - panelBox.x)).toBeLessThan(8);
   expect(toolsBox.y).toBeGreaterThan(panelBox.y + panelBox.height - 8);
+  await expect(page.locator(".regional-bite-calculator")).toContainText(
+    "Tick bite risk calculator"
+  );
+  await expect(page.locator(".regional-bite-calculator")).toContainText(
+    "Found a tick? Estimate your risk of disease"
+  );
   await expect(page.locator("#year-label")).toContainText("2026");
   await expect(page.locator("#year-mode-label")).toContainText("Forecast");
   await expect(page.locator(".forecast-view-radios")).toBeVisible();
@@ -459,11 +476,60 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
     "The brown line is observed annual reported incidence"
   );
   await expect(page.locator("#regional-chart-summary")).toContainText(
-    "The blue dot is the selected annual forecast"
+    "The blue dot marks the selected annual forecast"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "82nd percentile"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "worse than average"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "80% prediction range"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "95% wider range"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Prior average"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "worst observed"
+  );
+  await expect(page.locator("#regional-chart-summary")).not.toContainText(
+    "The blue dot is the selected annual forecast:"
   );
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "Allegany County annual forecast"
   );
+  await expect(page.locator("#regional-forecast-chart")).toContainText(
+    "Forecast percentile"
+  );
+  await expect(page.locator("#regional-forecast-chart")).toContainText(
+    "82nd percentile"
+  );
+  await expect(page.locator("#regional-forecast-chart")).toContainText(
+    "Overall"
+  );
+  await expect(page.locator("#regional-forecast-chart")).toContainText(
+    "worse than average"
+  );
+  await expect(page.locator("#regional-forecast-chart")).toContainText(
+    "80% prediction range"
+  );
+  await expect(page.locator("#regional-forecast-chart")).toContainText(
+    "95% wider range"
+  );
+  await expect(page.locator("#regional-forecast-chart")).toContainText(
+    "Prior average"
+  );
+  await expect(page.locator("#regional-forecast-chart")).toContainText(
+    "Worst observed"
+  );
+  await expect(page.locator("#regional-forecast-chart .chart-y-axis-title")).toContainText(
+    "Incidence per 100k"
+  );
+  await expect(page.locator("#regional-forecast-chart .chart-y-tick")).toHaveCount(3);
   await page.locator('label[for="forecast-scope-region"]').click();
   await expect(regionScopeRadio).toBeChecked();
   await expect(page.locator("#regional-chart-summary")).toContainText(
@@ -890,6 +956,32 @@ function countyMetadata(countyFips, countyName, regionId, regionName, rank) {
     ],
     forecast_typicality: forecastTypicalityRows(),
   };
+}
+
+function forecastTypicalityRecords() {
+  return ["24001", "24023", "42001", "51810"].flatMap((countyFips) =>
+    forecastTypicalityRows().map((row) => ({
+      ...row,
+      county_fips: countyFips,
+      county_name:
+        countyFips === "24001"
+          ? "Allegany County"
+          : countyFips === "24023"
+            ? "Garrett County"
+            : countyFips === "42001"
+              ? "Adams County"
+              : "Virginia Beach city",
+      forecast_population: 100000,
+      lower_80_incidence_per_100k: row.predicted_incidence_per_100k - 8,
+      upper_80_incidence_per_100k: row.predicted_incidence_per_100k + 24,
+      lower_95_incidence_per_100k: Math.max(0, row.predicted_incidence_per_100k - 16),
+      predicted_cases: row.predicted_incidence_per_100k,
+      upper_95_incidence_per_100k: row.predicted_incidence_per_100k + 56,
+      typical_median_incidence_per_100k: 36,
+      typical_p25_incidence_per_100k: 24,
+      typical_p75_incidence_per_100k: 45,
+    }))
+  );
 }
 
 function forecastTypicalityRows() {

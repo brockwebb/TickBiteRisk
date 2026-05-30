@@ -4,6 +4,7 @@ const regionalState = {
   counties: null,
   states: null,
   countyMetadata: null,
+  forecastTypicality: null,
   overlays: null,
   modelCard: null,
   sourceCatalog: null,
@@ -25,6 +26,7 @@ const regionalState = {
   annualByCountyYear: new Map(),
   annualRecordsByCounty: new Map(),
   metadataByCounty: new Map(),
+  typicalityByCountyYear: new Map(),
   overlaysByRegime: new Map(),
 };
 
@@ -35,6 +37,7 @@ const defaultRegionalDataPaths = {
   counties: "research-data/regional/regional_counties.geojson",
   states: "research-data/regional/regional_states.geojson",
   countyMetadata: "research-data/regional/regional_county_metadata.json",
+  forecastTypicality: "research-data/regional/regional_forecast_typicality.json",
   overlays: "research-data/regional/regional_spatial_regime_overlays.json",
   modelCard: "research-data/regional/model_card.json",
   sourceCatalog: "research-data/regional/source_catalog.json",
@@ -130,6 +133,7 @@ async function initRegionalResearch() {
       counties,
       states,
       countyMetadata,
+      forecastTypicality,
       overlays,
       modelCard,
       sourceCatalog,
@@ -140,6 +144,7 @@ async function initRegionalResearch() {
         fetchRegionalJson(regionalDataPaths.counties),
         fetchRegionalJson(regionalDataPaths.states),
         fetchRegionalJson(regionalDataPaths.countyMetadata),
+        fetchRegionalJson(regionalDataPaths.forecastTypicality),
         fetchRegionalJson(regionalDataPaths.overlays),
         fetchRegionalJson(regionalDataPaths.modelCard),
         fetchRegionalJson(regionalDataPaths.sourceCatalog),
@@ -150,12 +155,14 @@ async function initRegionalResearch() {
     regionalState.counties = counties;
     regionalState.states = states;
     regionalState.countyMetadata = countyMetadata;
+    regionalState.forecastTypicality = forecastTypicality;
     regionalState.overlays = overlays;
     regionalState.modelCard = modelCard;
     regionalState.sourceCatalog = sourceCatalog;
     indexRegionalRecords(weekly.records || []);
     indexRegionalAnnualRecords(annual.records || []);
     indexRegionalMetadata(countyMetadata.counties || []);
+    indexRegionalForecastTypicality(forecastTypicality.records || []);
     indexRegionalOverlays(overlays.records || []);
     setRegionalYearBounds(weekly.records || [], annual.records || []);
     setRegionalWeekBounds(regionalForecastRecordsForSelectedYear());
@@ -184,6 +191,7 @@ function regionalResearchDataPaths() {
     counties: `${regionalDataBase}/regional_counties.geojson`,
     states: `${regionalDataBase}/regional_states.geojson`,
     countyMetadata: `${regionalDataBase}/regional_county_metadata.json`,
+    forecastTypicality: `${regionalDataBase}/regional_forecast_typicality.json`,
     overlays: `${regionalDataBase}/regional_spatial_regime_overlays.json`,
     modelCard: `${regionalDataBase}/model_card.json`,
     sourceCatalog: `${regionalDataBase}/source_catalog.json`,
@@ -248,6 +256,16 @@ function indexRegionalMetadata(counties) {
   regionalState.metadataByCounty.clear();
   for (const county of counties) {
     regionalState.metadataByCounty.set(county.county_fips, county);
+  }
+}
+
+function indexRegionalForecastTypicality(records) {
+  regionalState.typicalityByCountyYear.clear();
+  for (const record of records) {
+    regionalState.typicalityByCountyYear.set(
+      `${String(record.county_fips).padStart(5, "0")}:${Number(record.forecast_year)}`,
+      record
+    );
   }
 }
 
@@ -1334,11 +1352,18 @@ function renderRegionalForecastTypicality(metadata) {
 }
 
 function regionalForecastTypicalityForYear(metadata) {
+  const countyFips = metadata && metadata.county_fips;
+  const selectedYear = Number(regionalState.selectedYear);
+  const indexedRecord = countyFips
+    ? regionalState.typicalityByCountyYear.get(
+        `${String(countyFips).padStart(5, "0")}:${selectedYear}`
+      )
+    : null;
+  if (indexedRecord) return indexedRecord;
   const records =
     metadata && Array.isArray(metadata.forecast_typicality)
       ? metadata.forecast_typicality
       : [];
-  const selectedYear = Number(regionalState.selectedYear);
   return (
     records.find((record) => Number(record.forecast_year) === selectedYear) ||
     null
@@ -2055,6 +2080,270 @@ function regionalForecastScopeAnnualTitle(scopeLabel) {
   return `${scopeLabel} annual forecast`;
 }
 
+function regionalAnnualForecastComparison(scopeSummary) {
+  const features = regionalForecastScopeFeatures();
+  const selectedCountyFips =
+    features.length === 1 ? (features[0].properties || {}).county_fips : null;
+  const metadata = selectedCountyFips
+    ? regionalState.metadataByCounty.get(selectedCountyFips)
+    : null;
+  const typicality = selectedCountyFips
+    ? regionalForecastTypicalityForYear(metadata)
+    : null;
+  const percentileValue = typicality
+    ? Number(typicality.forecast_percentile_of_county_history)
+    : regionalEmpiricalPercentile(
+        scopeSummary.predictedAnnualIncidence,
+        scopeSummary.observedRecords || []
+      );
+  const percentileText = Number.isFinite(percentileValue)
+    ? regionalPercentilePhrase(percentileValue)
+    : "unavailable";
+  const severity = typicality && typicality.severity_label
+    ? typicality.severity_label
+    : regionalEmpiricalSeverityLabel(percentileValue);
+  const comparisonEndYear =
+    typicality && typicality.comparison_year_end
+      ? Number(typicality.comparison_year_end)
+      : regionalForecastOriginYear(scopeSummary.forecastYear);
+  const comparisonStartYear =
+    typicality && typicality.comparison_year_start
+      ? Number(typicality.comparison_year_start)
+      : null;
+  const observedStats = regionalObservedComparisonStats(
+    scopeSummary.observedRecords || [],
+    comparisonEndYear
+  );
+  const interval = regionalAnnualPredictionInterval(scopeSummary, typicality, features);
+  const basis =
+    selectedCountyFips && metadata
+      ? `${metadata.county_name || selectedCountyFips} reported years${
+          comparisonStartYear && comparisonEndYear
+            ? ` ${comparisonStartYear}-${comparisonEndYear}`
+            : ""
+        }`
+      : `${scopeSummary.scopeLabel || "Selected scope"} observed years${
+          comparisonEndYear ? ` through ${comparisonEndYear}` : ""
+        }`;
+  return {
+    basis,
+    interval,
+    observedStats,
+    overall: regionalOverallComparisonLabel(severity, percentileValue),
+    percentileText,
+    severity,
+  };
+}
+
+function regionalObservedComparisonStats(records, comparisonEndYear) {
+  const comparisonRecords = (records || [])
+    .filter((record) => {
+      const year = Number(record.year);
+      return (
+        Number.isFinite(year) &&
+        (!Number.isFinite(comparisonEndYear) || year <= comparisonEndYear) &&
+        Number.isFinite(Number(record.incidence_per_100k))
+      );
+    })
+    .sort((left, right) => Number(left.year) - Number(right.year));
+  if (!comparisonRecords.length) {
+    return {
+      averageText: "unavailable",
+      count: 0,
+      worstText: "unavailable",
+    };
+  }
+  const values = comparisonRecords.map((record) => Number(record.incidence_per_100k));
+  const average = values.reduce((total, value) => total + value, 0) / values.length;
+  const worst = comparisonRecords.reduce((maxRecord, record) =>
+    Number(record.incidence_per_100k) > Number(maxRecord.incidence_per_100k)
+      ? record
+      : maxRecord
+  );
+  return {
+    averageText: `${regionalFormatNumber(average)} per 100k`,
+    count: comparisonRecords.length,
+    worstText: `${regionalFormatNumber(worst.incidence_per_100k)} per 100k in ${regionalEscapeHtml(worst.year)}`,
+  };
+}
+
+function regionalAnnualPredictionInterval(scopeSummary, typicality, features = []) {
+  if (typicality) {
+    return {
+      lower80: Number(typicality.lower_80_incidence_per_100k),
+      lower95: Number(typicality.lower_95_incidence_per_100k),
+      upper80: Number(typicality.upper_80_incidence_per_100k),
+      upper95: Number(typicality.upper_95_incidence_per_100k),
+    };
+  }
+  const aggregateInterval = regionalAggregateAnnualPredictionInterval(features);
+  if (Number.isFinite(aggregateInterval.lower80)) {
+    return aggregateInterval;
+  }
+  const record = scopeSummary && scopeSummary.record;
+  const annualIncidence = Number(scopeSummary && scopeSummary.predictedAnnualIncidence);
+  const weeklyIncidence = Number(record && record.predicted_weekly_incidence_per_100k);
+  if (
+    !record ||
+    !Number.isFinite(annualIncidence) ||
+    !Number.isFinite(weeklyIncidence) ||
+    weeklyIncidence <= 0
+  ) {
+    return {};
+  }
+  const ratio = annualIncidence / weeklyIncidence;
+  const interval80 = record.predicted_weekly_incidence_80_interval || [];
+  const interval95 = record.predicted_weekly_incidence_95_interval || [];
+  return {
+    lower80: Number(interval80[0]) * ratio,
+    lower95: Number(interval95[0]) * ratio,
+    upper80: Number(interval80[1]) * ratio,
+    upper95: Number(interval95[1]) * ratio,
+  };
+}
+
+function regionalAggregateAnnualPredictionInterval(features) {
+  const totals = {
+    lower80Cases: 0,
+    lower95Cases: 0,
+    population: 0,
+    upper80Cases: 0,
+    upper95Cases: 0,
+  };
+  for (const feature of features || []) {
+    const countyFips = feature && feature.properties && feature.properties.county_fips;
+    const metadata = countyFips ? regionalState.metadataByCounty.get(countyFips) : null;
+    const typicality = regionalForecastTypicalityForYear(metadata);
+    const population =
+      Number(typicality && typicality.forecast_population) ||
+      regionalPopulationFromCasesAndIncidence(
+        Number(typicality && typicality.predicted_cases),
+        Number(typicality && typicality.predicted_incidence_per_100k)
+      );
+    if (!Number.isFinite(population) || population <= 0) continue;
+    const lower80 = Number(typicality && typicality.lower_80_incidence_per_100k);
+    const lower95 = Number(typicality && typicality.lower_95_incidence_per_100k);
+    const upper80 = Number(typicality && typicality.upper_80_incidence_per_100k);
+    const upper95 = Number(typicality && typicality.upper_95_incidence_per_100k);
+    if (
+      !Number.isFinite(lower80) ||
+      !Number.isFinite(lower95) ||
+      !Number.isFinite(upper80) ||
+      !Number.isFinite(upper95)
+    ) {
+      continue;
+    }
+    totals.population += population;
+    totals.lower80Cases += (lower80 / 100000) * population;
+    totals.lower95Cases += (lower95 / 100000) * population;
+    totals.upper80Cases += (upper80 / 100000) * population;
+    totals.upper95Cases += (upper95 / 100000) * population;
+  }
+  if (!totals.population) return {};
+  return {
+    lower80: (totals.lower80Cases / totals.population) * 100000,
+    lower95: (totals.lower95Cases / totals.population) * 100000,
+    upper80: (totals.upper80Cases / totals.population) * 100000,
+    upper95: (totals.upper95Cases / totals.population) * 100000,
+  };
+}
+
+function regionalEmpiricalPercentile(value, records) {
+  const numericValue = Number(value);
+  const values = (records || [])
+    .map((record) => Number(record.incidence_per_100k))
+    .filter((recordValue) => Number.isFinite(recordValue));
+  if (!Number.isFinite(numericValue) || !values.length) return Number.NaN;
+  const belowOrEqual = values.filter((recordValue) => recordValue <= numericValue).length;
+  return (belowOrEqual / values.length) * 100;
+}
+
+function regionalEmpiricalSeverityLabel(percentile) {
+  const value = Number(percentile);
+  if (!Number.isFinite(value)) return "not classified";
+  if (value >= 67) return "above typical";
+  if (value <= 33) return "below typical";
+  return "typical";
+}
+
+function regionalOverallComparisonLabel(severity, percentile) {
+  const severityText = String(severity || "").toLowerCase();
+  if (severityText.includes("above") || severityText.includes("higher")) {
+    return "worse than average";
+  }
+  if (severityText.includes("below") || severityText.includes("lower")) {
+    return "better than average";
+  }
+  const value = Number(percentile);
+  if (Number.isFinite(value)) {
+    if (value >= 67) return "worse than average";
+    if (value <= 33) return "better than average";
+  }
+  return "about average";
+}
+
+function regionalForecastOriginYear(forecastYear) {
+  const metadata = regionalState.weekly && regionalState.weekly.selected_forecast_metadata;
+  const origin = Number(metadata && metadata.forecast_origin_year);
+  if (Number.isFinite(origin)) return origin;
+  const year = Number(forecastYear);
+  return Number.isFinite(year) ? year - 1 : Number.NaN;
+}
+
+function regionalIntervalText(lower, upper) {
+  return Number.isFinite(Number(lower)) && Number.isFinite(Number(upper))
+    ? `${regionalFormatNumber(lower)} to ${regionalFormatNumber(upper)} per 100k`
+    : "unavailable";
+}
+
+function regionalChartYAxisMarkup({ height, maxValue, padding, width, yScale }) {
+  const tickValues = [0, maxValue / 2, maxValue];
+  const gridRight = width - padding.right;
+  return `<g class="chart-scale" aria-label="Y-axis scale">
+    <text class="chart-y-axis-title" x="${padding.left}" y="14">Incidence per 100k</text>
+    ${tickValues
+      .map((value) => {
+        const y = yScale(value);
+        return `<line class="chart-grid" x1="${padding.left}" y1="${y.toFixed(2)}" x2="${gridRight}" y2="${y.toFixed(2)}"></line>
+        <text class="chart-y-tick" x="${padding.left - 8}" y="${(y + 4).toFixed(2)}">${regionalFormatNumber(value)}</text>`;
+      })
+      .join("")}
+  </g>`;
+}
+
+function renderRegionalAnnualChartContext(comparison) {
+  const interval = comparison.interval || {};
+  return `<section class="forecast-chart-context" aria-label="Annual forecast comparison">
+    <dl class="forecast-chart-context-grid">
+      <div>
+        <dt>Forecast percentile</dt>
+        <dd><b>${regionalEscapeHtml(comparison.percentileText)}</b><span>${regionalEscapeHtml(comparison.severity)}</span></dd>
+      </div>
+      <div>
+        <dt>Overall</dt>
+        <dd>${regionalEscapeHtml(comparison.overall)}</dd>
+      </div>
+      <div>
+        <dt>80% prediction range</dt>
+        <dd>${regionalEscapeHtml(regionalIntervalText(interval.lower80, interval.upper80))}</dd>
+      </div>
+      <div>
+        <dt>95% wider range</dt>
+        <dd>${regionalEscapeHtml(regionalIntervalText(interval.lower95, interval.upper95))}</dd>
+      </div>
+      <div>
+        <dt>Prior average</dt>
+        <dd>${regionalEscapeHtml(comparison.observedStats.averageText)}</dd>
+      </div>
+      <div>
+        <dt>Worst observed</dt>
+        <dd>${regionalEscapeHtml(comparison.observedStats.worstText)}</dd>
+      </div>
+    </dl>
+    <p>Compared with ${regionalEscapeHtml(comparison.basis)}, this forecast is ${regionalEscapeHtml(comparison.percentileText)} and ${regionalEscapeHtml(comparison.overall)}.</p>
+  </section>`;
+}
+
 function renderRegionalForecastExplainer() {
   const target = document.getElementById("regional-forecast-explainer");
   if (!target) return;
@@ -2127,6 +2416,7 @@ function regionalAggregateAnnualForecastSummary() {
     observedRecords: regionalAggregateObservedAnnualRecords(features),
     predictedAnnualCases: weightedValueCount ? totalCases : Number.NaN,
     predictedAnnualIncidence,
+    record: countySummaries.length === 1 ? countySummaries[0].record : null,
     scopeLabel: regionalForecastScopeLabel(),
   };
 }
@@ -2332,6 +2622,7 @@ function renderRegionalAnnualScopeChart(scopeSummary) {
     return;
   }
   const title = regionalForecastScopeAnnualTitle(scopeSummary.scopeLabel);
+  const comparison = regionalAnnualForecastComparison(scopeSummary);
   const chart = regionalAnnualChartSvg({
     activeClass: "annual-forecast-point",
     activeTitle: `${forecastYear} forecast: ${regionalFormatNumber(scopeSummary.predictedAnnualIncidence)} per 100k`,
@@ -2342,11 +2633,12 @@ function renderRegionalAnnualScopeChart(scopeSummary) {
     points,
     xLabelPrefix: "Annual incidence",
   });
-  target.innerHTML = chart;
+  target.innerHTML = `${renderRegionalAnnualChartContext(comparison)}${chart}`;
   const casesText = Number.isFinite(Number(scopeSummary.predictedAnnualCases))
     ? regionalFormatNumber(scopeSummary.predictedAnnualCases)
     : "unavailable";
-  summary.textContent = `${title} for ${forecastYear}. The brown line is observed annual reported incidence. The blue dot is the selected annual forecast: ${regionalFormatNumber(scopeSummary.predictedAnnualIncidence)} per 100k and ${casesText} predicted cases. ${regionalForecastScopeCountyCountText(scopeSummary.countyCount)}. County level CDC data are annual, so historical weeks or months are not shown.`;
+  const interval = comparison.interval || {};
+  summary.textContent = `${title} for ${forecastYear}. The brown line is observed annual reported incidence. The blue dot marks the selected annual forecast: ${regionalFormatNumber(scopeSummary.predictedAnnualIncidence)} per 100k and ${casesText} predicted cases. In context, that is ${comparison.percentileText} compared with ${comparison.basis}; Overall: ${comparison.overall}. 80% prediction range: ${regionalIntervalText(interval.lower80, interval.upper80)}. 95% wider range: ${regionalIntervalText(interval.lower95, interval.upper95)}. Prior average: ${comparison.observedStats.averageText}; worst observed: ${comparison.observedStats.worstText}. ${regionalForecastScopeCountyCountText(scopeSummary.countyCount)}. County level CDC data are annual, so historical weeks or months are not shown.`;
 }
 
 function renderRegionalWeeklyScopeChart(records) {
@@ -2360,7 +2652,7 @@ function renderRegionalWeeklyScopeChart(records) {
   }
   const width = 760;
   const height = 260;
-  const padding = { top: 18, right: 22, bottom: 34, left: 46 };
+  const padding = { top: 28, right: 22, bottom: 34, left: 58 };
   const weeks = records.map((record) => Number(record.mmwr_week));
   const minWeek = Math.min(...weeks);
   const maxWeek = Math.max(...weeks);
@@ -2401,8 +2693,16 @@ function renderRegionalWeeklyScopeChart(records) {
   const activeX = xScale(activeRecord.mmwr_week);
   const activeY = yScale(activeRecord.predicted_weekly_incidence_per_100k);
   const activeInterval = activeRecord.predicted_weekly_incidence_95_interval || [0, 0];
+  const yAxis = regionalChartYAxisMarkup({
+    height,
+    maxValue,
+    padding,
+    width,
+    yScale,
+  });
 
   target.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${regionalEscapeHtml(scopeLabel)} weekly forecast curve with empirical interval bands">
+    ${yAxis}
     <path class="interval-band-95" d="${band95}"><title>95% empirical interval band</title></path>
     <path class="interval-band-80" d="${band80}"><title>80% empirical interval band</title></path>
     <path class="county-forecast-line" d="${linePath}"><title>Predicted weekly incidence</title></path>
@@ -2412,7 +2712,6 @@ function renderRegionalWeeklyScopeChart(records) {
       <title>MMWR week ${regionalEscapeHtml(activeRecord.mmwr_week)}: ${regionalFormatNumber(activeRecord.predicted_weekly_incidence_per_100k)} per 100k</title>
     </circle>
     <text class="chart-label" x="${padding.left}" y="${height - 10}">MMWR weeks ${regionalEscapeHtml(minWeek)}-${regionalEscapeHtml(maxWeek)}</text>
-    <text class="chart-label" x="${padding.left}" y="13">${regionalFormatNumber(maxValue)} per 100k</text>
   </svg>`;
   summary.textContent = `${scopeLabel} weekly forecast, MMWR weeks ${minWeek}-${maxWeek}. The green line is the predicted weekly Lyme incidence. Dark blue band: narrower expected range from past forecast errors. Light blue band: wider expected range from past forecast errors. The red dot marks the selected week ${activeRecord.mmwr_week}, with a wider range of ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k. These ranges are uncertainty around reported-incidence forecasts, not medical confidence intervals.`;
 }
@@ -2461,7 +2760,7 @@ function regionalAnnualChartSvg({
 }) {
   const width = 760;
   const height = 260;
-  const padding = { top: 18, right: 22, bottom: 34, left: 46 };
+  const padding = { top: 28, right: 22, bottom: 34, left: 58 };
   const years = points.map((point) => Number(point.year));
   const minYear = Math.min(...years);
   const maxYear = Math.max(...years);
@@ -2489,7 +2788,15 @@ function regionalAnnualChartSvg({
   const activeY = yScale(activeValue);
   const activeYearAttribute =
     activeClass === "annual-forecast-point" ? "data-active-year" : "data-active-year";
+  const yAxis = regionalChartYAxisMarkup({
+    height,
+    maxValue,
+    padding,
+    width,
+    yScale,
+  });
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${regionalEscapeHtml(ariaLabel)}">
+    ${yAxis}
     ${observedLine}
     <line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
     <line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}"></line>
@@ -2497,7 +2804,6 @@ function regionalAnnualChartSvg({
       <title>${regionalEscapeHtml(activeTitle)}</title>
     </circle>
     <text class="chart-label" x="${padding.left}" y="${height - 10}">${regionalEscapeHtml(xLabelPrefix)} ${regionalEscapeHtml(minYear)}-${regionalEscapeHtml(maxYear)}</text>
-    <text class="chart-label" x="${padding.left}" y="13">${regionalFormatNumber(maxValue)} per 100k</text>
   </svg>`;
 }
 
@@ -2575,7 +2881,7 @@ function renderRegionalAnnualForecastChart(countyFips, annualSummary) {
     <text class="chart-label" x="${padding.left}" y="${height - 10}">Annual incidence ${regionalEscapeHtml(minYear)}-${regionalEscapeHtml(maxYear)}</text>
     <text class="chart-label" x="${padding.left}" y="13">${regionalFormatNumber(maxValue)} per 100k</text>
   </svg>`;
-  summary.textContent = `${countyName} annual forecast for ${forecastYear}. The brown line is observed annual reported incidence. The blue dot is the selected annual forecast: ${regionalFormatNumber(annualSummary.predictedAnnualIncidence)} per 100k and ${Number.isFinite(annualSummary.predictedAnnualCases) ? regionalFormatNumber(annualSummary.predictedAnnualCases) : "unavailable"} predicted cases. County level CDC data are annual, so historical weeks or months are not shown.`;
+  summary.textContent = `${countyName} annual forecast for ${forecastYear}. The brown line is observed annual reported incidence. The blue dot marks the selected annual forecast: ${regionalFormatNumber(annualSummary.predictedAnnualIncidence)} per 100k and ${Number.isFinite(annualSummary.predictedAnnualCases) ? regionalFormatNumber(annualSummary.predictedAnnualCases) : "unavailable"} predicted cases. County level CDC data are annual, so historical weeks or months are not shown.`;
 }
 
 function renderRegionalForecastChart(countyFips) {
