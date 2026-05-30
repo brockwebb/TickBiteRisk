@@ -301,6 +301,14 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
     "Weekly seasonal risk"
   );
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
+  await page.locator('label[for="forecast-view-weekly"]').click();
+  await expect(weeklyViewRadio).toBeChecked();
+  await expect(page.locator("#forecast-view-label")).toContainText(
+    "Weekly seasonal risk"
+  );
+  await page.locator('label[for="forecast-view-annual"]').click();
+  await expect(annualViewRadio).toBeChecked();
+  await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
   await expect(page.locator(".forecast-scope-radios")).toBeVisible();
   await expect(regionScopeRadio).toBeChecked();
   await expect(stateScopeRadio).toBeVisible();

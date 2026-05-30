@@ -567,6 +567,36 @@ h1 {
   text-align: center;
 }
 
+.forecast-view-radios label[for="forecast-view-annual"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.forecast-view-radios label[for="forecast-view-weekly"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.forecast-scope-radios label[for="forecast-scope-region"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.forecast-scope-radios label[for="forecast-scope-state"] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.forecast-scope-radios label[for="forecast-scope-regime"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.forecast-scope-radios label[for="forecast-scope-county"] {
+  grid-column: 2;
+  grid-row: 2;
+}
+
 .forecast-view-radios input:checked + label,
 .forecast-scope-radios input:checked + label {
   border-color: #15351f;
@@ -975,6 +1005,26 @@ h1 {
 @media (min-width: 720px) {
   .forecast-scope-radios {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .forecast-scope-radios label[for="forecast-scope-region"] {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .forecast-scope-radios label[for="forecast-scope-state"] {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .forecast-scope-radios label[for="forecast-scope-regime"] {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .forecast-scope-radios label[for="forecast-scope-county"] {
+    grid-column: 4;
+    grid-row: 1;
   }
 
   .regional-time-grid {
