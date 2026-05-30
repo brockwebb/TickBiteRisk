@@ -112,6 +112,20 @@
             Select a county to chart its weekly forecast.
           </p>
         </div>
+        <div class="regional-chart-controls" aria-label="Forecast chart scope">
+          <div class="forecast-scope-radios" role="radiogroup" aria-label="Forecast chart scope">
+            <input id="forecast-scope-region" type="radio" name="forecast-scope" value="region" checked />
+            <label for="forecast-scope-region">All states</label>
+            <input id="forecast-scope-state" type="radio" name="forecast-scope" value="state" />
+            <label for="forecast-scope-state">State</label>
+            <input id="forecast-scope-county" type="radio" name="forecast-scope" value="county" />
+            <label for="forecast-scope-county">County</label>
+          </div>
+          <label for="forecast-state-select">State</label>
+          <select id="forecast-state-select" disabled></select>
+          <label for="forecast-county-select">County</label>
+          <select id="forecast-county-select" disabled></select>
+        </div>
         <div
           id="regional-forecast-chart"
           class="forecast-chart"

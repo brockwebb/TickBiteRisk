@@ -282,6 +282,9 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   const panel = page.locator("#regional-panel-content");
   const annualViewRadio = page.locator("#forecast-view-annual");
   const weeklyViewRadio = page.locator("#forecast-view-weekly");
+  const regionScopeRadio = page.locator("#forecast-scope-region");
+  const stateScopeRadio = page.locator("#forecast-scope-state");
+  const countyScopeRadio = page.locator("#forecast-scope-county");
 
   await expect(page.locator("#regional-risk-map path[data-county]")).toHaveCount(4);
   await expect(page.locator("#regional-risk-map .regional-state-boundary")).toHaveCount(3);
@@ -297,6 +300,18 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
     "Weekly seasonal risk"
   );
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
+  await expect(page.locator(".forecast-scope-radios")).toBeVisible();
+  await expect(regionScopeRadio).toBeChecked();
+  await expect(stateScopeRadio).toBeVisible();
+  await expect(countyScopeRadio).toBeVisible();
+  await expect(page.locator("#forecast-state-select")).toBeDisabled();
+  await expect(page.locator("#forecast-county-select")).toBeDisabled();
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Regional annual forecast"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "32.67 per 100k"
+  );
   await expectWeekControlsDisabled(page);
   await expect(panel).toHaveAttribute(
     "aria-live",
@@ -304,6 +319,8 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   );
 
   await page.locator('path[data-county="24001"]').click();
+  await expect(countyScopeRadio).toBeChecked();
+  await expect(page.locator("#forecast-county-select")).toHaveValue("24001");
   await expect(panel).toContainText("Allegany County");
   await expect(panel).toContainText("MD");
   await expect(panel).toContainText("Predicted annual incidence");
@@ -387,6 +404,33 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   );
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "The blue dot is the selected annual forecast"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Allegany County annual forecast"
+  );
+  await page.locator('label[for="forecast-scope-region"]').click();
+  await expect(regionScopeRadio).toBeChecked();
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Regional annual forecast"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "3 counties in this chart"
+  );
+  await page.locator('label[for="forecast-scope-state"]').click();
+  await page.locator("#forecast-state-select").selectOption("MD");
+  await expect(stateScopeRadio).toBeChecked();
+  await expect(page.locator("#forecast-state-select")).toBeEnabled();
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "MD state annual forecast"
+  );
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "47.00 per 100k"
+  );
+  await page.locator('label[for="forecast-scope-county"]').click();
+  await page.locator("#forecast-county-select").selectOption("24001");
+  await expect(countyScopeRadio).toBeChecked();
+  await expect(page.locator("#regional-chart-summary")).toContainText(
+    "Allegany County annual forecast"
   );
 
   await page.locator('label[for="forecast-view-weekly"]').click();
