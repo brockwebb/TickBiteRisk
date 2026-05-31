@@ -325,3 +325,85 @@ def test_whitepaper_data_provenance_preserves_source_and_publication_boundaries(
     ]:
         assert source_gap in source_notes
         assert source_gap in chapter
+
+
+def test_whitepaper_limitations_preserve_overclaim_and_hitl_gates() -> None:
+    chapter = read(WHITEPAPER / "06-limitations-and-ethics.md")
+    register = read(LAB_NOTES / "07-limitations-review-register.md")
+    normalized_chapter = normalize_whitespace(chapter)
+    normalized_register = normalize_whitespace(register)
+
+    for heading in [
+        "## Highest-Risk Overclaims",
+        "## Medical And Public-Health Boundary",
+        "## Data And Evidence Gaps",
+        "## Reviewer Findings",
+        "## Human-In-The-Loop Gates",
+        "## Publication Boundary",
+    ]:
+        assert heading in chapter
+
+    for term in [
+        "relative reported Lyme pressure forecast",
+        "personal infection probability",
+        "true Lyme burden",
+        "medical advice",
+        "diagnosis",
+        "treatment recommendation",
+        "reported cases as stable true Lyme incidence",
+        "CDC seasonality allocation as observed county-week truth",
+        "regional forecast intervals as clinical intervals or posterior draws",
+        "applying calibration or Gamma-Poisson Bayesian update factors to "
+        "public forecasts while all overall rows remain gated "
+        "`do_not_apply_to_public_forecast`",
+        "promoting regional research branch findings",
+        "changing medical boundary language",
+        "treating exploratory diagnostics as public product evidence",
+        "public whitepaper claims about model validity, uncertainty, personal "
+        "risk, or coverage",
+        "committing, deleting, staging, or normalizing deliberate untracked "
+        "local files",
+        "`paper/refs.bib` is missing",
+        "not posterior draws or a joint spatial probability model",
+    ]:
+        assert normalize_whitespace(term) in normalized_register
+        assert normalize_whitespace(term) in normalized_chapter
+
+
+def test_whitepaper_reproducibility_points_to_claim_map_artifacts_and_tests() -> None:
+    chapter = read(WHITEPAPER / "07-reproducibility.md")
+    source_map = read(LAB_NOTES / "appendix-source-map.md")
+    normalized_chapter = normalize_whitespace(chapter)
+
+    for heading in [
+        "## Claim-To-Source Map",
+        "## Required Public Artifacts",
+        "## Commands And Provenance",
+        "## Tests And Verification",
+        "## Release Review Checklist",
+    ]:
+        assert heading in chapter
+
+    for reference in REQUIRED_SOURCE_REFERENCES:
+        assert reference in source_map
+        assert reference in chapter
+
+    for term in [
+        "public/data/model_card.json",
+        "public/data/source_catalog.json",
+        "public/data/static_export_manifest.json",
+        "public/research-data/regional/model_card.json",
+        "public/research-data/regional/static_export_manifest.json",
+        "build/etl/annual-forecast/annual_forecast_predictions.csv",
+        "build/etl/regional-annual-forecast/regional_annual_forecast_predictions.csv",
+        "build/etl/regional-forecast-typicality/regional_forecast_typicality.csv",
+        "tickbiterisk etl provenance-audit --root-dir build/etl",
+        "tests/test_research_docs.py",
+        "tests/test_public_docs.py",
+        "tests/test_regional_research_public_data.py",
+        "tests/test_regional_research_dashboard_static.py",
+        "source provenance, statistical language, medical boundaries, "
+        "references, redistribution terms",
+        "not release-ready",
+    ]:
+        assert term in normalized_chapter
