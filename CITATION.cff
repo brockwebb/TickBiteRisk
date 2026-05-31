@@ -1,29 +1,29 @@
 cff-version: 1.2.0
+message: "If you use TickBiteRisk, cite the software and review the current product boundary."
+title: "TickBiteRisk: Maryland-first reported Lyme pressure forecast"
+version: 0.1.0
+date-released: 2026-05-30
+license: MIT
+repository-code: "https://github.com/brockwebb/TickBiteRisk"
 authors:
-
-* family-names: Webb
-  given-names: Brock
-  orcid: "0000-0000-0000-0000"  # replace if you have one
-  affiliation: Independent Researcher
-* family-names: TickBiteRisk
-  given-names: Contributors
-  affiliation: Open-source community
-  title: TickBiteRisk: Bayesian per‑bite Lyme‑disease risk engine
-  version: 0.1.0
-  date-released: 2025-06-08
-  license: MIT
-  repository-code: "[https://github.com/yourhandle/tickbiterisk](https://github.com/yourhandle/tickbiterisk)"
-  abstract: |
-  TickBiteRisk is an open, reproducible toolkit that combines county-level
-  Borrelia prevalence, weekly human–tick exposure signals, and attachment‑time
-  dose–response data in a Bayesian state‑space model to estimate per‑bite Lyme
-  disease risk anywhere in the United States. The project targets clinicians,
-  outdoor educators, and data‑science learners, offering both a JSON API and
-  educational notebooks under permissive licenses.
-  keywords:
-* Lyme disease
-* Bayesian statistics
-* epidemiology
-* open data
-* tick-borne disease
-  doi: 10.5281/zenodo.xxxxx  # replace after Zenodo deposition
+  - family-names: Webb
+    given-names: Brock
+    affiliation: Independent Researcher
+  - name: TickBiteRisk Contributors
+    affiliation: Open-source community
+abstract: |
+  TickBiteRisk is an open-source Maryland-first research product for relative reported Lyme disease pressure.
+  The current implementation combines
+  county-year surveillance history, population denominators, CDC national Lyme
+  onset seasonality, documented forecast branches, derived public-safe JSON,
+  a static dashboard, and local CLI risk lookup/single-bite context commands.
+  It is informational only, not medical advice, not diagnosis or treatment
+  guidance, not a per-bite infection probability, and not a national personal
+  Lyme-risk engine.
+keywords:
+  - Lyme disease
+  - reported incidence
+  - forecasting
+  - epidemiology
+  - open data
+  - tick-borne disease

@@ -2,8 +2,10 @@ from pathlib import Path
 
 
 README = Path("README.md")
+CITATION = Path("CITATION.cff")
 API_SPEC = Path("api/api-spec.md")
 ARCHITECTURE = Path("docs/architecture.md")
+INSTALL_LOCAL = Path("docs/install-local.md")
 RUNBOOK = Path("docs/operational-runbook.md")
 USER_GUIDE = Path("docs/user-guide.md")
 ROADMAP = Path("docs/roadmap.md")
@@ -14,6 +16,8 @@ DATA_SOURCES = Path("docs/data-sources.md")
 TESTING_CI_PLAN = Path("docs/testing-ci-plan.md")
 ETL_PIPELINE = Path("docs/etl-pipeline.md")
 MODEL_BACKGROUND = Path("docs/model-background.md")
+BUILDABILITY_REVIEW = Path("review/2026-buildability-review.md")
+LIMITATIONS_REGISTER = Path("docs/research/lab-notes/07-limitations-review-register.md")
 SRS = Path("docs/software-requirements-spec.md")
 REGIONAL_SPATIAL_SPEC = Path(
     "docs/superpowers/specs/2026-05-29-regional-spatial-forecast-design.md"
@@ -37,6 +41,73 @@ def test_user_guide_matches_implemented_maryland_forecast_product() -> None:
         "Follow CDC guidance",
     ]:
         assert token in guide
+
+
+def test_public_metadata_and_historical_docs_match_current_forecast_boundary() -> None:
+    citation = CITATION.read_text(encoding="utf-8")
+    install = INSTALL_LOCAL.read_text(encoding="utf-8")
+    buildability = BUILDABILITY_REVIEW.read_text(encoding="utf-8")
+    register = LIMITATIONS_REGISTER.read_text(encoding="utf-8")
+
+    for token in [
+        "relative reported Lyme disease pressure",
+        "Maryland-first",
+        "static dashboard",
+        "not a per-bite infection probability",
+        "not medical advice",
+    ]:
+        assert token in citation
+
+    for token in [
+        "Current status",
+        "historical",
+        "current maintained quick start",
+        "tickbiterisk risk lookup",
+        "python -m http.server 8000 --directory public",
+        "FastAPI/PyMC/Postgres path is historical",
+    ]:
+        assert token in install
+
+    for token in [
+        "Historical review status",
+        "superseded by the current ETL/modeling/CLI/static-dashboard implementation",
+        "relative reported-incidence forecast",
+        "not a current implementation description",
+    ]:
+        assert token in buildability
+
+    current_install_section = install.split("## Historical install path", maxsplit=1)[0]
+    for token in [
+        "uvicorn api.app:app",
+        "fetch_cdc_ticks.sh",
+        "raw_cdc_ticks",
+        "GET /risk?fips=24003&tau=24",
+    ]:
+        assert token not in current_install_section
+
+    for text in [citation, buildability]:
+        for token in [
+            "Bayesian per-bite Lyme-disease risk engine",
+            "estimate per-bite Lyme disease risk anywhere in the United States",
+            "The project is currently a well-developed spec, not a runnable product",
+        ]:
+            assert token not in text
+
+    for token in [
+        "Prior Resolved Documentation Findings",
+        "`CITATION.cff` previously overclaimed",
+        "`docs/install-local.md` previously described",
+        "`review/2026-buildability-review.md` remains historical",
+        "Task 9 public-doc alignment resolved stale metadata/docs",
+    ]:
+        assert token in register
+
+    for token in [
+        "`CITATION.cff` appears to overclaim",
+        "`docs/install-local.md` may mention",
+        "`review/2026-buildability-review.md` says the repository is",
+    ]:
+        assert token not in register
 
 
 def test_user_guide_does_not_present_roadmap_api_as_live_medical_guidance() -> None:

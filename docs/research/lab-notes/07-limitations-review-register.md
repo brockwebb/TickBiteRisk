@@ -11,9 +11,6 @@ This chapter tracks the highest-risk overclaims, stale or conflicting documentat
 
 Current review should guard against language that turns a relative reported Lyme pressure forecast into Bayesian per-bite risk, personal infection probability, true Lyme burden, medical advice, or a guarantee about individual exposure outcomes.
 
-- `CITATION.cff` appears to overclaim Bayesian per-bite Lyme risk and national
-  personal-risk coverage compared with the current relative reported-incidence
-  forecast boundary.
 - Do not claim personal infection probability, true Lyme burden, medical
   advice, diagnosis, or treatment recommendation.
 - Do not promote a regional research branch as public default without HITL
@@ -26,11 +23,22 @@ Additional high-risk language to avoid:
 - treating regional forecast intervals as clinical intervals or posterior draws;
 - applying calibration or Gamma-Poisson Bayesian update factors to public forecasts while all overall rows remain gated `do_not_apply_to_public_forecast`.
 
-## Stale Or Conflicting Documentation
+## Prior Resolved Documentation Findings
 
-`docs/install-local.md` may mention older FastAPI and PyMC assumptions that do not match the current implemented ETL/modeling/CLI/static-artifact workflow. It should be checked before public installation instructions or architecture claims are copied into the whitepaper.
+`CITATION.cff` previously overclaimed Bayesian per-bite Lyme risk and national
+personal-risk coverage compared with the current relative reported-incidence
+forecast boundary. Task 9 replaced that metadata with Maryland-first relative
+reported Lyme pressure wording and explicit non-medical, non-probability
+caveats.
 
-`review/2026-buildability-review.md` says the repository is a well-developed specification rather than a runnable product. That conflicts with the current implemented ETL, modeling, CLI, and static-dashboard artifacts. The buildability review may still be useful historical review context, but it needs a dated note or replacement before being cited as current status.
+`docs/install-local.md` previously described a FastAPI/PyMC/Postgres laptop
+stack as the main setup path. Task 9 replaced it with the current maintained
+CLI/static-dashboard quick start and moved the older stack to a historical
+install path.
+
+`review/2026-buildability-review.md` remains historical feasibility context.
+Task 9 marked it as superseded by the current ETL/modeling/CLI/static-dashboard
+implementation so it is not cited as current product status.
 
 Older docs may also predate the current distinction between the Maryland public default, regional research page, single-bite decision-support overlay, calibration backtests, and Bayesian update backtests. Public-facing summaries should cite the current boundary docs instead of relying on stale overview language.
 
@@ -68,14 +76,13 @@ Open reviewer findings:
 - Task 6 documentation-inventory review found stale source-map references to old runtime/test paths. Resolution: source-map references were updated to `tickbiterisk/runtime/risk_lookup.py`, `tickbiterisk/runtime/static_export.py`, `tests/test_runtime_risk_lookup.py`, `tests/test_cli_risk_lookup.py`, `tests/test_seasonality.py`, `tests/test_cli_seasonality.py`, and `tests/test_single_bite_risk.py`.
 - Task 6 methods/statistics review found no blocking issues after checking score, percentile, interval, validation, and forecast-safe wording against `risk_score.py`, `regional_forecast_typicality.py`, and regional interval code.
 - Task 6 scientific/data-quality review found no blocking issues in surveillance caveats, medical boundary, regional research framing, or public-default guardrails.
+- Task 9 public-doc alignment resolved stale metadata/docs: `CITATION.cff` now describes the current Maryland-first relative reported-incidence forecast; `docs/install-local.md` now leads with the implemented CLI/static quick start; and `review/2026-buildability-review.md` is marked historical rather than current product status.
 
 ## Follow-Up Decisions
 
 Follow-up decisions before public whitepaper promotion:
 
-- revise or annotate `CITATION.cff` so it does not overstate Bayesian per-bite risk or national personal-risk coverage;
-- refresh `docs/install-local.md` or clearly mark outdated FastAPI/PyMC assumptions;
-- update or supersede `review/2026-buildability-review.md` with current runnable ETL/modeling/CLI/static-artifact status;
+- keep `CITATION.cff`, `docs/install-local.md`, and `review/2026-buildability-review.md` aligned with the current relative reported-incidence forecast boundary if product scope changes;
 - reconstruct `paper/refs.bib` and connect bibliography entries to the source map;
 - decide whether regional research artifacts remain internal review material or receive a separately approved public research framing;
 - keep calibration and Bayesian update methods research-only until rolling-origin gates improve error or calibration.

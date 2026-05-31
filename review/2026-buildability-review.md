@@ -2,6 +2,17 @@
 
 Assessed: 2026-05-23
 
+## Historical review status
+
+This review is a historical feasibility note from early project planning.
+It has been superseded by the current ETL/modeling/CLI/static-dashboard implementation, which now ships derived public-safe artifacts, local runtime commands, GitHub Pages-ready dashboard files, regional research diagnostics, and documentation guardrails.
+
+Read the sections below as concept-stage context, not a current implementation description.
+Current product language should follow the README, public product
+boundary, model cards, research lab notes, and whitepaper draft: TickBiteRisk
+is a relative reported-incidence forecast and risk-context tool, not a
+clinical decision system and not a per-bite infection probability engine.
+
 Question: Given that this idea was roughly a 2024 thought experiment, could this system be easily built today?
 
 ## Short Answer
@@ -14,7 +25,7 @@ My practical read: a focused MVP could be built in weeks by one strong builder u
 
 ## What Exists In This Repo Today
 
-The project is currently a well-developed spec, not a runnable product. The README describes Docker, PyPI, API, and model behavior, but the repo only contains docs, an API spec, licensing, and project governance files. That is fine for a concept-stage repo, but the buildability review should treat those quick-start sections as intended product behavior rather than existing implementation.
+At the time of this review, the project was mostly a concept-stage specification rather than the current runnable ETL/modeling/CLI/static-dashboard product. The README and public docs have since been revised around the implemented static forecast workflow.
 
 Strong existing assets:
 

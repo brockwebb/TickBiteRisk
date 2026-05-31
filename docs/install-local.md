@@ -1,126 +1,100 @@
-# TickBiteRisk – Local‑Laptop Install Guide
+# TickBiteRisk Local Install Guide
 
 > **File location:** `/docs/install-local.md`
 
-This guide walks you through spinning up TickBiteRisk entirely on your **personal laptop**—no Docker, no cloud.  Tested on macOS 14 and Ubuntu 22.04.
+## Current status
 
----
+This guide describes the current maintained quick start for the implemented
+TickBiteRisk product: local Python tooling, derived ETL artifacts, CLI lookup,
+single-bite context, static export, and a static dashboard served from
+`public/`.
 
-## 1 Prerequisites
+The current product is a Maryland-first relative reported Lyme disease
+pressure forecast and risk-context tool. It is informational only, not medical
+advice, not diagnosis or treatment guidance, and not a per-bite infection
+probability.
 
-| Component     | macOS command                                | Ubuntu/Debian command                              |
-| ------------- | -------------------------------------------- | -------------------------------------------------- |
-| PostgreSQL 17 | `brew install postgresql@17`                 | `sudo apt install postgresql-17`                   |
-| PostGIS 3     | `brew install postgis`                       | `sudo apt install postgis postgresql-17-postgis-3` |
-| GDAL ≥3.6     | installed with PostGIS                       | `sudo apt install gdal-bin libgdal-dev`            |
-| csvkit        | `brew install csvkit`                        | `sudo apt install csvkit`                          |
-| Python 3.11   | `brew install pyenv && pyenv install 3.11.8` | `sudo apt install python3.11 python3.11-venv`      |
-| Build tools   | `xcode-select --install`                     | `sudo apt install build-essential`                 |
+FastAPI/PyMC/Postgres path is historical. The repository keeps warehouse and
+future service design notes, but the public v0 runtime does not require a live
+database, API server, raw source files, or cloud service.
 
----
-
-## 2 Clone repo & set up Python
-
-```bash
-# clone
-git clone https://github.com/yourhandle/tickbiterisk.git
-cd tickbiterisk
-
-# create venv (replace with pyenv or conda if preferred)
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -e .[dev]   # pulls PyMC, FastAPI, rasterio, etc.
-```
-
----
-
-## 3 Bootstrap PostgreSQL
+## Current maintained quick start
 
 ```bash
-# start postgres (macOS brew service or systemctl for Linux)
-brew services start postgresql@17          # macOS
-# sudo systemctl start postgresql          # Ubuntu
-
-# create db
-override_user="$(whoami)"        # adjust if needed
-psql -U "$override_user" -d postgres -c 'CREATE DATABASE tickrisk;'
-psql -U "$override_user" -d tickrisk <<'SQL'
-CREATE EXTENSION postgis;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
-CREATE TABLE etl_log (
-  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
-  source text,
-  fetched_at timestamptz,
-  md5 char(32)
-);
-SQL
+python -m pip install -e ".[dev]"
 ```
 
-Export basic env‑vars (append to `~/.bash_profile`):
+Run a county/date lookup against a derived county-week forecast artifact:
 
 ```bash
-export POSTGRES_USER=$(whoami)
-export POSTGRES_PASSWORD=""      # blank if using peer auth
-export POSTGRES_DB=tickrisk
-export PGHOST=localhost
-export PGPORT=5432
+tickbiterisk risk lookup \
+  --county-fips 24003 \
+  --date 2026-05-26 \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --pretty
 ```
 
-`source ~/.bash_profile` to reload.
-
----
-
-## 4 Run a first ETL & model smoke‑test
+Run the single-bite context command:
 
 ```bash
-./data-pipelines/fetch_cdc_ticks.sh --year 2023
-psql -d tickrisk -c 'SELECT COUNT(*) FROM raw_cdc_ticks LIMIT 5;'
-
-make test-mini      # runs mini-model fit & unit tests (<2 min)
+tickbiterisk risk single-bite \
+  --county-fips 24003 \
+  --date 2026-05-26 \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --tick-species blacklegged \
+  --tick-stage nymph \
+  --attachment-hours 40 \
+  --engorgement engorged \
+  --hours-since-removal 24 \
+  --doxycycline-safe \
+  --pretty
 ```
 
-If all tests pass, your local environment is wired.
-
----
-
-## 5 Start the API
+Export public-safe static dashboard data:
 
 ```bash
-uvicorn api.app:app --reload --port 8000
-# visit http://localhost:8000/docs
+tickbiterisk risk export-static \
+  --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv \
+  --model-summary-path build/etl/model-comparison/model_comparison_summary.csv \
+  --output-dir build/public-risk
 ```
 
-Example query:
+Serve the committed static dashboard locally:
 
 ```bash
-curl 'http://localhost:8000/risk?fips=24003&tau=24'
+python -m http.server 8000 --directory public
 ```
 
----
+Then open `http://localhost:8000`.
 
-## 6 Schedule weekly & annual ETL (optional)
+## Current verification commands
 
-Edit your crontab (`crontab -e`):
+Run the same families of checks used for the current branch:
 
+```bash
+env PYTHONPATH=. ./.venv/bin/python -m pytest -q $(git ls-files 'tests/test*.py')
+PYTHONPATH=. ./.venv/bin/python -m ruff check .
+node --check public/app.js
+node --check public/regional-research.js
+npm run test:dashboard
 ```
-0 6 * * MON  /path/to/repo/cron/weekly.sh >> ~/tickrisk_weekly.log 2>&1
-30 5 15 11 *  /path/to/repo/cron/annual.sh >> ~/tickrisk_annual.log 2>&1
-```
 
-Both scripts will skip gracefully if dependencies are missing or MD5 unchanged.
+## Optional ETL context
 
----
+The README and operational runbook contain the current ETL command sequence for
+refreshing derived artifacts. Raw source files remain local or ignored unless a
+source-specific review allows redistribution. Public dashboard files should be
+derived, source-attributed, and free of credentials.
 
-### Troubleshooting
+## Historical install path
 
-| Symptom                                   | Likely cause                 | Fix                                                                      |
-| ----------------------------------------- | ---------------------------- | ------------------------------------------------------------------------ |
-| `psql: connection refused`                | Postgres service not running | `brew services start postgresql@17` or `sudo systemctl start postgresql` |
-| `relation "raw_cdc_ticks" does not exist` | ETL didn’t run or failed     | Check `etl_log` and rerun `fetch_cdc_ticks.sh`                           |
-| `GDAL_LIBRARY not found` import error     | GDAL missing in Python env   | Ensure `brew install gdal` then `pip reinstall rasterio`                 |
+Older drafts of this guide described a laptop stack built around PostgreSQL,
+PostGIS, FastAPI, PyMC, cron jobs, and a live `/risk` HTTP endpoint. That path
+was useful as a concept-stage architecture note, but it is not the maintained
+quick start for the current static v0 product.
 
----
+Use the current CLI/static commands above unless a future plan explicitly
+revives the database-backed HTTP service and validates its runtime, security,
+and public wording.
 
-*Last updated: 2025-06-08 (draft v0.1)*
+Last updated: 2026-05-30.
