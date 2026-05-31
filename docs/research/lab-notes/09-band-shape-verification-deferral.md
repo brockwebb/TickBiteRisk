@@ -81,9 +81,19 @@ behave well would not be.
 
 Blocked on generation of the multi-year `public/data/regional/` county-level
 artifact (multi-forecast-year interval rows). That generation is out of scope
-for this release. It is registered as a placeholder ResearchTask in the graph,
-and Issue c05124e3 carries a `blocked_by` edge to it so the deferral reason
-lives in the graph, not only on disk.
+for this release.
+
+The dependency is encoded in the graph as a three-node chain (the type system
+permits `blocked_by` only between two Issues, so the missing artifact is itself
+modeled as an Issue):
+
+- Issue c05124e3 (band-shape test gap) `blocked_by` Issue "multi-year
+  public/data/regional/ artifact does not exist on disk";
+- that blocker Issue `remediated_by` a placeholder ResearchTask that generates
+  the artifact.
+
+So the deferral reason and its single unblocking trigger live in the graph, not
+only on disk.
 
 ## Tracking
 
