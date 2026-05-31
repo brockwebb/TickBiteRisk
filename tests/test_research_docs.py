@@ -159,3 +159,43 @@ def test_whitepaper_references_are_working_project_register() -> None:
     ]
     for phrase in required_phrases:
         assert " ".join(phrase.split()) in normalized_references
+
+
+def test_whitepaper_methods_explain_forecast_score_and_update_contracts() -> None:
+    methods = read(WHITEPAPER / "04-methods.md")
+    normalized_methods = " ".join(methods.split())
+    required_phrases = [
+        "docs/research/lab-notes",
+        "county-year reported Lyme incidence per 100,000 people",
+        "surveillance-derived proxy for relative Lyme disease pressure",
+        "linear_blend_baseline",
+        "selected for transparency, stability, and plain-language defensibility",
+        "empirical_bayes_spatial_regime_incidence",
+        "not the public Maryland default",
+        "Forecast-safe means a target-year forecast can use only information "
+        "available at or before the forecast origin",
+        "same-year diagnostic fields cannot be promoted into forecast inputs",
+        "CDC national Lyme onset seasonality shares for MMWR weeks",
+        "not county-specific",
+        "not observed county-week Lyme cases",
+        "nearest-rank benchmark quantile",
+        "default benchmark quantile is `0.95`",
+        "headroom multiplier is `1.2`",
+        "rounded raw score clamped to `1..10`",
+        "not a probability, infection chance, clinical threshold, or treatment "
+        "trigger",
+        "Forecast typicality compares the selected annual forecast with the "
+        "same county's prior reported annual incidence",
+        "Forecast intervals are empirical ranges from historical forecast "
+        "residuals",
+        "Maryland public model card lists interval method `not_available`",
+        "regional research artifact includes intervals using "
+        "`empirical_rolling_origin_residual_quantile`",
+        "New surveillance, denominator, ecology, exposure, or regional evidence "
+        "is not allowed to automatically move the public score",
+        "default calibration and Bayesian update backtests worsened overall MAE",
+        "Promotion requires improved held-out behavior, forecast-safe inputs, "
+        "stable uncertainty language, and public-health wording",
+    ]
+    for phrase in required_phrases:
+        assert " ".join(phrase.split()) in normalized_methods
