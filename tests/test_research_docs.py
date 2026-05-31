@@ -268,3 +268,60 @@ def test_whitepaper_results_document_validation_gates_and_current_findings() -> 
         ]
         assert len(source_rows) == 2
         assert result_rows == source_rows
+
+
+def test_whitepaper_data_provenance_preserves_source_and_publication_boundaries() -> None:
+    chapter = read(WHITEPAPER / "03-data-and-provenance.md")
+    source_notes = read(LAB_NOTES / "02-data-provenance.md")
+    normalized_chapter = normalize_whitespace(chapter)
+    normalized_source = normalize_whitespace(source_notes)
+
+    for heading in [
+        "## Source Families",
+        "## Raw Files And Derived Public Artifacts",
+        "## Source Vintages And Forecast Origins",
+        "## Public Redistribution Boundary",
+        "## Provenance And Audit Trail",
+        "## Known Data Gaps",
+    ]:
+        assert heading in chapter
+
+    for term in [
+        "CDC and state Lyme surveillance",
+        "Census population and geography",
+        "CDC national Lyme onset seasonality",
+        "Weather, drought, ecology, host, and exposure sources are candidate "
+        "features or diagnostics unless a reviewed public branch explicitly "
+        "selects them",
+        "`public/data`",
+        "`public/research-data/regional`",
+        "Neither public surface should require raw data files, database "
+        "credentials, local secrets, or private ETL outputs",
+        "`forecast_origin_year`",
+        "`as_of_date`",
+        "`data_cutoff_date`",
+        "`source_vintage`",
+        "`update_mode`",
+        "Forecast rows should not contain or imply target-year actuals, "
+        "residuals, errors, or observed weekly truth",
+        "The redistribution boundary is derived-first",
+        "Raw surveillance rows, restricted tick-status workbooks, ambiguous "
+        "branch outputs, and deliberately untracked local files remain outside "
+        "the public release boundary",
+        "`acquisition_provenance.csv`",
+        "`tickbiterisk etl provenance-audit --root-dir build/etl`",
+        "request URLs that include credentials must be sanitized",
+    ]:
+        assert normalize_whitespace(term) in normalized_source
+        assert normalize_whitespace(term) in normalized_chapter
+
+    for source_gap in [
+        "NSSP tick-bite data are absent from the current model",
+        "Observed county-week and county-month Lyme truth are absent",
+        "Ecology extraction remains uneven",
+        "Official future population denominators are not yet available",
+        "Regional sidecars and state overlays have different geographies",
+        "Bibliography and source URL cleanup is still needed",
+    ]:
+        assert source_gap in source_notes
+        assert source_gap in chapter
