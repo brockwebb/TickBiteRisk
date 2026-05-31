@@ -49,6 +49,10 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def normalize_whitespace(text: str) -> str:
+    return " ".join(text.split())
+
+
 def test_lab_note_chapters_exist_with_review_front_matter() -> None:
     for filename in LAB_NOTE_FILES:
         path = LAB_NOTES / filename
@@ -199,3 +203,68 @@ def test_whitepaper_methods_explain_forecast_score_and_update_contracts() -> Non
     ]
     for phrase in required_phrases:
         assert " ".join(phrase.split()) in normalized_methods
+
+
+def test_whitepaper_results_document_validation_gates_and_current_findings() -> None:
+    results = read(WHITEPAPER / "05-results-and-validation.md")
+    source_notes = read(LAB_NOTES / "05-validation-results.md")
+    normalized_results = normalize_whitespace(results)
+    normalized_source = normalize_whitespace(source_notes)
+
+    for heading in [
+        "## Rolling-Origin Validation",
+        "## Branch Comparison Interpretation",
+        "## Forecast Calibration Backtest",
+        "## Gamma-Poisson Bayesian Update Backtest",
+        "## Regional Research Diagnostics",
+        "## Observed-Fit Overlay",
+        "## Promotion Gates",
+    ]:
+        assert heading in results
+
+    required_boundary_terms = [
+        "docs/research/lab-notes",
+        "rolling-origin",
+        "not independently observed county-week truth",
+        "reported-incidence forecast diagnostics",
+        "`do_not_apply_to_public_forecast`",
+        "research-only",
+        "`partial_state_overlay`",
+        "`not_training_feature`",
+        "`not_public_default`",
+        "`reported_cases_not_stable_true_incidence`",
+        "`not_public_maryland_default`",
+        "not be applied to the public forecast when overall performance worsens",
+        "rather than public Maryland forecast changes",
+    ]
+    for term in required_boundary_terms:
+        assert normalize_whitespace(term) in normalized_results
+
+    for term in [
+        "12 overall rows and 276 diagnostic subgroup rows",
+        "predicted cases: 9,415.098301",
+        "observed cases: 16,620",
+        "case MAE: 123.037986",
+        "incidence MAE: 84.387219 per 100k",
+        "48 under-predictions and 19 over-predictions",
+    ]:
+        assert normalize_whitespace(term) in normalized_source
+        assert normalize_whitespace(term) in normalized_results
+
+    for row_key in [
+        "linear_blend_baseline",
+        "forecast_safe_top4_ensemble",
+        "prior_year_incidence",
+    ]:
+        source_rows = [
+            line.strip()
+            for line in source_notes.splitlines()
+            if line.strip().startswith(f"| `{row_key}` |")
+        ]
+        result_rows = [
+            line.strip()
+            for line in results.splitlines()
+            if line.strip().startswith(f"| `{row_key}` |")
+        ]
+        assert len(source_rows) == 2
+        assert result_rows == source_rows
