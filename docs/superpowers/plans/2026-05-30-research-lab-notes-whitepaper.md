@@ -12,27 +12,27 @@
 
 ## File Structure
 
-- Create: `tests/test_research_docs.py`  
+- Create: `tests/test_research_docs.py`
   Validates the required research documentation files, chapter front matter, source-map references, and review-register overclaim entries.
-- Create: `docs/research/lab-notes/README.md`  
+- Create: `docs/research/lab-notes/README.md`
   Entry point for the internal research dossier.
-- Create: `docs/research/lab-notes/01-product-boundary.md`  
+- Create: `docs/research/lab-notes/01-product-boundary.md`
   Current product/research/medical boundary and current estimate vs non-estimates.
-- Create: `docs/research/lab-notes/02-data-provenance.md`  
+- Create: `docs/research/lab-notes/02-data-provenance.md`
   Source families, raw-vs-derived rule, artifact vintages, provenance, and redistribution boundaries.
-- Create: `docs/research/lab-notes/03-methods-modeling.md`  
+- Create: `docs/research/lab-notes/03-methods-modeling.md`
   Annual forecast, model comparison, forecast-safe design, regional branches, and update policy.
-- Create: `docs/research/lab-notes/04-plain-language-stats.md`  
+- Create: `docs/research/lab-notes/04-plain-language-stats.md`
   Definitions for per-100k, score, percentile, intervals, average/worse-than-average language, and chart marks.
-- Create: `docs/research/lab-notes/05-validation-results.md`  
+- Create: `docs/research/lab-notes/05-validation-results.md`
   Rolling-origin validation, branch comparison, failed update lanes, observed-fit overlays, and promotion gates.
-- Create: `docs/research/lab-notes/06-regional-research.md`  
+- Create: `docs/research/lab-notes/06-regional-research.md`
   Mid-Atlantic research scope, county-equivalents, spatial regimes, intervals, and public-default boundary.
-- Create: `docs/research/lab-notes/07-limitations-review-register.md`  
+- Create: `docs/research/lab-notes/07-limitations-review-register.md`
   Known overclaim risks, stale/conflicting docs, HITL gates, reviewer findings, and follow-up decisions.
-- Create: `docs/research/lab-notes/appendix-source-map.md`  
+- Create: `docs/research/lab-notes/appendix-source-map.md`
   Claims-to-sources map across docs, public artifacts, code modules, and tests.
-- Create: `docs/research/whitepaper/README.md`  
+- Create: `docs/research/whitepaper/README.md`
   Draft public whitepaper entry point after lab-note reviewer passes.
 - Create: `docs/research/whitepaper/01-executive-summary.md`
 - Create: `docs/research/whitepaper/02-background-related-work.md`
@@ -685,6 +685,10 @@ Plan completeness scan:
 
 Type and path consistency:
 
-- All planned files live under `docs/research/lab-notes`,
+- All files planned by this lab-notes/whitepaper slice live under `docs/research/lab-notes`,
   `docs/research/whitepaper`, or `tests/test_research_docs.py`.
 - Test constants match the planned filenames.
+- Branch-level review may also see earlier approved UX and regional-research
+  commits outside this plan, including public dashboard assets and regional
+  smoke/static tests. Those are intentionally outside this documentation
+  slice's file-ownership claim.
