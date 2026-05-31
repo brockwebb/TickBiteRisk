@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
 
+from tickbiterisk.modeling.regimes import (
+    REPORTING_BREAK_REGIMES,
+    classify_surveillance_regime,
+)
+
 
 class ModelDiagnosticsInputError(ValueError):
     """Raised when model diagnostics inputs are invalid."""
@@ -106,11 +111,6 @@ class RegionalCapacityInterval:
 
 
 MATERIAL_RESIDUAL_INCIDENCE_PER_100K = 10.0
-REPORTING_BREAK_REGIMES = {
-    "covid_reporting_disruption",
-    "case_definition_change_2022_plus",
-    "mdh_probable_only_2024",
-}
 
 
 @dataclass(frozen=True)
@@ -731,16 +731,7 @@ def _interpretation_share(
 
 
 def _classify_surveillance_regime(quality_flags: str, test_year: int) -> str:
-    flags = _split_flags(quality_flags)
-    if "mdh_probable_only_2024" in flags:
-        return "mdh_probable_only_2024"
-    if "covid_reporting_disruption" in flags or test_year == 2020:
-        return "covid_reporting_disruption"
-    if "lyme_case_definition_change" in flags or test_year >= 2022:
-        return "case_definition_change_2022_plus"
-    if test_year < 2020:
-        return "pre_2020_baseline"
-    return "other_surveillance_regime"
+    return classify_surveillance_regime(quality_flags, test_year)
 
 
 def _build_summary(

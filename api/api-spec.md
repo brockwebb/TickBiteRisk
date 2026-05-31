@@ -71,7 +71,9 @@ tickbiterisk risk lookup \
   "weather_mode": "not_used_by_lagged_model",
   "seasonality_source_id": "cdc_seasonality_week_2023",
   "period_label": "MMWR Week 21",
+  "risk_score_low": 1,
   "risk_score": 1,
+  "risk_score_high": 3,
   "risk_category": "very_low",
   "risk_score_raw": 1.23,
   "predicted_weekly_incidence_per_100k": 0.45,
@@ -175,9 +177,11 @@ tickbiterisk risk single-bite \
   "mmwr_year": 2026,
   "mmwr_week": 21,
   "disease": "lyme",
+  "single_bite_risk_score_low": 6,
   "single_bite_risk_score": 8,
+  "single_bite_risk_score_raw": 8,
+  "single_bite_risk_score_high": 9,
   "single_bite_risk_band": "elevated",
-  "single_bite_risk_score_raw": 8.05,
   "pep_consideration": "meets_cdc_consideration_criteria",
   "pep_criteria": [
     {
@@ -237,6 +241,55 @@ tickbiterisk risk single-bite \
 
 ---
 
+### 3.5. Runtime Contract Change: Score Bands
+
+Status: implemented for local runtime and static export in schema v2.
+
+The reporting-basis adjustment work requires the public 1-10 score to carry a
+plausible range wherever an annual forecast interval exists. The implemented
+contract change is:
+
+- Add `risk_score_low` and `risk_score_high` beside `risk_score` in county-week
+  lookup/static records, computed by mapping the lower/upper forecast interval
+  through the same score transform as the point score.
+- Add `single_bite_risk_score_low` and `single_bite_risk_score_high` beside
+  `single_bite_risk_score` once the county-week forecast carries a score band.
+- Restore `single_bite_risk_score_raw` as a deprecated alias for
+  `single_bite_risk_score` for one release. This is a compatibility bridge for
+  downstream callers that still read the old field; the removal-next-version
+  note is part of this contract. New consumers should use the banded fields as
+  primary.
+- Keep `risk_score_raw` in the county-week score artifact for audit/debug
+  purposes unless a separate contract change removes it.
+
+Any future payload change must update the dependency catalog below in the same
+branch and lock the new shape with tests before implementation proceeds.
+
+#### 3.5.1. Downstream Dependency Catalog
+
+Current contract sources and consumers that must be updated or explicitly left
+compatible:
+
+| Surface | Current dependency |
+| --- | --- |
+| Local runtime spec | This file, sections 2.3 and 3.3, documents the current score-band response shape and the deprecated alias `single_bite_risk_score_raw`. |
+| User docs | `docs/user-guide.md`, `docs/public-product-boundary.md`, `docs/model-spec.md`, and README runtime examples describe lookup/single-bite output. |
+| County-week score CSV | `tickbiterisk/modeling/risk_score.py` and `tickbiterisk/modeling/risk_score_build.py` define/write `risk_score_raw`; new score-band columns require schema updates. |
+| Runtime lookup | `tickbiterisk/runtime/risk_lookup.py` requires/parses `risk_score_raw` and builds `CountyWeekRiskResponse`. |
+| Single-bite runtime | `tickbiterisk/runtime/single_bite.py` defines `SingleBiteRiskResponse`; it exposes score-band fields and keeps `single_bite_risk_score_raw` as a deprecated alias for one release. |
+| Static export JSON | `tickbiterisk/runtime/static_export.py` writes `risk_score_raw`; schema version is `county-week-risk-static-v2` after adding score-band fields. |
+| Browser UI | `public/app.js` and `public/regional-research.js` read/display score fields and compute client-side single-bite payloads. |
+| Committed public data | `public/data/*.json` and regional research JSON fixtures include the current static schema fields. |
+| Tests | Runtime, CLI, static export, public docs, dashboard static, and browser smoke tests assert current fields. |
+
+Compatibility note: adding county-week `risk_score_low/high` is mostly
+additive, but the static JSON schema version is bumped because public files are
+a versioned contract. Removing `single_bite_risk_score_raw` would not be
+additive, so the field remains for one release as a deprecated alias with a
+removal-next-version note.
+
+---
+
 ## 4. Current Static Runtime: `tickbiterisk risk export-static`
 
 ```bash
@@ -293,4 +346,4 @@ Before this HTTP API is built, it needs separate implementation, validation,
 security review, dependency wiring, OpenAPI generation, and product wording
 review.
 
-*Last updated: 2026-05-27*
+*Last updated: 2026-05-31*

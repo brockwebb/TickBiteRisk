@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
 
+from tickbiterisk.modeling.regimes import classify_surveillance_regime
+
 
 COMPARISON_ASSUMPTION_FLAGS = (
     "observational_not_causal,"
@@ -47,6 +49,18 @@ REQUIRED_MODEL_COMPARISON_COLUMNS = [
     "target_population",
     "target_lyme_incidence_per_100k",
 ]
+BASIS_ADJUSTED_MODEL_COMPARISON_COLUMNS = [
+    "county_fips",
+    "year",
+    "target_population",
+    "source_regime",
+    "target_total_cases_basis_adjusted",
+    "target_lyme_incidence_per_100k_basis_adjusted",
+    "missing_basis_factor",
+]
+TARGET_SCALE_RAW = "raw"
+TARGET_SCALE_BASIS_ADJUSTED = "basis_adjusted"
+TARGET_SCALES = {TARGET_SCALE_RAW, TARGET_SCALE_BASIS_ADJUSTED}
 FORECAST_SAFE_EXACT_FEATURES = {
     "feature_year",
     "feature_prior_year_lyme_incidence_per_100k",
@@ -243,6 +257,10 @@ class ModelComparisonInputError(ValueError):
     """Raised when model comparison inputs or options are invalid."""
 
 
+class CrossRegimeTrainingError(ModelComparisonInputError):
+    """Raised when raw training would cross surveillance reporting regimes."""
+
+
 @dataclass(frozen=True)
 class ModelComparisonRun:
     run_id: str
@@ -257,6 +275,8 @@ class ModelComparisonRun:
     random_forest_min_samples_leaf: int
     random_forest_max_features: str
     random_forest_random_state: int
+    target_scale: str
+    allow_cross_regime_raw_targets: bool
     model_names: str
     target_definition: str
     evaluation_mode: str
@@ -285,7 +305,7 @@ class ModelComparisonPrediction:
     train_end_year: int
     train_row_count: int
     train_county_count: int
-    actual_cases: int
+    actual_cases: float
     actual_population: int
     actual_incidence_per_100k: float
     predicted_cases: float
@@ -384,11 +404,13 @@ class _DesignRow:
     county_fips: str
     county_name: str
     year: int
-    actual_cases: int
+    actual_cases: float
     population: int
     incidence_per_100k: float
     features: dict[str, float]
     model_feature_quality_flags: str
+    source_regime: str
+    missing_basis_factor: bool
 
 
 @dataclass(frozen=True)
@@ -412,6 +434,8 @@ def run_model_comparison(
     random_forest_min_samples_leaf: int = RANDOM_FOREST_MIN_SAMPLES_LEAF,
     random_forest_max_features: str = RANDOM_FOREST_MAX_FEATURES,
     random_forest_random_state: int = RANDOM_FOREST_RANDOM_STATE,
+    target_scale: str = TARGET_SCALE_RAW,
+    allow_cross_regime_raw_targets: bool = False,
 ) -> ModelComparisonResult:
     if min_train_years < 1:
         raise ModelComparisonInputError("min_train_years must be at least 1")
@@ -432,8 +456,14 @@ def run_model_comparison(
         raise ModelComparisonInputError(
             "random_forest_max_features must be one of: " f"{allowed}"
         )
+    if target_scale not in TARGET_SCALES:
+        allowed = ", ".join(sorted(TARGET_SCALES))
+        raise ModelComparisonInputError(f"target_scale must be one of: {allowed}")
 
-    rows, feature_columns = _read_design_rows(design_matrix_path)
+    rows, feature_columns = _read_design_rows(
+        design_matrix_path,
+        target_scale=target_scale,
+    )
     if not rows:
         raise ModelComparisonInputError("model design matrix has no usable rows")
     input_min_year = min(row.year for row in rows)
@@ -458,10 +488,12 @@ def run_model_comparison(
         f"mintrain{min_train_years}_ridge{_slug_float(ridge_alpha)}_"
         f"shrink{_slug_float(shrinkage_strength)}_"
         f"rf{random_forest_n_estimators}_leaf{random_forest_min_samples_leaf}_"
-        f"max{random_forest_max_features}_seed{random_forest_random_state}"
+        f"max{random_forest_max_features}_seed{random_forest_random_state}_"
+        f"target{target_scale}_rawallow{int(allow_cross_regime_raw_targets)}"
     )
     predictions: list[ModelComparisonPrediction] = []
     intervals: list[ModelComparisonInterval] = []
+    run_extra_flags: set[str] = set()
     for test_year in range(start_year, resolved_end_year + 1):
         train_rows = [row for row in rows if row.year < test_year]
         if not _has_training_depth(train_rows, min_train_years=min_train_years):
@@ -469,6 +501,17 @@ def run_model_comparison(
         test_rows = [row for row in rows if row.year == test_year]
         if not test_rows:
             continue
+        extra_flags = _cross_regime_guard_flags(
+            train_rows=train_rows,
+            test_rows=test_rows,
+            target_scale=target_scale,
+            allow_cross_regime_raw_targets=allow_cross_regime_raw_targets,
+        )
+        run_extra_flags.update(extra_flags)
+        comparison_assumption_flags = _join_flags(
+            COMPARISON_ASSUMPTION_FLAGS,
+            *extra_flags,
+        )
         train_start_year = min(row.year for row in train_rows)
         train_end_year = max(row.year for row in train_rows)
         train_county_count = len({row.county_fips for row in train_rows})
@@ -505,6 +548,7 @@ def run_model_comparison(
                         train_end_year=train_end_year,
                         train_row_count=len(train_rows),
                         train_county_count=train_county_count,
+                        comparison_assumption_flags=comparison_assumption_flags,
                     )
                 )
                 if model_name == "analog_year_forecast":
@@ -517,8 +561,10 @@ def run_model_comparison(
                             source_sha=source_sha,
                             train_start_year=train_start_year,
                             train_end_year=train_end_year,
+                            comparison_assumption_flags=comparison_assumption_flags,
                         )
                     )
+    run_assumption_flags = _join_flags(COMPARISON_ASSUMPTION_FLAGS, *run_extra_flags)
     metrics = _metric_rows(run_id, predictions)
     summary = _summary_rows(run_id, metrics)
     model_names = ",".join(sorted({row.model_name for row in predictions}))
@@ -535,6 +581,8 @@ def run_model_comparison(
         random_forest_min_samples_leaf=random_forest_min_samples_leaf,
         random_forest_max_features=random_forest_max_features,
         random_forest_random_state=random_forest_random_state,
+        target_scale=target_scale,
+        allow_cross_regime_raw_targets=allow_cross_regime_raw_targets,
         model_names=model_names,
         target_definition=TARGET_DEFINITION,
         evaluation_mode=EVALUATION_MODE,
@@ -542,7 +590,7 @@ def run_model_comparison(
         feature_set="safe_numeric_design_matrix",
         n_design_rows=len(rows),
         n_predictions=len(predictions),
-        comparison_assumption_flags=COMPARISON_ASSUMPTION_FLAGS,
+        comparison_assumption_flags=run_assumption_flags,
     )
     return ModelComparisonResult(
         run_id=run_id,
@@ -554,14 +602,23 @@ def run_model_comparison(
     )
 
 
-def _read_design_rows(path: Path) -> tuple[list[_DesignRow], list[str]]:
+def _read_design_rows(
+    path: Path,
+    *,
+    target_scale: str = TARGET_SCALE_RAW,
+) -> tuple[list[_DesignRow], list[str]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         fieldnames = reader.fieldnames or []
         fieldname_set = set(fieldnames)
+        required_columns = (
+            REQUIRED_MODEL_COMPARISON_COLUMNS
+            if target_scale == TARGET_SCALE_RAW
+            else BASIS_ADJUSTED_MODEL_COMPARISON_COLUMNS
+        )
         missing_columns = [
             column
-            for column in REQUIRED_MODEL_COMPARISON_COLUMNS
+            for column in required_columns
             if column not in fieldname_set
         ]
         if missing_columns:
@@ -575,27 +632,83 @@ def _read_design_rows(path: Path) -> tuple[list[_DesignRow], list[str]]:
             if _is_safe_feature_column(column)
         ]
         rows = [
-            _DesignRow(
-                county_fips=str(row["county_fips"]).zfill(5),
-                county_name=str(row.get("county_name", "")),
-                year=int(row["year"]),
-                actual_cases=_parse_int(row["target_total_cases"]),
-                population=_parse_int(row["target_population"]),
-                incidence_per_100k=_parse_float(
-                    row["target_lyme_incidence_per_100k"]
-                ),
-                features={
-                    column: _parse_float(row.get(column, ""))
-                    for column in feature_columns
-                },
-                model_feature_quality_flags=str(
-                    row.get("model_feature_quality_flags", "")
-                ),
-            )
+            _design_row_from_csv(row, feature_columns, target_scale=target_scale)
             for row in reader
             if _parse_int(row["target_population"]) > 0
         ]
     return rows, feature_columns
+
+
+def _design_row_from_csv(
+    row: dict[str, str],
+    feature_columns: list[str],
+    *,
+    target_scale: str,
+) -> _DesignRow:
+    year = int(row["year"])
+    quality_flags = str(row.get("model_feature_quality_flags", ""))
+    if target_scale == TARGET_SCALE_BASIS_ADJUSTED:
+        cases_column = "target_total_cases_basis_adjusted"
+        incidence_column = "target_lyme_incidence_per_100k_basis_adjusted"
+        source_regime = str(row.get("source_regime", ""))
+        missing_basis_factor = _parse_bool(row.get("missing_basis_factor", ""))
+    else:
+        cases_column = "target_total_cases"
+        incidence_column = "target_lyme_incidence_per_100k"
+        source_regime = classify_surveillance_regime(quality_flags, year)
+        missing_basis_factor = False
+    return _DesignRow(
+        county_fips=str(row["county_fips"]).zfill(5),
+        county_name=str(row.get("county_name", "")),
+        year=year,
+        actual_cases=_parse_float(row[cases_column]),
+        population=_parse_int(row["target_population"]),
+        incidence_per_100k=_parse_float(row[incidence_column]),
+        features={
+            column: _parse_float(row.get(column, ""))
+            for column in feature_columns
+        },
+        model_feature_quality_flags=quality_flags,
+        source_regime=source_regime,
+        missing_basis_factor=missing_basis_factor,
+    )
+
+
+def _cross_regime_guard_flags(
+    *,
+    train_rows: list[_DesignRow],
+    test_rows: list[_DesignRow],
+    target_scale: str,
+    allow_cross_regime_raw_targets: bool,
+) -> list[str]:
+    train_regimes = {row.source_regime for row in train_rows}
+    test_regimes = {row.source_regime for row in test_rows}
+    crosses_regime = len(train_regimes) > 1 or train_regimes != test_regimes
+    if target_scale == TARGET_SCALE_BASIS_ADJUSTED:
+        if any(row.missing_basis_factor for row in [*train_rows, *test_rows]):
+            if crosses_regime and not allow_cross_regime_raw_targets:
+                raise CrossRegimeTrainingError(
+                    "basis-adjusted target_scale includes missing_basis_factor "
+                    "rows across surveillance regimes; provide "
+                    "allow_cross_regime_raw_targets=True to override. "
+                    f"train_regimes={sorted(train_regimes)} "
+                    f"test_regimes={sorted(test_regimes)}"
+                )
+            return [
+                "regime_basis_adjusted_targets",
+                "cross_regime_raw_training_allowed",
+            ]
+        return ["regime_basis_adjusted_targets"]
+    if crosses_regime and not allow_cross_regime_raw_targets:
+        raise CrossRegimeTrainingError(
+            "raw target_scale would train across surveillance reporting regimes; "
+            "provide allow_cross_regime_raw_targets=True to override. "
+            f"train_regimes={sorted(train_regimes)} "
+            f"test_regimes={sorted(test_regimes)}"
+        )
+    if crosses_regime:
+        return ["cross_regime_raw_training_allowed"]
+    return []
 
 
 def _is_safe_feature_column(column: str) -> bool:
@@ -970,6 +1083,7 @@ def _analog_interval_row(
     source_sha: str,
     train_start_year: int,
     train_end_year: int,
+    comparison_assumption_flags: str,
 ) -> ModelComparisonInterval:
     prediction, analogs = _analog_forecast(row, train_rows, feature_columns)
     if not analogs:
@@ -1022,7 +1136,7 @@ def _analog_interval_row(
         observed_incidence_per_100k=observed,
         covered_80=lower_80 <= observed <= upper_80,
         covered_95=lower_95 <= observed <= upper_95,
-        comparison_assumption_flags=COMPARISON_ASSUMPTION_FLAGS,
+        comparison_assumption_flags=comparison_assumption_flags,
     )
 
 
@@ -1278,6 +1392,7 @@ def _prediction_row(
     train_end_year: int,
     train_row_count: int,
     train_county_count: int,
+    comparison_assumption_flags: str,
 ) -> ModelComparisonPrediction:
     predicted_incidence = max(predicted_incidence, 0.0)
     predicted_cases = predicted_incidence / 100000 * row.population
@@ -1318,7 +1433,7 @@ def _prediction_row(
         residual_cases=_round(residual_cases),
         absolute_error_cases=_round(abs(residual_cases)),
         model_feature_quality_flags=row.model_feature_quality_flags,
-        comparison_assumption_flags=COMPARISON_ASSUMPTION_FLAGS,
+        comparison_assumption_flags=comparison_assumption_flags,
     )
 
 
@@ -1370,7 +1485,7 @@ def _metric_row(
             [row.actual_incidence_per_100k for row in rows],
             [row.predicted_incidence_per_100k for row in rows],
         ),
-        comparison_assumption_flags=COMPARISON_ASSUMPTION_FLAGS,
+        comparison_assumption_flags=first.comparison_assumption_flags,
     )
 
 
@@ -1398,7 +1513,7 @@ def _summary_rows(
             mae_incidence_per_100k=row.mae_incidence_per_100k,
             rmse_incidence_per_100k=row.rmse_incidence_per_100k,
             pearson_correlation=row.pearson_correlation,
-            comparison_assumption_flags=COMPARISON_ASSUMPTION_FLAGS,
+            comparison_assumption_flags=row.comparison_assumption_flags,
         )
         for index, row in enumerate(ranked, start=1)
     ]
@@ -1451,6 +1566,22 @@ def _parse_int(value: str) -> int:
 
 def _parse_float(value: str) -> float:
     return float(str(value or "0").strip() or "0")
+
+
+def _parse_bool(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _join_flags(*values: str) -> str:
+    flags = []
+    seen = set()
+    for value in values:
+        for raw_flag in str(value or "").split(","):
+            flag = raw_flag.strip()
+            if flag and flag not in seen:
+                flags.append(flag)
+                seen.add(flag)
+    return ",".join(flags)
 
 
 def _round(value: float) -> float:

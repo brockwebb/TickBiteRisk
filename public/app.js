@@ -271,10 +271,12 @@ function selectCounty(countyFips) {
   }
 
   const interval95 = record.predicted_weekly_incidence_95_interval || [0, 0];
+  const scoreRange = scoreRangeLabel(record.risk_score_low, record.risk_score_high);
   panel.innerHTML = `<div class="score-card">
     <p class="muted">MMWR week ${escapeHtml(record.mmwr_week)}, data year ${escapeHtml(record.data_year)}</p>
     <h3>${escapeHtml(record.county_name)}</h3>
     <p><span class="score-badge ${riskClass(record.risk_score)}">${escapeHtml(record.risk_score)}/10</span> ${escapeHtml(categoryLabel(record.risk_category))}</p>
+    <p>Plausible score range: ${escapeHtml(scoreRange)}.</p>
     <p>${escapeHtml(sentenceCase(record.risk_category))} relative seasonal forecast for Lyme reports in Maryland counties like this one during this week.</p>
     <p>Predicted weekly incidence: ${formatNumber(record.predicted_weekly_incidence_per_100k)} per 100k.</p>
     <p>95% empirical interval: ${formatNumber(interval95[0])} to ${formatNumber(interval95[1])} per 100k.</p>
@@ -307,6 +309,7 @@ function renderBiteResult() {
   target.innerHTML = `<section aria-labelledby="bite-result-title">
     <h4 id="bite-result-title">Single-bite Lyme score</h4>
     <p><span class="score-badge ${riskClass(result.single_bite_risk_score)}">${escapeHtml(result.single_bite_risk_score)}/10</span> ${escapeHtml(result.single_bite_risk_band)}</p>
+    <p>Plausible score range: ${escapeHtml(scoreRangeLabel(result.single_bite_risk_score_low, result.single_bite_risk_score_high))}.</p>
     <p>${escapeHtml(result.risk_interpretation)}</p>
     <p><b>CDC criteria:</b> ${escapeHtml(readableModelName(result.pep_consideration))}</p>
     <ul class="criteria-list">${criteriaItems}</ul>
@@ -353,11 +356,50 @@ function readBiteInputs() {
 
 function estimateSingleBiteRisk(record, input) {
   const modifiers = {
-    location_season: locationSeasonModifier(record),
+    location_season: locationSeasonModifier(record, record.risk_score),
     tick_species: speciesModifier(input.tick_species),
     tick_stage: stageModifier(input.tick_stage),
     attachment: attachmentModifier(input.attachment_hours, input.engorgement),
   };
+  const tickCount = Math.min(20, Math.max(1, Number(input.tick_count || 1)));
+  const score = singleBiteScore(modifiers, tickCount);
+  const scoreLow = singleBiteScore(
+    {
+      ...modifiers,
+      location_season: locationSeasonModifier(
+        record,
+        record.risk_score_low || record.risk_score
+      ),
+    },
+    tickCount
+  );
+  const scoreHigh = singleBiteScore(
+    {
+      ...modifiers,
+      location_season: locationSeasonModifier(
+        record,
+        record.risk_score_high || record.risk_score
+      ),
+    },
+    tickCount
+  );
+  const criteria = pepCriteria(record, input);
+  return {
+    single_bite_risk_score_low: Math.min(scoreLow, score),
+    single_bite_risk_score: score,
+    single_bite_risk_score_raw: score,
+    single_bite_risk_score_high: Math.max(scoreHigh, score),
+    single_bite_risk_band: biteRiskBand(score),
+    pep_consideration: pepConsideration(criteria),
+    pep_criteria: criteria,
+    evidence_modifiers: modifiers,
+    caveats: biteCaveats(record, input),
+    risk_interpretation:
+      "This score combines the selected county-week forecast with tick identity, stage, attachment, engorgement, and tick count. It is not an absolute infection probability.",
+  };
+}
+
+function singleBiteScore(modifiers, tickCount) {
   const rawSingle = Math.min(
     1,
     Math.max(
@@ -368,30 +410,24 @@ function estimateSingleBiteRisk(record, input) {
         modifiers.attachment
     )
   );
-  const tickCount = Math.min(20, Math.max(1, Number(input.tick_count || 1)));
   const combined = 1 - (1 - rawSingle) ** tickCount;
   const scoreRaw = Number((combined * 10).toFixed(6));
-  const score = Math.max(1, Math.min(10, Math.ceil(scoreRaw)));
-  const criteria = pepCriteria(record, input);
-  return {
-    single_bite_risk_score: score,
-    single_bite_risk_band: biteRiskBand(score),
-    single_bite_risk_score_raw: scoreRaw,
-    pep_consideration: pepConsideration(criteria),
-    pep_criteria: criteria,
-    evidence_modifiers: modifiers,
-    caveats: biteCaveats(record, input),
-    risk_interpretation:
-      "This score combines the selected county-week forecast with tick identity, stage, attachment, engorgement, and tick count. It is not an absolute infection probability.",
-  };
+  return Math.max(1, Math.min(10, Math.ceil(scoreRaw)));
 }
 
-function locationSeasonModifier(record) {
-  const baseline = Number(record.risk_score || 1) / 10;
+function locationSeasonModifier(record, scoreValue) {
+  const baseline = Number(scoreValue || record.risk_score || 1) / 10;
   if (String(record.county_fips || "").startsWith("24")) {
     return Math.max(baseline, 0.45);
   }
   return baseline;
+}
+
+function scoreRangeLabel(low, high) {
+  const scoreLow = Math.max(1, Math.min(10, Number(low || 1)));
+  const scoreHigh = Math.max(1, Math.min(10, Number(high || scoreLow)));
+  if (scoreLow === scoreHigh) return `${scoreLow}/10`;
+  return `${scoreLow}-${scoreHigh}/10`;
 }
 
 function speciesModifier(species) {

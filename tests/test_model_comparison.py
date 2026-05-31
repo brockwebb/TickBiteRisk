@@ -3,8 +3,11 @@ import math
 from pathlib import Path
 from statistics import mean
 
+import pytest
+
 from tickbiterisk.modeling import model_compare
 from tickbiterisk.modeling.model_compare import (
+    CrossRegimeTrainingError,
     run_model_comparison as _run_model_comparison,
 )
 from tickbiterisk.modeling.model_compare_build import (
@@ -15,10 +18,14 @@ from tickbiterisk.modeling.model_compare_build import (
     MODEL_COMPARISON_SUMMARY_COLUMNS,
     write_model_comparison_outputs,
 )
+from tickbiterisk.modeling.regimes import CASE_DEFINITION_2022_PLUS
+from tickbiterisk.modeling.regimes import COVID_REPORTING_DISRUPTION
+from tickbiterisk.modeling.regimes import PRE_2020_BASELINE
 
 
 def run_model_comparison(**kwargs):
     kwargs.setdefault("random_forest_n_estimators", 5)
+    kwargs.setdefault("allow_cross_regime_raw_targets", True)
     return _run_model_comparison(**kwargs)
 
 
@@ -72,6 +79,89 @@ def test_run_model_comparison_uses_prior_year_training_windows(
     assert result.run.random_forest_max_features == "sqrt"
     assert result.run.random_forest_random_state == 1337
     assert model_compare.RANDOM_FOREST_N_ESTIMATORS == 200
+
+
+def test_run_model_comparison_raw_cross_regime_training_raises_by_default(
+    tmp_path: Path,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv")
+
+    with pytest.raises(CrossRegimeTrainingError, match="allow_cross_regime"):
+        _run_model_comparison(
+            design_matrix_path=matrix,
+            start_year=2021,
+            min_train_years=1,
+            random_forest_n_estimators=5,
+        )
+
+
+def test_run_model_comparison_raw_cross_regime_override_flags_predictions(
+    tmp_path: Path,
+) -> None:
+    matrix = _write_design_matrix(tmp_path / "design_matrix.csv")
+
+    result = _run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+        random_forest_n_estimators=5,
+        allow_cross_regime_raw_targets=True,
+    )
+
+    assert "cross_regime_raw_training_allowed" in (
+        result.run.comparison_assumption_flags
+    )
+    assert all(
+        "cross_regime_raw_training_allowed" in row.comparison_assumption_flags
+        for row in result.predictions
+    )
+
+
+def test_run_model_comparison_basis_adjusted_target_scale_crosses_regimes(
+    tmp_path: Path,
+) -> None:
+    matrix = _write_design_matrix(
+        tmp_path / "design_matrix.csv",
+        include_basis_adjusted=True,
+    )
+
+    result = _run_model_comparison(
+        design_matrix_path=matrix,
+        start_year=2021,
+        min_train_years=1,
+        random_forest_n_estimators=5,
+        target_scale="basis_adjusted",
+    )
+
+    adjusted = next(
+        row
+        for row in result.predictions
+        if row.model_name == "prior_year_incidence"
+        and row.county_fips == "24001"
+        and row.test_year == 2021
+    )
+    assert result.run.target_scale == "basis_adjusted"
+    assert adjusted.actual_incidence_per_100k == 60.0
+    assert "regime_basis_adjusted_targets" in adjusted.comparison_assumption_flags
+
+
+def test_run_model_comparison_basis_adjusted_missing_factor_still_raises(
+    tmp_path: Path,
+) -> None:
+    matrix = _write_design_matrix(
+        tmp_path / "design_matrix.csv",
+        include_basis_adjusted=True,
+        missing_basis_factor_years={2020},
+    )
+
+    with pytest.raises(CrossRegimeTrainingError, match="missing_basis_factor"):
+        _run_model_comparison(
+            design_matrix_path=matrix,
+            start_year=2021,
+            min_train_years=1,
+            random_forest_n_estimators=5,
+            target_scale="basis_adjusted",
+        )
 
 
 def test_run_model_comparison_includes_empirical_bayes_and_metrics(
@@ -890,6 +980,8 @@ def _write_design_matrix(
     include_spatial: bool = True,
     include_regional: bool = False,
     include_composite: bool = False,
+    include_basis_adjusted: bool = False,
+    missing_basis_factor_years: set[int] | None = None,
 ) -> Path:
     rows = []
     values = {
@@ -1010,12 +1102,42 @@ def _write_design_matrix(
                         ),
                     }
                 )
+            if include_basis_adjusted:
+                factor = 2.0 if year < 2022 else 1.0
+                missing_basis_factor = year in (missing_basis_factor_years or set())
+                row.update(
+                    {
+                        "source_regime": _test_source_regime(year),
+                        "basis_factor_applied": str(factor),
+                        "basis_factor_ci95_low": str(factor),
+                        "basis_factor_ci95_high": str(factor),
+                        "target_total_cases_basis_adjusted": str(cases * factor),
+                        "target_lyme_incidence_per_100k_basis_adjusted": str(
+                            cases * factor
+                        ),
+                        "target_is_reference_basis": (
+                            "1" if factor == 1.0 else "0"
+                        ),
+                        "missing_basis_factor": (
+                            "1" if missing_basis_factor else "0"
+                        ),
+                        "displayed_as": "Estimate adjusted to 2022 CDC reporting guidelines",
+                    }
+                )
             rows.append(row)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
     return path
+
+
+def _test_source_regime(year: int) -> str:
+    if year < 2020:
+        return PRE_2020_BASELINE
+    if year == 2020:
+        return COVID_REPORTING_DISRUPTION
+    return CASE_DEFINITION_2022_PLUS
 
 
 def _state_prior(values: dict[str, list[int]], offset: int) -> float:

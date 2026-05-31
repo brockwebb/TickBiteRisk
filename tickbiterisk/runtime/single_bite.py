@@ -72,9 +72,11 @@ class SingleBiteRiskResponse:
     mmwr_year: int
     mmwr_week: int
     disease: str
+    single_bite_risk_score_low: int
     single_bite_risk_score: int
+    single_bite_risk_score_raw: int
+    single_bite_risk_score_high: int
     single_bite_risk_band: str
-    single_bite_risk_score_raw: float
     pep_consideration: str
     pep_criteria: list[dict[str, str]]
     forecast_context: dict[str, object]
@@ -117,22 +119,37 @@ def estimate_single_bite_risk(
     if tick_count < 1 or tick_count > 20:
         raise SingleBiteRiskInputError("tick_count must be between 1 and 20")
 
+    location_season = _location_season_modifier(
+        baseline,
+        risk_score=baseline.risk_score,
+    )
     modifiers = {
-        "location_season": _location_season_modifier(baseline),
+        "location_season": location_season,
         "tick_species": _species_modifier(species),
         "tick_stage": _stage_modifier(stage),
         "attachment": _attachment_modifier(attachment, engorgement_level),
     }
-    raw_single = (
-        modifiers["location_season"]
-        * modifiers["tick_species"]
-        * modifiers["tick_stage"]
-        * modifiers["attachment"]
+    score = _single_bite_score(modifiers, tick_count=tick_count)
+    score_low = _single_bite_score(
+        {
+            **modifiers,
+            "location_season": _location_season_modifier(
+                baseline,
+                risk_score=baseline.risk_score_low,
+            ),
+        },
+        tick_count=tick_count,
     )
-    raw_single = max(0.0, min(1.0, raw_single))
-    combined = 1 - ((1 - raw_single) ** tick_count)
-    score_raw = round(combined * 10, 6)
-    score = max(1, min(10, math.ceil(score_raw)))
+    score_high = _single_bite_score(
+        {
+            **modifiers,
+            "location_season": _location_season_modifier(
+                baseline,
+                risk_score=baseline.risk_score_high,
+            ),
+        },
+        tick_count=tick_count,
+    )
     pep_criteria = _pep_criteria(
         baseline=baseline,
         species=species,
@@ -149,13 +166,17 @@ def estimate_single_bite_risk(
         mmwr_year=baseline.mmwr_year,
         mmwr_week=baseline.mmwr_week,
         disease="lyme",
+        single_bite_risk_score_low=min(score_low, score),
         single_bite_risk_score=score,
+        single_bite_risk_score_raw=score,
+        single_bite_risk_score_high=max(score_high, score),
         single_bite_risk_band=_risk_band(score),
-        single_bite_risk_score_raw=score_raw,
         pep_consideration=_pep_consideration(pep_criteria),
         pep_criteria=pep_criteria,
         forecast_context={
+            "county_week_risk_score_low": baseline.risk_score_low,
             "county_week_risk_score": baseline.risk_score,
+            "county_week_risk_score_high": baseline.risk_score_high,
             "county_week_risk_category": baseline.risk_category,
             "data_year": baseline.data_year,
             "model_name": baseline.model_name,
@@ -351,8 +372,29 @@ def _risk_band(score: int) -> str:
     return "very_low"
 
 
-def _location_season_modifier(baseline: CountyWeekRiskResponse) -> float:
-    baseline_modifier = baseline.risk_score / 10
+def _single_bite_score(
+    modifiers: dict[str, float],
+    *,
+    tick_count: int,
+) -> int:
+    raw_single = (
+        modifiers["location_season"]
+        * modifiers["tick_species"]
+        * modifiers["tick_stage"]
+        * modifiers["attachment"]
+    )
+    raw_single = max(0.0, min(1.0, raw_single))
+    combined = 1 - ((1 - raw_single) ** tick_count)
+    score_raw = round(combined * 10, 6)
+    return max(1, min(10, math.ceil(score_raw)))
+
+
+def _location_season_modifier(
+    baseline: CountyWeekRiskResponse,
+    *,
+    risk_score: int,
+) -> float:
+    baseline_modifier = risk_score / 10
     if baseline.county_fips.startswith("24"):
         return round(max(baseline_modifier, 0.45), 6)
     return round(baseline_modifier, 6)

@@ -30,7 +30,7 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     source_catalog = _read_json(outputs.source_catalog_path)
     manifest = _read_json(outputs.export_manifest_path)
 
-    assert weekly["schema_version"] == "county-week-risk-static-v1"
+    assert weekly["schema_version"] == "county-week-risk-static-v2"
     assert weekly["export_type"] == "md_county_risk_weekly"
     assert weekly["scope"] == "maryland_county_week"
     assert weekly["date_system"]["name"] == "CDC MMWR"
@@ -117,6 +117,8 @@ def test_export_static_risk_data_writes_public_json_files(tmp_path: Path) -> Non
     assert weekly["records"][0]["week_start_date"] == "2023-01-01"
     assert weekly["records"][0]["week_end_date"] == "2023-01-07"
     assert weekly["records"][0]["risk_score"] == 7
+    assert weekly["records"][0]["risk_score_low"] == 5
+    assert weekly["records"][0]["risk_score_high"] == 8
     assert weekly["records"][0]["predicted_weekly_incidence_95_interval"] == [
         1.5,
         3.5,

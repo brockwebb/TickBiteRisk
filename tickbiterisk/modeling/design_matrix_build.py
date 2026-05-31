@@ -8,7 +8,6 @@ from pathlib import Path
 from tickbiterisk.modeling.design_matrix import (
     ID_COLUMNS,
     PASSTHROUGH_COLUMNS,
-    TARGET_COLUMNS,
     ModelDesignMatrixResult,
 )
 
@@ -28,7 +27,7 @@ def write_model_design_matrix_outputs(
     schema_path = output_dir / "model_design_matrix_schema.json"
     columns = [
         *ID_COLUMNS,
-        *TARGET_COLUMNS,
+        *result.schema.target_columns,
         *result.schema.feature_columns,
         *PASSTHROUGH_COLUMNS,
     ]

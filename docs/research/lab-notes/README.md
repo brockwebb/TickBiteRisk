@@ -25,4 +25,5 @@ recommendation, or calibrated personal infection probability.
 | 5 | [Validation Results](05-validation-results.md) | Gather rolling-origin, calibration, Bayesian-update, and observed-fit evidence. |
 | 6 | [Regional Research](06-regional-research.md) | Separate regional research diagnostics from the Maryland public surface. |
 | 7 | [Limitations Review Register](07-limitations-review-register.md) | Track overclaims, documentation conflicts, reviewer findings, and promotion gates. |
+| 8 | [Reporting-Basis Identification Decision](08-reporting-basis-identification.md) | Lock the CDC-anchor identification decision and the closed out-of-region DiD result. |
 | Appendix | [Source Map](appendix-source-map.md) | Map claims and planned whitepaper sections back to source docs, code, and artifacts. |

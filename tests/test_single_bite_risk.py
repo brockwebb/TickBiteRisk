@@ -26,9 +26,14 @@ def test_single_bite_risk_combines_county_week_prior_with_bite_evidence(
     assert response.county_fips == "24003"
     assert response.query_date == "2023-01-01"
     assert response.single_bite_risk_score >= baseline.risk_score
+    assert response.single_bite_risk_score_low <= response.single_bite_risk_score
+    assert response.single_bite_risk_score_high >= response.single_bite_risk_score
+    assert response.single_bite_risk_score_raw == response.single_bite_risk_score
     assert response.single_bite_risk_band in {"elevated", "high"}
     assert response.pep_consideration == "meets_cdc_consideration_criteria"
     assert response.forecast_context["county_week_risk_score"] == 7
+    assert response.forecast_context["county_week_risk_score_low"] == 5
+    assert response.forecast_context["county_week_risk_score_high"] == 8
     assert response.input_summary["tick_species"] == "ixodes_scapularis"
     assert response.evidence_modifiers["attachment"] >= 1.0
     assert _criterion(response, "attachment_duration")["status"] == "meets"

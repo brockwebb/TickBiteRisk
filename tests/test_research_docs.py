@@ -16,6 +16,7 @@ LAB_NOTE_FILES = [
     "05-validation-results.md",
     "06-regional-research.md",
     "07-limitations-review-register.md",
+    "08-reporting-basis-identification.md",
     "appendix-source-map.md",
 ]
 
@@ -101,6 +102,24 @@ def test_source_map_references_backing_docs_code_and_artifacts() -> None:
     source_map = read(LAB_NOTES / "appendix-source-map.md")
     for reference in REQUIRED_SOURCE_REFERENCES:
         assert reference in source_map
+
+
+def test_reporting_basis_identification_note_locks_cdc_anchor_decision() -> None:
+    note = read(LAB_NOTES / "08-reporting-basis-identification.md")
+    normalized_note = normalize_whitespace(note)
+    required_phrases = [
+        "CDC anchor stands",
+        "did_control_evaluated=true",
+        "did_control_passed=false",
+        "insufficient_unsuppressed_county_panel_2017_2019",
+        "qtbi-xd4i",
+        "docs/research/source-materials/did-control-verification-2017-2019.csv",
+        "step 6 is unblocked by the CDC fixed-prior anchor",
+        "ITS remains diagnostic-only",
+        "weakest joint in the chain",
+    ]
+    for phrase in required_phrases:
+        assert " ".join(phrase.split()) in normalized_note
 
 
 def test_whitepaper_draft_exists_and_points_back_to_lab_notes() -> None:

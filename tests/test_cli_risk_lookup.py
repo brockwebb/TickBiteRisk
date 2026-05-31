@@ -31,6 +31,8 @@ def test_risk_lookup_command_returns_json_response(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert payload["county_fips"] == "24003"
     assert payload["risk_score"] == 7
+    assert payload["risk_score_low"] == 5
+    assert payload["risk_score_high"] == 8
     assert payload["risk_category"] == "high"
     assert payload["query_date"] == "2023-01-01"
     assert payload["model_family"] == "ensemble"
@@ -111,6 +113,9 @@ def test_risk_single_bite_command_returns_decision_support_json(
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["county_fips"] == "24003"
+    assert payload["single_bite_risk_score_raw"] == payload["single_bite_risk_score"]
+    assert payload["single_bite_risk_score_low"] <= payload["single_bite_risk_score"]
+    assert payload["single_bite_risk_score_high"] >= payload["single_bite_risk_score"]
     assert payload["single_bite_risk_score"] >= payload["forecast_context"][
         "county_week_risk_score"
     ]

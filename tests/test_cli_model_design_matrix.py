@@ -5,6 +5,11 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from tickbiterisk.cli import app
+from tickbiterisk.modeling.regimes import PRE_2020_BASELINE
+from tickbiterisk.modeling.reporting_basis_adjustment import DEFAULT_DISPLAY_LABEL
+from tickbiterisk.modeling.reporting_basis_adjustment_build import (
+    REPORTING_BASIS_ADJUSTMENT_COLUMNS,
+)
 
 
 runner = CliRunner()
@@ -164,6 +169,47 @@ def test_model_design_matrix_command_accepts_regional_incidence_clusters_path(
     assert schema["regional_incidence_cluster_source_path"] == str(regional_clusters)
 
 
+def test_model_design_matrix_command_accepts_reporting_basis_adjustment_path(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_pre_2020_feature_matrix(tmp_path / "model_features.csv")
+    adjustment = _write_reporting_basis_adjustment(
+        tmp_path / "reporting_basis_adjustment.csv"
+    )
+    output_dir = tmp_path / "out"
+
+    result = runner.invoke(
+        app,
+        [
+            "etl",
+            "model-design-matrix",
+            "--model-features-path",
+            str(feature_matrix),
+            "--reporting-basis-adjustment-path",
+            str(adjustment),
+            "--lookback-years",
+            "1",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    with (output_dir / "model_design_matrix_county_year.csv").open(
+        newline="",
+        encoding="utf-8",
+    ) as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["source_regime"] == PRE_2020_BASELINE
+    assert rows[0]["target_total_cases_basis_adjusted"] == "30.0"
+    assert rows[0]["basis_factor_applied"] == "1.5"
+
+    schema = json.loads(
+        (output_dir / "model_design_matrix_schema.json").read_text(encoding="utf-8")
+    )
+    assert schema["reporting_basis_adjustment_source_path"] == str(adjustment)
+
+
 def test_model_design_matrix_command_fails_cleanly_when_regional_signals_missing(
     tmp_path: Path,
 ) -> None:
@@ -288,6 +334,28 @@ def _write_feature_matrix(path: Path) -> Path:
     return _write_rows(path, rows)
 
 
+def _write_pre_2020_feature_matrix(path: Path) -> Path:
+    rows = []
+    for year, cases in [(2018, 10), (2019, 20)]:
+        rows.append(
+            {
+                "county_fips": "24003",
+                "county_name": "Anne Arundel County",
+                "year": str(year),
+                "total_cases": str(cases),
+                "population": "100000",
+                "lyme_incidence_per_100k": str(float(cases)),
+                "weather_temp_mean_f": str(50 + (year - 2018)),
+                "weather_precip_total_mm": "1000",
+                "deer_harvest_per_sqmi_prior_season": "",
+                "ixodes_scapularis_status": "established",
+                "borrelia_burgdorferi_status": "present",
+                "model_feature_quality_flags": "missing_deer_harvest_prior_season",
+            }
+        )
+    return _write_rows(path, rows)
+
+
 def _write_two_county_feature_matrix(path: Path) -> Path:
     rows = []
     for county_fips, county_name, cases_by_year in [
@@ -326,6 +394,49 @@ def _write_adjacency(path: Path) -> Path:
         },
     ]
     return _write_rows(path, rows)
+
+
+def _write_reporting_basis_adjustment(path: Path) -> Path:
+    rows = [
+        {
+            "adjustment_id": (
+                "county_24003__boundary2022__out_of_region_low_incidence_did"
+            ),
+            "jurisdiction_scope": "county_24003",
+            "boundary_year": "2022",
+            "source_regime": PRE_2020_BASELINE,
+            "target_reference_basis": "case_definition_change_2022_plus",
+            "adjustment_method": "out_of_region_low_incidence_did",
+            "multiplicative_factor": "1.5",
+            "factor_se_log": "0.1",
+            "factor_ci80_low": "1.3",
+            "factor_ci80_high": "1.7",
+            "factor_ci95_low": "1.2",
+            "factor_ci95_high": "1.8",
+            "treatment_status": "high_incidence",
+            "n_control_jurisdictions": "1",
+            "n_observations_used": "8",
+            "identification_quality": "strong",
+            "smoothed_on_adjacency": "true",
+            "displayed_as": DEFAULT_DISPLAY_LABEL,
+            "pre_window": "2017-2019",
+            "source_citation_url": (
+                "https://www.cdc.gov/mmwr/volumes/73/wr/mm7306a1.htm"
+            ),
+            "source_panel_sha256": "a" * 64,
+            "source_vintage": "test",
+            "assumption_flags": "did_parallel_trends_passed",
+            "notes": "test adjustment",
+        }
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=REPORTING_BASIS_ADJUSTMENT_COLUMNS,
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
 
 
 def _write_regional_signals(path: Path) -> Path:

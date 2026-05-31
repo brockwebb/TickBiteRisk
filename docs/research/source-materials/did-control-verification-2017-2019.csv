@@ -1,0 +1,15 @@
+# Verification summary: distinct resolved county FIPS per candidate state, 2017-2019
+# Source: CDC qtbi-xd4i (Lyme public-use aggregated data with geography, 2008-2021)
+# Verified live 2026-05-31T12:40:19Z by direct download of rows.csv and FIPS-resolution count
+# resolved = FIPS field is a real 5-digit code (cell not suppressed); suppressed = FIPS field == "Suppressed"
+state,distinct_resolved_counties_3yr,resolved_rows,suppressed_rows
+GA,0,0,9
+SC,3,4,15
+TN,2,9,16
+AL,3,10,14
+KS,1,2,14
+NE,1,2,6
+CO,0,0,1
+UT,1,9,18
+MO,0,0,7
+KY,1,16,13

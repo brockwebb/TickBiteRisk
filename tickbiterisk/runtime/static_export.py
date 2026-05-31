@@ -17,7 +17,7 @@ from tickbiterisk.runtime.risk_lookup import (
 )
 
 
-STATIC_EXPORT_SCHEMA_VERSION = "county-week-risk-static-v1"
+STATIC_EXPORT_SCHEMA_VERSION = "county-week-risk-static-v2"
 MARYLAND_GEOGRAPHY_SCOPE = "maryland_county_week"
 MIDATLANTIC_GEOGRAPHY_SCOPE = "midatlantic_county_week"
 
@@ -486,7 +486,9 @@ def _weekly_record(record: CountyWeekRiskRecord) -> dict[str, object]:
         "period_label": record.period_label,
         "week_start_date": week_start.isoformat(),
         "week_end_date": week_end.isoformat(),
+        "risk_score_low": record.risk_score_low,
         "risk_score": record.risk_score,
+        "risk_score_high": record.risk_score_high,
         "risk_category": record.risk_category,
         "risk_score_raw": record.risk_score_raw,
         "predicted_weekly_incidence_per_100k": (

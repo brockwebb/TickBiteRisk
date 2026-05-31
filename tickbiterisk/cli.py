@@ -321,6 +321,13 @@ from tickbiterisk.modeling.forecast_calibration_backtest import (
 from tickbiterisk.modeling.forecast_calibration_backtest_build import (
     write_forecast_calibration_backtest_outputs,
 )
+from tickbiterisk.modeling.forecast_skill_anchor import (
+    ForecastSkillAnchorInputError,
+    build_step1_forecast_skill_anchor,
+)
+from tickbiterisk.modeling.forecast_skill_anchor_build import (
+    write_step1_forecast_skill_anchor_outputs,
+)
 from tickbiterisk.modeling.forecast_bayesian_update_backtest import (
     ForecastBayesianUpdateBacktestInputError,
     build_forecast_bayesian_update_backtest,
@@ -379,6 +386,13 @@ from tickbiterisk.modeling.regional_forecast_typicality import (
 )
 from tickbiterisk.modeling.regional_forecast_typicality_build import (
     write_regional_forecast_typicality_outputs,
+)
+from tickbiterisk.modeling.reporting_basis_adjustment import (
+    ReportingBasisAdjustmentInputError,
+    build_reporting_basis_adjustment,
+)
+from tickbiterisk.modeling.reporting_basis_adjustment_build import (
+    write_reporting_basis_adjustment_outputs,
 )
 from tickbiterisk.modeling.regional_outcome_stress import (
     RegionalOutcomeStressInputError,
@@ -2542,6 +2556,13 @@ def model_design_matrix(
             "capacity-band features."
         ),
     ),
+    reporting_basis_adjustment_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional reporting-basis adjustment CSV for parallel adjusted "
+            "target columns."
+        ),
+    ),
     lookback_years: int = typer.Option(
         5,
         help="Maximum prior county years used for lagged outcome features.",
@@ -2573,6 +2594,14 @@ def model_design_matrix(
             "Regional incidence clusters file not found: "
             f"{regional_incidence_clusters_path}"
         )
+    if (
+        reporting_basis_adjustment_path is not None
+        and not reporting_basis_adjustment_path.exists()
+    ):
+        raise typer.BadParameter(
+            "Reporting basis adjustment file not found: "
+            f"{reporting_basis_adjustment_path}"
+        )
 
     try:
         result = build_model_design_matrix(
@@ -2581,12 +2610,102 @@ def model_design_matrix(
             county_adjacency_path=county_adjacency_path,
             regional_signals_path=regional_signals_path,
             regional_incidence_clusters_path=regional_incidence_clusters_path,
+            reporting_basis_adjustment_path=reporting_basis_adjustment_path,
         )
     except ModelDesignMatrixInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
     outputs = write_model_design_matrix_outputs(result, output_dir)
     typer.echo(f"Wrote {len(result.rows)} model design matrix row(s) to {outputs.matrix_path}")
     typer.echo(f"Wrote model design matrix schema to {outputs.schema_path}")
+
+
+@etl_app.command("reporting-basis-adjustment")
+def reporting_basis_adjustment(
+    regional_incidence_path: Path = typer.Option(
+        Path("build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv"),
+        help="Input regional county-year Lyme incidence panel CSV.",
+    ),
+    county_adjacency_path: Path | None = typer.Option(
+        None,
+        help="Optional regional county adjacency CSV for factor smoothing.",
+    ),
+    did_control_panel_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional out-of-region low-incidence county-year panel used only "
+            "as a non-forecast DiD identification instrument."
+        ),
+    ),
+    pre_window_start: int = typer.Option(
+        2017,
+        help="First year in the clean pre-window used for treatment assignment.",
+    ),
+    pre_window_end: int = typer.Option(
+        2019,
+        help="Last year in the clean pre-window used for treatment assignment.",
+    ),
+    boundary_year: int = typer.Option(
+        2022,
+        help="Surveillance reporting-basis boundary year.",
+    ),
+    threshold_per_100k: float = typer.Option(
+        10.0,
+        help="CDC high-incidence threshold per 100k in the pre-window.",
+    ),
+    consecutive_years_required: int = typer.Option(
+        3,
+        help="Consecutive qualifying pre-window years required.",
+    ),
+    parallel_trend_tolerance: float = typer.Option(
+        0.25,
+        help="Maximum allowed treatment/control pre-window slope difference.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/reporting-basis-adjustment"),
+        help="Output directory for reporting-basis adjustment artifacts.",
+    ),
+) -> None:
+    if not regional_incidence_path.exists():
+        raise typer.BadParameter(
+            f"Regional incidence file not found: {regional_incidence_path}"
+        )
+    if county_adjacency_path is not None and not county_adjacency_path.exists():
+        raise typer.BadParameter(
+            f"County adjacency file not found: {county_adjacency_path}"
+        )
+    if did_control_panel_path is not None and not did_control_panel_path.exists():
+        raise typer.BadParameter(
+            f"DiD control panel file not found: {did_control_panel_path}"
+        )
+    try:
+        result = build_reporting_basis_adjustment(
+            regional_incidence_path=regional_incidence_path,
+            county_adjacency_path=county_adjacency_path,
+            did_control_panel_path=did_control_panel_path,
+            pre_window_start=pre_window_start,
+            pre_window_end=pre_window_end,
+            boundary_year=boundary_year,
+            threshold_per_100k=threshold_per_100k,
+            consecutive_years_required=consecutive_years_required,
+            parallel_trend_tolerance=parallel_trend_tolerance,
+        )
+    except ReportingBasisAdjustmentInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_reporting_basis_adjustment_outputs(result, output_dir)
+    typer.echo(
+        "Wrote "
+        f"{len(result.classifications)} high-incidence classification row(s) "
+        f"to {outputs.classification_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.did_control_panel)} DiD control panel row(s) "
+        f"to {outputs.did_control_panel_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.adjustments)} reporting basis adjustment row(s) "
+        f"to {outputs.adjustment_path}"
+    )
+    typer.echo(f"Wrote reporting basis adjustment run row to {outputs.run_path}")
 
 
 @etl_app.command("county-adjacency")
@@ -2730,6 +2849,18 @@ def model_compare(
         RANDOM_FOREST_RANDOM_STATE,
         help="Random seed for the random forest research comparison lane.",
     ),
+    target_scale: str = typer.Option(
+        "raw",
+        help="Target scale to evaluate: raw or basis_adjusted.",
+    ),
+    allow_cross_regime_raw_targets: bool = typer.Option(
+        False,
+        "--allow-cross-regime-raw-targets/--no-allow-cross-regime-raw-targets",
+        help=(
+            "Explicitly allow raw-scale training across surveillance reporting "
+            "regimes and flag outputs."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/model-comparison"),
         help="Output directory for model comparison artifacts.",
@@ -2771,6 +2902,8 @@ def model_compare(
             random_forest_min_samples_leaf=random_forest_min_samples_leaf,
             random_forest_max_features=random_forest_max_features,
             random_forest_random_state=random_forest_random_state,
+            target_scale=target_scale,
+            allow_cross_regime_raw_targets=allow_cross_regime_raw_targets,
         )
     except ModelComparisonInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -4118,6 +4251,54 @@ def regional_annual_forecast_intervals(
     typer.echo(
         f"Wrote {len(result.summary)} regional annual forecast interval summary "
         f"row(s) to {outputs.summary_path}"
+    )
+
+
+@etl_app.command("step1-forecast-skill-anchor")
+def step1_forecast_skill_anchor(
+    observed_fit_comparisons_path: Path = typer.Option(
+        Path(
+            "build/etl/regional-forecast-observed-fit/"
+            "regional_forecast_observed_fit_comparisons.csv"
+        ),
+        help="Input regional forecast-vs-observed comparison CSV.",
+    ),
+    forecast_year: int = typer.Option(
+        2024,
+        help="Forecast year to use as the step-1 anchor.",
+    ),
+    state_abbr: str = typer.Option(
+        "PA",
+        help="Observed state overlay abbreviation to use as the anchor.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/step1-forecast-skill-anchor"),
+        help="Output directory for step-1 forecast skill anchor artifacts.",
+    ),
+) -> None:
+    if not observed_fit_comparisons_path.exists():
+        raise typer.BadParameter(
+            "Observed-fit comparisons not found: "
+            f"{observed_fit_comparisons_path}"
+        )
+    if forecast_year < 1:
+        raise typer.BadParameter("forecast-year must be positive")
+    if not state_abbr.strip():
+        raise typer.BadParameter("state-abbr is required")
+
+    try:
+        result = build_step1_forecast_skill_anchor(
+            observed_fit_comparisons_path=observed_fit_comparisons_path,
+            forecast_year=forecast_year,
+            state_abbr=state_abbr,
+        )
+    except ForecastSkillAnchorInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_step1_forecast_skill_anchor_outputs(result, output_dir)
+    typer.echo(f"Wrote 1 step-1 forecast skill anchor run row to {outputs.run_path}")
+    typer.echo(
+        f"Wrote {len(result.anchors)} step-1 forecast skill anchor row(s) "
+        f"to {outputs.anchor_path}"
     )
 
 

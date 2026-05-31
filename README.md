@@ -460,8 +460,8 @@ committed data product used by the static dashboard.
 
 Implemented local lookup:
 
-* `tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26 --pretty` – relative county-week seasonal Lyme forecast JSON, not per-bite probability.
-* `tickbiterisk risk single-bite --county-fips 24003 --date 2026-05-26 --tick-species blacklegged --tick-stage nymph --attachment-hours 40 --engorgement engorged --hours-since-removal 24 --doxycycline-safe --pretty` – single-bite Lyme decision-support score and CDC prophylaxis criteria summary, not an absolute infection probability.
+* `tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26 --pretty` – relative county-week seasonal Lyme forecast JSON with a 1-10 score range, not per-bite probability.
+* `tickbiterisk risk single-bite --county-fips 24003 --date 2026-05-26 --tick-species blacklegged --tick-stage nymph --attachment-hours 40 --engorgement engorged --hours-since-removal 24 --doxycycline-safe --pretty` – single-bite Lyme decision-support score range and CDC prophylaxis criteria summary, not an absolute infection probability.
 * `tickbiterisk risk export-static --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv --model-summary-path build/etl/model-comparison/model_comparison_summary.csv --output-dir build/public-risk` – public-safe derived JSON bundle for static web/runtime use.
 
 Roadmap HTTP API:
