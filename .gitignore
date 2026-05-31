@@ -246,3 +246,11 @@ tickbiterisk/**/* 2.py
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Seldon — ephemeral session state and AI task/handoff specs.
+# seldon.yaml (project config) and seldon_events.jsonl (graph source-of-truth
+# event log) ARE tracked; only local session state and CC task/handoff docs
+# (per engineering-standards CLAUDE.md §6) are ignored.
+.seldon/
+cc_tasks/
+handoffs/

@@ -1,0 +1,16 @@
+event_store:
+  path: seldon_events.jsonl
+neo4j:
+  database: seldon-tickbiterisk
+  uri: bolt://localhost:7687
+project:
+  created_at: '2026-05-31T13:06:21.568895Z'
+  domain: research
+  name: TickBiteRisk
+  slug: tickbiterisk
+  template: blank
+shared_ontology:
+  inheritance: read-only
+  source: /Users/brock/Documents/GitHub/seldon/ontology
+  vocabularies:
+  - validity/VALIDITY_VOCABULARY.md
