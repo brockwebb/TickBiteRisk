@@ -196,6 +196,11 @@ data/raw/
 data/private/
 data/warehouse/
 data/postgres/
+data/*.csv
+data/*.xlsx
+data/*.xls
+data/*.pdf
+data/*.html
 raw/
 private/
 exports/private/
@@ -224,6 +229,13 @@ raw/**/*.parquet
 raw/**/*.geojson
 raw/**/*.tif
 raw/**/*.tiff
+
+# Local duplicate copies created by file sync or Finder conflict resolution.
+docs/superpowers/**/* 2.md
+public/* 2.html
+tests/**/* 2.py
+tests/browser/* 2.mjs
+tickbiterisk/**/* 2.py
 
 # PyPI configuration file
 .pypirc
