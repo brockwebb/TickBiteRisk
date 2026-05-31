@@ -714,6 +714,32 @@ def test_srs_documents_single_bite_runtime_as_current_nonmedical_feature() -> No
         assert token in srs
 
 
+def test_srs_crosswalks_current_research_docs_and_forecast_explanations() -> None:
+    srs = SRS.read_text(encoding="utf-8")
+    normalized_srs = " ".join(srs.split())
+
+    for token in [
+        "Documentation crosswalk",
+        "docs/research/lab-notes/04-plain-language-stats.md",
+        "docs/research/lab-notes/appendix-source-map.md",
+        "docs/research/whitepaper/README.md",
+        "docs/research/whitepaper/references.md",
+        "Predicted score",
+        "Forecast percentile",
+        "Forecast interval",
+        "not a medical confidence interval",
+        "regional research remains research-only",
+        "HITL product decision",
+        "linear_blend_baseline",
+        "empirical_bayes_spatial_regime_incidence",
+        "annual_forecast_predictions.csv",
+        "regional_forecast_typicality.csv",
+        "public/data/model_card.json",
+        "public/research-data/regional/model_card.json",
+    ]:
+        assert " ".join(token.split()) in normalized_srs
+
+
 def test_data_sources_catalog_matches_current_v0_artifacts() -> None:
     catalog = DATA_SOURCES.read_text(encoding="utf-8")
 

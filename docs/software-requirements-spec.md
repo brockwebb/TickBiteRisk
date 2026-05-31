@@ -1,10 +1,37 @@
 # TickBiteRisk Software Requirements Specification
 
-Version: 0.2 draft  
-Date: 2026-05-24  
+Version: 0.3 draft
+Date: 2026-05-31
 Scope: Maryland tick-risk data warehouse, model evaluation, and risk-score product
 
-Implementation status: the first ETL slices are implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, NSSP coverage feasibility normalization, Census county reference/area, Census population denominators, regional Census age-structure context, ACS residential exposure context, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, baseline backtesting, county-week seasonal risk forecasts, runtime lookup/static export, and Postgres-ready schema.
+Implementation status: the maintained local product path is implemented through source parsing, Maryland Lyme reconciliation, CDC disease-onset seasonality baselines, tick-status normalization and feature materialization, NSSP coverage feasibility normalization, Census county reference/area, Census population denominators, regional Census age-structure context, ACS residential exposure context, Maryland DNR deer harvest density features, NOAA station audit/backfill tooling, NOAA weekly/monthly feature generation, model feature assembly, model comparisons, annual forecast artifacts, county-week seasonal risk forecasts, runtime lookup, single-bite decision-support runtime, static public export, static dashboard assets, and regional research artifacts. Postgres/PostGIS remains an allowed warehouse target, but the current maintained path is a local CLI/static-artifact workflow.
+
+## Documentation crosswalk
+
+The SRS is the product requirements index, not the full scientific write-up.
+Current explanatory and evidence documents are:
+
+- `docs/research/lab-notes/04-plain-language-stats.md`: plain-language
+  definitions for Predicted score, Forecast percentile, Forecast interval,
+  per-100k incidence, average/worse-than-average language, and chart marks.
+- `docs/research/lab-notes/appendix-source-map.md`: claim-to-source map for
+  product boundary, data provenance, annual forecasts, seasonal allocation,
+  score scale, percentile, intervals, validation, regional research, and
+  medical-risk communication.
+- `docs/research/whitepaper/README.md`: draft public technical whitepaper
+  entry point derived from the internal lab notes.
+- `docs/research/whitepaper/references.md`: working reference register and
+  bibliography reconstruction boundary; it is not publication-ready.
+- `public/data/model_card.json`: public Maryland model card for the selected
+  `linear_blend_baseline` county-week seasonal forecast.
+- `public/research-data/regional/model_card.json`: regional research model
+  card for the `empirical_bayes_spatial_regime_incidence` branch.
+
+Current forecast artifacts that requirements and explanations should cite by
+name include `annual_forecast_predictions.csv`,
+`regional_forecast_typicality.csv`, model cards, source catalogs, and static
+export manifests. The regional research remains research-only until a HITL
+product decision promotes any branch, geography, or public wording change.
 
 ## 1. Purpose
 
@@ -358,6 +385,34 @@ Display categories:
 The first product-shaped risk artifact is a relative county-week seasonal forecast. It combines a selected annual prediction branch, currently from the model-comparison artifact by default, with the CDC national MMWR-week disease-onset curve and maps the resulting weekly incidence estimate to the 1-10 scale. It must be labeled as `relative_seasonal_baseline`, `static_seasonality_prior`, and `not_weather_adjusted` until weather, habitat, host, and intervention modifiers are explicitly added.
 
 The first runtime surfaces for this score are the local `tickbiterisk risk lookup` command and the `tickbiterisk risk export-static` public JSON bundle. Both preserve the non-medical, relative-forecast framing.
+
+### FR10A: Score, Percentile, And Forecast-Interval Explanation
+
+Every public or research-facing forecast surface must explain the score and
+comparison basis in plain language:
+
+- Predicted score is the rounded 1-10 display score derived from predicted
+  weekly reported-incidence pressure and the selected score denominator. It is
+  not a probability, clinical threshold, or treatment trigger.
+- Forecast percentile compares the selected annual forecast with prior
+  county reported-incidence history through the forecast origin. It must be
+  framed as typicality for reported disease pressure, not biological certainty
+  or individual infection risk.
+- Forecast interval means an empirical forecast uncertainty range when the
+  selected artifact provides interval rows. It is not a medical confidence
+  interval and not a per-bite infection-probability interval.
+- Expected cases and incidence per 100k must be displayed with enough context
+  for a reader to compare the forecast with average, high, and historically
+  extreme prior years where those summaries are available.
+- Chart markers must be described by their statistical role. A selected annual
+  forecast point should be explained as the model's selected annual forecast
+  value and, where available, its county-history percentile and interval
+  context.
+
+The controlling explanatory source is
+`docs/research/lab-notes/04-plain-language-stats.md`; publication-facing
+wording should also remain traceable through
+`docs/research/lab-notes/appendix-source-map.md`.
 
 ### FR11: Model Backtesting
 
