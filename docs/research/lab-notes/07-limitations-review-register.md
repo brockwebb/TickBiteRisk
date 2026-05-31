@@ -3,7 +3,7 @@
 Status: draft
 Primary sources: docs/public-product-boundary.md; docs/regional-research-evidence.md; CITATION.cff; docs/install-local.md; review/2026-buildability-review.md
 Reviewer focus: scientific/data-quality
-Last checked against commit: 375a818
+Last checked against commit: 28d23f9
 
 This chapter tracks the highest-risk overclaims, stale or conflicting documentation, source and citation gaps, HITL gates, reviewer findings, and follow-up decisions that must be resolved before public whitepaper promotion.
 
@@ -65,6 +65,9 @@ Open reviewer findings:
 - Gamma-Poisson Bayesian update backtest: 288 metric rows, all 12 overall rows gated `do_not_apply_to_public_forecast`; selected overall MAE rows worsened for the same branches.
 - PA 2024 observed-fit overlay: useful partial diagnostic evidence, but caveated as `partial_state_overlay`, `not_training_feature`, `not_public_default`, `reported_cases_not_stable_true_incidence`, and `not_public_maryland_default`.
 - Regional interval summaries: useful planning aggregates, but not posterior draws or a joint spatial probability model.
+- Task 6 documentation-inventory review found stale source-map references to old runtime/test paths. Resolution: source-map references were updated to `tickbiterisk/runtime/risk_lookup.py`, `tickbiterisk/runtime/static_export.py`, `tests/test_runtime_risk_lookup.py`, `tests/test_cli_risk_lookup.py`, `tests/test_seasonality.py`, `tests/test_cli_seasonality.py`, and `tests/test_single_bite_risk.py`.
+- Task 6 methods/statistics review found no blocking issues after checking score, percentile, interval, validation, and forecast-safe wording against `risk_score.py`, `regional_forecast_typicality.py`, and regional interval code.
+- Task 6 scientific/data-quality review found no blocking issues in surveillance caveats, medical boundary, regional research framing, or public-default guardrails.
 
 ## Follow-Up Decisions
 
