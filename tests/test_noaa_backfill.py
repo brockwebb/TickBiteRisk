@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from tickbiterisk.etl.noaa import NoaaDailyObservation
 from tickbiterisk.etl.noaa_backfill import (
     NoaaBackfillCountyFipsError,
     NoaaBackfillDateRangeError,
@@ -13,7 +14,103 @@ from tickbiterisk.etl.noaa_backfill import (
     audit_noaa_station_coverage,
     run_noaa_county_backfill,
     run_noaa_maryland_backfill,
+    run_noaa_regional_backfill,
 )
+
+
+def _long_coverage_station_json(url: str, token: str) -> dict:
+    """Station response with one long-coverage station; daily handled elsewhere."""
+    if "stations?" in url:
+        return {
+            "results": [
+                {
+                    "id": "GHCND:LONG",
+                    "name": "LONG COVERAGE",
+                    "latitude": 39.0,
+                    "longitude": -76.0,
+                    "mindate": "1990-01-01",
+                    "maxdate": "2026-01-01",
+                    "datacoverage": 1.0,
+                }
+            ]
+        }
+    raise AssertionError(f"daily data must not go through json_get: {url}")
+
+
+def _one_obs(county_fips, station_id, start_date, end_date):
+    return [
+        NoaaDailyObservation(
+            county_fips=county_fips,
+            station_id=station_id,
+            date=date(2019, 1, 1),
+            source="noaa_ghcnd_dly_bulk",
+            tmax_f=50.0,
+            tmin_f=32.0,
+            prcp_inches=1.0,
+            snow_inches=0.0,
+            snwd_inches=None,
+            source_url_hash="hash",
+        )
+    ]
+
+
+def test_run_noaa_county_backfill_uses_injected_daily_fetcher(tmp_path: Path) -> None:
+    fetched: list[str] = []
+
+    def fake_daily_fetcher(county_fips, station_id, start_date, end_date):
+        fetched.append(station_id)
+        return _one_obs(county_fips, station_id, start_date, end_date)
+
+    result = run_noaa_county_backfill(
+        county_fips="10001",
+        start_date=date(2017, 1, 1),
+        end_date=date(2021, 12, 31),
+        output_dir=tmp_path,
+        token="fake-token",
+        json_get=_long_coverage_station_json,
+        daily_fetcher=fake_daily_fetcher,
+    )
+
+    assert fetched == ["GHCND:LONG"]  # injected fetcher used, not CDO /data
+    assert result.daily_observation_count == 1
+    assert result.daily_output_path.exists()
+
+
+def test_fallback_distance_resolves_non_maryland_county_centroid() -> None:
+    # Regression: the nearest-station fallback resolved county centroids from the
+    # Maryland-only locations, raising KeyError for DE/DC/PA/VA/WV counties.
+    from tickbiterisk.etl.noaa import NoaaStation
+    from tickbiterisk.etl.noaa_backfill import _station_distance_to_county_miles
+
+    station = NoaaStation(
+        county_fips="51820",
+        station_id="GHCND:X",
+        name="X",
+        latitude=38.07,
+        longitude=-78.90,
+        mindate=date(1990, 1, 1),
+        maxdate=date(2026, 1, 1),
+        data_coverage=0.9,
+    )
+    miles = _station_distance_to_county_miles("51820", station)  # VA city, not MD
+    assert miles >= 0.0
+
+
+def test_run_noaa_regional_backfill_loops_multiple_counties(tmp_path: Path) -> None:
+    result = run_noaa_regional_backfill(
+        county_fips_values=["10001", "11001"],
+        start_date=date(2017, 1, 1),
+        end_date=date(2021, 12, 31),
+        output_dir=tmp_path,
+        token="fake-token",
+        json_get=_long_coverage_station_json,
+        daily_fetcher=_one_obs,
+    )
+
+    assert result.county_count == 2
+    assert result.success_count == 2
+    assert result.failure_count == 0
+    assert {r.county_fips for r in result.county_results} == {"10001", "11001"}
 
 
 def test_run_noaa_county_backfill_selects_station_and_writes_outputs(

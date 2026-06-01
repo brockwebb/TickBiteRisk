@@ -10,6 +10,7 @@ from typing import Any, Callable
 import pandas as pd
 
 from tickbiterisk.etl.noaa import (
+    NoaaDailyObservation,
     NoaaStation,
     fetch_noaa_daily_observations,
     fetch_noaa_stations,
@@ -22,7 +23,13 @@ from tickbiterisk.etl.weather_build import (
 from tickbiterisk.etl.weather_locations import (
     WeatherLocation,
     load_maryland_weather_locations,
+    load_weather_locations,
 )
+
+# A daily-observation fetcher: (county_fips, station_id, start_date, end_date)
+# -> observations. Defaults to the CDO /data path; the GHCND .dly bulk path is
+# injected for the regional time-series acquisition.
+DailyFetcher = Callable[[str, str, date, date], list[NoaaDailyObservation]]
 
 
 class NoaaBackfillError(RuntimeError):
@@ -67,6 +74,9 @@ class NoaaMarylandBackfillResult:
     @property
     def county_count(self) -> int:
         return self.success_count + self.failure_count
+
+    # NOTE: structurally a generic multi-county backfill result; see the
+    # NoaaMultiCountyBackfillResult alias below used by the regional path.
 
     @property
     def success_count(self) -> int:
@@ -138,6 +148,7 @@ def run_noaa_county_backfill(
     max_end_lag_days: int = 14,
     fallback_stations: Sequence[NoaaStation] | None = None,
     json_get: Callable[[str, str], dict[str, Any]] | None = None,
+    daily_fetcher: DailyFetcher | None = None,
 ) -> NoaaCountyBackfillResult:
     normalized_county_fips = county_fips.zfill(5)
     _validate_backfill_args(
@@ -185,14 +196,22 @@ def run_noaa_county_backfill(
     daily_rows = []
     daily_observation_count_by_station = {}
     for station in selected:
-        station_daily_rows = fetch_noaa_daily_observations(
-            normalized_county_fips,
-            station.station_id,
-            start_date,
-            end_date,
-            token=token,
-            json_get=json_get,
-        )
+        if daily_fetcher is not None:
+            station_daily_rows = daily_fetcher(
+                normalized_county_fips,
+                station.station_id,
+                start_date,
+                end_date,
+            )
+        else:
+            station_daily_rows = fetch_noaa_daily_observations(
+                normalized_county_fips,
+                station.station_id,
+                start_date,
+                end_date,
+                token=token,
+                json_get=json_get,
+            )
         daily_observation_count_by_station[station.station_id] = len(
             station_daily_rows
         )
@@ -292,6 +311,97 @@ def run_noaa_maryland_backfill(
             )
 
     return NoaaMarylandBackfillResult(
+        county_results=county_results,
+        failures=failures,
+    )
+
+
+# The regional multi-county result shares the structure of the Maryland one.
+NoaaMultiCountyBackfillResult = NoaaMarylandBackfillResult
+
+
+def run_noaa_regional_backfill(
+    *,
+    county_fips_values: Sequence[str],
+    start_date: date,
+    end_date: date,
+    output_dir: Path,
+    token: str,
+    station_limit: int = 1,
+    min_data_coverage: float = 0.5,
+    max_end_lag_days: int = 14,
+    continue_on_error: bool = True,
+    nearest_station_fallback: bool = False,
+    json_get: Callable[[str, str], dict[str, Any]] | None = None,
+    daily_fetcher: DailyFetcher | None = None,
+) -> NoaaMultiCountyBackfillResult:
+    """State-agnostic multi-county NOAA backfill for the six-state product.
+
+    Generalizes the Maryland backfill: the caller supplies the county FIPS set
+    (resolved from config via the weather locations loader) and, for the bulk
+    time-series path, a ``daily_fetcher`` (GHCND .dly). Station discovery stays
+    FIPS-based. A county with no qualifying station is recorded as a failure
+    (fail-loud per county) rather than silently dropped.
+    """
+    if not county_fips_values:
+        raise NoaaBackfillCountyFipsError(
+            "run_noaa_regional_backfill requires at least one county FIPS"
+        )
+    county_fips_list = [str(value).zfill(5) for value in county_fips_values]
+    _validate_backfill_args(
+        start_date=start_date,
+        end_date=end_date,
+        station_limit=station_limit,
+    )
+
+    fallback_stations = (
+        _fetch_noaa_station_pool(
+            county_fips_list=county_fips_list,
+            start_date=start_date,
+            end_date=end_date,
+            token=token,
+            json_get=json_get,
+        )
+        if nearest_station_fallback
+        else None
+    )
+
+    county_results: list[NoaaCountyBackfillResult] = []
+    failures: list[NoaaCountyBackfillFailure] = []
+    for county_fips in county_fips_list:
+        try:
+            county_results.append(
+                run_noaa_county_backfill(
+                    county_fips=county_fips,
+                    start_date=start_date,
+                    end_date=end_date,
+                    output_dir=output_dir,
+                    token=token,
+                    station_limit=station_limit,
+                    min_data_coverage=min_data_coverage,
+                    max_end_lag_days=max_end_lag_days,
+                    fallback_stations=fallback_stations,
+                    json_get=json_get,
+                    daily_fetcher=daily_fetcher,
+                )
+            )
+        except NoaaBackfillError as exc:
+            if not continue_on_error:
+                raise
+            failures.append(
+                NoaaCountyBackfillFailure(county_fips=county_fips, error=str(exc))
+            )
+        except Exception as exc:  # noqa: BLE001 - recorded per-county, not swallowed
+            if not continue_on_error:
+                raise
+            failures.append(
+                NoaaCountyBackfillFailure(
+                    county_fips=county_fips,
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+            )
+
+    return NoaaMultiCountyBackfillResult(
         county_results=county_results,
         failures=failures,
     )
@@ -490,6 +600,16 @@ def _maryland_weather_location_by_fips() -> dict[str, WeatherLocation]:
     return {location.county_fips: location for location in load_maryland_weather_locations()}
 
 
+def _weather_location_by_fips() -> dict[str, WeatherLocation]:
+    """County centroid lookup across all six regional jurisdictions.
+
+    The nearest-station fallback needs centroids for any of DE/DC/MD/PA/VA/WV, not
+    only Maryland; resolving from the Maryland-only resource raised KeyError for
+    every out-of-MD county that fell through to the fallback.
+    """
+    return {location.county_fips: location for location in load_weather_locations()}
+
+
 def _station_coverage_audit_row(
     *,
     county_fips: str,
@@ -622,7 +742,7 @@ def _station_distance_to_county_miles(
     county_fips: str,
     station: NoaaStation,
 ) -> float:
-    location = _maryland_weather_location_by_fips()[county_fips]
+    location = _weather_location_by_fips()[county_fips]
     return _distance_miles(
         location.centroid_lat,
         location.centroid_lon,

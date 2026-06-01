@@ -218,8 +218,14 @@ from tickbiterisk.etl.noaa_backfill import (
     resolve_maryland_noaa_county_fips,
     run_noaa_county_backfill,
     run_noaa_maryland_backfill,
+    run_noaa_regional_backfill,
     validate_noaa_backfill_args,
 )
+from tickbiterisk.etl.noaa_ghcnd_dly import (
+    build_ghcnd_dly_url,
+    fetch_ghcnd_dly_observations,
+)
+from tickbiterisk.etl.weather_config import WeatherConfigError, load_weather_config
 from tickbiterisk.etl.nssp_coverage import (
     CDC_NSSP_ABOUT_URL,
     CDC_NSSP_COVERAGE_CSV_URL,
@@ -299,7 +305,11 @@ from tickbiterisk.etl.weather_features import (
     compute_noaa_weekly_weather_features,
     compute_weekly_weather_features,
 )
-from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
+from tickbiterisk.etl.weather_locations import (
+    WeatherLocationError,
+    load_maryland_weather_locations,
+    load_weather_locations,
+)
 from tickbiterisk.modeling.backtest import BacktestInputError, run_baseline_backtests
 from tickbiterisk.modeling.backtest_build import write_model_backtest_outputs
 from tickbiterisk.modeling.annual_forecast import (
@@ -5588,6 +5598,156 @@ def noaa_backfill_maryland(
         typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
 
 
+@etl_app.command("noaa-backfill-regional")
+def noaa_backfill_regional(
+    config_path: Path = typer.Option(
+        Path("config/weather.toml"),
+        help="Weather acquisition config (TOML): states, datatypes, date range, "
+        "baseline window, station-selection knobs.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/noaa-regional-1992-present"),
+        help="Output directory for ETL artifacts.",
+    ),
+    states: list[str] | None = typer.Option(
+        None,
+        "--state",
+        help="Optional subset override of config states. Repeat for multiple.",
+    ),
+    county_fips: list[str] | None = typer.Option(
+        None,
+        "--county-fips",
+        help="Optional explicit county FIPS subset (e.g. to re-pull failed "
+        "counties). Repeat for multiple. Must be within the six-state universe.",
+    ),
+    fail_fast: bool = typer.Option(False, help="Stop at the first county failure."),
+    allow_partial: bool = typer.Option(
+        False, help="Exit successfully even when one or more counties fail."
+    ),
+    dry_run: bool = typer.Option(
+        False, help="Print planned county pulls without fetching data."
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None, help="Output CSV manifest for API acquisition provenance."
+    ),
+) -> None:
+    """Config-driven six-state NOAA GHCND .dly time-series backfill.
+
+    Resolves the county set from the weather config (DE/DC/MD/PA/VA/WV), then for
+    each county discovers a station (CDO, FIPS-based) and pulls that station's
+    full GHCND .dly history once, windowed to the configured date range. Every
+    API call is logged to the acquisition provenance manifest.
+    """
+    try:
+        config = load_weather_config(config_path)
+    except WeatherConfigError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    selected_states = states or config.states
+    if county_fips:
+        by_fips = {loc.county_fips: loc for loc in load_weather_locations()}
+        requested = [str(value).zfill(5) for value in county_fips]
+        unknown = [value for value in requested if value not in by_fips]
+        if unknown:
+            raise typer.BadParameter(
+                f"county FIPS outside the six-state universe: {unknown}"
+            )
+        locations = [by_fips[value] for value in requested]
+    else:
+        try:
+            locations = load_weather_locations(selected_states)
+        except WeatherLocationError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+    county_fips_values = [loc.county_fips for loc in locations]
+
+    if dry_run:
+        typer.echo(
+            f"Planned {len(county_fips_values)} regional NOAA .dly county "
+            f"backfill(s) for states {selected_states} over "
+            f"{config.start_date.isoformat()}..{config.end_date.isoformat()}"
+        )
+        for loc in locations:
+            typer.echo(f"{loc.state} {loc.county_fips} {loc.county_name}")
+        typer.echo(
+            "station discovery example: "
+            + build_noaa_station_url(
+                county_fips_values[0], config.start_date, config.end_date
+            )
+        )
+        typer.echo("daily series: GHCND .dly bulk file per selected station")
+        return
+
+    def daily_fetcher(county_fips, station_id, start_date, end_date):
+        return fetch_ghcnd_dly_observations(
+            county_fips,
+            station_id,
+            start_date,
+            end_date,
+            datatypes=config.ghcnd_datatypes,
+        )
+
+    try:
+        result = run_noaa_regional_backfill(
+            county_fips_values=county_fips_values,
+            start_date=config.start_date,
+            end_date=config.end_date,
+            output_dir=output_dir,
+            token=get_noaa_token(),
+            station_limit=config.station_limit,
+            min_data_coverage=config.min_data_coverage,
+            max_end_lag_days=config.max_end_lag_days,
+            continue_on_error=not fail_fast,
+            nearest_station_fallback=config.nearest_station_fallback,
+            daily_fetcher=daily_fetcher,
+        )
+    except NoaaBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    typer.echo(
+        f"Completed {result.success_count}/{result.county_count} "
+        "regional county backfill(s)"
+    )
+    typer.echo(f"Wrote {result.daily_observation_count} daily observation row(s)")
+    if result.failure_count:
+        typer.echo(f"Failures: {result.failure_count}")
+        for failure in result.failures:
+            typer.echo(f"{failure.county_fips}: {failure.error}")
+        if not allow_partial:
+            raise typer.Exit(1)
+
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    acquisition_command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "noaa-backfill-regional",
+            "--config-path",
+            str(config_path),
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+    provenance_records = [
+        record
+        for county_result in result.county_results
+        for record in _noaa_regional_dly_provenance_records(
+            result=county_result,
+            acquisition_command=acquisition_command,
+            start_date=config.start_date,
+            end_date=config.end_date,
+        )
+    ]
+    if provenance_records:
+        provenance_output = write_acquisition_provenance_manifest(
+            provenance_records,
+            manifest_path=resolved_manifest_path,
+            append=True,
+        )
+        typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
 @etl_app.command("noaa-audit-stations")
 def noaa_audit_stations(
     start_date: str = typer.Option(..., help="Coverage start date."),
@@ -8114,6 +8274,74 @@ def _noaa_backfill_provenance_records(
                 parser_method=(
                     "run_noaa_county_backfill;fetch_noaa_daily_observations;"
                     "parse_noaa_daily_data_response"
+                ),
+            )
+        )
+    return records
+
+
+def _noaa_regional_dly_provenance_records(
+    *,
+    result: NoaaCountyBackfillResult,
+    acquisition_command: str,
+    start_date: date,
+    end_date: date,
+) -> list[AcquisitionProvenanceRecord]:
+    """Accurate provenance for the regional GHCND .dly time-series acquisition.
+
+    Records the real API calls: CDO station discovery (FIPS-based) and the bulk
+    GHCND .dly station-file URL (full period of record). Distinct from the CDO
+    /data path so the manifest is honest about how each county was pulled.
+    """
+    records = [
+        _noaa_provenance_record(
+            source_id=(
+                "noaa_cdo_ghcnd_stations_regional_dly_backfill_"
+                f"{result.county_fips}_{_date_slug(start_date)}_{_date_slug(end_date)}"
+            ),
+            source_name="NOAA CDO GHCND station discovery",
+            source_url=build_noaa_station_url(result.county_fips, start_date, end_date),
+            acquisition_command=acquisition_command,
+            request_description=(
+                "NOAA CDO GHCND FIPS-based station discovery for regional county "
+                f"FIPS {result.county_fips} during six-state .dly backfill."
+            ),
+            output_path=result.stations_output_path,
+            row_count=result.station_count,
+            parser_method=(
+                "run_noaa_regional_backfill;fetch_noaa_stations;"
+                "parse_noaa_station_response;select_long_coverage_stations"
+            ),
+        )
+    ]
+    for station_id in result.selected_station_ids:
+        station_row_count = result.daily_observation_count_by_station.get(
+            station_id,
+            result.daily_observation_count
+            if len(result.selected_station_ids) == 1
+            else 0,
+        )
+        records.append(
+            _noaa_provenance_record(
+                source_id=(
+                    "noaa_ghcnd_dly_regional_backfill_"
+                    f"{result.county_fips}_{_source_id_slug(station_id)}_"
+                    f"{_date_slug(start_date)}_{_date_slug(end_date)}"
+                ),
+                source_name="NOAA GHCND .dly bulk station time series",
+                source_url=build_ghcnd_dly_url(station_id),
+                acquisition_command=acquisition_command,
+                request_description=(
+                    "NOAA GHCND .dly bulk station file (full period of record) for "
+                    f"station {station_id} mapped to regional county FIPS "
+                    f"{result.county_fips}; windowed to "
+                    f"{start_date.isoformat()}..{end_date.isoformat()}."
+                ),
+                output_path=result.daily_output_path,
+                row_count=station_row_count,
+                parser_method=(
+                    "run_noaa_regional_backfill;fetch_ghcnd_dly_observations;"
+                    "parse_ghcnd_dly_text"
                 ),
             )
         )
