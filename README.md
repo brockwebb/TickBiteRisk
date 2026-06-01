@@ -350,6 +350,13 @@ the full 283-county feature set and source/caveat metadata.
 `public/research-data/regional/` for local GUI review, preserving `/` and
 `public/data` as the committed Maryland public contract.
 
+Multi-year forecast note: the deployed regional bundle is driven by a
+multi-year (2024/2025/2026) annual forecast, which is three single-year
+`etl regional-annual-forecast` runs concatenated — not the single-year
+`--target-year 2026` command shown above. See
+[docs/regional-multiyear-forecast-combine.md](docs/regional-multiyear-forecast-combine.md)
+for the verified combine recipe (reproduces the recorded source SHAs).
+
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only
 `forecast_safe_top4_ensemble` over the strongest forecast-safe comparison
