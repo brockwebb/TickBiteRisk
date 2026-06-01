@@ -43,7 +43,9 @@
 # USAGE
 #   scripts/rebuild_regional_bundle.sh [--output-dir DIR] [--allow-dirty]
 #   Default --output-dir is a scratch path; it NEVER writes the deployed bundle.
-#   To promote a verified build, a human copies DIR -> public/research-data/regional/.
+#   To promote a verified build, a human copies ONLY the bundle files (the
+#   BUNDLE_FILES set below) from DIR -> public/research-data/regional/ -- never
+#   the intermediate regional-county-week-risk/ score CSVs that also live in DIR.
 
 set -euo pipefail
 
@@ -79,6 +81,25 @@ OBSFIT="build/etl/regional-forecast-observed-fit/regional_forecast_observed_fit_
 TYP="build/etl/regional-forecast-typicality/regional_forecast_typicality.csv"
 MODEL_NAME="empirical_bayes_spatial_regime_incidence"
 SCORES_OUT="${OUTPUT_DIR}/regional-county-week-risk"
+
+# Canonical deployed bundle: the exact 11 files the GitHub Pages validator
+# asserts (.github/workflows/pages.yml -> "Validate regional research preview
+# data", expected_files). Promotion copies ONLY these. The score CSVs the build
+# writes under ${SCORES_OUT} are intermediates and must NOT reach the bundle, or
+# the validator's exact-file-set assert fails on the next deploy.
+BUNDLE_FILES=(
+  model_card.json
+  regional_counties.geojson
+  regional_county_incidence_annual.json
+  regional_states.geojson
+  regional_county_metadata.json
+  regional_county_risk_weekly.json
+  regional_forecast_observed_fit.json
+  regional_forecast_typicality.json
+  regional_spatial_regime_overlays.json
+  source_catalog.json
+  static_export_manifest.json
+)
 
 # ---- 1. clean-tree gate ------------------------------------------------------
 if [ -n "$(git status --porcelain)" ] && [ "${ALLOW_DIRTY}" -ne 1 ]; then
@@ -201,8 +222,19 @@ if ok:
 sys.exit(0 if ok else 1)
 PY
 
-# ---- 7. final line -----------------------------------------------------------
+# ---- 7. promote-readiness gate + safe deploy hint ----------------------------
+# Confirm the exact bundle file set exists before declaring readiness. Explicit
+# per-file checks fail loud on a missing file, rather than letting a broad glob
+# silently ship the wrong set (or sweep in the intermediate score CSVs).
+for f in "${BUNDLE_FILES[@]}"; do
+  [ -f "${OUTPUT_DIR}/${f}" ] || block "built bundle is missing expected file: ${OUTPUT_DIR}/${f}"
+done
+
 echo ""
 echo "READY TO DEPLOY (commit ${GIT_COMMIT})"
 echo "  built bundle: ${OUTPUT_DIR}"
-echo "  to deploy (human-gated): cp -r ${OUTPUT_DIR}/* public/research-data/regional/  # then commit"
+echo "  to deploy (human-gated): copy ONLY the ${#BUNDLE_FILES[@]} bundle files"
+echo "  (NOT the intermediate ${SCORES_OUT##*/}/ score CSVs that also live in OUTPUT_DIR):"
+echo "      for f in ${BUNDLE_FILES[*]}; do \\"
+echo "        cp \"${OUTPUT_DIR}/\$f\" public/research-data/regional/; done"
+echo "      # then review the diff and commit"
