@@ -137,12 +137,35 @@
             </section>
           </section>
 
+        </div>
+
+        <div class="regional-side-column">
+          <aside
+            id="regional-county-panel"
+            class="county-panel regional-county-panel"
+            aria-labelledby="regional-panel-title"
+          >
+            <h2 id="regional-panel-title">County risk details</h2>
+            <div id="regional-panel-content" aria-live="polite">
+              <p>Select a county to see its forecasted regional risk context.</p>
+            </div>
+            <section
+              id="regional-regime-panel"
+              class="regional-regime-strip"
+              aria-labelledby="regional-regime-title"
+            >
+              <h3 id="regional-regime-title">Local forecast region</h3>
+              <p class="muted">Select a county to see its local forecast region.</p>
+            </section>
+          </aside>
+
           <section
             id="regional-bite-risk-section"
             class="bite-calculator regional-bite-calculator"
             aria-labelledby="regional-bite-title"
           >
-            <p class="eyebrow">Tick bite risk calculator</p>
+            <details>
+              <summary>Tick bite risk calculator — estimate your risk of disease</summary>
             <h2 id="regional-bite-title">Found a tick? Estimate your risk of disease</h2>
             <form id="regional-bite-form">
               <div class="bite-form-grid">
@@ -185,28 +208,8 @@
             <div id="regional-bite-result" class="bite-result" aria-live="polite">
               <p>Select a county and enter tick details to estimate bite concern.</p>
             </div>
+            </details>
           </section>
-        </div>
-
-        <div class="regional-side-column">
-          <aside
-            id="regional-county-panel"
-            class="county-panel regional-county-panel"
-            aria-labelledby="regional-panel-title"
-          >
-            <h2 id="regional-panel-title">County risk details</h2>
-            <div id="regional-panel-content" aria-live="polite">
-              <p>Select a county to see its forecasted regional risk context.</p>
-            </div>
-            <section
-              id="regional-regime-panel"
-              class="regional-regime-strip"
-              aria-labelledby="regional-regime-title"
-            >
-              <h3 id="regional-regime-title">Local forecast region</h3>
-              <p class="muted">Select a county to see its local forecast region.</p>
-            </section>
-          </aside>
 
           <section class="county-list-section regional-county-tools-section" aria-labelledby="regional-list-title">
             <h2 id="regional-list-title">Find a county</h2>

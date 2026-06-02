@@ -86,7 +86,9 @@ const regionalSurveillanceProtocols = [
   },
 ];
 
-document.addEventListener("DOMContentLoaded", initRegionalResearch);
+if (typeof document !== "undefined") {
+  document.addEventListener("DOMContentLoaded", initRegionalResearch);
+}
 
 async function initRegionalResearch() {
   document
@@ -180,7 +182,8 @@ async function initRegionalResearch() {
 }
 
 function regionalResearchDataPaths() {
-  const params = new URLSearchParams(window.location.search);
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const params = new URLSearchParams(search);
   const requested = params.get("dataBase");
   if (!requested) return defaultRegionalDataPaths;
   const regionalDataBase = requested.replace(/\/+$/, "");
@@ -2432,6 +2435,7 @@ function renderRegionalForecastExplainer() {
   target.innerHTML = `<h3 id="regional-forecast-explainer-title">Forecast notes</h3>
     <p><b>Annual target:</b> reported Lyme incidence per 100k and predicted reported cases. County-level Lyme truth in this preview is annual surveillance data, not observed county-week truth.</p>
     <p><b>Weekly view:</b> current-year weekly values spread the annual forecast across MMWR weeks using ${regionalEscapeHtml(seasonalScope)}.</p>
+    <p><b>Aggregate scopes:</b> All-states, state, and local-region curves are population-weighted mean incidence (total predicted cases divided by total population across the region's counties), not a simple average of county rates — so larger-population counties weigh more.</p>
     <p><b>Intervals:</b> dark and light blue bands are empirical forecast-error ranges around reported-incidence forecasts (${regionalEscapeHtml(regionalReadableName(intervalMethod))}), not medical confidence intervals.</p>
     <p><b>Score scale:</b> weekly scores divide predicted weekly incidence by ${regionalEscapeHtml(denominator)}, then round and clamp to 1-10. Map colors are display categories over the selected metric; they do not replace the numeric incidence or score shown in county details.</p>
     <p><b>Updates:</b> Bayesian or calibration updates are ${regionalEscapeHtml(regionalReadableName(updateStatus))} and are not automatic public score corrections.</p>`;
@@ -2538,26 +2542,12 @@ function regionalAggregateObservedAnnualRecords(features = regionalForecastScope
 }
 
 function regionalAggregateWeeklyForecastRecords() {
-  const recordsByWeek = new Map();
+  const bucketsByWeek = new Map();
   for (const feature of regionalForecastScopeFeatures()) {
     const countyFips = (feature.properties || {}).county_fips;
     for (const record of regionalCountyWeekRecords(countyFips)) {
       const week = Number(record.mmwr_week);
       if (!Number.isFinite(week)) continue;
-      if (!recordsByWeek.has(week)) {
-        recordsByWeek.set(week, {
-          interval80LowerCases: 0,
-          interval80UpperCases: 0,
-          interval95LowerCases: 0,
-          interval95UpperCases: 0,
-          population: 0,
-          predicted_weekly_cases: 0,
-          week_end_date: record.week_end_date,
-          week_start_date: record.week_start_date,
-          mmwr_week: week,
-        });
-      }
-      const aggregate = recordsByWeek.get(week);
       const population = regionalForecastPopulation(record);
       const weeklyCases = Number(record.predicted_weekly_cases);
       const weeklyIncidence = Number(record.predicted_weekly_incidence_per_100k);
@@ -2569,50 +2559,96 @@ function regionalAggregateWeeklyForecastRecords() {
       if (!Number.isFinite(population) || population <= 0 || !Number.isFinite(cases)) {
         continue;
       }
-      aggregate.population += population;
-      aggregate.predicted_weekly_cases += cases;
-      regionalAddIntervalCases(
-        aggregate,
-        record.predicted_weekly_incidence_80_interval,
+      if (!bucketsByWeek.has(week)) {
+        bucketsByWeek.set(week, {
+          mmwr_week: week,
+          week_end_date: record.week_end_date,
+          week_start_date: record.week_start_date,
+          contributions: [],
+        });
+      }
+      bucketsByWeek.get(week).contributions.push({
         population,
-        "interval80LowerCases",
-        "interval80UpperCases"
-      );
-      regionalAddIntervalCases(
-        aggregate,
-        record.predicted_weekly_incidence_95_interval,
-        population,
-        "interval95LowerCases",
-        "interval95UpperCases"
-      );
+        cases,
+        interval80: record.predicted_weekly_incidence_80_interval,
+        interval95: record.predicted_weekly_incidence_95_interval,
+      });
     }
   }
-  return Array.from(recordsByWeek.values())
-    .map((record) => ({
-      mmwr_week: record.mmwr_week,
-      predicted_weekly_incidence_80_interval:
-        regionalIntervalCasesToRates(
-          record.interval80LowerCases,
-          record.interval80UpperCases,
-          record.population
-        ),
-      predicted_weekly_incidence_95_interval:
-        regionalIntervalCasesToRates(
-          record.interval95LowerCases,
-          record.interval95UpperCases,
-          record.population
-        ),
-      predicted_weekly_incidence_per_100k:
-        record.population > 0
-          ? (record.predicted_weekly_cases / record.population) * 100000
-          : Number.NaN,
-      week_end_date: record.week_end_date,
-      week_start_date: record.week_start_date,
+  return Array.from(bucketsByWeek.values())
+    .map((bucket) => ({
+      mmwr_week: bucket.mmwr_week,
+      week_end_date: bucket.week_end_date,
+      week_start_date: bucket.week_start_date,
+      ...regionalAggregateWeekContributions(bucket.contributions),
     }))
     .filter((record) =>
       Number.isFinite(Number(record.predicted_weekly_incidence_per_100k))
     )
     .sort((left, right) => Number(left.mmwr_week) - Number(right.mmwr_week));
+}
+
+// Pure (no globals): aggregate one week's per-county contributions into the
+// population-weighted incidence LINE and the 80/95 interval BANDS. Each band
+// uses its OWN population denominator — only the counties that contributed
+// finite interval cases — so a county with weekly cases but missing interval
+// fields inflates the line's denominator without diluting the band toward zero.
+// contributions: [{ population, cases, interval80:[lo,hi]|null, interval95:[lo,hi]|null }]
+function regionalAggregateWeekContributions(contributions) {
+  let population = 0;
+  let predictedCases = 0;
+  let i80Lower = 0;
+  let i80Upper = 0;
+  let i80Population = 0;
+  let i95Lower = 0;
+  let i95Upper = 0;
+  let i95Population = 0;
+  for (const contribution of contributions || []) {
+    const pop = Number(contribution.population);
+    const cases = Number(contribution.cases);
+    if (!Number.isFinite(pop) || pop <= 0 || !Number.isFinite(cases)) continue;
+    population += pop;
+    predictedCases += cases;
+    // Map missing endpoints (null/undefined/"") to NaN so a missing interval is
+    // EXCLUDED from the band's population — not coerced to a [0,0] contribution
+    // (Number(null) === 0, which would silently re-dilute the band).
+    const endpoint = (value) =>
+      value === null || value === undefined || value === ""
+        ? Number.NaN
+        : Number(value);
+    const i80 = contribution.interval80 || [];
+    const lower80 = endpoint(i80[0]);
+    const upper80 = endpoint(i80[1]);
+    if (Number.isFinite(lower80) && Number.isFinite(upper80)) {
+      i80Lower += (lower80 / 100000) * pop;
+      i80Upper += (upper80 / 100000) * pop;
+      i80Population += pop;
+    }
+    const i95 = contribution.interval95 || [];
+    const lower95 = endpoint(i95[0]);
+    const upper95 = endpoint(i95[1]);
+    if (Number.isFinite(lower95) && Number.isFinite(upper95)) {
+      i95Lower += (lower95 / 100000) * pop;
+      i95Upper += (upper95 / 100000) * pop;
+      i95Population += pop;
+    }
+  }
+  return {
+    population,
+    predicted_weekly_cases: predictedCases,
+    predicted_weekly_incidence_per_100k:
+      population > 0 ? (predictedCases / population) * 100000 : Number.NaN,
+    predicted_weekly_incidence_80_interval: regionalIntervalCasesToRates(
+      i80Lower,
+      i80Upper,
+      i80Population
+    ),
+    predicted_weekly_incidence_95_interval: regionalIntervalCasesToRates(
+      i95Lower,
+      i95Upper,
+      i95Population
+    ),
+  };
 }
 
 function regionalForecastPopulation(record) {
@@ -2637,17 +2673,6 @@ function regionalPopulationFromCasesAndIncidence(cases, incidence) {
     return Number.NaN;
   }
   return (numericCases / numericIncidence) * 100000;
-}
-
-function regionalAddIntervalCases(aggregate, interval, population, lowerKey, upperKey) {
-  const lower = Number(interval && interval[0]);
-  const upper = Number(interval && interval[1]);
-  if (Number.isFinite(lower)) {
-    aggregate[lowerKey] += (lower / 100000) * population;
-  }
-  if (Number.isFinite(upper)) {
-    aggregate[upperKey] += (upper / 100000) * population;
-  }
 }
 
 function regionalIntervalCasesToRates(lowerCases, upperCases, population) {
@@ -2776,7 +2801,11 @@ function renderRegionalWeeklyScopeChart(records) {
     </circle>
     <text class="chart-label" x="${padding.left}" y="${height - 10}">MMWR weeks ${regionalEscapeHtml(minWeek)}-${regionalEscapeHtml(maxWeek)}</text>
   </svg>`;
-  summary.textContent = `${scopeLabel} weekly forecast, MMWR weeks ${minWeek}-${maxWeek}. The green line is the predicted weekly Lyme incidence. Dark blue band: narrower expected range from past forecast errors. Light blue band: wider expected range from past forecast errors. The red dot marks the selected week ${activeRecord.mmwr_week}, with a wider range of ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k. These ranges are uncertainty around reported-incidence forecasts, not medical confidence intervals.`;
+  const aggregateNote =
+    regionalState.forecastScope === "county"
+      ? ""
+      : " This curve is population-weighted mean incidence (total predicted cases divided by total population), not an average of county rates.";
+  summary.textContent = `${scopeLabel} weekly forecast, MMWR weeks ${minWeek}-${maxWeek}. The red line is the predicted weekly Lyme incidence. Dark blue band: narrower expected range from past forecast errors. Light blue band: wider expected range from past forecast errors. The red dot marks the selected week ${activeRecord.mmwr_week}, with a wider range of ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k. These ranges are uncertainty around reported-incidence forecasts, not medical confidence intervals.${aggregateNote}`;
 }
 
 function renderRegionalObservedScopeHistoryChart(records) {
@@ -3021,7 +3050,7 @@ function renderRegionalForecastChart(countyFips) {
     <text class="chart-label" x="${padding.left}" y="${height - 10}">MMWR weeks ${regionalEscapeHtml(minWeek)}-${regionalEscapeHtml(maxWeek)}</text>
     <text class="chart-label" x="${padding.left}" y="13">${regionalFormatNumber(maxValue)} per 100k</text>
   </svg>`;
-  summary.textContent = `${countyName} weekly forecast, MMWR weeks ${minWeek}-${maxWeek}. The green line is the predicted weekly Lyme incidence. Dark blue band: narrower expected range from past forecast errors. Light blue band: wider expected range from past forecast errors. The red dot marks the selected week ${activeRecord.mmwr_week}, with a wider range of ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k. These ranges are uncertainty around reported-incidence forecasts, not medical confidence intervals.`;
+  summary.textContent = `${countyName} weekly forecast, MMWR weeks ${minWeek}-${maxWeek}. The red line is the predicted weekly Lyme incidence. Dark blue band: narrower expected range from past forecast errors. Light blue band: wider expected range from past forecast errors. The red dot marks the selected week ${activeRecord.mmwr_week}, with a wider range of ${regionalFormatNumber(activeInterval[0])} to ${regionalFormatNumber(activeInterval[1])} per 100k. These ranges are uncertainty around reported-incidence forecasts, not medical confidence intervals.`;
 }
 
 function renderRegionalObservedHistoryChart(countyFips) {
@@ -3455,4 +3484,12 @@ function regionalEscapeHtml(value) {
     };
     return replacements[char];
   });
+}
+
+// Test hook (browser ignores this; Node test runner requires it).
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    regionalAggregateWeekContributions,
+    regionalIntervalCasesToRates,
+  };
 }

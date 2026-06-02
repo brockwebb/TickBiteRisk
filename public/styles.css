@@ -1036,7 +1036,7 @@ h1 {
 
 .county-forecast-line {
   fill: none;
-  stroke: #15351f;
+  stroke: #d62728;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 3;
@@ -1051,7 +1051,7 @@ h1 {
 }
 
 .active-week-marker {
-  fill: #9e1b32;
+  fill: #204f8f;
   stroke: #fff;
   stroke-width: 2;
 }
