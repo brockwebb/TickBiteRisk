@@ -314,10 +314,12 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   expect(toolsBox).not.toBeNull();
   expect(Math.abs(chartBox.x - mapBox.x)).toBeLessThan(8);
   expect(chartBox.y).toBeGreaterThan(mapBox.y + mapBox.height - 8);
-  expect(Math.abs(biteBox.x - chartBox.x)).toBeLessThan(8);
-  expect(biteBox.y).toBeGreaterThan(chartBox.y + chartBox.height - 8);
+  // Bite calculator now lives in the side column: under the county panel,
+  // above "Find a county" (panel -> bite -> tools).
+  expect(Math.abs(biteBox.x - panelBox.x)).toBeLessThan(8);
+  expect(biteBox.y).toBeGreaterThan(panelBox.y + panelBox.height - 8);
   expect(Math.abs(toolsBox.x - panelBox.x)).toBeLessThan(8);
-  expect(toolsBox.y).toBeGreaterThan(panelBox.y + panelBox.height - 8);
+  expect(toolsBox.y).toBeGreaterThan(biteBox.y + biteBox.height - 8);
   await expect(page.locator(".regional-bite-calculator")).toContainText(
     "Tick bite risk calculator"
   );
@@ -595,7 +597,7 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#regional-forecast-chart .interval-band-95")).toHaveCount(1);
   await expect(page.locator("#regional-forecast-chart .county-forecast-line")).toHaveCount(1);
   await expect(page.locator("#regional-chart-summary")).toContainText(
-    "The green line is the predicted weekly Lyme incidence"
+    "The red line is the predicted weekly Lyme incidence"
   );
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "Dark blue band"
@@ -671,6 +673,9 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#regional-chart-summary")).toContainText(
     "Garrett County weekly forecast"
   );
+  // Bite calculator is a collapsed <details> in the side column; expand it first.
+  await page.locator("#regional-bite-risk-section details > summary").click();
+  await expect(page.locator("#regional-bite-tick-species")).toBeVisible();
   await page.locator("#regional-bite-tick-species").selectOption("ixodes_scapularis");
   await page.locator("#regional-bite-tick-stage").selectOption("nymph");
   await page.locator("#regional-bite-attachment-hours").fill("48");

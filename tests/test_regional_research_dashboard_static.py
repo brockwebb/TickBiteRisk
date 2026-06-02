@@ -198,7 +198,7 @@ def test_regional_research_javascript_uses_regional_bundle_without_maryland_defa
         "Why this forecast?",
         "County level data are released as annual totals only",
         "most recent CDC county data available in this release",
-        "The green line is the predicted weekly Lyme incidence",
+        "The red line is the predicted weekly Lyme incidence",
         "Dark blue band",
         "Light blue band",
         "past forecast errors",

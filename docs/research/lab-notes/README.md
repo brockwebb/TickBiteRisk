@@ -28,4 +28,5 @@ recommendation, or calibrated personal infection probability.
 | 8 | [Reporting-Basis Identification Decision](08-reporting-basis-identification.md) | Lock the CDC-anchor identification decision and the closed out-of-region DiD result. |
 | 9 | [Band-Shape Verification Deferral](09-band-shape-verification-deferral.md) | Record why cross-horizon interval band-shape verification is deferred until multi-year data arrives, and the load-bearing boundary for horizon claims. |
 | 10 | [Weather-Magnitude Identification Decision](10-weather-magnitude-identification.md) | Lock the scoped negative result: temperature excluded as an annual incidence-*magnitude* covariate, retained for *timing/phenology*; vindicates `weather_mode=not_used`. |
+| 11 | [Ecology Host-Dynamics (Mast / Deer) Data Dead-End](11-ecology-host-dynamics-dead-end.md) | Close the ecology arm as data-limited (mast has no county resolution; WV diagnostic unconstructable; deer scoped out) — a DATA dead-end, not a biology refutation. |
 | Appendix | [Source Map](appendix-source-map.md) | Map claims and planned whitepaper sections back to source docs, code, and artifacts. |
