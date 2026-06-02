@@ -210,6 +210,31 @@ def bootstrap_ci(panel, n_boot=1000, seed_stride=2654435761):
     return (lo, hi)
 
 
+def loo_year_stability(inc, wx, feature, lag, seg):
+    """Leave-one-year-out pooled-Spearman per dropped year + sign-stability verdict.
+
+    Reusable across signal-check scripts. Only meaningful for segments with >= 5
+    years; callers gate on segment length.
+    """
+    loo = []
+    for drop in range(seg["start_year"], seg["end_year"] + 1):
+        p2 = defaultdict(list)
+        for yy in range(seg["start_year"], seg["end_year"] + 1):
+            if yy == drop:
+                continue
+            for (fips, iy), incidence in inc.items():
+                if iy != yy:
+                    continue
+                fv = wx.get((fips, yy - lag), {}).get(feature)
+                if fv is not None:
+                    p2[fips].append((fv, incidence))
+        r2, _ = pooled_spearman(dict(p2))
+        loo.append(None if math.isnan(r2) else round(r2, 4))
+    signs = {(-1 if v < 0 else 1) for v in loo if v is not None}
+    stability = "stable_sign" if len(signs) == 1 else "sign_flips"
+    return loo, stability
+
+
 def build_panel(inc, wx, feature, lag, seg):
     """{county: [(feature_value(year-lag), incidence(year)), ...]} over segment years."""
     panel = defaultdict(list)
@@ -278,23 +303,9 @@ def main():
                 }
                 # within-segment stability
                 if seg["end_year"] - seg["start_year"] + 1 >= 5:
-                    loo = []
-                    for drop in range(seg["start_year"], seg["end_year"] + 1):
-                        p2 = defaultdict(list)
-                        for yy in range(seg["start_year"], seg["end_year"] + 1):
-                            if yy == drop:
-                                continue
-                            for (fips, iy), incidence in inc.items():
-                                if iy != yy:
-                                    continue
-                                fv = wx.get((fips, yy - lag), {}).get(feature)
-                                if fv is not None:
-                                    p2[fips].append((fv, incidence))
-                        r2, _ = pooled_spearman(dict(p2))
-                        loo.append(None if math.isnan(r2) else round(r2, 4))
+                    loo, stability = loo_year_stability(inc, wx, feature, lag, seg)
                     entry["loo_year_rho"] = loo
-                    signs = {(-1 if v < 0 else 1) for v in loo if v is not None}
-                    entry["stability"] = "stable_sign" if len(signs) == 1 else "sign_flips"
+                    entry["stability"] = stability
                 else:
                     entry["stability"] = "INDETERMINATE_n2"  # n=2: cannot support a stability claim
                 lag_block[feature] = entry

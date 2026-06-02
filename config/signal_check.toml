@@ -54,3 +54,28 @@ gdd_base50_warm = "+"
 spring_onset_doy = "-"   # earlier onset (lower DOY) -> higher incidence
 winter_hard_freeze_days = "-"
 warm_season_precip_in = "+"
+early_season_gdd = "+"          # more early warmth -> earlier/larger questing cohort
+early_warm_run_count = "+"
+early_warm_run_days = "+"
+
+# Early-season sustained-warmth feature family (follow-on hypothesis test).
+# Grounded in Eisen, Eisen, Ogden & Beard 2016, J Med Entomol 53(2):250-61,
+# DOI 10.1093/jme/tjv199 (I. scapularis): nymphal activity-onset is a RANGE
+# (~4-15 C / 39-59 F, unresolved), and cumulative GDD through ~calendar week 20
+# is the best-evidenced temperature predictor of Lyme-season timing. Nymphal
+# phenology (NE/Mid-Atlantic): active late March, peak late May-early July.
+#
+# ANTI-OVERFIT RULE: evaluate every feature across this whole grid; report every
+# cell; never select the max-correlation cell as "the" result. A signal that
+# appears only at one (threshold, run_days) cell on a 5-point panel is noise.
+[signal_check.early_season]
+# early_season_gdd: cumulative GDD from Jan 1 through this early-season cutoff.
+cutoff_doy = 140                  # ~ calendar week 20
+# Run-based feature search window (DOY); covers nymphal activity onset->peak.
+run_window_start_doy = 60
+run_window_end_doy = 180
+# Onset-band threshold grid in degrees C (NOT one committed value), spanning the
+# review's named 4-15 C uncertain band. Used as GDD base AND run threshold.
+threshold_grid_c = [8, 10, 12, 14]
+# Minimum consecutive days above threshold to count as a "solid run".
+run_days_grid = [5, 7, 10]
