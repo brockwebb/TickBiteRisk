@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-PUBLIC_DIR = Path("public")
+PUBLIC_DIR = Path("archive/md-poc")
 
 
 def test_dashboard_html_has_accessible_landmarks_and_data_hooks() -> None:
@@ -108,6 +108,9 @@ def test_dashboard_javascript_has_single_bite_scoring_logic() -> None:
 
     for token in [
         "single_bite_risk_score",
+        "single_bite_risk_score_raw",
+        "single_bite_risk_score_low",
+        "single_bite_risk_score_high",
         "pep_consideration",
         "meets_cdc_consideration_criteria",
         "does_not_meet_cdc_consideration_criteria",

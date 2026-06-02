@@ -122,7 +122,7 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-29T21:55:39+00:00",
+  "generated_at": "2026-05-31T09:59:07+00:00",
   "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality; displayed county-week values are seasonal allocation, not observed county-week data.",
   "model_name": "linear_blend_baseline",
   "not_for": [
@@ -137,7 +137,7 @@
     "static_seasonality_prior",
     "not_weather_adjusted"
   ],
-  "schema_version": "county-week-risk-static-v1",
+  "schema_version": "county-week-risk-static-v2",
   "score_interpretation": "Relative seasonal Lyme forecast on a 1-10 Maryland scale; annual county forecasts are allocated across MMWR weeks using national seasonality and are not per-bite infection probabilities.",
   "target_definition": "lyme_incidence_per_100k",
   "temporal_contract": {

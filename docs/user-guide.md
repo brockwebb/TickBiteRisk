@@ -56,7 +56,7 @@ Important response fields:
 | `county_fips`, `county_name` | Maryland county returned by the lookup. |
 | `query_date`, `mmwr_year`, `mmwr_week` | Calendar date and CDC MMWR week used for lookup. |
 | `data_year` | Forecast data year used; may differ from query year when current-year data is unavailable. |
-| `risk_score`, `risk_category` | Relative 1-10 Maryland seasonal score and plain category. |
+| `risk_score_low`, `risk_score`, `risk_score_high`, `risk_category` | Relative 1-10 Maryland seasonal score, plausible score range, and plain category. |
 | `predicted_weekly_incidence_per_100k` | Model-derived weekly incidence forecast behind the score. |
 | `predicted_weekly_incidence_95_interval` | Empirical model interval for the forecast, not clinical confidence for an individual bite. |
 | `source_metadata` | Model-comparison and seasonality source run/hash metadata. |
@@ -87,7 +87,7 @@ Important response fields:
 
 | Field | Meaning |
 | --- | --- |
-| `single_bite_risk_score`, `single_bite_risk_band` | Evidence-adjusted 1-10 Lyme concern score and category. |
+| `single_bite_risk_score_low`, `single_bite_risk_score`, `single_bite_risk_score_high`, `single_bite_risk_band` | Evidence-adjusted 1-10 Lyme concern score, plausible score range, and category. |
 | `forecast_context` | County-week seasonal forecast used as local context. |
 | `input_summary` | Normalized tick species, stage, attachment, engorgement, removal timing, doxycycline safety, and tick count inputs. |
 | `evidence_modifiers` | Transparent modifiers applied to the county-week forecast. |

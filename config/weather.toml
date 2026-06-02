@@ -1,0 +1,39 @@
+# Weather acquisition configuration for the six-state regional product.
+#
+# Read by tickbiterisk.etl.weather_config.load_weather_config (stdlib tomllib).
+# The NOAA API token is NOT here — it is a secret read from the NOAA_TOKEN
+# environment variable (see tickbiterisk.etl.noaa.get_noaa_token).
+#
+# Used by:  tickbiterisk etl noaa-backfill-regional --config-path config/weather.toml
+
+[weather]
+# Six-jurisdiction product scope (settled). The loader resolves each state's
+# counties from the regional county universe (tickbiterisk/resources/weather_locations.csv).
+states = ["DE", "DC", "MD", "PA", "VA", "WV"]
+
+# NOAA GHCND daily variables to extract from each station's .dly time series.
+ghcnd_datatypes = ["TMAX", "TMIN", "PRCP", "SNOW", "SNWD"]
+
+# Acquisition window: 1992 start gives a true 30-year climatological normal;
+# end extends to present because forecasts (2024/2025/2026) need weather
+# covariates through today regardless of where incidence ends.
+start_date = "1992-01-01"
+end_date = "2026-12-31"
+
+# A station qualifies only if its ACTUAL TMAX/TMIN reaches at least this date
+# (minus station lag) — not CDO's all-element maxdate, which a precip-only
+# station inflates. Set to the fit-window end so the in-window gate is met;
+# tunable upward once the fittable window is set from incidence availability.
+validate_temp_through = "2021-12-31"
+
+# Climatological-baseline window in years. 10 = the trailing baseline materialized
+# today (temp_anomaly_vs_10yr); 30 = the true normal now buildable from 1992+ data
+# without a code change.
+baseline_years = 30
+
+[weather.station_selection]
+station_limit = 1
+min_data_coverage = 0.5
+max_end_lag_days = 14
+# Use the nearest qualifying in-region station when a county has none of its own.
+nearest_station_fallback = true

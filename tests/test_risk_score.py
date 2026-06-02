@@ -204,6 +204,9 @@ def test_build_seasonal_risk_scores_can_apply_annual_prediction_intervals(
     assert first.upper_80_weekly_incidence_per_100k == 14.0
     assert first.lower_95_weekly_incidence_per_100k == 1.2
     assert first.upper_95_weekly_incidence_per_100k == 27.0
+    assert first.risk_score_low == 1
+    assert first.risk_score_low <= first.risk_score <= first.risk_score_high
+    assert first.risk_score_high == 10
     assert "annual_forecast_interval_applied" in first.feature_quality_flags
     assert "empirical_rolling_origin_residual_interval" in (
         first.backtest_assumption_flags
@@ -567,6 +570,8 @@ def test_write_seasonal_risk_score_outputs_upgrades_stale_append_files(
     assert len(score_rows) == 4
     assert len(scale_rows) == 1
     assert score_rows[0]["benchmark_quantile"] == "0.95"
+    assert "risk_score_low" in score_rows[0]
+    assert "risk_score_high" in score_rows[0]
     assert scale_rows[0]["seasonality_source_id"] == "cdc_seasonality_week_2023"
 
 

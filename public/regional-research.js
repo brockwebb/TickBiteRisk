@@ -1718,6 +1718,7 @@ function renderRegionalBiteResult() {
     <h4 id="regional-bite-result-title">Bite concern score</h4>
     <p class="muted">Uses ${regionalEscapeHtml(periodText)} forecast context for ${regionalEscapeHtml(record.county_name || record.county_fips)}.</p>
     <p><span class="score-badge ${regionalRiskClass(result.single_bite_risk_score)}">${regionalEscapeHtml(result.single_bite_risk_score)}/10</span> ${regionalEscapeHtml(result.single_bite_risk_band)}</p>
+    <p>Plausible score range: ${regionalEscapeHtml(regionalScoreRangeLabel(result.single_bite_risk_score_low, result.single_bite_risk_score_high))}.</p>
     <p>${regionalEscapeHtml(result.risk_interpretation)}</p>
     <p><b>CDC consideration context:</b> ${regionalEscapeHtml(regionalReadableName(result.pep_consideration))}</p>
     <ul class="criteria-list">${criteriaItems}</ul>
@@ -1744,24 +1745,32 @@ function estimateRegionalSingleBiteRisk(record, input) {
       input.attachment_hours,
       input.engorgement
     ),
-    location_season: regionalLocationSeasonModifier(record),
+    location_season: regionalLocationSeasonModifier(record, record.risk_score),
     tick_species: regionalSpeciesModifier(input.tick_species),
     tick_stage: regionalStageModifier(input.tick_stage),
   };
-  const rawSingle = Math.min(
-    1,
-    Math.max(
-      0,
-      modifiers.location_season *
-        modifiers.tick_species *
-        modifiers.tick_stage *
-        modifiers.attachment
-    )
-  );
   const tickCount = Math.min(20, Math.max(1, Number(input.tick_count || 1)));
-  const combined = 1 - (1 - rawSingle) ** tickCount;
-  const scoreRaw = Number((combined * 10).toFixed(6));
-  const score = Math.max(1, Math.min(10, Math.ceil(scoreRaw)));
+  const score = regionalSingleBiteScore(modifiers, tickCount);
+  const scoreLow = regionalSingleBiteScore(
+    {
+      ...modifiers,
+      location_season: regionalLocationSeasonModifier(
+        record,
+        record.risk_score_low || record.risk_score
+      ),
+    },
+    tickCount
+  );
+  const scoreHigh = regionalSingleBiteScore(
+    {
+      ...modifiers,
+      location_season: regionalLocationSeasonModifier(
+        record,
+        record.risk_score_high || record.risk_score
+      ),
+    },
+    tickCount
+  );
   const criteria = regionalPepCriteria(record, input);
   return {
     caveats: regionalBiteCaveats(record, input),
@@ -1771,8 +1780,10 @@ function estimateRegionalSingleBiteRisk(record, input) {
     risk_interpretation:
       "This score combines the selected county-week forecast with tick identity, stage, attachment, engorgement, and tick count. It is not an absolute infection probability.",
     single_bite_risk_band: regionalBiteRiskBand(score),
+    single_bite_risk_score_low: Math.min(scoreLow, score),
     single_bite_risk_score: score,
-    single_bite_risk_score_raw: scoreRaw,
+    single_bite_risk_score_raw: score,
+    single_bite_risk_score_high: Math.max(scoreHigh, score),
   };
 }
 
@@ -1792,8 +1803,24 @@ function regionalBiteForecastRecord() {
   );
 }
 
-function regionalLocationSeasonModifier(record) {
-  const scoreBaseline = Number(record.risk_score || 1) / 10;
+function regionalSingleBiteScore(modifiers, tickCount) {
+  const rawSingle = Math.min(
+    1,
+    Math.max(
+      0,
+      modifiers.location_season *
+        modifiers.tick_species *
+        modifiers.tick_stage *
+        modifiers.attachment
+    )
+  );
+  const combined = 1 - (1 - rawSingle) ** tickCount;
+  const scoreRaw = Number((combined * 10).toFixed(6));
+  return Math.max(1, Math.min(10, Math.ceil(scoreRaw)));
+}
+
+function regionalLocationSeasonModifier(record, scoreValue) {
+  const scoreBaseline = Number(scoreValue || record.risk_score || 1) / 10;
   const annualIncidence = Number(record.predicted_annual_incidence_per_100k);
   if (Number.isFinite(annualIncidence) && annualIncidence >= 50) {
     return Math.max(scoreBaseline, 0.55);
@@ -1802,6 +1829,13 @@ function regionalLocationSeasonModifier(record) {
     return Math.max(scoreBaseline, 0.35);
   }
   return scoreBaseline;
+}
+
+function regionalScoreRangeLabel(low, high) {
+  const scoreLow = Math.max(1, Math.min(10, Number(low || 1)));
+  const scoreHigh = Math.max(1, Math.min(10, Number(high || scoreLow)));
+  if (scoreLow === scoreHigh) return `${scoreLow}/10`;
+  return `${scoreLow}-${scoreHigh}/10`;
 }
 
 function regionalSpeciesModifier(species) {

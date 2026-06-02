@@ -1,0 +1,94 @@
+# Config for the within-segment weather->incidence signal check
+# (cc_tasks/2026-06-01_within-segment-weather-signal-check.md).
+#
+# Exploratory, read-only with respect to the model. Feature definitions and
+# thresholds live here (constitution §2) so the analysis is not hardcoded and
+# the pre-committed choices are auditable. Read by
+# scripts/within_segment_signal_check.py.
+
+[signal_check]
+states = ["DE", "DC", "MD", "PA", "VA", "WV"]
+
+# Incidence-lag hypotheses, stated up front and held fixed across both segments.
+# Both are reported (never just the best): lag 0 = same-year weather; lag 1 =
+# prior-year weather shaping the questing cohort reported the following year.
+lags = [0, 1]
+
+# Definition-stable segments (never fit across the 2022 CSTE +72.9% break).
+# (Array-of-tables must follow the scalar keys above.)
+[[signal_check.segments]]
+name = "2017-2021"
+start_year = 2017
+end_year = 2021
+
+[[signal_check.segments]]
+name = "2022-2023"
+start_year = 2022
+end_year = 2023
+
+[signal_check.features]
+# Growing-degree-days accumulation over the warm season. Base 50 F (~10 C), the
+# common arthropod development threshold; warmth drives tick development/questing.
+gdd_base_f = 50.0
+warm_season_months = [3, 4, 5, 6, 7, 8, 9, 10]
+
+# Spring activity onset: day-of-year of the first day starting a sustained run of
+# daily-mean temperature >= the threshold. Earlier onset = longer activity season.
+spring_onset_mean_f = 45.0
+spring_onset_run_days = 7
+
+# Overwinter cold severity: count of hard-freeze days (tmin <= threshold) in the
+# cold season. More hard-freeze days = greater overwinter tick mortality.
+hard_freeze_tmin_f = 14.0
+cold_season_months = [11, 12, 1, 2, 3]
+
+# Moisture proxy: total warm-season precipitation (inches). Included because PRCP
+# is present and ~99% complete in-window; soil/humidity/ET are absent in GHCND
+# and are deliberately OMITTED (not fabricated).
+include_precip = true
+
+# Pre-committed expected sign of each feature's rank-association with incidence
+# (reported regardless of expectation; this only frames interpretation).
+[signal_check.expected_sign]
+gdd_base50_warm = "+"
+spring_onset_doy = "-"   # earlier onset (lower DOY) -> higher incidence
+winter_hard_freeze_days = "-"
+warm_season_precip_in = "+"
+early_season_gdd = "+"          # more early warmth -> earlier/larger questing cohort
+early_warm_run_count = "+"
+early_warm_run_days = "+"
+
+# Early-season sustained-warmth feature family (follow-on hypothesis test).
+# Grounded in Eisen, Eisen, Ogden & Beard 2016, J Med Entomol 53(2):250-61,
+# DOI 10.1093/jme/tjv199 (I. scapularis): nymphal activity-onset is a RANGE
+# (~4-15 C / 39-59 F, unresolved), and cumulative GDD through ~calendar week 20
+# is the best-evidenced temperature predictor of Lyme-season timing. Nymphal
+# phenology (NE/Mid-Atlantic): active late March, peak late May-early July.
+#
+# ANTI-OVERFIT RULE: evaluate every feature across this whole grid; report every
+# cell; never select the max-correlation cell as "the" result. A signal that
+# appears only at one (threshold, run_days) cell on a 5-point panel is noise.
+[signal_check.early_season]
+# early_season_gdd: cumulative GDD from Jan 1 through this early-season cutoff.
+cutoff_doy = 140                  # ~ calendar week 20
+# Run-based feature search window (DOY); covers nymphal activity onset->peak.
+run_window_start_doy = 60
+run_window_end_doy = 180
+# Onset-band threshold grid in degrees C (NOT one committed value), spanning the
+# review's named 4-15 C uncertain band. Used as GDD base AND run threshold.
+threshold_grid_c = [8, 10, 12, 14]
+# Minimum consecutive days above threshold to count as a "solid run".
+run_days_grid = [5, 7, 10]
+
+# Rare high-threshold "unseasonable early warm spell" feature (third check).
+# Single COMMITTED threshold (user decision), NOT a grid. Uses daily-MAX temp:
+# a sustained run of >=70 F max days early in the season is the intended
+# "unseasonably warm week." Aimed at the magnitude outcome but lag-0 is
+# confound-suspect by construction (early warmth is a TIMING signal; the spring
+# nymph cohort size was set the prior year). Both lags reported regardless.
+[signal_check.warm70]
+threshold_max_f = 70.0
+run_days = 5
+window_start_doy = 60       # ~ Mar 1
+window_end_doy = 151        # ~ May 31
+expected_sign = { warm70_onset_doy = "-", warm70_spell_count = "+", warm70_presence = "+" }

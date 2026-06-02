@@ -113,7 +113,9 @@ class CountyWeekRiskRecord:
     headroom_multiplier: float
     score_denominator: float
     risk_score_raw: float
+    risk_score_low: int
     risk_score: int
+    risk_score_high: int
     risk_category: str
     seasonality_source_id: str
     feature_quality_flags: str
@@ -136,7 +138,9 @@ class CountyWeekRiskResponse:
     weather_mode: str
     seasonality_source_id: str
     period_label: str
+    risk_score_low: int
     risk_score: int
+    risk_score_high: int
     risk_category: str
     risk_score_raw: float
     predicted_weekly_incidence_per_100k: float
@@ -307,7 +311,9 @@ class RiskLookupStore:
             weather_mode=record.weather_mode,
             seasonality_source_id=record.seasonality_source_id,
             period_label=record.period_label,
+            risk_score_low=record.risk_score_low,
             risk_score=record.risk_score,
+            risk_score_high=record.risk_score_high,
             risk_category=record.risk_category,
             risk_score_raw=record.risk_score_raw,
             predicted_weekly_incidence_per_100k=(
@@ -394,6 +400,19 @@ def _read_score_records(path: Path) -> list[CountyWeekRiskRecord]:
 
 
 def _score_record_from_row(row: dict[str, str]) -> CountyWeekRiskRecord:
+    risk_score = _parse_score(row["risk_score"], "risk_score")
+    risk_score_low = _parse_score(
+        row.get("risk_score_low", row["risk_score"]),
+        "risk_score_low",
+    )
+    risk_score_high = _parse_score(
+        row.get("risk_score_high", row["risk_score"]),
+        "risk_score_high",
+    )
+    if risk_score_low > risk_score or risk_score > risk_score_high:
+        raise RiskLookupInputError(
+            "risk_score_low <= risk_score <= risk_score_high is required"
+        )
     return CountyWeekRiskRecord(
         source_prediction_run_id=row["source_prediction_run_id"],
         source_prediction_sha256=row["source_prediction_sha256"],
@@ -485,7 +504,9 @@ def _score_record_from_row(row: dict[str, str]) -> CountyWeekRiskRecord:
         ),
         score_denominator=_parse_float(row["score_denominator"], "score_denominator"),
         risk_score_raw=_parse_float(row["risk_score_raw"], "risk_score_raw"),
-        risk_score=_parse_score(row["risk_score"]),
+        risk_score_low=risk_score_low,
+        risk_score=risk_score,
+        risk_score_high=risk_score_high,
         risk_category=row["risk_category"],
         seasonality_source_id=row["seasonality_source_id"],
         feature_quality_flags=row["feature_quality_flags"],
@@ -549,10 +570,10 @@ def _parse_week(value: str) -> int:
     return week
 
 
-def _parse_score(value: str) -> int:
-    score = _parse_int(value, "risk_score")
+def _parse_score(value: str, field_name: str) -> int:
+    score = _parse_int(value, field_name)
     if score < 1 or score > 10:
-        raise RiskLookupInputError("risk_score must be between 1 and 10")
+        raise RiskLookupInputError(f"{field_name} must be between 1 and 10")
     return score
 
 

@@ -466,6 +466,8 @@ def _forecast_design_rows(
                     incidence_per_100k=0.0,
                     features=features,
                     model_feature_quality_flags=latest.model_feature_quality_flags,
+                    source_regime=latest.source_regime,
+                    missing_basis_factor=latest.missing_basis_factor,
                 ),
                 population_row,
             )

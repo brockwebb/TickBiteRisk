@@ -350,6 +350,13 @@ the full 283-county feature set and source/caveat metadata.
 `public/research-data/regional/` for local GUI review, preserving `/` and
 `public/data` as the committed Maryland public contract.
 
+Multi-year forecast note: the deployed regional bundle is driven by a
+multi-year (2024/2025/2026) annual forecast, which is three single-year
+`etl regional-annual-forecast` runs concatenated — not the single-year
+`--target-year 2026` command shown above. See
+[docs/regional-multiyear-forecast-combine.md](docs/regional-multiyear-forecast-combine.md)
+for the verified combine recipe (reproduces the recorded source SHAs).
+
 Model-comparison research note: the 2026-05-29 `model-compare` refresh adds a
 deterministic `random_forest_forecast_research` lane and a research-only
 `forecast_safe_top4_ensemble` over the strongest forecast-safe comparison
@@ -460,8 +467,8 @@ committed data product used by the static dashboard.
 
 Implemented local lookup:
 
-* `tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26 --pretty` – relative county-week seasonal Lyme forecast JSON, not per-bite probability.
-* `tickbiterisk risk single-bite --county-fips 24003 --date 2026-05-26 --tick-species blacklegged --tick-stage nymph --attachment-hours 40 --engorgement engorged --hours-since-removal 24 --doxycycline-safe --pretty` – single-bite Lyme decision-support score and CDC prophylaxis criteria summary, not an absolute infection probability.
+* `tickbiterisk risk lookup --county-fips 24003 --date 2026-05-26 --pretty` – relative county-week seasonal Lyme forecast JSON with a 1-10 score range, not per-bite probability.
+* `tickbiterisk risk single-bite --county-fips 24003 --date 2026-05-26 --tick-species blacklegged --tick-stage nymph --attachment-hours 40 --engorgement engorged --hours-since-removal 24 --doxycycline-safe --pretty` – single-bite Lyme decision-support score range and CDC prophylaxis criteria summary, not an absolute infection probability.
 * `tickbiterisk risk export-static --scores-path build/etl/county-week-risk/county_week_seasonal_risk_baseline.csv --model-summary-path build/etl/model-comparison/model_comparison_summary.csv --output-dir build/public-risk` – public-safe derived JSON bundle for static web/runtime use.
 
 Roadmap HTTP API:

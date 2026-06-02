@@ -58,6 +58,23 @@ not posterior draws or a joint spatial probability model. Forecast intervals
 describe uncertainty around the modeled reported-incidence proxy, not medical
 certainty for a person or a bite.
 
+## Interval Validation Scope
+
+Forecast intervals are validated for internal consistency only: the published
+rows satisfy interval ordering (`score_low <= score <= score_high`) and nested
+coverage (the 95% interval contains the 80% interval) across all published
+rows. Cross-horizon band-shape behavior — whether intervals widen across
+forecast years, whether near-term years are tighter when a state-source anchor
+is present, or whether basis-adjusted targets carry wider bands — is NOT yet
+empirically validated, because the current release covers a single forecast
+year and a multi-year county-level interval artifact is not yet available. This
+whitepaper therefore makes no claim that uncertainty grows with forecast
+horizon or that intervals widen into the future. The methodology is designed to
+incorporate multi-year and historical county-level data as it arrives, at which
+point these band-shape properties become testable and, only if confirmed,
+reportable. The internal record for this deferral is
+docs/research/lab-notes/09-band-shape-verification-deferral.md.
+
 ## Reviewer Findings
 
 Current reviewer findings that remain controlling for public interpretation:

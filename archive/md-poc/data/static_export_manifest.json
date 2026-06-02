@@ -8,13 +8,13 @@
     "static_export_manifest.json",
     "md_counties.geojson"
   ],
-  "generated_at": "2026-05-29T21:55:39+00:00",
+  "generated_at": "2026-05-31T09:59:07+00:00",
   "record_counts": {
     "county_geojson_features": 24,
     "county_metadata": 24,
     "weekly_risk": 1272
   },
-  "schema_version": "county-week-risk-static-v1",
+  "schema_version": "county-week-risk-static-v2",
   "temporal_contract": {
     "county_month_or_week_observed_truth_available": false,
     "display_temporal_grain": "mmwr_week",

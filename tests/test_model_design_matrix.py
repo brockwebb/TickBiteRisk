@@ -10,6 +10,12 @@ from tickbiterisk.modeling.design_matrix import ModelDesignMatrixInputError
 from tickbiterisk.modeling.design_matrix_build import (
     write_model_design_matrix_outputs,
 )
+from tickbiterisk.modeling.regimes import COVID_REPORTING_DISRUPTION
+from tickbiterisk.modeling.regimes import PRE_2020_BASELINE
+from tickbiterisk.modeling.reporting_basis_adjustment import DEFAULT_DISPLAY_LABEL
+from tickbiterisk.modeling.reporting_basis_adjustment_build import (
+    REPORTING_BASIS_ADJUSTMENT_COLUMNS,
+)
 
 
 def test_build_model_design_matrix_writes_numeric_features_and_missing_indicators(
@@ -229,6 +235,102 @@ def test_write_model_design_matrix_outputs_writes_csv_and_schema_json(
     assert schema["lookback_years"] == 2
     assert schema["source_path"] == str(feature_matrix)
     assert schema["feature_columns"] == result.schema.feature_columns
+
+
+def test_build_model_design_matrix_adds_reporting_basis_adjusted_targets(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+    adjustment = _write_reporting_basis_adjustment(
+        tmp_path / "reporting_basis_adjustment.csv"
+    )
+
+    result = build_model_design_matrix(
+        model_features_path=feature_matrix,
+        lookback_years=1,
+        reporting_basis_adjustment_path=adjustment,
+    )
+
+    anne_2019 = next(
+        row
+        for row in result.rows
+        if row["county_fips"] == "24003" and row["year"] == "2019"
+    )
+    assert anne_2019["source_regime"] == PRE_2020_BASELINE
+    assert anne_2019["basis_factor_applied"] == "1.5"
+    assert anne_2019["basis_factor_ci95_low"] == "1.2"
+    assert anne_2019["basis_factor_ci95_high"] == "1.8"
+    assert anne_2019["target_total_cases_basis_adjusted"] == "30.0"
+    assert anne_2019["target_lyme_incidence_per_100k_basis_adjusted"] == "30.0"
+    assert anne_2019["target_is_reference_basis"] == "0"
+    assert anne_2019["missing_basis_factor"] == "0"
+    assert anne_2019["displayed_as"] == DEFAULT_DISPLAY_LABEL
+
+    anne_2020 = next(
+        row
+        for row in result.rows
+        if row["county_fips"] == "24003" and row["year"] == "2020"
+    )
+    assert anne_2020["source_regime"] == COVID_REPORTING_DISRUPTION
+    assert anne_2020["basis_factor_applied"] == "1.0"
+    assert anne_2020["target_total_cases_basis_adjusted"] == "30.0"
+    assert anne_2020["missing_basis_factor"] == "1"
+
+    assert "target_total_cases_basis_adjusted" in result.schema.target_columns
+    assert result.schema.reporting_basis_adjustment_source_path == str(adjustment)
+    assert len(result.schema.reporting_basis_adjustment_source_sha256 or "") == 64
+
+
+def test_build_model_design_matrix_rejects_did_control_panel_contamination(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+    adjustment = _write_reporting_basis_adjustment(
+        tmp_path / "reporting_basis_adjustment.csv"
+    )
+    _write_csv(
+        tmp_path / "did_control_panel.csv",
+        [
+            {
+                "candidate_state_fips": "13",
+                "county_fips": "24003",
+                "instrument_role": "non_forecast_identification_instrument",
+                "forecast_exclusion": "must_not_enter_forecast_design_matrix",
+            }
+        ],
+    )
+
+    with pytest.raises(
+        ModelDesignMatrixInputError,
+        match="non-forecast identification instrument",
+    ):
+        build_model_design_matrix(
+            model_features_path=feature_matrix,
+            lookback_years=1,
+            reporting_basis_adjustment_path=adjustment,
+        )
+
+
+def test_write_model_design_matrix_outputs_preserves_adjusted_targets(
+    tmp_path: Path,
+) -> None:
+    feature_matrix = _write_feature_matrix(tmp_path / "model_features.csv")
+    adjustment = _write_reporting_basis_adjustment(
+        tmp_path / "reporting_basis_adjustment.csv"
+    )
+    result = build_model_design_matrix(
+        model_features_path=feature_matrix,
+        lookback_years=1,
+        reporting_basis_adjustment_path=adjustment,
+    )
+
+    outputs = write_model_design_matrix_outputs(result, tmp_path / "out")
+
+    with outputs.matrix_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    anne_2019 = next(row for row in rows if row["year"] == "2019")
+    assert anne_2019["target_total_cases_basis_adjusted"] == "30.0"
+    assert anne_2019["basis_factor_applied"] == "1.5"
 
 
 def test_build_model_design_matrix_adds_prior_year_neighbor_incidence_features(
@@ -524,6 +626,47 @@ def _write_csv(path: Path, rows: list[dict[str, str]]) -> Path:
                 fieldnames.append(column)
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _write_reporting_basis_adjustment(path: Path) -> Path:
+    rows = [
+        {
+            "adjustment_id": (
+                "county_24003__boundary2022__out_of_region_low_incidence_did"
+            ),
+            "jurisdiction_scope": "county_24003",
+            "boundary_year": "2022",
+            "source_regime": PRE_2020_BASELINE,
+            "target_reference_basis": "case_definition_change_2022_plus",
+            "adjustment_method": "out_of_region_low_incidence_did",
+            "multiplicative_factor": "1.5",
+            "factor_se_log": "0.1",
+            "factor_ci80_low": "1.3",
+            "factor_ci80_high": "1.7",
+            "factor_ci95_low": "1.2",
+            "factor_ci95_high": "1.8",
+            "treatment_status": "high_incidence",
+            "n_control_jurisdictions": "1",
+            "n_observations_used": "8",
+            "identification_quality": "strong",
+            "smoothed_on_adjacency": "true",
+            "displayed_as": DEFAULT_DISPLAY_LABEL,
+            "pre_window": "2017-2019",
+            "source_citation_url": "https://www.cdc.gov/mmwr/volumes/73/wr/mm7306a1.htm",
+            "source_panel_sha256": "a" * 64,
+            "source_vintage": "test",
+            "assumption_flags": "did_parallel_trends_passed",
+            "notes": "test adjustment",
+        }
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=REPORTING_BASIS_ADJUSTMENT_COLUMNS,
+        )
         writer.writeheader()
         writer.writerows(rows)
     return path

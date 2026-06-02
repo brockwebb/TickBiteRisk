@@ -20,6 +20,8 @@ MODEL_COMPARISON_RUN_COLUMNS = [
     "random_forest_min_samples_leaf",
     "random_forest_max_features",
     "random_forest_random_state",
+    "target_scale",
+    "allow_cross_regime_raw_targets",
     "model_names",
     "target_definition",
     "evaluation_mode",

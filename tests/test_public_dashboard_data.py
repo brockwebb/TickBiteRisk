@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-PUBLIC_DATA_DIR = Path(__file__).resolve().parents[1] / "public" / "data"
+PUBLIC_DATA_DIR = Path(__file__).resolve().parents[1] / "archive" / "md-poc" / "data"
 
 EXPECTED_PUBLIC_DATA_FILES = {
     "md_counties.geojson",
@@ -145,7 +145,14 @@ def test_weekly_risk_scores_and_categories_are_in_dashboard_ranges() -> None:
 
     for record in weekly["records"]:
         assert isinstance(record["risk_score"], int)
+        assert isinstance(record["risk_score_low"], int)
+        assert isinstance(record["risk_score_high"], int)
+        assert record["risk_score_low"] <= record["risk_score"] <= record[
+            "risk_score_high"
+        ]
         assert 1 <= record["risk_score"] <= 10
+        assert 1 <= record["risk_score_low"] <= 10
+        assert 1 <= record["risk_score_high"] <= 10
         assert record["risk_category"] in RISK_CATEGORIES
         assert record["risk_category"] == EXPECTED_RISK_CATEGORIES_BY_SCORE[
             record["risk_score"]

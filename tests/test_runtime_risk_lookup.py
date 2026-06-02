@@ -39,6 +39,8 @@ def test_lookup_returns_county_date_response_with_disclaimer_and_guidance(
     assert response.evaluation_mode == "forecast_prior_year"
     assert response.weather_mode == "not_used_by_baseline"
     assert response.risk_score == 7
+    assert response.risk_score_low == 5
+    assert response.risk_score_high == 8
     assert response.risk_category == "high"
     assert response.predicted_weekly_incidence_per_100k == 2.5
     assert response.predicted_weekly_incidence_95_interval == [1.5, 3.5]
@@ -268,6 +270,7 @@ def _score_row(
     mmwr_week: str,
     risk_score: str,
 ) -> dict[str, str]:
+    point_score = int(risk_score)
     return {
         "source_prediction_run_id": "run1",
         "source_prediction_sha256": "a" * 64,
@@ -305,6 +308,8 @@ def _score_row(
         "headroom_multiplier": "1.2",
         "score_denominator": "3.5",
         "risk_score_raw": "7.1",
+        "risk_score_low": str(max(1, point_score - 2)),
+        "risk_score_high": str(min(10, point_score + 1)),
         "risk_score": risk_score,
         "risk_category": "high" if risk_score == "7" else "moderate",
         "seasonality_source_id": "cdc_seasonality_week_2023",

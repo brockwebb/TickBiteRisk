@@ -7,12 +7,32 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
 
+from tickbiterisk.modeling.regimes import CASE_DEFINITION_2022_PLUS
+from tickbiterisk.modeling.regimes import classify_surveillance_regime
+from tickbiterisk.modeling.reporting_basis_adjustment import (
+    ReportingBasisAdjustment,
+)
+from tickbiterisk.modeling.reporting_basis_adjustment import (
+    read_reporting_basis_adjustment,
+)
+
 
 ID_COLUMNS = ["county_fips", "county_name", "year"]
 TARGET_COLUMNS = [
     "target_total_cases",
     "target_lyme_incidence_per_100k",
     "target_population",
+]
+BASIS_ADJUSTED_TARGET_COLUMNS = [
+    "source_regime",
+    "basis_factor_applied",
+    "basis_factor_ci95_low",
+    "basis_factor_ci95_high",
+    "target_total_cases_basis_adjusted",
+    "target_lyme_incidence_per_100k_basis_adjusted",
+    "target_is_reference_basis",
+    "missing_basis_factor",
+    "displayed_as",
 ]
 PASSTHROUGH_COLUMNS = ["model_feature_quality_flags"]
 NON_NUMERIC_PROVENANCE_QUALITY_FLAGS = {
@@ -291,6 +311,8 @@ class ModelDesignMatrixSchema:
     regional_signal_source_sha256: str | None
     regional_incidence_cluster_source_path: str | None
     regional_incidence_cluster_source_sha256: str | None
+    reporting_basis_adjustment_source_path: str | None
+    reporting_basis_adjustment_source_sha256: str | None
     row_count: int
     lookback_years: int
     id_columns: list[str]
@@ -314,17 +336,25 @@ def build_model_design_matrix(
     county_adjacency_path: Path | None = None,
     regional_signals_path: Path | None = None,
     regional_incidence_clusters_path: Path | None = None,
+    reporting_basis_adjustment_path: Path | None = None,
 ) -> ModelDesignMatrixResult:
     if lookback_years < 1:
         raise ModelDesignMatrixInputError("lookback_years must be at least 1")
 
     source_rows = _read_rows(model_features_path)
+    _assert_no_did_control_panel_contamination(
+        source_rows,
+        reporting_basis_adjustment_path,
+    )
     rows_by_county = _rows_by_county(source_rows)
     rows_by_year = _rows_by_year(source_rows)
     county_neighbors = _read_county_adjacency(county_adjacency_path)
     regional_signals = _read_regional_signals(regional_signals_path)
     regional_incidence_clusters = _read_regional_incidence_clusters(
         regional_incidence_clusters_path
+    )
+    reporting_basis_adjustments = _read_reporting_basis_adjustments(
+        reporting_basis_adjustment_path
     )
     categorical_mappings = _categorical_mappings(source_rows)
     quality_flags = _quality_flags(
@@ -342,6 +372,14 @@ def build_model_design_matrix(
             regional_incidence_clusters_path is not None
         ),
     )
+    target_columns = [
+        *TARGET_COLUMNS,
+        *(
+            BASIS_ADJUSTED_TARGET_COLUMNS
+            if reporting_basis_adjustment_path is not None
+            else []
+        ),
+    ]
 
     output_rows = []
     for row in sorted(source_rows, key=lambda item: (item["county_fips"], int(item["year"]))):
@@ -365,6 +403,10 @@ def build_model_design_matrix(
                 regional_incidence_clusters=regional_incidence_clusters,
                 include_regional_incidence_clusters=(
                     regional_incidence_clusters_path is not None
+                ),
+                reporting_basis_adjustments=reporting_basis_adjustments,
+                include_reporting_basis_adjustment=(
+                    reporting_basis_adjustment_path is not None
                 ),
                 lookback_years=lookback_years,
                 categorical_mappings=categorical_mappings,
@@ -398,10 +440,20 @@ def build_model_design_matrix(
             if regional_incidence_clusters_path is None
             else _sha256_file(regional_incidence_clusters_path)
         ),
+        reporting_basis_adjustment_source_path=(
+            None
+            if reporting_basis_adjustment_path is None
+            else str(reporting_basis_adjustment_path)
+        ),
+        reporting_basis_adjustment_source_sha256=(
+            None
+            if reporting_basis_adjustment_path is None
+            else _sha256_file(reporting_basis_adjustment_path)
+        ),
         row_count=len(output_rows),
         lookback_years=lookback_years,
         id_columns=ID_COLUMNS,
-        target_columns=TARGET_COLUMNS,
+        target_columns=target_columns,
         feature_columns=feature_columns,
         passthrough_columns=PASSTHROUGH_COLUMNS,
         categorical_mappings=categorical_mappings,
@@ -415,6 +467,7 @@ def build_model_design_matrix(
             "spatial_neighbor": "prior-year neighbor incidence features use only county-adjacent rows from year Y-1; unavailable neighbor priors are imputed to 0.0 with a missing indicator",
             "regional_signal": "regional signal features use only prior-year and trailing-history fields from the Mid-Atlantic signal artifact; same-year diagnostic fields are not joined",
             "regional_incidence_cluster": "regional incidence cluster features use only prior-year/trailing county incidence summaries and cluster labels; same-year actual incidence, case, and population fields are not joined",
+            "reporting_basis_adjustment": "raw targets are preserved; optional adjusted target columns join county/regime factors and flag missing factors as raw-scale rows",
         },
     )
     return ModelDesignMatrixResult(rows=output_rows, schema=schema)
@@ -570,6 +623,51 @@ def _regional_incidence_cluster_row(row: dict[str, str]) -> dict[str, str]:
     }
 
 
+def _read_reporting_basis_adjustments(
+    path: Path | None,
+) -> dict[tuple[str, str], ReportingBasisAdjustment]:
+    if path is None:
+        return {}
+    return {
+        (row.jurisdiction_scope, row.source_regime): row
+        for row in read_reporting_basis_adjustment(path)
+    }
+
+
+def _assert_no_did_control_panel_contamination(
+    source_rows: list[dict[str, str]],
+    reporting_basis_adjustment_path: Path | None,
+) -> None:
+    if reporting_basis_adjustment_path is None:
+        return
+    control_path = reporting_basis_adjustment_path.with_name("did_control_panel.csv")
+    if not control_path.exists():
+        return
+    control_fips = _read_did_control_county_fips(control_path)
+    observed = sorted({row["county_fips"] for row in source_rows} & control_fips)
+    if observed:
+        raise ModelDesignMatrixInputError(
+            "DiD control panel county FIPS appear in the forecast design matrix: "
+            f"{', '.join(observed)}. The control panel is a non-forecast "
+            "identification instrument and must stay walled off."
+        )
+
+
+def _read_did_control_county_fips(path: Path) -> set[str]:
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if "county_fips" not in set(reader.fieldnames or []):
+            raise ModelDesignMatrixInputError(
+                "did_control_panel.csv must include county_fips for the "
+                "non-forecast identification instrument contamination guard"
+            )
+        return {
+            str(row["county_fips"]).zfill(5)
+            for row in reader
+            if str(row.get("county_fips", "")).strip()
+        }
+
+
 def _categorical_mappings(rows: list[dict[str, str]]) -> dict[str, list[str]]:
     mappings: dict[str, list[str]] = {}
     for column in STATUS_COLUMNS:
@@ -659,6 +757,8 @@ def _design_row(
     include_regional_signals: bool,
     regional_incidence_clusters: dict[tuple[str, int], dict[str, str]],
     include_regional_incidence_clusters: bool,
+    reporting_basis_adjustments: dict[tuple[str, str], ReportingBasisAdjustment],
+    include_reporting_basis_adjustment: bool,
     lookback_years: int,
     categorical_mappings: dict[str, list[str]],
     quality_flags: list[str],
@@ -696,6 +796,7 @@ def _design_row(
             else ""
         ),
     )
+    source_regime = classify_surveillance_regime(observed_quality_flags, year)
     record = {
         "county_fips": row["county_fips"],
         "county_name": row.get("county_name", ""),
@@ -707,6 +808,14 @@ def _design_row(
         "target_population": _format_int(row.get("population", "")),
         "model_feature_quality_flags": observed_quality_flags,
     }
+    if include_reporting_basis_adjustment:
+        record.update(
+            _basis_adjusted_targets(
+                row=row,
+                source_regime=source_regime,
+                reporting_basis_adjustments=reporting_basis_adjustments,
+            )
+        )
     feature_values = {
         "feature_year": str(year),
         "feature_prior_year_lyme_incidence_per_100k": _format_float(
@@ -760,6 +869,49 @@ def _design_row(
     for column in feature_columns:
         record[column] = feature_values.get(column, "0")
     return record
+
+
+def _basis_adjusted_targets(
+    *,
+    row: dict[str, str],
+    source_regime: str,
+    reporting_basis_adjustments: dict[tuple[str, str], ReportingBasisAdjustment],
+) -> dict[str, str]:
+    adjustment = reporting_basis_adjustments.get(
+        (f"county_{row['county_fips']}", source_regime)
+    )
+    missing_basis_factor = False
+    displayed_as = ""
+    if adjustment is not None:
+        factor = adjustment.multiplicative_factor
+        ci95_low = adjustment.factor_ci95_low
+        ci95_high = adjustment.factor_ci95_high
+        displayed_as = adjustment.displayed_as
+    elif source_regime == CASE_DEFINITION_2022_PLUS:
+        factor = 1.0
+        ci95_low = 1.0
+        ci95_high = 1.0
+    else:
+        factor = 1.0
+        ci95_low = 1.0
+        ci95_high = 1.0
+        missing_basis_factor = True
+
+    raw_cases = _parse_float(row.get("total_cases", ""))
+    raw_incidence = _parse_float(row.get("lyme_incidence_per_100k", ""))
+    return {
+        "source_regime": source_regime,
+        "basis_factor_applied": _format_number(factor),
+        "basis_factor_ci95_low": _format_number(ci95_low),
+        "basis_factor_ci95_high": _format_number(ci95_high),
+        "target_total_cases_basis_adjusted": _format_number(raw_cases * factor),
+        "target_lyme_incidence_per_100k_basis_adjusted": _format_number(
+            raw_incidence * factor
+        ),
+        "target_is_reference_basis": "1" if factor == 1.0 else "0",
+        "missing_basis_factor": "1" if missing_basis_factor else "0",
+        "displayed_as": displayed_as,
+    }
 
 
 def _spatial_neighbor_features(

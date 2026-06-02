@@ -83,7 +83,9 @@ class SeasonalRiskScore:
     headroom_multiplier: float
     score_denominator: float
     risk_score_raw: float
+    risk_score_low: int
     risk_score: int
+    risk_score_high: int
     risk_category: str
     seasonality_source_id: str
     model_feature_quality_flags: str
@@ -283,7 +285,7 @@ def _risk_score_row(
     prediction_interval_sha256: str,
     seasonality_sha256: str,
 ) -> SeasonalRiskScore:
-    raw_score = 0.0 if denominator <= 0 else 10 * weekly_incidence / denominator
+    raw_score = _raw_risk_score(weekly_incidence, denominator)
     score = _risk_score(raw_score)
     model_feature_quality_flags = _score_model_feature_quality_flags(prediction)
     annual_lower_80 = (
@@ -306,6 +308,15 @@ def _risk_score_row(
         if prediction_interval is None
         else prediction_interval.upper_95_incidence_per_100k
     )
+    lower_95_weekly_incidence = annual_lower_95 * seasonality.lower_95_share
+    upper_95_weekly_incidence = annual_upper_95 * seasonality.upper_95_share
+    risk_score_low = _risk_score(
+        _raw_risk_score(lower_95_weekly_incidence, denominator)
+    )
+    risk_score_high = _risk_score(
+        _raw_risk_score(upper_95_weekly_incidence, denominator)
+    )
+
     return SeasonalRiskScore(
         source_prediction_run_id=prediction.run_id,
         source_prediction_sha256=prediction_sha256,
@@ -347,12 +358,8 @@ def _risk_score_row(
         upper_80_weekly_incidence_per_100k=_round(
             annual_upper_80 * seasonality.upper_80_share
         ),
-        lower_95_weekly_incidence_per_100k=_round(
-            annual_lower_95 * seasonality.lower_95_share
-        ),
-        upper_95_weekly_incidence_per_100k=_round(
-            annual_upper_95 * seasonality.upper_95_share
-        ),
+        lower_95_weekly_incidence_per_100k=_round(lower_95_weekly_incidence),
+        upper_95_weekly_incidence_per_100k=_round(upper_95_weekly_incidence),
         predicted_weekly_cases=_round(
             prediction.predicted_cases * seasonality.mean_share
         ),
@@ -360,7 +367,9 @@ def _risk_score_row(
         headroom_multiplier=headroom_multiplier,
         score_denominator=_round(denominator),
         risk_score_raw=_round(raw_score),
+        risk_score_low=min(risk_score_low, score),
         risk_score=score,
+        risk_score_high=max(risk_score_high, score),
         risk_category=_risk_category(score),
         seasonality_source_id=seasonality.source_id,
         model_feature_quality_flags=model_feature_quality_flags,
@@ -645,6 +654,10 @@ def _nearest_rank(values: list[float], probability: float) -> float:
 
 def _risk_score(raw_score: float) -> int:
     return max(1, min(10, int(round(raw_score))))
+
+
+def _raw_risk_score(weekly_incidence: float, denominator: float) -> float:
+    return 0.0 if denominator <= 0 else 10 * weekly_incidence / denominator
 
 
 def _risk_category(score: int) -> str:

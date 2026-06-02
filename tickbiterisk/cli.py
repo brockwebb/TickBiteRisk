@@ -218,8 +218,14 @@ from tickbiterisk.etl.noaa_backfill import (
     resolve_maryland_noaa_county_fips,
     run_noaa_county_backfill,
     run_noaa_maryland_backfill,
+    run_noaa_regional_backfill,
     validate_noaa_backfill_args,
 )
+from tickbiterisk.etl.noaa_ghcnd_dly import (
+    build_ghcnd_dly_url,
+    fetch_ghcnd_dly_observations,
+)
+from tickbiterisk.etl.weather_config import WeatherConfigError, load_weather_config
 from tickbiterisk.etl.nssp_coverage import (
     CDC_NSSP_ABOUT_URL,
     CDC_NSSP_COVERAGE_CSV_URL,
@@ -299,7 +305,11 @@ from tickbiterisk.etl.weather_features import (
     compute_noaa_weekly_weather_features,
     compute_weekly_weather_features,
 )
-from tickbiterisk.etl.weather_locations import load_maryland_weather_locations
+from tickbiterisk.etl.weather_locations import (
+    WeatherLocationError,
+    load_maryland_weather_locations,
+    load_weather_locations,
+)
 from tickbiterisk.modeling.backtest import BacktestInputError, run_baseline_backtests
 from tickbiterisk.modeling.backtest_build import write_model_backtest_outputs
 from tickbiterisk.modeling.annual_forecast import (
@@ -320,6 +330,13 @@ from tickbiterisk.modeling.forecast_calibration_backtest import (
 )
 from tickbiterisk.modeling.forecast_calibration_backtest_build import (
     write_forecast_calibration_backtest_outputs,
+)
+from tickbiterisk.modeling.forecast_skill_anchor import (
+    ForecastSkillAnchorInputError,
+    build_step1_forecast_skill_anchor,
+)
+from tickbiterisk.modeling.forecast_skill_anchor_build import (
+    write_step1_forecast_skill_anchor_outputs,
 )
 from tickbiterisk.modeling.forecast_bayesian_update_backtest import (
     ForecastBayesianUpdateBacktestInputError,
@@ -379,6 +396,13 @@ from tickbiterisk.modeling.regional_forecast_typicality import (
 )
 from tickbiterisk.modeling.regional_forecast_typicality_build import (
     write_regional_forecast_typicality_outputs,
+)
+from tickbiterisk.modeling.reporting_basis_adjustment import (
+    ReportingBasisAdjustmentInputError,
+    build_reporting_basis_adjustment,
+)
+from tickbiterisk.modeling.reporting_basis_adjustment_build import (
+    write_reporting_basis_adjustment_outputs,
 )
 from tickbiterisk.modeling.regional_outcome_stress import (
     RegionalOutcomeStressInputError,
@@ -2542,6 +2566,13 @@ def model_design_matrix(
             "capacity-band features."
         ),
     ),
+    reporting_basis_adjustment_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional reporting-basis adjustment CSV for parallel adjusted "
+            "target columns."
+        ),
+    ),
     lookback_years: int = typer.Option(
         5,
         help="Maximum prior county years used for lagged outcome features.",
@@ -2573,6 +2604,14 @@ def model_design_matrix(
             "Regional incidence clusters file not found: "
             f"{regional_incidence_clusters_path}"
         )
+    if (
+        reporting_basis_adjustment_path is not None
+        and not reporting_basis_adjustment_path.exists()
+    ):
+        raise typer.BadParameter(
+            "Reporting basis adjustment file not found: "
+            f"{reporting_basis_adjustment_path}"
+        )
 
     try:
         result = build_model_design_matrix(
@@ -2581,12 +2620,102 @@ def model_design_matrix(
             county_adjacency_path=county_adjacency_path,
             regional_signals_path=regional_signals_path,
             regional_incidence_clusters_path=regional_incidence_clusters_path,
+            reporting_basis_adjustment_path=reporting_basis_adjustment_path,
         )
     except ModelDesignMatrixInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
     outputs = write_model_design_matrix_outputs(result, output_dir)
     typer.echo(f"Wrote {len(result.rows)} model design matrix row(s) to {outputs.matrix_path}")
     typer.echo(f"Wrote model design matrix schema to {outputs.schema_path}")
+
+
+@etl_app.command("reporting-basis-adjustment")
+def reporting_basis_adjustment(
+    regional_incidence_path: Path = typer.Option(
+        Path("build/etl/regional-incidence/midatlantic_lyme_incidence_county_year.csv"),
+        help="Input regional county-year Lyme incidence panel CSV.",
+    ),
+    county_adjacency_path: Path | None = typer.Option(
+        None,
+        help="Optional regional county adjacency CSV for factor smoothing.",
+    ),
+    did_control_panel_path: Path | None = typer.Option(
+        None,
+        help=(
+            "Optional out-of-region low-incidence county-year panel used only "
+            "as a non-forecast DiD identification instrument."
+        ),
+    ),
+    pre_window_start: int = typer.Option(
+        2017,
+        help="First year in the clean pre-window used for treatment assignment.",
+    ),
+    pre_window_end: int = typer.Option(
+        2019,
+        help="Last year in the clean pre-window used for treatment assignment.",
+    ),
+    boundary_year: int = typer.Option(
+        2022,
+        help="Surveillance reporting-basis boundary year.",
+    ),
+    threshold_per_100k: float = typer.Option(
+        10.0,
+        help="CDC high-incidence threshold per 100k in the pre-window.",
+    ),
+    consecutive_years_required: int = typer.Option(
+        3,
+        help="Consecutive qualifying pre-window years required.",
+    ),
+    parallel_trend_tolerance: float = typer.Option(
+        0.25,
+        help="Maximum allowed treatment/control pre-window slope difference.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/reporting-basis-adjustment"),
+        help="Output directory for reporting-basis adjustment artifacts.",
+    ),
+) -> None:
+    if not regional_incidence_path.exists():
+        raise typer.BadParameter(
+            f"Regional incidence file not found: {regional_incidence_path}"
+        )
+    if county_adjacency_path is not None and not county_adjacency_path.exists():
+        raise typer.BadParameter(
+            f"County adjacency file not found: {county_adjacency_path}"
+        )
+    if did_control_panel_path is not None and not did_control_panel_path.exists():
+        raise typer.BadParameter(
+            f"DiD control panel file not found: {did_control_panel_path}"
+        )
+    try:
+        result = build_reporting_basis_adjustment(
+            regional_incidence_path=regional_incidence_path,
+            county_adjacency_path=county_adjacency_path,
+            did_control_panel_path=did_control_panel_path,
+            pre_window_start=pre_window_start,
+            pre_window_end=pre_window_end,
+            boundary_year=boundary_year,
+            threshold_per_100k=threshold_per_100k,
+            consecutive_years_required=consecutive_years_required,
+            parallel_trend_tolerance=parallel_trend_tolerance,
+        )
+    except ReportingBasisAdjustmentInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_reporting_basis_adjustment_outputs(result, output_dir)
+    typer.echo(
+        "Wrote "
+        f"{len(result.classifications)} high-incidence classification row(s) "
+        f"to {outputs.classification_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.did_control_panel)} DiD control panel row(s) "
+        f"to {outputs.did_control_panel_path}"
+    )
+    typer.echo(
+        f"Wrote {len(result.adjustments)} reporting basis adjustment row(s) "
+        f"to {outputs.adjustment_path}"
+    )
+    typer.echo(f"Wrote reporting basis adjustment run row to {outputs.run_path}")
 
 
 @etl_app.command("county-adjacency")
@@ -2730,6 +2859,18 @@ def model_compare(
         RANDOM_FOREST_RANDOM_STATE,
         help="Random seed for the random forest research comparison lane.",
     ),
+    target_scale: str = typer.Option(
+        "raw",
+        help="Target scale to evaluate: raw or basis_adjusted.",
+    ),
+    allow_cross_regime_raw_targets: bool = typer.Option(
+        False,
+        "--allow-cross-regime-raw-targets/--no-allow-cross-regime-raw-targets",
+        help=(
+            "Explicitly allow raw-scale training across surveillance reporting "
+            "regimes and flag outputs."
+        ),
+    ),
     output_dir: Path = typer.Option(
         Path("build/etl/model-comparison"),
         help="Output directory for model comparison artifacts.",
@@ -2771,6 +2912,8 @@ def model_compare(
             random_forest_min_samples_leaf=random_forest_min_samples_leaf,
             random_forest_max_features=random_forest_max_features,
             random_forest_random_state=random_forest_random_state,
+            target_scale=target_scale,
+            allow_cross_regime_raw_targets=allow_cross_regime_raw_targets,
         )
     except ModelComparisonInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -4121,6 +4264,54 @@ def regional_annual_forecast_intervals(
     )
 
 
+@etl_app.command("step1-forecast-skill-anchor")
+def step1_forecast_skill_anchor(
+    observed_fit_comparisons_path: Path = typer.Option(
+        Path(
+            "build/etl/regional-forecast-observed-fit/"
+            "regional_forecast_observed_fit_comparisons.csv"
+        ),
+        help="Input regional forecast-vs-observed comparison CSV.",
+    ),
+    forecast_year: int = typer.Option(
+        2024,
+        help="Forecast year to use as the step-1 anchor.",
+    ),
+    state_abbr: str = typer.Option(
+        "PA",
+        help="Observed state overlay abbreviation to use as the anchor.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/step1-forecast-skill-anchor"),
+        help="Output directory for step-1 forecast skill anchor artifacts.",
+    ),
+) -> None:
+    if not observed_fit_comparisons_path.exists():
+        raise typer.BadParameter(
+            "Observed-fit comparisons not found: "
+            f"{observed_fit_comparisons_path}"
+        )
+    if forecast_year < 1:
+        raise typer.BadParameter("forecast-year must be positive")
+    if not state_abbr.strip():
+        raise typer.BadParameter("state-abbr is required")
+
+    try:
+        result = build_step1_forecast_skill_anchor(
+            observed_fit_comparisons_path=observed_fit_comparisons_path,
+            forecast_year=forecast_year,
+            state_abbr=state_abbr,
+        )
+    except ForecastSkillAnchorInputError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    outputs = write_step1_forecast_skill_anchor_outputs(result, output_dir)
+    typer.echo(f"Wrote 1 step-1 forecast skill anchor run row to {outputs.run_path}")
+    typer.echo(
+        f"Wrote {len(result.anchors)} step-1 forecast skill anchor row(s) "
+        f"to {outputs.anchor_path}"
+    )
+
+
 @etl_app.command("regional-spatial-regime-forecast-interval-summary")
 def regional_spatial_regime_forecast_interval_summary(
     regional_annual_forecast_intervals_path: Path = typer.Option(
@@ -5396,6 +5587,161 @@ def noaa_backfill_maryland(
             ),
             start_date=parsed_start_date,
             end_date=parsed_end_date,
+        )
+    ]
+    if provenance_records:
+        provenance_output = write_acquisition_provenance_manifest(
+            provenance_records,
+            manifest_path=resolved_manifest_path,
+            append=True,
+        )
+        typer.echo(f"Wrote acquisition provenance manifest to {provenance_output}")
+
+
+@etl_app.command("noaa-backfill-regional")
+def noaa_backfill_regional(
+    config_path: Path = typer.Option(
+        Path("config/weather.toml"),
+        help="Weather acquisition config (TOML): states, datatypes, date range, "
+        "baseline window, station-selection knobs.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("build/etl/noaa-regional-1992-present"),
+        help="Output directory for ETL artifacts.",
+    ),
+    states: list[str] | None = typer.Option(
+        None,
+        "--state",
+        help="Optional subset override of config states. Repeat for multiple.",
+    ),
+    county_fips: list[str] | None = typer.Option(
+        None,
+        "--county-fips",
+        help="Optional explicit county FIPS subset (e.g. to re-pull failed "
+        "counties). Repeat for multiple. Must be within the six-state universe.",
+    ),
+    fail_fast: bool = typer.Option(False, help="Stop at the first county failure."),
+    allow_partial: bool = typer.Option(
+        False, help="Exit successfully even when one or more counties fail."
+    ),
+    dry_run: bool = typer.Option(
+        False, help="Print planned county pulls without fetching data."
+    ),
+    provenance_manifest_path: Path | None = typer.Option(
+        None, help="Output CSV manifest for API acquisition provenance."
+    ),
+) -> None:
+    """Config-driven six-state NOAA GHCND .dly time-series backfill.
+
+    Resolves the county set from the weather config (DE/DC/MD/PA/VA/WV), then for
+    each county discovers a station (CDO, FIPS-based) and pulls that station's
+    full GHCND .dly history once, windowed to the configured date range. Every
+    API call is logged to the acquisition provenance manifest.
+    """
+    try:
+        config = load_weather_config(config_path)
+    except WeatherConfigError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    selected_states = states or config.states
+    if county_fips:
+        by_fips = {loc.county_fips: loc for loc in load_weather_locations()}
+        requested = [str(value).zfill(5) for value in county_fips]
+        unknown = [value for value in requested if value not in by_fips]
+        if unknown:
+            raise typer.BadParameter(
+                f"county FIPS outside the six-state universe: {unknown}"
+            )
+        locations = [by_fips[value] for value in requested]
+    else:
+        try:
+            locations = load_weather_locations(selected_states)
+        except WeatherLocationError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+    county_fips_values = [loc.county_fips for loc in locations]
+
+    if dry_run:
+        typer.echo(
+            f"Planned {len(county_fips_values)} regional NOAA .dly county "
+            f"backfill(s) for states {selected_states} over "
+            f"{config.start_date.isoformat()}..{config.end_date.isoformat()}"
+        )
+        for loc in locations:
+            typer.echo(f"{loc.state} {loc.county_fips} {loc.county_name}")
+        typer.echo(
+            "station discovery example: "
+            + build_noaa_station_url(
+                county_fips_values[0], config.start_date, config.end_date
+            )
+        )
+        typer.echo("daily series: GHCND .dly bulk file per selected station")
+        return
+
+    def daily_fetcher(county_fips, station_id, start_date, end_date):
+        return fetch_ghcnd_dly_observations(
+            county_fips,
+            station_id,
+            start_date,
+            end_date,
+            datatypes=config.ghcnd_datatypes,
+        )
+
+    # Fallback pool drawn from the FULL six-state universe so a subset re-pull
+    # still finds the genuinely nearest station (not a temp-dead far one).
+    full_universe_fips = [loc.county_fips for loc in load_weather_locations()]
+    try:
+        result = run_noaa_regional_backfill(
+            county_fips_values=county_fips_values,
+            start_date=config.start_date,
+            end_date=config.end_date,
+            output_dir=output_dir,
+            token=get_noaa_token(),
+            station_limit=config.station_limit,
+            min_data_coverage=config.min_data_coverage,
+            max_end_lag_days=config.max_end_lag_days,
+            continue_on_error=not fail_fast,
+            nearest_station_fallback=config.nearest_station_fallback,
+            daily_fetcher=daily_fetcher,
+            validate_temp_window_end=config.validate_temp_through,
+            station_pool_county_fips=full_universe_fips,
+        )
+    except NoaaBackfillError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    typer.echo(
+        f"Completed {result.success_count}/{result.county_count} "
+        "regional county backfill(s)"
+    )
+    typer.echo(f"Wrote {result.daily_observation_count} daily observation row(s)")
+    if result.failure_count:
+        typer.echo(f"Failures: {result.failure_count}")
+        for failure in result.failures:
+            typer.echo(f"{failure.county_fips}: {failure.error}")
+        if not allow_partial:
+            raise typer.Exit(1)
+
+    resolved_manifest_path = (
+        provenance_manifest_path or output_dir / "acquisition_provenance.csv"
+    )
+    acquisition_command = _format_cli_command(
+        [
+            "tickbiterisk",
+            "etl",
+            "noaa-backfill-regional",
+            "--config-path",
+            str(config_path),
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+    provenance_records = [
+        record
+        for county_result in result.county_results
+        for record in _noaa_regional_dly_provenance_records(
+            result=county_result,
+            acquisition_command=acquisition_command,
+            start_date=config.start_date,
+            end_date=config.end_date,
         )
     ]
     if provenance_records:
@@ -7933,6 +8279,74 @@ def _noaa_backfill_provenance_records(
                 parser_method=(
                     "run_noaa_county_backfill;fetch_noaa_daily_observations;"
                     "parse_noaa_daily_data_response"
+                ),
+            )
+        )
+    return records
+
+
+def _noaa_regional_dly_provenance_records(
+    *,
+    result: NoaaCountyBackfillResult,
+    acquisition_command: str,
+    start_date: date,
+    end_date: date,
+) -> list[AcquisitionProvenanceRecord]:
+    """Accurate provenance for the regional GHCND .dly time-series acquisition.
+
+    Records the real API calls: CDO station discovery (FIPS-based) and the bulk
+    GHCND .dly station-file URL (full period of record). Distinct from the CDO
+    /data path so the manifest is honest about how each county was pulled.
+    """
+    records = [
+        _noaa_provenance_record(
+            source_id=(
+                "noaa_cdo_ghcnd_stations_regional_dly_backfill_"
+                f"{result.county_fips}_{_date_slug(start_date)}_{_date_slug(end_date)}"
+            ),
+            source_name="NOAA CDO GHCND station discovery",
+            source_url=build_noaa_station_url(result.county_fips, start_date, end_date),
+            acquisition_command=acquisition_command,
+            request_description=(
+                "NOAA CDO GHCND FIPS-based station discovery for regional county "
+                f"FIPS {result.county_fips} during six-state .dly backfill."
+            ),
+            output_path=result.stations_output_path,
+            row_count=result.station_count,
+            parser_method=(
+                "run_noaa_regional_backfill;fetch_noaa_stations;"
+                "parse_noaa_station_response;select_long_coverage_stations"
+            ),
+        )
+    ]
+    for station_id in result.selected_station_ids:
+        station_row_count = result.daily_observation_count_by_station.get(
+            station_id,
+            result.daily_observation_count
+            if len(result.selected_station_ids) == 1
+            else 0,
+        )
+        records.append(
+            _noaa_provenance_record(
+                source_id=(
+                    "noaa_ghcnd_dly_regional_backfill_"
+                    f"{result.county_fips}_{_source_id_slug(station_id)}_"
+                    f"{_date_slug(start_date)}_{_date_slug(end_date)}"
+                ),
+                source_name="NOAA GHCND .dly bulk station time series",
+                source_url=build_ghcnd_dly_url(station_id),
+                acquisition_command=acquisition_command,
+                request_description=(
+                    "NOAA GHCND .dly bulk station file (full period of record) for "
+                    f"station {station_id} mapped to regional county FIPS "
+                    f"{result.county_fips}; windowed to "
+                    f"{start_date.isoformat()}..{end_date.isoformat()}."
+                ),
+                output_path=result.daily_output_path,
+                row_count=station_row_count,
+                parser_method=(
+                    "run_noaa_regional_backfill;fetch_ghcnd_dly_observations;"
+                    "parse_ghcnd_dly_text"
                 ),
             )
         )
