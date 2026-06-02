@@ -15,8 +15,8 @@ python -m pip install -e ".[dev]"
 - Single test: `python -m pytest tests/test_risk_score.py::test_name -q`
 - Lint: `ruff check .`  (if not on PATH, it is installed in the project venv: `.venv/bin/ruff check .`)
 - Dashboard browser smoke (Playwright, serves `public/`): `npm ci` then `npm run test:dashboard`
-- JS syntax gate: `node --check public/app.js && node --check public/regional-research.js`
-- Serve a dashboard locally: `python3 -m http.server 8000 --directory public` → open `/index.html` (Maryland) or `/regional-research.html` (six-state)
+- JS syntax gate: `node --check public/regional-research.js`
+- Serve the dashboard locally: `python3 -m http.server 8000 --directory public` → open `/` (redirects to the six-state regional product) or `/regional-research.html` directly. (The former Maryland POC is archived at `archive/md-poc/`, out of the deploy path.)
 
 The CLI is the entry point for everything: `tickbiterisk <subapp> <command>` (`cli.py:app`, sub-apps `etl`, `risk`, `dashboard`). Internal tooling is CLI commands by design (AD-003), not MCP. `cli.py` is large and thin — logic lives in the packages below.
 
@@ -31,20 +31,19 @@ Data flows in one direction through four stages; each stage is a layer of `tickb
 
 `build/` is gitignored — never commit ETL outputs or acquired data there. `data/raw/` (source) and `public/` (derived, public-safe bundles) ARE committed. `cc_tasks/`, `handoffs/`, and `.env` are gitignored.
 
-## Two deployed products share one pipeline
+## The product is the six-state regional dashboard (MD was POC only)
 
-`public/` is served as-is (locally or via GitHub Pages) and hosts two distinct dashboards:
+The shipped, public product is the **regional research dashboard** (six-state: DE, DC, MD, PA, VA, WV): `regional-research.html` + `regional-research.js` + `public/research-data/regional/*` (11-file JSON/GeoJSON bundle), built by `dashboard build-regional-research-assets` → `dashboard_assets.write_regional_research_dashboard_assets` (same `static_export` path). `public/index.html` is a thin redirect to `regional-research.html`, so `/` lands on the product. The regional bundle carries `research_status` metadata (display/metadata only; does NOT gate visibility — anything in `public/` is published).
 
-- **Maryland default**: `index.html` + `app.js` + `public/data/md_*.json`.
-- **Regional research (six-state: DE, DC, MD, PA, VA, WV)**: `regional-research.html` + `regional-research.js` + `public/research-data/regional/*` (11-file JSON/GeoJSON bundle), built by `dashboard build-regional-research-assets` → `dashboard_assets.write_regional_research_dashboard_assets` (which calls the same `static_export` path). The regional bundle carries `research_status` metadata; that flag is display/metadata only and does **not** gate public visibility — anything in `public/` is published.
+**Maryland was the POC/MVP and is NOT the product.** It is archived at `archive/md-poc/` (out of the deploy path), retained for posterity only. It is not deployed, not maintained, and carries a known band-collapse display defect that will NOT be fixed (POC, not product). Do not treat MD as a live product, do not reintroduce it to `public/`, and do not let any forecast claim derive from it.
 
-`.github/workflows/pages.yml` is the deploy gate: on push to `main` it runs ruff + pytest + JS checks + the Playwright smoke, then **validates the exact committed bundle** (the regional step asserts the 11-file set, county/state counts 283/6, schema, and `research_status`), then deploys `public/`. Any edit to a committed bundle must keep that validator green, or the deploy breaks.
+`.github/workflows/pages.yml` is the deploy gate: on push to `main` it runs ruff + pytest + JS checks + the Playwright smoke, then validates the exact committed regional bundle (11-file set, county/state counts 283/6, schema, `research_status`), then deploys `public/`. Any edit to the committed bundle must keep that validator green.
 
 ## Domain landmines (these have cost repeat effort)
 
 - **Incidence has two incompatible bases.** County Lyme incidence comes from either the **CDC county dashboard** (zero-suppression, the basis the shipped panel uses — every row flagged `cdc_dashboard_total_cases`) OR the **CDC public-use** files (`qtbi-xd4i` 2008–2021, `x5j9-wybp` 2022–2023), which are heavily suppressed (~50% of county-years overall, ~70% in VA/WV). They are NOT interchangeable; "re-derive from `qtbi-xd4i`" yields a far sparser panel than what's live. A consistent six-state basis extends through **2023**; 2024 exists only via heterogeneous state-DOH sources.
 - **The 2022 CSTE case-definition change (CSTE 21-ID-05, effective 2022-01-01) is a large discontinuity** (+72.9% reported cases in high-incidence jurisdictions) unrelated to true disease change. Models fit across it without accounting for the regime break will attribute the artifact to the covariate. The longest definition-stable window ending 2021 is 2017–2021.
-- **The central forecast is a seasonally-allocated lagged-incidence baseline; `model_card` reports `weather_mode=not_used`.** Do not let the product claim weather/ecology/Bayesian adjustment it does not have. The real weather→incidence model is Track-2 work in progress on branch `codex/surveillance-regime-bridge` (not on `main`).
+- **The central forecast is a seasonally-allocated lagged-incidence baseline; `model_card` reports `weather_mode=not_used`.** Do not let the product claim weather/ecology/Bayesian adjustment it does not have. Track-2 investigated weather and ecology covariates and found them non-identifying/null at annual county resolution (three converging weather nulls + a data-limited ecology dead-end; see lab notes 10 and 11). `weather_mode=not_used` is the **earned scoping decision from that investigation, not a placeholder** — the negative-result trail (signal-check scripts, `config/signal_check.toml`) is on `main` as evidence, not as a wired feature.
 
 ## Weather acquisition (config-driven)
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-PUBLIC_DATA_DIR = Path(__file__).resolve().parents[1] / "public" / "data"
+PUBLIC_DATA_DIR = Path(__file__).resolve().parents[1] / "archive" / "md-poc" / "data"
 
 EXPECTED_PUBLIC_DATA_FILES = {
     "md_counties.geojson",

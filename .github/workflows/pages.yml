@@ -50,37 +50,10 @@ jobs:
 
       - name: Check dashboard JavaScript syntax
         run: |
-          node --check public/app.js
           node --check public/regional-research.js
 
       - name: Run dashboard browser smoke
         run: npm run test:dashboard
-
-      - name: Validate committed dashboard data
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          data_dir = Path("public/data")
-          expected_files = [
-              "md_counties.geojson",
-              "md_county_metadata.json",
-              "md_county_risk_weekly.json",
-              "model_card.json",
-              "source_catalog.json",
-              "static_export_manifest.json",
-          ]
-
-          for filename in expected_files:
-              path = data_dir / filename
-              if not path.is_file():
-                  raise SystemExit(f"Missing dashboard data asset: {path}")
-              with path.open(encoding="utf-8") as handle:
-                  parsed = json.load(handle)
-              if filename.endswith(".geojson") and parsed.get("type") != "FeatureCollection":
-                  raise SystemExit(f"Expected GeoJSON FeatureCollection: {path}")
-          PY
 
       - name: Validate regional research preview data
         run: |

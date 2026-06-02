@@ -1,7 +1,7 @@
 from pathlib import Path
 
 
-PUBLIC_DIR = Path("public")
+PUBLIC_DIR = Path("archive/md-poc")
 
 
 def test_dashboard_html_has_accessible_landmarks_and_data_hooks() -> None:
