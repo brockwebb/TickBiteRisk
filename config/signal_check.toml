@@ -79,3 +79,16 @@ run_window_end_doy = 180
 threshold_grid_c = [8, 10, 12, 14]
 # Minimum consecutive days above threshold to count as a "solid run".
 run_days_grid = [5, 7, 10]
+
+# Rare high-threshold "unseasonable early warm spell" feature (third check).
+# Single COMMITTED threshold (user decision), NOT a grid. Uses daily-MAX temp:
+# a sustained run of >=70 F max days early in the season is the intended
+# "unseasonably warm week." Aimed at the magnitude outcome but lag-0 is
+# confound-suspect by construction (early warmth is a TIMING signal; the spring
+# nymph cohort size was set the prior year). Both lags reported regardless.
+[signal_check.warm70]
+threshold_max_f = 70.0
+run_days = 5
+window_start_doy = 60       # ~ Mar 1
+window_end_doy = 151        # ~ May 31
+expected_sign = { warm70_onset_doy = "-", warm70_spell_count = "+", warm70_presence = "+" }
