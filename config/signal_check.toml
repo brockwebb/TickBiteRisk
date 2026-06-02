@@ -1,0 +1,56 @@
+# Config for the within-segment weather->incidence signal check
+# (cc_tasks/2026-06-01_within-segment-weather-signal-check.md).
+#
+# Exploratory, read-only with respect to the model. Feature definitions and
+# thresholds live here (constitution §2) so the analysis is not hardcoded and
+# the pre-committed choices are auditable. Read by
+# scripts/within_segment_signal_check.py.
+
+[signal_check]
+states = ["DE", "DC", "MD", "PA", "VA", "WV"]
+
+# Incidence-lag hypotheses, stated up front and held fixed across both segments.
+# Both are reported (never just the best): lag 0 = same-year weather; lag 1 =
+# prior-year weather shaping the questing cohort reported the following year.
+lags = [0, 1]
+
+# Definition-stable segments (never fit across the 2022 CSTE +72.9% break).
+# (Array-of-tables must follow the scalar keys above.)
+[[signal_check.segments]]
+name = "2017-2021"
+start_year = 2017
+end_year = 2021
+
+[[signal_check.segments]]
+name = "2022-2023"
+start_year = 2022
+end_year = 2023
+
+[signal_check.features]
+# Growing-degree-days accumulation over the warm season. Base 50 F (~10 C), the
+# common arthropod development threshold; warmth drives tick development/questing.
+gdd_base_f = 50.0
+warm_season_months = [3, 4, 5, 6, 7, 8, 9, 10]
+
+# Spring activity onset: day-of-year of the first day starting a sustained run of
+# daily-mean temperature >= the threshold. Earlier onset = longer activity season.
+spring_onset_mean_f = 45.0
+spring_onset_run_days = 7
+
+# Overwinter cold severity: count of hard-freeze days (tmin <= threshold) in the
+# cold season. More hard-freeze days = greater overwinter tick mortality.
+hard_freeze_tmin_f = 14.0
+cold_season_months = [11, 12, 1, 2, 3]
+
+# Moisture proxy: total warm-season precipitation (inches). Included because PRCP
+# is present and ~99% complete in-window; soil/humidity/ET are absent in GHCND
+# and are deliberately OMITTED (not fabricated).
+include_precip = true
+
+# Pre-committed expected sign of each feature's rank-association with incidence
+# (reported regardless of expectation; this only frames interpretation).
+[signal_check.expected_sign]
+gdd_base50_warm = "+"
+spring_onset_doy = "-"   # earlier onset (lower DOY) -> higher incidence
+winter_hard_freeze_days = "-"
+warm_season_precip_in = "+"
