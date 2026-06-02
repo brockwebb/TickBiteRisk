@@ -32,6 +32,7 @@ class WeatherConfig:
     ghcnd_datatypes: list[str]
     start_date: date
     end_date: date
+    validate_temp_through: date
     baseline_years: int
     station_limit: int
     min_data_coverage: float
@@ -89,6 +90,18 @@ def load_weather_config(path: Path) -> WeatherConfig:
             f"weather.start_date ({start_date}) must not be after weather.end_date ({end_date})"
         )
 
+    if "validate_temp_through" in weather:
+        validate_temp_through = _parse_date(
+            weather["validate_temp_through"], "weather.validate_temp_through"
+        )
+    else:
+        validate_temp_through = end_date
+    if not (start_date <= validate_temp_through <= end_date):
+        raise WeatherConfigError(
+            "weather.validate_temp_through must fall within "
+            f"[{start_date}, {end_date}]; got {validate_temp_through}"
+        )
+
     baseline_years = int(_require(weather, "baseline_years", "weather."))
     if baseline_years <= 0:
         raise WeatherConfigError("weather.baseline_years must be a positive integer")
@@ -116,6 +129,7 @@ def load_weather_config(path: Path) -> WeatherConfig:
         ghcnd_datatypes=datatypes,
         start_date=start_date,
         end_date=end_date,
+        validate_temp_through=validate_temp_through,
         baseline_years=baseline_years,
         station_limit=station_limit,
         min_data_coverage=min_data_coverage,

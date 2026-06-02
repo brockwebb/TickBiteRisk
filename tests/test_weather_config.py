@@ -22,6 +22,7 @@ states = ["DE", "DC", "MD", "PA", "VA", "WV"]
 ghcnd_datatypes = ["TMAX", "TMIN", "PRCP", "SNOW", "SNWD"]
 start_date = "1992-01-01"
 end_date = "2021-12-31"
+validate_temp_through = "2021-12-31"
 baseline_years = 30
 
 [weather.station_selection]
@@ -44,7 +45,14 @@ def test_loads_all_parameters(tmp_path):
     assert config.ghcnd_datatypes == ["TMAX", "TMIN", "PRCP", "SNOW", "SNWD"]
     assert config.start_date == date(1992, 1, 1)
     assert config.end_date == date(2021, 12, 31)
+    assert config.validate_temp_through == date(2021, 12, 31)
     assert config.baseline_years == 30
+
+
+def test_validate_temp_through_defaults_to_end_date(tmp_path):
+    body = VALID.replace('validate_temp_through = "2021-12-31"\n', "")
+    config = load_weather_config(_write(tmp_path, body))
+    assert config.validate_temp_through == config.end_date
     assert config.station_limit == 1
     assert config.min_data_coverage == 0.5
     assert config.max_end_lag_days == 14

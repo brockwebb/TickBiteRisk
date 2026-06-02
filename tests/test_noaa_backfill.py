@@ -76,6 +76,77 @@ def test_run_noaa_county_backfill_uses_injected_daily_fetcher(tmp_path: Path) ->
     assert result.daily_output_path.exists()
 
 
+def test_temp_maxdate_in_window_ignores_non_temp_rows() -> None:
+    from tickbiterisk.etl.noaa import NoaaDailyObservation
+    from tickbiterisk.etl.noaa_backfill import temp_maxdate
+
+    rows = [
+        NoaaDailyObservation("10001", "S", date(2007, 6, 1), "x", 50.0, 32.0,
+                             0.0, 0.0, None, "h"),
+        # later row but PRCP only (no temp) -> must not count toward temp maxdate
+        NoaaDailyObservation("10001", "S", date(2021, 6, 1), "x", None, None,
+                             0.1, 0.0, None, "h"),
+    ]
+    assert temp_maxdate(rows) == date(2007, 6, 1)
+
+
+def test_select_validated_dly_station_skips_temp_dead_station() -> None:
+    # First (nearest) station has TMAX/TMIN ending 2007; must be rejected for a
+    # 2021 window in favor of the next candidate with live temp data.
+    from tickbiterisk.etl.noaa import NoaaDailyObservation, NoaaStation
+    from tickbiterisk.etl.noaa_backfill import select_validated_dly_station
+
+    def mk_station(sid):
+        return NoaaStation("10001", sid, sid, 39.0, -75.0,
+                           date(1990, 1, 1), date(2026, 1, 1), 0.9)
+
+    dead, live = mk_station("GHCND:DEAD"), mk_station("GHCND:LIVE")
+
+    def fetcher(county_fips, station_id, start_date, end_date):
+        end = date(2007, 12, 31) if station_id == "GHCND:DEAD" else date(2021, 12, 31)
+        return [
+            NoaaDailyObservation(county_fips, station_id, date(2000, 1, 1), "x",
+                                 50.0, 32.0, 0.0, 0.0, None, "h"),
+            NoaaDailyObservation(county_fips, station_id, end, "x",
+                                 50.0, 32.0, 0.0, 0.0, None, "h"),
+        ]
+
+    station, rows = select_validated_dly_station(
+        [dead, live],
+        county_fips="10001",
+        daily_fetcher=fetcher,
+        acquire_start=date(2017, 1, 1),
+        acquire_end=date(2021, 12, 31),
+        validate_window_start=date(2017, 1, 1),
+        validate_window_end=date(2021, 12, 31),
+    )
+    assert station is not None and station.station_id == "GHCND:LIVE"
+    assert rows
+
+
+def test_select_validated_dly_station_returns_none_when_all_temp_dead() -> None:
+    from tickbiterisk.etl.noaa import NoaaDailyObservation, NoaaStation
+    from tickbiterisk.etl.noaa_backfill import select_validated_dly_station
+
+    s = NoaaStation("10001", "GHCND:DEAD", "x", 39.0, -75.0,
+                    date(1990, 1, 1), date(2026, 1, 1), 0.9)
+
+    def fetcher(county_fips, station_id, start_date, end_date):
+        return [NoaaDailyObservation(county_fips, station_id, date(2007, 1, 1), "x",
+                                     50.0, 32.0, 0.0, 0.0, None, "h")]
+
+    station, rows = select_validated_dly_station(
+        [s],
+        county_fips="10001",
+        daily_fetcher=fetcher,
+        acquire_start=date(2017, 1, 1),
+        acquire_end=date(2021, 12, 31),
+        validate_window_start=date(2017, 1, 1),
+        validate_window_end=date(2021, 12, 31),
+    )
+    assert station is None and rows == []
+
+
 def test_fallback_distance_resolves_non_maryland_county_centroid() -> None:
     # Regression: the nearest-station fallback resolved county centroids from the
     # Maryland-only locations, raising KeyError for DE/DC/PA/VA/WV counties.
@@ -94,6 +165,64 @@ def test_fallback_distance_resolves_non_maryland_county_centroid() -> None:
     )
     miles = _station_distance_to_county_miles("51820", station)  # VA city, not MD
     assert miles >= 0.0
+
+
+def test_run_noaa_county_backfill_validated_skips_temp_dead_internal(tmp_path: Path) -> None:
+    # Internal station is temp-dead (ends 2007); a live fallback exists.
+    from tickbiterisk.etl.noaa import NoaaStation
+
+    def stations_json(url, token):
+        if "stations?" in url:
+            return {"results": [{"id": "GHCND:DEAD", "name": "DEAD", "latitude": 39.0,
+                                 "longitude": -76.0, "mindate": "1990-01-01",
+                                 "maxdate": "2026-01-01", "datacoverage": 1.0}]}
+        raise AssertionError(url)
+
+    live_fallback = NoaaStation("99999", "GHCND:LIVE", "LIVE", 39.1, -76.1,
+                                date(1990, 1, 1), date(2026, 1, 1), 0.95)
+
+    def fetcher(county_fips, station_id, start_date, end_date):
+        end = date(2007, 12, 31) if station_id == "GHCND:DEAD" else date(2021, 12, 31)
+        return [NoaaDailyObservation(county_fips, station_id, end, "x",
+                                     50.0, 32.0, 0.0, 0.0, None, "h")]
+
+    result = run_noaa_county_backfill(
+        county_fips="10001",
+        start_date=date(1992, 1, 1),
+        end_date=date(2021, 12, 31),
+        output_dir=tmp_path,
+        token="t",
+        json_get=stations_json,
+        daily_fetcher=fetcher,
+        fallback_stations=[live_fallback],
+        validate_temp_window_end=date(2021, 12, 31),
+    )
+    assert result.selected_station_ids == ["GHCND:LIVE"]  # temp-dead internal rejected
+
+
+def test_run_noaa_county_backfill_validated_raises_when_all_temp_dead(tmp_path: Path) -> None:
+    def stations_json(url, token):
+        if "stations?" in url:
+            return {"results": [{"id": "GHCND:DEAD", "name": "DEAD", "latitude": 39.0,
+                                 "longitude": -76.0, "mindate": "1990-01-01",
+                                 "maxdate": "2026-01-01", "datacoverage": 1.0}]}
+        raise AssertionError(url)
+
+    def fetcher(county_fips, station_id, start_date, end_date):
+        return [NoaaDailyObservation(county_fips, station_id, date(2007, 1, 1), "x",
+                                     50.0, 32.0, 0.0, 0.0, None, "h")]
+
+    with pytest.raises(NoaaBackfillNoStationError):
+        run_noaa_county_backfill(
+            county_fips="10001",
+            start_date=date(1992, 1, 1),
+            end_date=date(2021, 12, 31),
+            output_dir=tmp_path,
+            token="t",
+            json_get=stations_json,
+            daily_fetcher=fetcher,
+            validate_temp_window_end=date(2021, 12, 31),
+        )
 
 
 def test_run_noaa_regional_backfill_loops_multiple_counties(tmp_path: Path) -> None:

@@ -110,11 +110,13 @@ def test_regional_backfill_run_writes_daily_and_provenance(tmp_path, monkeypatch
         ]
 
     def fake_dly(county_fips, station_id, start_date, end_date, *, datatypes=None):
+        # Temp must reach the validation window end (config validate_temp_through
+        # = 2021-12-31) or the station is correctly rejected.
         return [
             NoaaDailyObservation(
                 county_fips=county_fips,
                 station_id=station_id,
-                date=date(2019, 1, 1),
+                date=d,
                 source="noaa_ghcnd_dly_bulk",
                 tmax_f=50.0,
                 tmin_f=32.0,
@@ -123,6 +125,7 @@ def test_regional_backfill_run_writes_daily_and_provenance(tmp_path, monkeypatch
                 snwd_inches=None,
                 source_url_hash="hash",
             )
+            for d in (date(2019, 1, 1), date(2021, 12, 31))
         ]
 
     monkeypatch.setattr("tickbiterisk.cli.get_noaa_token", lambda: "fake-token")

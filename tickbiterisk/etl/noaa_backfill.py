@@ -31,6 +31,10 @@ from tickbiterisk.etl.weather_locations import (
 # injected for the regional time-series acquisition.
 DailyFetcher = Callable[[str, str, date, date], list[NoaaDailyObservation]]
 
+# Length (years) of the temperature-density validation window ending at the
+# configured validation date (e.g. 2021 -> 2017-2021).
+_VALIDATION_WINDOW_YEARS = 5
+
 
 class NoaaBackfillError(RuntimeError):
     """Base error for NOAA backfill orchestration failures."""
@@ -149,6 +153,7 @@ def run_noaa_county_backfill(
     fallback_stations: Sequence[NoaaStation] | None = None,
     json_get: Callable[[str, str], dict[str, Any]] | None = None,
     daily_fetcher: DailyFetcher | None = None,
+    validate_temp_window_end: date | None = None,
 ) -> NoaaCountyBackfillResult:
     normalized_county_fips = county_fips.zfill(5)
     _validate_backfill_args(
@@ -164,13 +169,83 @@ def run_noaa_county_backfill(
         token=token,
         json_get=json_get,
     )
-    selected = select_long_coverage_stations(
+    # Station eligibility is decided by the validation window (where we need
+    # temperature), NOT the acquisition end_date — the .dly pull may extend years
+    # past it for covariates, and station metadata maxdate lags by months.
+    eligibility_end = (
+        validate_temp_window_end if validate_temp_window_end is not None else end_date
+    )
+    internal = select_long_coverage_stations(
         stations,
         start_date=start_date,
-        end_date=end_date,
+        end_date=eligibility_end,
         min_data_coverage=min_data_coverage,
         max_end_lag_days=max_end_lag_days,
-    )[:station_limit]
+    )
+
+    # Validated .dly path: try candidates in rank order and accept the first whose
+    # ACTUAL in-window TMAX/TMIN reaches the window — rejecting stations whose
+    # temperature record died early (CDO all-element maxdate overstates temp).
+    if validate_temp_window_end is not None and daily_fetcher is not None:
+        candidate_ids = {station.station_id for station in internal}
+        candidates = list(internal)
+        if fallback_stations:
+            nearest = _nearest_eligible_fallback_stations(
+                county_fips=normalized_county_fips,
+                stations=fallback_stations,
+                start_date=start_date,
+                end_date=eligibility_end,
+                station_limit=len(fallback_stations),
+                min_data_coverage=min_data_coverage,
+                max_end_lag_days=max_end_lag_days,
+            )
+            candidates += [s for s in nearest if s.station_id not in candidate_ids]
+        # Validate temperature density over a fit window ending at the validation
+        # date (5-year window), so a station must actually report temp IN the
+        # window, not merely reach it.
+        validate_window_start = date(
+            validate_temp_window_end.year - (_VALIDATION_WINDOW_YEARS - 1), 1, 1
+        )
+        station, validated_rows = select_validated_dly_station(
+            candidates,
+            county_fips=normalized_county_fips,
+            daily_fetcher=daily_fetcher,
+            acquire_start=start_date,
+            acquire_end=end_date,
+            validate_window_start=validate_window_start,
+            validate_window_end=validate_temp_window_end,
+        )
+        if station is None:
+            raise NoaaBackfillNoStationError(
+                "No NOAA GHCND station with TMAX/TMIN through "
+                f"{validate_temp_window_end.isoformat()} covers "
+                f"county_fips={normalized_county_fips} (checked "
+                f"{len(candidates)} candidate station(s))"
+            )
+        selected = [station]
+        selection_method = (
+            "internal" if station.station_id in candidate_ids else "nearest_validated"
+        )
+        daily_rows = list(validated_rows)
+        daily_observation_count_by_station = {station.station_id: len(validated_rows)}
+        stations_output_path = write_noaa_stations_output(
+            selected, output_dir, append=True
+        )
+        daily_output_path = write_noaa_daily_observations_output(
+            daily_rows, output_dir, append=True
+        )
+        return NoaaCountyBackfillResult(
+            county_fips=normalized_county_fips,
+            selected_station_ids=[station.station_id],
+            station_count=1,
+            daily_observation_count=len(daily_rows),
+            stations_output_path=stations_output_path,
+            daily_output_path=daily_output_path,
+            daily_observation_count_by_station=daily_observation_count_by_station,
+            selection_method=selection_method,
+        )
+
+    selected = internal[:station_limit]
     selection_method = "internal"
     if not selected and fallback_stations:
         selected = _nearest_eligible_fallback_stations(
@@ -334,6 +409,8 @@ def run_noaa_regional_backfill(
     nearest_station_fallback: bool = False,
     json_get: Callable[[str, str], dict[str, Any]] | None = None,
     daily_fetcher: DailyFetcher | None = None,
+    validate_temp_window_end: date | None = None,
+    station_pool_county_fips: Sequence[str] | None = None,
 ) -> NoaaMultiCountyBackfillResult:
     """State-agnostic multi-county NOAA backfill for the six-state product.
 
@@ -342,6 +419,13 @@ def run_noaa_regional_backfill(
     time-series path, a ``daily_fetcher`` (GHCND .dly). Station discovery stays
     FIPS-based. A county with no qualifying station is recorded as a failure
     (fail-loud per county) rather than silently dropped.
+
+    ``validate_temp_window_end`` enables validated selection (reject stations
+    whose actual TMAX/TMIN died before the window). ``station_pool_county_fips``
+    sources the nearest-station fallback pool from the FULL six-state universe
+    (not just the processed subset), so a re-pull of a few counties still draws
+    on every region station — this is what stops a temp-dead far station from
+    being assigned to dozens of counties.
     """
     if not county_fips_values:
         raise NoaaBackfillCountyFipsError(
@@ -354,9 +438,14 @@ def run_noaa_regional_backfill(
         station_limit=station_limit,
     )
 
+    pool_fips = (
+        [str(v).zfill(5) for v in station_pool_county_fips]
+        if station_pool_county_fips is not None
+        else county_fips_list
+    )
     fallback_stations = (
         _fetch_noaa_station_pool(
-            county_fips_list=county_fips_list,
+            county_fips_list=pool_fips,
             start_date=start_date,
             end_date=end_date,
             token=token,
@@ -383,6 +472,7 @@ def run_noaa_regional_backfill(
                     fallback_stations=fallback_stations,
                     json_get=json_get,
                     daily_fetcher=daily_fetcher,
+                    validate_temp_window_end=validate_temp_window_end,
                 )
             )
         except NoaaBackfillError as exc:
@@ -712,6 +802,80 @@ def _nearest_eligible_fallback_stations(
         replace(station, county_fips=county_fips)
         for station in sorted_by_distance[:station_limit]
     ]
+
+
+def temp_maxdate(daily_rows: Sequence[NoaaDailyObservation]) -> date | None:
+    """Latest date with an actual TMAX or TMIN observation.
+
+    Distinct from a station's CDO all-element ``maxdate``: a station can still
+    report precipitation long after its temperature record ended, so the CDO
+    maxdate overstates temperature availability. Station selection must use this.
+    """
+    temp_dates = [
+        row.date
+        for row in daily_rows
+        if row.tmax_f is not None or row.tmin_f is not None
+    ]
+    return max(temp_dates) if temp_dates else None
+
+
+def inwindow_temp_days(
+    daily_rows: Sequence[NoaaDailyObservation],
+    window_start: date,
+    window_end: date,
+) -> int:
+    """Distinct dates inside the window with an actual TMAX or TMIN observation."""
+    return len(
+        {
+            row.date
+            for row in daily_rows
+            if window_start <= row.date <= window_end
+            and (row.tmax_f is not None or row.tmin_f is not None)
+        }
+    )
+
+
+# Max candidate stations to fetch+test per county before settling for the best.
+_MAX_VALIDATION_CANDIDATES = 8
+
+
+def select_validated_dly_station(
+    candidates: Sequence[NoaaStation],
+    *,
+    county_fips: str,
+    daily_fetcher: DailyFetcher,
+    acquire_start: date,
+    acquire_end: date,
+    validate_window_start: date,
+    validate_window_end: date,
+    good_density: float = 0.90,
+) -> tuple[NoaaStation | None, list[NoaaDailyObservation]]:
+    """Pick the candidate with the best ACTUAL in-window temperature density.
+
+    Fetches each candidate's full ``.dly`` over ``[acquire_start, acquire_end]``
+    (so accepted stations keep their entire covariate series) and measures real
+    TMAX/TMIN coverage WITHIN ``[validate_window_start, validate_window_end]`` —
+    not merely the latest temp date, which a station that only began reporting
+    temperature after the window would satisfy while contributing nothing in it.
+    Early-accepts the first candidate at or above ``good_density``; otherwise
+    keeps the best with any in-window temperature. Returns ``(None, [])`` only
+    when no candidate has a single in-window temperature day (→ interpolation).
+    """
+    normalized_fips = county_fips.zfill(5)
+    expected = (validate_window_end - validate_window_start).days + 1
+    best: tuple[int, NoaaStation, list[NoaaDailyObservation]] | None = None
+    for station in candidates[:_MAX_VALIDATION_CANDIDATES]:
+        rows = daily_fetcher(
+            normalized_fips, station.station_id, acquire_start, acquire_end
+        )
+        days = inwindow_temp_days(rows, validate_window_start, validate_window_end)
+        if best is None or days > best[0]:
+            best = (days, station, rows)
+        if expected and days / expected >= good_density:
+            return replace(station, county_fips=normalized_fips), rows
+    if best is not None and best[0] > 0:
+        return replace(best[1], county_fips=normalized_fips), best[2]
+    return None, []
 
 
 def _dedupe_stations_by_id(stations: Sequence[NoaaStation]) -> list[NoaaStation]:

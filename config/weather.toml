@@ -14,10 +14,17 @@ states = ["DE", "DC", "MD", "PA", "VA", "WV"]
 # NOAA GHCND daily variables to extract from each station's .dly time series.
 ghcnd_datatypes = ["TMAX", "TMIN", "PRCP", "SNOW", "SNWD"]
 
-# Acquisition window: 1992 start gives a true 30-year climatological normal
-# (1992-2021); the definition-stable fit window (2017-2021) sits inside it.
+# Acquisition window: 1992 start gives a true 30-year climatological normal;
+# end extends to present because forecasts (2024/2025/2026) need weather
+# covariates through today regardless of where incidence ends.
 start_date = "1992-01-01"
-end_date = "2021-12-31"
+end_date = "2026-12-31"
+
+# A station qualifies only if its ACTUAL TMAX/TMIN reaches at least this date
+# (minus station lag) — not CDO's all-element maxdate, which a precip-only
+# station inflates. Set to the fit-window end so the in-window gate is met;
+# tunable upward once the fittable window is set from incidence availability.
+validate_temp_through = "2021-12-31"
 
 # Climatological-baseline window in years. 10 = the trailing baseline materialized
 # today (temp_anomaly_vs_10yr); 30 = the true normal now buildable from 1992+ data

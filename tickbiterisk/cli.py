@@ -5686,6 +5686,9 @@ def noaa_backfill_regional(
             datatypes=config.ghcnd_datatypes,
         )
 
+    # Fallback pool drawn from the FULL six-state universe so a subset re-pull
+    # still finds the genuinely nearest station (not a temp-dead far one).
+    full_universe_fips = [loc.county_fips for loc in load_weather_locations()]
     try:
         result = run_noaa_regional_backfill(
             county_fips_values=county_fips_values,
@@ -5699,6 +5702,8 @@ def noaa_backfill_regional(
             continue_on_error=not fail_fast,
             nearest_station_fallback=config.nearest_station_fallback,
             daily_fetcher=daily_fetcher,
+            validate_temp_window_end=config.validate_temp_through,
+            station_pool_county_fips=full_universe_fips,
         )
     except NoaaBackfillError as exc:
         raise typer.BadParameter(str(exc)) from exc
