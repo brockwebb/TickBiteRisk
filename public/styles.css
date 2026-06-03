@@ -399,11 +399,30 @@ h1 {
 
 .regional-bite-calculator {
   margin-top: 0;
+  /* Sits at the top of the side column now; the card already has its own top
+     border, so the .bite-calculator separator border-top is stale here. */
+  border-top: none;
 }
 
 .regional-bite-calculator h2 {
   margin: 0 0 0.75rem;
   font-size: 1.35rem;
+}
+
+/* "Find a county" relocated inside the county panel: render it as the panel's
+   selector header, not a nested card (it shares .county-list-section's card
+   chrome, which would box-in-a-box inside .regional-county-panel). */
+.regional-county-tools-section {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 0 0.75rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.regional-county-tools-section h2 {
+  margin-top: 0;
 }
 
 .bite-form-grid {
