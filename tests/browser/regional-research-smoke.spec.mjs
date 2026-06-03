@@ -315,12 +315,12 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   expect(Math.abs(chartBox.x - mapBox.x)).toBeLessThan(8);
   expect(chartBox.y).toBeGreaterThan(mapBox.y + mapBox.height - 8);
   // Side-column order: bite calculator at the TOP (collapsed), then the county
-  // panel with "Find a county" relocated inside it, near the top
-  // (bite -> panel[ find-a-county -> details ]).
+  // panel whose contents read: county-details content -> "Find a county"
+  // selector -> regime strip (bite -> panel[ details -> find-a-county ]).
   expect(Math.abs(biteBox.x - panelBox.x)).toBeLessThan(8);
   expect(panelBox.y).toBeGreaterThan(biteBox.y + biteBox.height - 8);
-  // "Find a county" now sits inside the county panel, near its top: it is
-  // indented by the panel's padding and contained within the panel's bounds.
+  // "Find a county" sits inside the county panel: indented by the panel's
+  // padding and contained within the panel's bounds.
   expect(toolsBox.x).toBeGreaterThanOrEqual(panelBox.x - 1);
   expect(toolsBox.x + toolsBox.width).toBeLessThanOrEqual(
     panelBox.x + panelBox.width + 1
@@ -328,6 +328,13 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   expect(toolsBox.y).toBeGreaterThanOrEqual(panelBox.y - 8);
   expect(toolsBox.y + toolsBox.height).toBeLessThanOrEqual(
     panelBox.y + panelBox.height + 8
+  );
+  // County-details content (#regional-panel-content) now precedes the
+  // "Find a county" selector inside the panel.
+  const panelContentBox = await page.locator("#regional-panel-content").boundingBox();
+  expect(panelContentBox).not.toBeNull();
+  expect(toolsBox.y).toBeGreaterThan(
+    panelContentBox.y + panelContentBox.height - 8
   );
   await expect(page.locator(".regional-bite-calculator")).toContainText(
     "Tick bite risk calculator"
