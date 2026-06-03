@@ -314,12 +314,21 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   expect(toolsBox).not.toBeNull();
   expect(Math.abs(chartBox.x - mapBox.x)).toBeLessThan(8);
   expect(chartBox.y).toBeGreaterThan(mapBox.y + mapBox.height - 8);
-  // Bite calculator now lives in the side column: under the county panel,
-  // above "Find a county" (panel -> bite -> tools).
+  // Side-column order: bite calculator at the TOP (collapsed), then the county
+  // panel with "Find a county" relocated inside it, near the top
+  // (bite -> panel[ find-a-county -> details ]).
   expect(Math.abs(biteBox.x - panelBox.x)).toBeLessThan(8);
-  expect(biteBox.y).toBeGreaterThan(panelBox.y + panelBox.height - 8);
-  expect(Math.abs(toolsBox.x - panelBox.x)).toBeLessThan(8);
-  expect(toolsBox.y).toBeGreaterThan(biteBox.y + biteBox.height - 8);
+  expect(panelBox.y).toBeGreaterThan(biteBox.y + biteBox.height - 8);
+  // "Find a county" now sits inside the county panel, near its top: it is
+  // indented by the panel's padding and contained within the panel's bounds.
+  expect(toolsBox.x).toBeGreaterThanOrEqual(panelBox.x - 1);
+  expect(toolsBox.x + toolsBox.width).toBeLessThanOrEqual(
+    panelBox.x + panelBox.width + 1
+  );
+  expect(toolsBox.y).toBeGreaterThanOrEqual(panelBox.y - 8);
+  expect(toolsBox.y + toolsBox.height).toBeLessThanOrEqual(
+    panelBox.y + panelBox.height + 8
+  );
   await expect(page.locator(".regional-bite-calculator")).toContainText(
     "Tick bite risk calculator"
   );

@@ -140,25 +140,6 @@
         </div>
 
         <div class="regional-side-column">
-          <aside
-            id="regional-county-panel"
-            class="county-panel regional-county-panel"
-            aria-labelledby="regional-panel-title"
-          >
-            <h2 id="regional-panel-title">County risk details</h2>
-            <div id="regional-panel-content" aria-live="polite">
-              <p>Select a county to see its forecasted regional risk context.</p>
-            </div>
-            <section
-              id="regional-regime-panel"
-              class="regional-regime-strip"
-              aria-labelledby="regional-regime-title"
-            >
-              <h3 id="regional-regime-title">Local forecast region</h3>
-              <p class="muted">Select a county to see its local forecast region.</p>
-            </section>
-          </aside>
-
           <section
             id="regional-bite-risk-section"
             class="bite-calculator regional-bite-calculator"
@@ -211,22 +192,40 @@
             </details>
           </section>
 
-          <section class="county-list-section regional-county-tools-section" aria-labelledby="regional-list-title">
-            <h2 id="regional-list-title">Find a county</h2>
-            <div class="regional-list-filters">
-              <label for="state-filter">State</label>
-              <select id="state-filter">
-                <option value="">All states</option>
-              </select>
-              <label for="county-search">Search</label>
-              <input id="county-search" type="search" autocomplete="off" />
-              <label for="regional-county-picker">County</label>
-              <select id="regional-county-picker"></select>
-              <p id="regional-list-status" aria-live="polite" class="muted">
-                Loading county choices...
-              </p>
+          <aside
+            id="regional-county-panel"
+            class="county-panel regional-county-panel"
+            aria-labelledby="regional-panel-title"
+          >
+            <h2 id="regional-panel-title">County risk details</h2>
+            <section class="county-list-section regional-county-tools-section" aria-labelledby="regional-list-title">
+              <h2 id="regional-list-title">Find a county</h2>
+              <div class="regional-list-filters">
+                <label for="state-filter">State</label>
+                <select id="state-filter">
+                  <option value="">All states</option>
+                </select>
+                <label for="county-search">Search</label>
+                <input id="county-search" type="search" autocomplete="off" />
+                <label for="regional-county-picker">County</label>
+                <select id="regional-county-picker"></select>
+                <p id="regional-list-status" aria-live="polite" class="muted">
+                  Loading county choices...
+                </p>
+              </div>
+            </section>
+            <div id="regional-panel-content" aria-live="polite">
+              <p>Select a county to see its forecasted regional risk context.</p>
             </div>
-          </section>
+            <section
+              id="regional-regime-panel"
+              class="regional-regime-strip"
+              aria-labelledby="regional-regime-title"
+            >
+              <h3 id="regional-regime-title">Local forecast region</h3>
+              <p class="muted">Select a county to see its local forecast region.</p>
+            </section>
+          </aside>
         </div>
       </div>
 
