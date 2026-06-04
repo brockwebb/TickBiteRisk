@@ -408,12 +408,15 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(panel).toContainText("Allegany County");
   await expect(panel).toContainText("MD");
   await expect(panel).toContainText("How bad is it?");
-  await expect(panel).toContainText("Predicted score");
+  await expect(panel).toContainText("Predicted risk level");
   await expect(panel).toContainText("10/10");
   await expect(panel).toContainText("peak seasonal score");
-  await expect(panel).toContainText("Forecast percentile");
+  // Option A: the dominant line is the score's absolute category; the
+  // self-relative percentile is demoted and the raw severity_label is not
+  // headlined.
+  await expect(panel).toContainText("very high risk");
   await expect(panel).toContainText("82nd percentile");
-  await expect(panel).toContainText("above typical");
+  await expect(panel).not.toContainText("above typical");
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("52.00 per 100k");
   await expect(panel).toContainText("Predicted annual cases");
@@ -455,17 +458,17 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
       "2018 origin -> 2021 observed outcome"
     );
     await expect(panel).toContainText(
-      "How unusual is this forecast?"
-    );
-    await expect(panel).toContainText(
-      "above typical"
+      "Relative to this county's own recent history"
     );
     await expect(panel).toContainText(
       "82nd percentile"
     );
+    // Interval is shown as an incidence range (per 100k), never as the
+    // saturating self-history percentile ranks.
     await expect(panel).toContainText(
-      "likely range 65th percentile to 91st percentile"
+      "80% range 44.00 to 76.00 per 100k"
     );
+    await expect(panel).not.toContainText("percentile to");
     await expect(panel).toContainText(
       "not tick abundance"
     );
@@ -777,12 +780,12 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
   await expectWeekControlsDisabled(page);
   await page.locator('path[data-county="24001"]').click();
-  await expect(panel).toContainText("Predicted score");
+  await expect(panel).toContainText("Predicted risk level");
   await expect(panel).toContainText("7/10");
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("38.00 per 100k");
   await expect(panel).toContainText("Predicted annual cases");
-  await expect(panel).toContainText("How unusual is this forecast?");
+  await expect(panel).toContainText("Relative to this county's own recent history");
   await expect(panel).toContainText("55th percentile");
   await expect(panel).not.toContainText("Feature year");
   await expect(panel).not.toContainText("Forecast origin");
@@ -830,11 +833,12 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
   await expectWeekControlsDisabled(page);
   await page.locator('path[data-county="24001"]').click();
-  await expect(panel).toContainText("Predicted score");
+  await expect(panel).toContainText("Predicted risk level");
   await expect(panel).toContainText("8/10");
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("44.00 per 100k");
   await expect(panel).toContainText("Predicted annual cases");
+  await expect(panel).toContainText("Relative to this county's own recent history");
   await expect(panel).toContainText("65th percentile");
   await expect(page.locator("#regional-regime-panel")).toContainText(
     "No local forecast region summary is available for 2025"
@@ -847,7 +851,7 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("#forecast-view-label")).toContainText("Annual forecast");
   await expectWeekControlsDisabled(page);
   await page.locator('path[data-county="24023"]').click();
-  await expect(panel).toContainText("Predicted score");
+  await expect(panel).toContainText("Predicted risk level");
   await expect(panel).toContainText("8/10");
   await expect(panel).toContainText("Predicted annual incidence");
   await expect(panel).toContainText("42.00 per 100k");
@@ -858,6 +862,68 @@ test("regional research dashboard renders annual forecasts, seasonal view, and r
   await expect(page.locator("body")).not.toContainText("not_public_maryland_default");
   await expect(page.locator("body")).not.toContainText("not public Maryland default");
   await expect(page.locator("body")).not.toContainText("Research only");
+
+  expect(consoleErrors).toEqual([]);
+});
+
+test("floored-score county demotes self-relative typicality and shows an incidence-range interval (Option A)", async ({
+  page,
+}) => {
+  const consoleErrors = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("pageerror", (error) => consoleErrors.push(error.message));
+  await page.route("**/research-data/regional/*", async (route) => {
+    const filename = route.request().url().split("/").pop();
+    const body = fixtures[filename];
+    if (!body) {
+      await route.fulfill({ status: 404, body: "missing fixture" });
+      return;
+    }
+    await route.fulfill({
+      body: JSON.stringify(body),
+      contentType: filename.endsWith(".geojson")
+        ? "application/geo+json"
+        : "application/json",
+    });
+  });
+
+  await page.goto("/regional-research.html");
+  await page.locator("#year-select").selectOption("2026");
+  await expect(page.locator("#year-label")).toContainText("2026");
+
+  // Virginia Beach 2026: peak weekly risk_score = 1 (very_low), but the
+  // typicality fixture says "much higher than typical" at the 100th
+  // self-history percentile — the floored/self-relative-alarm (Henrico) shape.
+  await page.locator('path[data-county="51810"]').click();
+  const panel = page.locator("#regional-panel-content");
+  await expect(panel).toContainText("Virginia Beach city");
+
+  const severity = page.locator(".forecast-severity-summary");
+  // HARD REQUIREMENT: the alarm severity label must NOT be a headline.
+  await expect(severity).not.toContainText("much higher than typical");
+  // Dominant framing reflects the score's absolute (very low) category.
+  await expect(severity).toContainText("Predicted risk level");
+  await expect(severity).toContainText("very low risk");
+  // Self-relative typicality is demoted to a quiet, paired note (not bare).
+  await expect(severity).toContainText(
+    "Relative to this county's own recent history"
+  );
+  await expect(severity.locator("p.forecast-severity-note.muted").first()).toContainText(
+    "absolute predicted risk is very low"
+  );
+  // Interval is an incidence range (per 100k), never percentile ranks.
+  await expect(severity).toContainText("Forecast interval (reported incidence)");
+  await expect(severity).toContainText("80% range 0.00 to 61.12 per 100k");
+  await expect(severity).toContainText("95% range 0.00 to 148.70 per 100k");
+  // The interval is NOT expressed as percentile ranks ("Nth percentile to Mth
+  // percentile"); the demoted self-relative note may still mention a percentile.
+  await expect(severity).not.toContainText("percentile to");
+  await expect(severity).not.toContainText("likely range");
+  // Transfer honesty: pooled-residual caveat + forecast (not confidence) framing.
+  await expect(severity).toContainText("pooled across the region's counties");
+  await expect(severity).toContainText("not a clinical confidence interval");
 
   expect(consoleErrors).toEqual([]);
 });
@@ -991,27 +1057,43 @@ function countyMetadata(countyFips, countyName, regionId, regionName, rank) {
 
 function forecastTypicalityRecords() {
   return ["24001", "24023", "42001", "51810"].flatMap((countyFips) =>
-    forecastTypicalityRows().map((row) => ({
-      ...row,
-      county_fips: countyFips,
-      county_name:
-        countyFips === "24001"
-          ? "Allegany County"
-          : countyFips === "24023"
-            ? "Garrett County"
-            : countyFips === "42001"
-              ? "Adams County"
-              : "Virginia Beach city",
-      forecast_population: 100000,
-      lower_80_incidence_per_100k: row.predicted_incidence_per_100k - 8,
-      upper_80_incidence_per_100k: row.predicted_incidence_per_100k + 24,
-      lower_95_incidence_per_100k: Math.max(0, row.predicted_incidence_per_100k - 16),
-      predicted_cases: row.predicted_incidence_per_100k,
-      upper_95_incidence_per_100k: row.predicted_incidence_per_100k + 56,
-      typical_median_incidence_per_100k: 36,
-      typical_p25_incidence_per_100k: 24,
-      typical_p75_incidence_per_100k: 45,
-    }))
+    forecastTypicalityRows().map((row) => {
+      const record = {
+        ...row,
+        county_fips: countyFips,
+        county_name:
+          countyFips === "24001"
+            ? "Allegany County"
+            : countyFips === "24023"
+              ? "Garrett County"
+              : countyFips === "42001"
+                ? "Adams County"
+                : "Virginia Beach city",
+        forecast_population: 100000,
+        lower_80_incidence_per_100k: row.predicted_incidence_per_100k - 8,
+        upper_80_incidence_per_100k: row.predicted_incidence_per_100k + 24,
+        lower_95_incidence_per_100k: Math.max(0, row.predicted_incidence_per_100k - 16),
+        predicted_cases: row.predicted_incidence_per_100k,
+        upper_95_incidence_per_100k: row.predicted_incidence_per_100k + 56,
+        typical_median_incidence_per_100k: 36,
+        typical_p25_incidence_per_100k: 24,
+        typical_p75_incidence_per_100k: 45,
+      };
+      // Virginia Beach 2026 is the floored-score / self-relative-alarm case
+      // (peak weekly risk_score=1 "very_low" in the weekly fixture, yet the
+      // typicality says "much higher than typical" at the 100th self-history
+      // percentile with a wide pooled-residual incidence band) — the Henrico
+      // shape the Option A panel must NOT render as an alarm headline.
+      if (countyFips === "51810" && row.forecast_year === 2026) {
+        record.severity_label = "much higher than typical";
+        record.forecast_percentile_of_county_history = 100;
+        record.lower_80_incidence_per_100k = 0;
+        record.upper_80_incidence_per_100k = 61.12;
+        record.lower_95_incidence_per_100k = 0;
+        record.upper_95_incidence_per_100k = 148.7;
+      }
+      return record;
+    })
   );
 }
 

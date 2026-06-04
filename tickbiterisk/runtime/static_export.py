@@ -32,6 +32,7 @@ PUBLIC_CAVEATS = [
     "CDC national onset seasonality is not county-specific.",
     "Surveillance/reporting changes and interventions are unmodeled.",
     "Empirical intervals describe forecast uncertainty, not clinical confidence for an individual bite.",
+    "Prediction intervals apply forecast residuals pooled across the region's counties to each county's point forecast, so a low-incidence county's interval can extend well beyond its own historical range.",
 ]
 
 EXPLAINER_PLACEHOLDERS = [
