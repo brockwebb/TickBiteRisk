@@ -454,6 +454,7 @@ from tickbiterisk.runtime.single_bite import (
     SingleBiteRiskInputError,
     estimate_single_bite_risk,
 )
+from tickbiterisk.runtime.regional_bundle_tevv import build_tevv_report
 from tickbiterisk.runtime.static_export import (
     StaticExportInputError,
     export_static_risk_data,
@@ -1387,6 +1388,15 @@ def dashboard_build_regional_research_assets(
         "cdc_seasonality_week_2023",
         help="Weekly seasonality source_id to export.",
     ),
+    generated_at: str | None = typer.Option(
+        None,
+        help=(
+            "Override the bundle 'generated_at' stamp (e.g. the producing git "
+            "commit time, for a deterministic provenance-meaningful build). When "
+            "omitted, it is content-derived from the source data so repeated "
+            "rebuilds from identical inputs are byte-identical."
+        ),
+    ),
 ) -> None:
     if not scores_path.exists():
         raise typer.BadParameter(f"Risk score file not found: {scores_path}")
@@ -1462,6 +1472,7 @@ def dashboard_build_regional_research_assets(
             regional_forecast_typicality_path=regional_forecast_typicality_path,
             model_name=model_name,
             seasonality_source_id=seasonality_source_id,
+            generated_at=generated_at,
         )
     except StaticExportInputError as exc:
         raise typer.BadParameter(str(exc)) from exc
@@ -1478,6 +1489,49 @@ def dashboard_build_regional_research_assets(
         typer.echo(f"Wrote {outputs.forecast_observed_fit_path}")
     if outputs.forecast_typicality_path is not None:
         typer.echo(f"Wrote {outputs.forecast_typicality_path}")
+
+
+@dashboard_app.command("tevv-materiality-report")
+def tevv_materiality_report(
+    new_dir: Path = typer.Option(
+        ..., help="Freshly-built regional bundle directory (the candidate)."
+    ),
+    deployed_dir: Path | None = typer.Option(
+        None,
+        help=(
+            "Currently-deployed regional bundle directory to diff against. "
+            "Omit (or point at an absent dir) for a first-run baseline report."
+        ),
+    ),
+    out_md: Path = typer.Option(
+        ..., help="Output path for the human-readable Markdown report."
+    ),
+    out_json: Path | None = typer.Option(
+        None, help="Optional output path for the machine-readable JSON report."
+    ),
+) -> None:
+    """Diff a freshly-built bundle vs the deployed one; emit the TEVV report.
+
+    Exit code 0 always (the report is informational, not a gate); the
+    REVIEW_RECOMMENDED banner is the human signal. The automation script reads
+    the JSON's review_recommended flag for its commit message.
+    """
+    if not new_dir.exists():
+        raise typer.BadParameter(f"New bundle directory not found: {new_dir}")
+    result, markdown, payload = build_tevv_report(
+        new_dir=new_dir,
+        deployed_dir=deployed_dir,
+    )
+    out_md.parent.mkdir(parents=True, exist_ok=True)
+    out_md.write_text(markdown, encoding="utf-8")
+    typer.echo(f"Wrote {out_md}")
+    if out_json is not None:
+        out_json.parent.mkdir(parents=True, exist_ok=True)
+        out_json.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        typer.echo(f"Wrote {out_json}")
+    typer.echo(
+        f"REVIEW_RECOMMENDED={'yes' if result.review_recommended else 'no'}"
+    )
 
 
 @etl_app.command("weather-locations")

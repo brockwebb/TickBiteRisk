@@ -1,4 +1,5 @@
 import csv
+import hashlib
 import json
 from pathlib import Path
 
@@ -1049,3 +1050,77 @@ def _county_feature(county_fips: str, county_name: str, index: int) -> dict:
             ],
         },
     }
+
+
+def _build_regional_bundle_into(output_dir: Path, tmp_path: Path, **overrides):
+    """Build the full regional bundle from a fixed fixture set into output_dir."""
+    scores_path = _write_regional_scores(tmp_path / "scores.csv")
+    regional_geojson_path = tmp_path / "regional_counties.geojson"
+    regional_geojson_path.write_text(json.dumps(_regional_geojson()), encoding="utf-8")
+    regional_states_path = tmp_path / "regional_states.geojson"
+    regional_states_path.write_text(
+        json.dumps(_regional_state_geojson()), encoding="utf-8"
+    )
+    regional_incidence_path = _write_regional_incidence(
+        tmp_path / "regional_incidence.csv"
+    )
+    overlays_path = _write_regional_overlay_summary(tmp_path / "overlays.csv")
+    annual_forecast_path = _write_regional_annual_forecast_predictions(
+        tmp_path / "regional_annual_forecast_predictions.csv"
+    )
+    observed_fit_path = _write_regional_forecast_observed_fit(
+        tmp_path / "regional_forecast_observed_fit_comparisons.csv"
+    )
+    typicality_path = _write_regional_forecast_typicality(
+        tmp_path / "regional_forecast_typicality.csv"
+    )
+    return write_regional_research_dashboard_assets(
+        scores_path=scores_path,
+        output_dir=output_dir,
+        regional_counties_geojson_path=regional_geojson_path,
+        regional_states_geojson_path=regional_states_path,
+        regional_incidence_path=regional_incidence_path,
+        spatial_regime_summary_path=overlays_path,
+        regional_annual_forecast_path=annual_forecast_path,
+        regional_forecast_observed_fit_path=observed_fit_path,
+        regional_forecast_typicality_path=typicality_path,
+        model_name="linear_blend_baseline",
+        **overrides,
+    )
+
+
+def test_regional_bundle_is_byte_identical_across_rebuilds(tmp_path: Path) -> None:
+    """Part 1 determinism: same source data -> byte-identical bundle.
+
+    The writer adds no build_provenance block (only the rebuild script does), so
+    with the default content-derived generated_at the two builds match byte for
+    byte across every emitted file.
+    """
+    out_a = tmp_path / "build-a"
+    out_b = tmp_path / "build-b"
+    _build_regional_bundle_into(out_a, tmp_path / "inputs-a")
+    _build_regional_bundle_into(out_b, tmp_path / "inputs-b")
+
+    files_a = sorted(p.name for p in out_a.iterdir())
+    files_b = sorted(p.name for p in out_b.iterdir())
+    assert files_a == files_b
+    assert files_a, "expected at least one bundle file"
+    for name in files_a:
+        digest_a = hashlib.sha256((out_a / name).read_bytes()).hexdigest()
+        digest_b = hashlib.sha256((out_b / name).read_bytes()).hexdigest()
+        assert digest_a == digest_b, f"{name} differs across rebuilds"
+
+    # generated_at is content-derived (deterministic), not a wall-clock stamp.
+    manifest = json.loads((out_a / "static_export_manifest.json").read_text("utf-8"))
+    assert manifest["generated_at"].endswith("T00:00:00+00:00")
+
+
+def test_regional_bundle_generated_at_override_is_used(tmp_path: Path) -> None:
+    """An injected generated_at (e.g. git commit time) is honored verbatim."""
+    stamp = "2025-01-02T03:04:05+00:00"
+    out = tmp_path / "build"
+    _build_regional_bundle_into(out, tmp_path / "inputs", generated_at=stamp)
+    manifest = json.loads((out / "static_export_manifest.json").read_text("utf-8"))
+    model_card = json.loads((out / "model_card.json").read_text("utf-8"))
+    assert manifest["generated_at"] == stamp
+    assert model_card["generated_at"] == stamp
