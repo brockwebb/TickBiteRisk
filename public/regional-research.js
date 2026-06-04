@@ -1159,18 +1159,16 @@ function renderRegionalForecastSeveritySummary({
         </div>`
       : "";
   const typicality = regionalForecastTypicalityForYear(metadata);
+  // Option A: the dominant severity reflects the SCORE's own absolute category
+  // (very_low..very_high), not the self-relative percentile. The score's
+  // risk_category is the authored band; fall back to the score thresholds.
+  const scoreCategoryLabel =
+    scoreRecord && scoreRecord.risk_category
+      ? regionalCategoryLabel(scoreRecord.risk_category)
+      : regionalScoreSeverityLabel(score);
   const percentile = typicality
     ? regionalPercentilePhrase(typicality.forecast_percentile_of_county_history)
     : "unavailable";
-  const severity = typicality && typicality.severity_label
-    ? typicality.severity_label
-    : "not classified";
-  const lower = typicality
-    ? regionalPercentilePhrase(typicality.lower_80_percentile_of_county_history)
-    : "unknown";
-  const upper = typicality
-    ? regionalPercentilePhrase(typicality.upper_80_percentile_of_county_history)
-    : "unknown";
   const comparisonYears =
     typicality &&
     typicality.comparison_year_start &&
@@ -1180,31 +1178,69 @@ function renderRegionalForecastSeveritySummary({
   const evidence = typicality && typicality.typicality_evidence_level
     ? typicality.typicality_evidence_level
     : "limited";
+  // Option A part 2: interval shown as an incidence range (per 100k), never as
+  // self-history percentile ranks (those saturate at 4th..100th and mislead).
+  const intervalIncidenceText = regionalForecastIntervalIncidenceText(typicality);
   const annualIncidence = Number(annualSummary && annualSummary.predictedAnnualIncidence);
   const annualIncidenceText = Number.isFinite(annualIncidence)
     ? `${regionalFormatNumber(annualIncidence)} per 100k`
     : "unavailable";
+  // Self-relative typicality is DEMOTED to a quiet, paired note: never a bare
+  // alarm headline, and absolute-low framing sits in the same sentence.
+  const selfRelativeNote =
+    typicality && percentile !== "unavailable"
+      ? `<p class="forecast-severity-note muted"><b>Relative to this county's own recent history:</b> this forecast sits at the ${regionalEscapeHtml(percentile)} of its reported Lyme years (${regionalEscapeHtml(comparisonYears)}); the absolute predicted risk is ${regionalEscapeHtml(scoreCategoryLabel)}.</p>`
+      : "";
   return `<section class="forecast-severity-summary" aria-labelledby="regional-forecast-severity-heading">
     <h4 id="regional-forecast-severity-heading">How bad is it?</h4>
     <dl class="forecast-severity-grid">
       <div>
-        <dt>Predicted score</dt>
-        <dd><span class="score-badge ${scoreClass}">${scoreText}</span><br><span>${regionalEscapeHtml(scoreBasis)}</span></dd>
+        <dt>Predicted risk level</dt>
+        <dd><span class="score-badge ${scoreClass}">${scoreText}</span><br><span>${regionalEscapeHtml(scoreCategoryLabel)} risk &middot; ${regionalEscapeHtml(scoreBasis)}</span></dd>
       </div>
       ${peakHtml}
-      <div>
-        <dt>Forecast percentile</dt>
-        <dd><b>${regionalEscapeHtml(percentile)}</b><br><span>${regionalEscapeHtml(severity)}</span></dd>
-      </div>
       <div>
         <dt>Annual forecast</dt>
         <dd>${regionalEscapeHtml(annualIncidenceText)}</dd>
       </div>
     </dl>
-    <p class="forecast-severity-note"><b>How unusual is this forecast?</b> Compared with this county's prior reported Lyme years (${regionalEscapeHtml(comparisonYears)}), this forecast is ${regionalEscapeHtml(severity)} (${regionalEscapeHtml(percentile)}).</p>
-    <p class="forecast-severity-note"><b>Forecast interval range:</b> likely range ${regionalEscapeHtml(lower)} to ${regionalEscapeHtml(upper)}; evidence ${regionalEscapeHtml(evidence)}.</p>
-    <p class="forecast-severity-note">This score and percentile summarize reported-incidence forecasts. They are not tick abundance, infected tick prevalence, or individual infection probability.</p>
+    ${selfRelativeNote}
+    <p class="forecast-severity-note"><b>Forecast interval (reported incidence):</b> ${regionalEscapeHtml(intervalIncidenceText)} Evidence ${regionalEscapeHtml(evidence)}.</p>
+    <p class="forecast-severity-note muted">This forecast interval uses forecast residuals pooled across the region's counties, so for a low-incidence county the range can extend well beyond its own historical levels. It is a forecast uncertainty range, not a clinical confidence interval.</p>
+    <p class="forecast-severity-note">This score and forecast summarize reported-incidence forecasts. They are not tick abundance, infected tick prevalence, or individual infection probability.</p>
   </section>`;
+}
+
+function regionalScoreSeverityLabel(score) {
+  if (!Number.isFinite(score)) return "unavailable";
+  if (score >= 9) return "very high";
+  if (score >= 7) return "high";
+  if (score >= 5) return "moderate";
+  if (score >= 3) return "low";
+  return "very low";
+}
+
+function regionalForecastIntervalIncidenceText(typicality) {
+  if (!typicality) return "unavailable.";
+  const fmt = (value) => {
+    // null/undefined/"" are MISSING (Number(null) === 0 would falsely render
+    // a 0.00 bound); a real 0 is kept.
+    if (value === null || value === undefined || value === "") return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? regionalFormatNumber(num) : null;
+  };
+  const lower80 = fmt(typicality.lower_80_incidence_per_100k);
+  const upper80 = fmt(typicality.upper_80_incidence_per_100k);
+  const lower95 = fmt(typicality.lower_95_incidence_per_100k);
+  const upper95 = fmt(typicality.upper_95_incidence_per_100k);
+  const parts = [];
+  if (lower80 !== null && upper80 !== null) {
+    parts.push(`80% range ${lower80} to ${upper80} per 100k`);
+  }
+  if (lower95 !== null && upper95 !== null) {
+    parts.push(`95% range ${lower95} to ${upper95} per 100k`);
+  }
+  return parts.length ? `${parts.join("; ")}.` : "unavailable.";
 }
 
 function regionalPeakWeeklyScoreRecord(countyFips) {
@@ -1326,31 +1362,6 @@ function renderRegionalComparableYear(record, metadata) {
     <h4 id="regional-comparable-year-heading">Nearest comparable history</h4>
     <p>${regionalEscapeHtml(match.match_origin_year)} origin -&gt; ${regionalEscapeHtml(match.match_observed_year)} observed outcome (${horizon}; ${regionalEscapeHtml(distance)}).</p>
     <p>Basis: ${regionalEscapeHtml(match.basis || "horizon-matched reported-incidence history")} from ${regionalEscapeHtml(regionalReadableName(match.analog_model_name || "analog_year_county_incidence"))}.</p>
-  </section>`;
-}
-
-function renderRegionalForecastTypicality(metadata) {
-  const typicality = regionalForecastTypicalityForYear(metadata);
-  if (!typicality) return "";
-  const percentile = regionalOrdinalPercentile(
-    typicality.forecast_percentile_of_county_history
-  );
-  const lower = regionalOrdinalPercentile(
-    typicality.lower_80_percentile_of_county_history
-  );
-  const upper = regionalOrdinalPercentile(
-    typicality.upper_80_percentile_of_county_history
-  );
-  const comparisonYears =
-    typicality.comparison_year_start && typicality.comparison_year_end
-      ? `${typicality.comparison_year_start}-${typicality.comparison_year_end}`
-      : "prior reported years";
-  const evidence = typicality.typicality_evidence_level || "limited";
-  return `<section class="lineage-strip forecast-typicality" aria-labelledby="regional-forecast-typicality-heading">
-    <h4 id="regional-forecast-typicality-heading">How unusual is this forecast?</h4>
-    <p>Compared with this county's prior reported Lyme years (${regionalEscapeHtml(comparisonYears)}), this forecast is <b>${regionalEscapeHtml(typicality.severity_label || "not classified")}</b> (${regionalEscapeHtml(percentile)} percentile).</p>
-    <p><b>Forecast interval range:</b> likely range ${regionalEscapeHtml(lower)}-${regionalEscapeHtml(upper)} percentile; evidence ${regionalEscapeHtml(evidence)}.</p>
-    <p>This compares reported annual Lyme incidence. It is not tick abundance, infected tick prevalence, or individual infection probability.</p>
   </section>`;
 }
 
@@ -3491,5 +3502,7 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     regionalAggregateWeekContributions,
     regionalIntervalCasesToRates,
+    regionalForecastIntervalIncidenceText,
+    regionalScoreSeverityLabel,
   };
 }
