@@ -112,6 +112,7 @@ def write_regional_research_dashboard_assets(
     source_prediction_run_id: str | None = None,
     source_prediction_sha256: str | None = None,
     source_seasonality_sha256: str | None = None,
+    generated_at: str | None = None,
 ) -> RegionalResearchDashboardAssetPaths:
     static_paths = export_static_risk_data(
         scores_path=scores_path,
@@ -125,6 +126,7 @@ def write_regional_research_dashboard_assets(
         source_prediction_sha256=source_prediction_sha256,
         source_seasonality_sha256=source_seasonality_sha256,
         geography_scope=MIDATLANTIC_GEOGRAPHY_SCOPE,
+        generated_at=generated_at,
     )
     raw_geojson = json.loads(regional_counties_geojson_path.read_text(encoding="utf-8"))
     normalized_geojson = simplify_regional_geojson_for_web_map(

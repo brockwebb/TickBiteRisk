@@ -130,6 +130,10 @@ ${PY} etl county-week-risk \
   --output-dir "$SCORES_OUT" --replace
 
 echo "==> building regional research assets -> ${OUTPUT_DIR}"
+# --generated-at = the producing commit time: deterministic given the commit
+# (two rebuilds from the same commit are byte-identical bundles, modulo the
+# build_provenance.built_at wall-clock), so an auto-commit diff means data
+# actually changed rather than timestamp churn.
 ${PY} dashboard build-regional-research-assets \
   --scores-path "${SCORES_OUT}/county_week_seasonal_risk_baseline.csv" \
   --regional-counties-geojson-path "$COUNTIES" \
@@ -138,6 +142,7 @@ ${PY} dashboard build-regional-research-assets \
   --regional-annual-forecast-path "$PRED" \
   --regional-forecast-observed-fit-path "$OBSFIT" \
   --regional-forecast-typicality-path "$TYP" \
+  --generated-at "$GIT_COMMIT_TIME" \
   --output-dir "${OUTPUT_DIR}"
 
 # ---- 4. stamp build provenance ----------------------------------------------

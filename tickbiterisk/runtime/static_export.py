@@ -4,7 +4,7 @@ import csv
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
 from tickbiterisk.runtime.risk_lookup import (
@@ -146,6 +146,7 @@ def export_static_risk_data(
     source_seasonality_sha256: str | None = None,
     model_summary_path: Path | None = None,
     geography_scope: str = MARYLAND_GEOGRAPHY_SCOPE,
+    generated_at: str | None = None,
 ) -> StaticRiskExportPaths:
     geography = _geography_scope(geography_scope)
     try:
@@ -176,7 +177,13 @@ def export_static_risk_data(
         source_catalog_path=output_dir / "source_catalog.json",
         export_manifest_path=output_dir / "static_export_manifest.json",
     )
-    generated_at = datetime.now(UTC).replace(microsecond=0).isoformat()
+    # Deterministic by default: the bundle stamp is content-derived (the latest
+    # covered week end), so two rebuilds from the same source data produce a
+    # byte-identical bundle. Callers may inject a meaningful stamp (e.g. the
+    # producing git commit time) via `generated_at`. A bare datetime.now() here
+    # was the churn source that made auto-rebuild diffs un-mechanizable.
+    if generated_at is None:
+        generated_at = _deterministic_generated_at(selected)
     weekly_payload = _weekly_payload(
         selected,
         generated_at=generated_at,
@@ -215,6 +222,24 @@ def export_static_risk_data(
     _write_json(paths.source_catalog_path, source_catalog_payload)
     _write_json(paths.export_manifest_path, manifest_payload)
     return paths
+
+
+def _deterministic_generated_at(records: list[CountyWeekRiskRecord]) -> str:
+    """Content-derived bundle stamp: the latest covered week end at UTC midnight.
+
+    Deterministic given the source data, so repeated rebuilds from identical
+    inputs yield a byte-identical bundle (the property that makes auto-commit
+    safe and its git diff meaningful). Callers may override via `generated_at`.
+    """
+    if not records:
+        raise StaticExportInputError(
+            "cannot derive a deterministic generated_at from empty records"
+        )
+    latest_week_end = max(
+        _mmwr_week_start(record.year, record.mmwr_week) + timedelta(days=6)
+        for record in records
+    )
+    return f"{latest_week_end.isoformat()}T00:00:00+00:00"
 
 
 def _geography_scope(scope: str) -> _GeographyScope:
