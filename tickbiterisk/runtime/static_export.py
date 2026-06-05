@@ -217,7 +217,7 @@ def export_static_risk_data(
         geography=geography,
     )
 
-    _write_json(paths.weekly_risk_path, weekly_payload)
+    _write_json(paths.weekly_risk_path, weekly_payload, compact=True)
     _write_json(paths.county_metadata_path, county_payload)
     _write_json(paths.model_card_path, model_card_payload)
     _write_json(paths.source_catalog_path, source_catalog_payload)
@@ -1079,11 +1079,16 @@ def _annual_interval_metadata(record: CountyWeekRiskRecord) -> dict[str, object]
     }
 
 
-def _write_json(path: Path, payload: dict[str, object]) -> None:
-    path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+def _write_json(path: Path, payload: dict[str, object], *, compact: bool = False) -> None:
+    # The large weekly file is serialized compact (single line) to match the
+    # deployed bundle's form and keep the asset/diff small; the other, smaller
+    # bundle files stay indented for human readability. Both are deterministic:
+    # repeated builds of the same data are byte-identical.
+    if compact:
+        text = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    else:
+        text = json.dumps(payload, indent=2, sort_keys=True)
+    path.write_text(text + "\n", encoding="utf-8")
 
 
 def _sha256_file(path: Path) -> str:

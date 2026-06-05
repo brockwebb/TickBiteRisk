@@ -14,12 +14,18 @@ from tickbiterisk.runtime.regional_bundle_tevv import (
 YEAR = 2026
 
 
-def _metrics(rows, total=EXPECTED_COUNTY_COUNT):
+def _metrics(
+    rows,
+    total=EXPECTED_COUNTY_COUNT,
+    schema_version="county-week-risk-static-v2",
+    caveats=("base caveat",),
+    field_nonnull_rates=None,
+    file_sizes=None,
+):
     """rows: list of (fips, incidence, score). Builds a one-year BundleMetrics.
 
-    total_counties defaults to the deploy-validator invariant (283) so the
-    county-count banner does not fire incidentally; tests that need a different
-    region size pass `total` explicitly.
+    Structural fields default to STABLE values so the value-rule tests don't
+    trip structural detection; structural tests vary one field at a time.
     """
     counties = {}
     for fips, inc, score in rows:
@@ -38,6 +44,10 @@ def _metrics(rows, total=EXPECTED_COUNTY_COUNT):
         record_counts={"regional_forecast_typicality.json": len(rows)},
         commit="newsha",
         generated_at="2026-06-06T00:00:00+00:00",
+        schema_version=schema_version,
+        caveats=caveats,
+        field_nonnull_rates=field_nonnull_rates or {},
+        file_sizes=file_sizes or {},
     )
 
 
@@ -183,3 +193,101 @@ def test_baseline_when_no_deployed_bundle():
     assert result.is_baseline is True
     assert result.review_recommended is False
     assert "Baseline" in render_markdown(result)
+
+
+# --- Part B: structural materiality (B1-B5) ---------------------------------
+
+def test_b1_schema_bump_fires_review():
+    deployed = _metrics([(_fips(1), 10.0, 5)], schema_version="county-week-risk-static-v1")
+    new = _metrics([(_fips(1), 10.0, 5)], schema_version="county-week-risk-static-v2")
+    result = compare_bundle_metrics(deployed, new)
+    assert result.review_recommended is True
+    assert any(c.startswith("B1 schema_version") for c in result.structural_changes)
+
+
+def test_b2_field_population_fires_review():
+    # risk_score_high goes null (0% non-null) -> populated (100%): >1% epsilon.
+    deployed = _metrics([(_fips(1), 10.0, 5)], field_nonnull_rates={"risk_score_high": 0.0})
+    new = _metrics([(_fips(1), 10.0, 5)], field_nonnull_rates={"risk_score_high": 1.0})
+    result = compare_bundle_metrics(deployed, new)
+    assert result.review_recommended is True
+    assert any("risk_score_high" in c for c in result.structural_changes)
+
+
+def test_b2_field_population_below_epsilon_no_fire():
+    # 0.5% non-null shift is below the 1% epsilon -> not structural.
+    deployed = _metrics([(_fips(1), 10.0, 5)], field_nonnull_rates={"f": 0.500})
+    new = _metrics([(_fips(1), 10.0, 5)], field_nonnull_rates={"f": 0.505})
+    result = compare_bundle_metrics(deployed, new)
+    assert result.structural_changes == []
+    assert result.review_recommended is False
+
+
+def test_b3_caveat_added_fires_review():
+    deployed = _metrics([(_fips(1), 10.0, 5)], caveats=("base caveat",))
+    new = _metrics([(_fips(1), 10.0, 5)], caveats=("base caveat", "new pooled-residual caveat"))
+    result = compare_bundle_metrics(deployed, new)
+    assert result.review_recommended is True
+    assert any("caveat added" in c for c in result.structural_changes)
+
+
+def test_b4_size_delta_relative_fires_review():
+    # weekly file +100% (> 5%) -> structural.
+    deployed = _metrics([(_fips(1), 10.0, 5)], file_sizes={"regional_county_risk_weekly.json": 1_000})
+    new = _metrics([(_fips(1), 10.0, 5)], file_sizes={"regional_county_risk_weekly.json": 2_000})
+    result = compare_bundle_metrics(deployed, new)
+    assert result.review_recommended is True
+    assert any(c.startswith("B4") for c in result.structural_changes)
+
+
+def test_b4_size_delta_absolute_fires_review():
+    # +3 MB on a large file: <5% relative but > 2 MB absolute -> structural.
+    deployed = _metrics([(_fips(1), 10.0, 5)], file_sizes={"regional_county_risk_weekly.json": 80_000_000})
+    new = _metrics([(_fips(1), 10.0, 5)], file_sizes={"regional_county_risk_weekly.json": 83_000_000})
+    result = compare_bundle_metrics(deployed, new)
+    assert result.review_recommended is True
+    assert any(c.startswith("B4") for c in result.structural_changes)
+
+
+def test_b4_small_size_delta_no_fire():
+    # +1% and < 2 MB -> not structural.
+    deployed = _metrics([(_fips(1), 10.0, 5)], file_sizes={"f.json": 1_000_000})
+    new = _metrics([(_fips(1), 10.0, 5)], file_sizes={"f.json": 1_010_000})
+    result = compare_bundle_metrics(deployed, new)
+    assert result.structural_changes == []
+    assert result.review_recommended is False
+
+
+def test_b5_record_count_appears_in_structural():
+    deployed = _metrics([(_fips(1), 10.0, 5)])
+    new = _metrics([(_fips(1), 10.0, 5)])
+    new = BundleMetrics(
+        counties=new.counties,
+        total_counties=new.total_counties,
+        forecast_years=new.forecast_years,
+        record_counts={"regional_forecast_typicality.json": 999},
+        commit="newsha",
+        generated_at="x",
+        schema_version=new.schema_version,
+        caveats=new.caveats,
+    )
+    result = compare_bundle_metrics(deployed, new)
+    assert result.review_recommended is True
+    assert any(c.startswith("B5 record_count") for c in result.structural_changes)
+
+
+def test_identical_structural_no_review():
+    # Same value rows AND same structural fields -> no structural change, no review.
+    rows = [(_fips(1), 10.0, 5)]
+    common = dict(
+        schema_version="county-week-risk-static-v2",
+        caveats=("base caveat",),
+        field_nonnull_rates={"risk_score": 1.0},
+        file_sizes={"regional_county_risk_weekly.json": 80_000_000},
+    )
+    deployed = _metrics(rows, **common)
+    new = _metrics(rows, **common)
+    result = compare_bundle_metrics(deployed, new)
+    assert result.structural_changes == []
+    assert result.review_recommended is False
+    assert "None (schema" in render_markdown(result)

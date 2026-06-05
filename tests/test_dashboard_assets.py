@@ -1124,3 +1124,17 @@ def test_regional_bundle_generated_at_override_is_used(tmp_path: Path) -> None:
     model_card = json.loads((out / "model_card.json").read_text("utf-8"))
     assert manifest["generated_at"] == stamp
     assert model_card["generated_at"] == stamp
+
+
+def test_regional_weekly_bundle_is_compact_other_files_indented(tmp_path: Path) -> None:
+    """Part A: the large weekly file is compact single-line (matches deployed);
+    the smaller files stay indented. Eliminates the multi-million-line reformat
+    diff a no-op rebuild otherwise produced."""
+    out = tmp_path / "build"
+    _build_regional_bundle_into(out, tmp_path / "inputs")
+    weekly = (out / "regional_county_risk_weekly.json").read_text("utf-8")
+    assert weekly.count("\n") == 1  # single line + trailing newline (compact)
+    assert "\n  " not in weekly  # no 2-space indentation
+    model_card = (out / "model_card.json").read_text("utf-8")
+    assert model_card.count("\n") > 5  # still indented / human-readable
+    assert "\n  " in model_card
