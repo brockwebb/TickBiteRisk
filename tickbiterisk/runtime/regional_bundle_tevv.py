@@ -26,6 +26,14 @@ BANNER_FLAGGED_FRACTION = 0.15  # >15% of counties flagged -> review
 BANNER_BIG_MOVER_RELATIVE = 0.50  # any one county >50% relative (>= floor) -> review
 EXPECTED_COUNTY_COUNT = 283  # deploy-validator invariant
 
+# --- Structural materiality (additive; fires REVIEW regardless of value rules) -
+# Value rules above catch incidence/score/category MOVES; these catch STRUCTURAL
+# change (schema, field population, caveat text, serialized size) that a no-op
+# value diff would otherwise hide.
+STRUCTURAL_FIELD_NONNULL_EPSILON = 0.01  # >1% of records change non-null state
+STRUCTURAL_SIZE_RELATIVE = 0.05  # per-file byte size moves >5% ...
+STRUCTURAL_SIZE_ABSOLUTE_BYTES = 2 * 1024 * 1024  # ... OR >2 MB absolute
+
 # Score band -> display risk-category (matches root.score_scale.categories).
 _SCORE_BANDS = (
     (1, 2, "very_low"),
@@ -88,6 +96,11 @@ class BundleMetrics:
     record_counts: dict[str, int]
     commit: str | None
     generated_at: str | None
+    # Structural signals (defaults keep existing positional/keyword construction).
+    schema_version: str | None = None
+    caveats: tuple[str, ...] = ()
+    field_nonnull_rates: dict[str, float] = field(default_factory=dict)
+    file_sizes: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -116,6 +129,7 @@ class MaterialityResult:
     record_counts_deployed: dict[str, int] | None = None
     record_counts_new: dict[str, int] = field(default_factory=dict)
     record_count_changes: list[str] = field(default_factory=list)
+    structural_changes: list[str] = field(default_factory=list)
     forecast_years: tuple[int, ...] = ()
     deployed_commit: str | None = None
     new_commit: str | None = None
@@ -271,7 +285,67 @@ def compare_bundle_metrics(
     if result.record_count_changes:
         result.review_recommended = True
         result.review_reasons.append("record_count changed between bundles")
+
+    # Structural detection (B1-B5): any structural change is maximally material
+    # and fires REVIEW regardless of the value rules above. B5 (record_counts) is
+    # already computed above; surface it under structural too.
+    result.structural_changes = _detect_structural_changes(deployed, new)
+    result.structural_changes += [
+        f"B5 record_count {c}" for c in result.record_count_changes
+    ]
+    if result.structural_changes:
+        result.review_recommended = True
+        result.review_reasons.append(
+            f"structural change(s): {len(result.structural_changes)} "
+            "(see Structural changes)"
+        )
     return result
+
+
+def _detect_structural_changes(deployed: BundleMetrics, new: BundleMetrics) -> list[str]:
+    """B1 schema, B2 field-population, B3 caveats, B4 size, B5 record_counts."""
+    changes: list[str] = []
+
+    # B1 — schema_version bump (string compare; maximally material).
+    if deployed.schema_version != new.schema_version:
+        changes.append(
+            f"B1 schema_version: {deployed.schema_version} -> {new.schema_version}"
+        )
+
+    # B2 — a field's non-null rate shifts by more than epsilon (e.g. score bands
+    # going null -> populated). This is the score-range-UI detector.
+    for field_name in sorted(set(deployed.field_nonnull_rates) | set(new.field_nonnull_rates)):
+        dep_rate = deployed.field_nonnull_rates.get(field_name, 0.0)
+        new_rate = new.field_nonnull_rates.get(field_name, 0.0)
+        if abs(new_rate - dep_rate) > STRUCTURAL_FIELD_NONNULL_EPSILON:
+            changes.append(
+                f"B2 field '{field_name}' non-null rate "
+                f"{dep_rate:.1%} -> {new_rate:.1%}"
+            )
+
+    # B3 — added/removed user-facing caveat strings.
+    dep_caveats, new_caveats = set(deployed.caveats), set(new.caveats)
+    for added in sorted(new_caveats - dep_caveats):
+        changes.append(f"B3 caveat added: {added}")
+    for removed in sorted(dep_caveats - new_caveats):
+        changes.append(f"B3 caveat removed: {removed}")
+
+    # B4 — per-file serialized-size delta > 5% relative OR > 2 MB absolute.
+    for name in sorted(set(deployed.file_sizes) | set(new.file_sizes)):
+        dep_size = deployed.file_sizes.get(name)
+        new_size = new.file_sizes.get(name)
+        if dep_size is None or new_size is None:
+            changes.append(f"B4 file {name} present in only one bundle")
+            continue
+        delta = abs(new_size - dep_size)
+        rel = delta / dep_size if dep_size else float("inf")
+        if rel > STRUCTURAL_SIZE_RELATIVE or delta > STRUCTURAL_SIZE_ABSOLUTE_BYTES:
+            changes.append(
+                f"B4 {name} size {dep_size} -> {new_size} "
+                f"({rel:+.1%}, {(new_size - dep_size) / 1e6:+.1f} MB)"
+            )
+
+    return changes
 
 
 # --- Bundle loading (I/O; the pure rules above don't need this) --------------
@@ -290,16 +364,26 @@ def load_bundle_metrics(bundle_dir: Path) -> BundleMetrics:
     typ_records = typicality["records"] if isinstance(typicality, dict) else typicality
     weekly_records = weekly["records"] if isinstance(weekly, dict) else weekly
 
-    # Peak seasonal score per (county_fips, year).
+    # Peak seasonal score per (county_fips, year) + per-field non-null rates
+    # (one pass over the weekly records).
     peak: dict[tuple[str, int], int] = {}
+    weekly_nonnull: dict[str, int] = {}
+    weekly_total = 0
     for row in weekly_records:
-        fips = str(row["county_fips"]).zfill(5)
-        year = int(row.get("forecast_year", row.get("year")))
+        weekly_total += 1
+        for field_name, value in row.items():
+            if value is not None:
+                weekly_nonnull[field_name] = weekly_nonnull.get(field_name, 0) + 1
         score = row.get("risk_score")
         if score is None:
             continue
+        fips = str(row["county_fips"]).zfill(5)
+        year = int(row.get("forecast_year", row.get("year")))
         key = (fips, year)
         peak[key] = max(peak.get(key, score), int(score))
+    field_nonnull_rates = (
+        {k: v / weekly_total for k, v in weekly_nonnull.items()} if weekly_total else {}
+    )
 
     counties: dict[tuple[str, int], CountyMetric] = {}
     for row in typ_records:
@@ -336,6 +420,18 @@ def load_bundle_metrics(bundle_dir: Path) -> BundleMetrics:
             if isinstance(payload, dict) and "record_count" in payload:
                 record_counts[name] = int(payload["record_count"])
 
+    schema_version = weekly.get("schema_version") if isinstance(weekly, dict) else None
+    caveats = (
+        tuple(model_card.get("caveats", ()))
+        if isinstance(model_card, dict)
+        else ()
+    )
+    file_sizes = {
+        p.name: p.stat().st_size
+        for p in sorted(bundle_dir.iterdir())
+        if p.is_file() and p.suffix in (".json", ".geojson")
+    }
+
     return BundleMetrics(
         counties=counties,
         total_counties=total_counties,
@@ -343,6 +439,10 @@ def load_bundle_metrics(bundle_dir: Path) -> BundleMetrics:
         record_counts=record_counts,
         commit=commit,
         generated_at=generated_at,
+        schema_version=schema_version,
+        caveats=caveats,
+        field_nonnull_rates=field_nonnull_rates,
+        file_sizes=file_sizes,
     )
 
 
@@ -442,6 +542,18 @@ def render_markdown(result: MaterialityResult) -> str:
             lines.append(f"…and {overflow} more flagged (table capped at {_FLAG_TABLE_CAP}).")
         lines.append("")
 
+    lines.append("## Structural changes")
+    lines.append("")
+    if result.structural_changes:
+        lines.append(
+            "⚠️ Structural change detected (schema / field population / caveats / "
+            "size / record counts):"
+        )
+        for change in result.structural_changes:
+            lines.append(f"- {change}")
+    else:
+        lines.append("- None (schema, field population, caveats, sizes, counts stable).")
+    lines.append("")
     lines.append("## Distribution shifts")
     lines.append("")
     lines.append(
@@ -482,6 +594,7 @@ def render_json(result: MaterialityResult) -> dict:
         "category_histogram_deployed": result.category_histogram_deployed,
         "category_histogram_new": result.category_histogram_new,
         "record_count_changes": result.record_count_changes,
+        "structural_changes": result.structural_changes,
         "flags": [
             {
                 "county_fips": f.metric_new.county_fips,
