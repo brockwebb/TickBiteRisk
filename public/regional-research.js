@@ -1848,8 +1848,23 @@ function regionalLocationSeasonModifier(record, scoreValue) {
 function regionalScoreRangeLabel(low, high) {
   const scoreLow = Math.max(1, Math.min(10, Number(low || 1)));
   const scoreHigh = Math.max(1, Math.min(10, Number(high || scoreLow)));
-  if (scoreLow === scoreHigh) return `${scoreLow}/10`;
-  return `${scoreLow}-${scoreHigh}/10`;
+  // Display-only width clamp (lab note 13): an over-wide band is pooled-residual
+  // transfer noise, not information, so collapse it to a band centered on the
+  // band's own midpoint (the score is intentionally NOT used). Ends clamp to
+  // [1,10] WITHOUT re-expanding the opposite end. width<=4 is left untouched.
+  let lo = scoreLow;
+  let hi = scoreHigh;
+  const width = scoreHigh - scoreLow;
+  if (width >= 5) {
+    const center = Math.round((scoreLow + scoreHigh) / 2); // round-half-up
+    const halfWidth = width >= 7 ? 2 : 1;
+    lo = center - halfWidth;
+    hi = center + halfWidth;
+    if (lo < 1) lo = 1;
+    if (hi > 10) hi = 10;
+  }
+  if (lo === hi) return `${lo}/10`;
+  return `${lo}-${hi}/10`;
 }
 
 function regionalSpeciesModifier(species) {
@@ -3504,5 +3519,6 @@ if (typeof module !== "undefined" && module.exports) {
     regionalIntervalCasesToRates,
     regionalForecastIntervalIncidenceText,
     regionalScoreSeverityLabel,
+    regionalScoreRangeLabel,
   };
 }
