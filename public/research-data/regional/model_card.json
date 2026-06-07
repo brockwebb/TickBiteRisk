@@ -26,6 +26,13 @@
     "update_mode": "pre_update",
     "weather_mode": "not_used_by_regional_annual_forecast"
   },
+  "build_provenance": {
+    "branch": "main",
+    "built_at": "2026-06-07T10:48:42.161117+00:00",
+    "dirty": false,
+    "git_commit": "8b427d804bbcf86928a4605d393a88c1fddd69ca",
+    "git_commit_time": "2026-06-07T06:26:09-04:00"
+  },
   "caveats": [
     "Informational and educational only; not medical advice.",
     "Does not diagnose disease or determine whether a person is infected.",
@@ -36,7 +43,8 @@
     "Static seasonal prior; not a weather-adjusted forecast.",
     "CDC national onset seasonality is not county-specific.",
     "Surveillance/reporting changes and interventions are unmodeled.",
-    "Empirical intervals describe forecast uncertainty, not clinical confidence for an individual bite."
+    "Empirical intervals describe forecast uncertainty, not clinical confidence for an individual bite.",
+    "Prediction intervals apply forecast residuals pooled across the region's counties to each county's point forecast, so a low-incidence county's interval can extend well beyond its own historical range."
   ],
   "clinical_disclaimer": "TickBiteRisk is for informational and educational purposes only. It is not medical advice, does not diagnose disease, and does not determine whether you are infected. Follow CDC guidance and contact a qualified healthcare professional about your situation.",
   "explainer_placeholders": [
@@ -138,7 +146,7 @@
     "status": "risk_forecasting_tool",
     "update_policy": "New surveillance, ecology, exposure, and calibration evidence are reconciled against prior forecasts and backtests before they are considered for future reviewed estimates."
   },
-  "generated_at": "2026-05-29T21:55:46+00:00",
+  "generated_at": "2026-06-07T06:26:09-04:00",
   "method_summary": "Selected annual forecast rows apportioned by CDC national MMWR-week Lyme onset seasonality; displayed county-week values are seasonal allocation, not observed county-week data.",
   "model_name": "empirical_bayes_spatial_regime_incidence",
   "not_for": [
@@ -157,7 +165,7 @@
     "not_public_maryland_default": true,
     "research_only": true
   },
-  "schema_version": "county-week-risk-static-v1",
+  "schema_version": "county-week-risk-static-v2",
   "score_interpretation": "Relative seasonal Lyme forecast on a 1-10 regional scale; annual county forecasts are allocated across MMWR weeks using national seasonality and are not per-bite infection probabilities.",
   "target_definition": "lyme_incidence_per_100k",
   "temporal_contract": {

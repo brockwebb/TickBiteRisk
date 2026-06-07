@@ -79,7 +79,7 @@
       "promotion_rule": "Bayesian or calibration updates are not promoted to public scores unless rolling-origin backtests show improved error or calibration."
     }
   },
-  "generated_at": "2026-05-30T00:46:34+00:00",
+  "generated_at": "2026-06-07T06:26:09-04:00",
   "guidance_links": [
     {
       "title": "CDC: What to do after a tick bite",
@@ -94,12 +94,12 @@
       "url": "https://www.cdc.gov/lyme/signs-symptoms/index.html"
     }
   ],
-  "input_artifact_sha256": "f6ee26a0db38603924e7ef16d025ed128983ae697175959f2dd5d636448f0507",
+  "input_artifact_sha256": "20658ad79bf9d36aa3040bd1c57c85a48d15cbfd756a7eb5272a4ee5a321bff8",
   "research_status": {
     "not_public_maryland_default": true,
     "research_only": true
   },
-  "schema_version": "county-week-risk-static-v1",
+  "schema_version": "county-week-risk-static-v2",
   "source_prediction_run_id": "regional_annual_forecast_target2024_origin2023_mintrain3_lookback3_shrink5p0_spatialregimes",
   "source_prediction_sha256": "247da9eaafa50fa48bdaaab8cdceafad7cd4b66c4584296fcef31d6c023e89f9",
   "source_seasonality_sha256": "1c8fe90325eba9110b0d5d9aab355bfc1750311033f0c1ba87d64a12a5ba9a74",
@@ -108,7 +108,7 @@
       "artifact_type": "derived",
       "notes": "Derived from selected annual forecast rows and CDC seasonality as a seasonal allocation; not observed county-week data. Do not publish raw restricted or terms-unclear source extracts.",
       "redistribution": "public derived data",
-      "sha256": "f6ee26a0db38603924e7ef16d025ed128983ae697175959f2dd5d636448f0507",
+      "sha256": "20658ad79bf9d36aa3040bd1c57c85a48d15cbfd756a7eb5272a4ee5a321bff8",
       "source_id": "county_week_seasonal_risk_baseline"
     },
     {

@@ -1,0 +1,49 @@
+{
+  "review_recommended": true,
+  "review_reasons": [
+    "structural change(s): 6 (see Structural changes)"
+  ],
+  "built_from_commit": "8b427d804bbcf86928a4605d393a88c1fddd69ca",
+  "deployed_commit": null,
+  "forecast_years": [
+    2024,
+    2025,
+    2026
+  ],
+  "total_counties_new": 283,
+  "total_counties_deployed": 283,
+  "county_count_ok": true,
+  "is_baseline": false,
+  "flagged_county_count": 0,
+  "rule_counts": {
+    "a": 0,
+    "b": 0,
+    "c": 0
+  },
+  "score_floor_deployed": 357,
+  "score_floor_new": 357,
+  "category_histogram_deployed": {
+    "very_low": 393,
+    "very_high": 243,
+    "low": 60,
+    "moderate": 105,
+    "high": 48
+  },
+  "category_histogram_new": {
+    "very_low": 393,
+    "very_high": 243,
+    "low": 60,
+    "moderate": 105,
+    "high": 48
+  },
+  "record_count_changes": [],
+  "structural_changes": [
+    "B1 schema_version: county-week-risk-static-v1 -> county-week-risk-static-v2",
+    "B2 field 'risk_score_high' non-null rate 0.0% -> 100.0%",
+    "B2 field 'risk_score_low' non-null rate 0.0% -> 100.0%",
+    "B3 caveat added: Prediction intervals apply forecast residuals pooled across the region's counties to each county's point forecast, so a low-incidence county's interval can extend well beyond its own historical range.",
+    "B4 model_card.json size 8621 -> 9065 (+5.2%, +0.0 MB)",
+    "B4 static_export_manifest.json size 1635 -> 1871 (+14.4%, +0.0 MB)"
+  ],
+  "flags": []
+}

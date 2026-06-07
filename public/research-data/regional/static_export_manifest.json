@@ -1,4 +1,11 @@
 {
+  "build_provenance": {
+    "branch": "main",
+    "built_at": "2026-06-07T10:48:42.161117+00:00",
+    "dirty": false,
+    "git_commit": "8b427d804bbcf86928a4605d393a88c1fddd69ca",
+    "git_commit_time": "2026-06-07T06:26:09-04:00"
+  },
   "export_type": "static_export_manifest",
   "files": [
     "regional_county_risk_weekly.json",
@@ -13,7 +20,7 @@
     "regional_forecast_observed_fit.json",
     "regional_forecast_typicality.json"
   ],
-  "generated_at": "2026-05-30T00:46:34+00:00",
+  "generated_at": "2026-06-07T06:26:09-04:00",
   "record_counts": {
     "county_metadata": 283,
     "regional_annual_observed_incidence": 6576,
@@ -29,7 +36,7 @@
     "not_public_maryland_default": true,
     "research_only": true
   },
-  "schema_version": "county-week-risk-static-v1",
+  "schema_version": "county-week-risk-static-v2",
   "temporal_contract": {
     "county_month_or_week_observed_truth_available": false,
     "display_temporal_grain": "mmwr_week",
