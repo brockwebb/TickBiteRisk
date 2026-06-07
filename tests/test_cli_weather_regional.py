@@ -72,7 +72,14 @@ def test_regional_backfill_county_fips_outside_region_fails_loud(tmp_path):
         ],
     )
     assert result.exit_code != 0
-    assert "36001" in result.stderr
+    # Fail-loud signal must be version-robust: click 8.1.7's default CliRunner mixes
+    # stderr into result.output (and result.stderr raises "not separately captured"),
+    # while click >=8.2 captures stderr separately (absent from result.output). Search
+    # a combined string so the message assertion holds under either stream policy.
+    combined = result.output
+    if result.stderr_bytes is not None:
+        combined += result.stderr
+    assert "36001" in combined
 
 
 def test_regional_backfill_dry_run_plans_counties_without_network(tmp_path):
