@@ -1,0 +1,7 @@
+# AD-036-R4 baseline for TickBiteRisk: every gated design note on TickBiteRisk main when the prior-art gate reached this
+# repository (SQ-010 Part 0, 2026-10-11, main at 8c2ac8c67fc3540e101131cab14ea36fa159a12d; read from `git ls-files`,
+# so an untracked note is not baseline). These are grandfathered, not re-litigated: the gate
+# (the commit hook, `seldon verify`, `seldon cc register`) applies to a note NOT listed here. Addenda and errata are
+# exempt by glob and not listed. Never extended: a note added after this list needs a passing
+# `seldon prior-art verify`.
+# No gated design note was on main when the gate reached this repository.
