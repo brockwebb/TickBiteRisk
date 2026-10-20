@@ -247,10 +247,13 @@ tickbiterisk/**/* 2.py
 .cursorignore
 .cursorindexingignore
 
-# Seldon — ephemeral session state and AI task/handoff specs.
+# Seldon — ephemeral session state.
 # seldon.yaml (project config) and seldon_events.jsonl (graph source-of-truth
-# event log) ARE tracked; only local session state and CC task/handoff docs
-# (per engineering-standards CLAUDE.md §6) are ignored.
+# event log) ARE tracked; only local session state is ignored. cc_tasks/ and handoffs/
+# are tracked (AD-039, which withdrew engineering-standards CLAUDE.md §6's rule).
 .seldon/
-cc_tasks/
-handoffs/
+# AD-039: cc_tasks/ and handoffs/ are TRACKED; only data blobs under them are ignored, by size. Handoffs are secret-scanned before commit (FC-02).
+cc_tasks/*.json
+cc_tasks/*.jsonl
+handoffs/*.json
+handoffs/*.jsonl
